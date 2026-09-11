@@ -27,6 +27,7 @@ import Playwright.PageClickSpec qualified as PageClickSpec
 import Playwright.PageDispatchEventSpec qualified as PageDispatchEventSpec
 import Playwright.PageDialogSpec qualified as PageDialogSpec
 import Playwright.PageEventConsoleSpec qualified as PageEventConsoleSpec
+import Playwright.PageEventPopupSpec qualified as PageEventPopupSpec
 import Playwright.PageEvaluateSpec qualified as PageEvaluateSpec
 import Playwright.PageFillSpec qualified as PageFillSpec
 import Playwright.PageFocusSpec qualified as PageFocusSpec
@@ -89,6 +90,7 @@ main =
         , PageDispatchEventSpec.tests
         , PageDialogSpec.tests
         , PageEventConsoleSpec.tests
+        , PageEventPopupSpec.tests
         , PageEvaluateSpec.tests
         , PageFillSpec.tests
         , PageFocusSpec.tests

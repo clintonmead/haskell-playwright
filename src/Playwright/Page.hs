@@ -37,6 +37,10 @@ module Playwright.Page
   , waitForDialog
   , waitForResponse
   , waitForResponseWith
+  , armPopup
+  , opener
+  , pagesEqual
+  , waitForPopup
   ) where
 
 import Control.Concurrent
@@ -156,6 +160,7 @@ import Playwright.MethodName
 import Playwright.Protocol
   ( BrowserContextConsoleEvent
   , BrowserContextDialogEvent (browserContextDialogEventDialog)
+  , BrowserContextPageEvent (browserContextPageEventPage)
   , BrowserContextResponseEvent (browserContextResponseEventResponse)
   , BrowserContextUpdateSubscriptionParamsEvent (BrowserContextUpdateSubscriptionParamsEventConsole, BrowserContextUpdateSubscriptionParamsEventDialog, BrowserContextUpdateSubscriptionParamsEventResponse)
   , BrowserContextUpdateSubscriptionResult
@@ -168,7 +173,7 @@ import Playwright.Protocol
   , PageCloseResult
   , PageGoBackResult (pageGoBackResultResponse)
   , PageGoForwardResult (pageGoForwardResultResponse)
-  , PageInitializer (pageInitializerMainFrame)
+  , PageInitializer (pageInitializerMainFrame, pageInitializerOpener)
   , PageReloadResult (pageReloadResultResponse)
   , PageScreenshotParams (pageScreenshotParamsFullPage)
   , PageScreenshotResult (pageScreenshotResultBinary)
@@ -519,3 +524,43 @@ waitForResponseWith page glob timeout =
       if matchesUrlGlob glob current
         then pure response
         else collectResponse
+
+waitForPopup :: Page -> IO Page
+waitForPopup page = do
+  takePopup <- armPopup page
+  takePopup
+
+armPopup :: Page -> IO (IO Page)
+armPopup page =
+  pure (collectPopup page)
+
+collectPopup :: Page -> IO Page
+collectPopup page = do
+  params <-
+    waitForChannelEvent
+      (channelConnection (pageContextChannel page))
+      (channelGuid (pageContextChannel page))
+      (MethodName "page")
+  event <- either throwIO pure (fromJsonValue params)
+  candidate <- pageFromRef (pageContextChannel page) (browserContextPageEventPage event)
+  parent <- opener candidate
+  case parent of
+    Just existing
+      | pagesEqual existing page ->
+          pure candidate
+    _ ->
+      collectPopup page
+
+opener :: Page -> IO (Maybe Page)
+opener page = do
+  obj <- lookupObject (channelConnection (pageChannel page)) (channelGuid (pageChannel page))
+  initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
+  case pageInitializerOpener initializer of
+    Nothing ->
+      pure Nothing
+    Just ref ->
+      Just <$> pageFromRef (pageContextChannel page) ref
+
+pagesEqual :: Page -> Page -> Bool
+pagesEqual left right =
+  channelGuid (pageChannel left) == channelGuid (pageChannel right)

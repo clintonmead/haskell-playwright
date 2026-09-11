@@ -154,6 +154,7 @@ test-suite playwright-test
       Playwright.PageDispatchEventSpec
       Playwright.PageEvaluateSpec
       Playwright.PageEventConsoleSpec
+      Playwright.PageEventPopupSpec
       Playwright.PageFillSpec
       Playwright.PageFocusSpec
       Playwright.PageGotoSpec

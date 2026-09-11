@@ -52,6 +52,7 @@ module Playwright
   , allLocators
   , armConsole
   , armDialog
+  , armPopup
   , boolArgument
   , boundingBox
   , browserFromRef
@@ -164,7 +165,9 @@ module Playwright
   , numberArgument
   , numbersArgument
   , objectNumberArgument
+  , opener
   , pageFromRef
+  , pagesEqual
   , press
   , querySelector
   , reload
@@ -197,6 +200,7 @@ module Playwright
   , waitForDialog
   , waitForFunction
   , waitForLoadState
+  , waitForPopup
   , waitForResponse
   , waitForResponseWith
   , waitForSelector
@@ -409,6 +413,7 @@ import Playwright.Page
   , addStyleTag
   , armConsole
   , armDialog
+  , armPopup
   , closePage
   , content
   , getByLabel
@@ -419,7 +424,9 @@ import Playwright.Page
   , goForward
   , goto
   , locator
+  , opener
   , pageFromRef
+  , pagesEqual
   , querySelector
   , reload
   , screenshot
@@ -432,6 +439,7 @@ import Playwright.Page
   , waitForDialog
   , waitForFunction
   , waitForLoadState
+  , waitForPopup
   , waitForResponse
   , waitForResponseWith
   , waitForSelector

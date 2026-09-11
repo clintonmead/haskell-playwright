@@ -118,3 +118,5 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - Console and dialog events are BrowserContext protocol events; Page waits subscribe via `updateSubscription` then STM-wait on the context guid.
 - `waitForURL` glob-matches the live frame URL (`**` / `*` / `?`) then waits for load.
 - `waitForResponse` subscribes to BrowserContext `response` events and filters by URL glob.
+- Popups arrive as BrowserContext `page` events; `opener` is `PageInitializer.opener`.
+- BrowserContext always emits `page` (not behind `updateSubscription`). The first `newPage` is also buffered, so `waitForPopup` skips pages whose opener is not the waiting page.
