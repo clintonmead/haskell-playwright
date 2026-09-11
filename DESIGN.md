@@ -130,7 +130,7 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - `Frame.dragAndDrop` is exposed on locators. Official drag tests also use hover + mouse down/up.
 - ElementHandle `type` and `scrollIntoViewIfNeeded` take the same default timeout as other actions; `scrollIntoViewIfNeededWith` exposes the protocol timeout. A timeout waiting for visibility is reported as `Timeout <n>ms exceeded` on the protocol (the JS client adds extra "element is not visible" wrapping).
 - Persistent `registerEventHandler` callbacks run on `forkIO` from the connection reader so they can `send` without deadlocking. `exposeFunction` is `Page.exposeBinding` plus a `bindingCall` handler that `resolve`/`reject`s the BindingCall.
-- `BrowserContext.grantPermissions` / `clearPermissions` and `setGeolocation` wrap the context channel. Invalid longitude is rejected by the driver (`-180 <= LONGITUDE <= 180`).
+- `BrowserContext.grantPermissions` / `clearPermissions` and `setGeolocation` wrap the context channel. Invalid longitude is rejected by the driver (`-180 <= LONGITUDE <= 180`). `setOffline` toggles `navigator.onLine`.
 - `waitForNavigation` waits for the next `Frame.navigated` (not a buffered prior navigation), optionally glob-filtered, then load, then `Request.response` for `newDocument.request`.
 - JSHandle `evaluateExpression` uses `isFunction: true` for function source and `false` for raw expressions.
 - `fileChooser` is a Page `updateSubscription` event (not BrowserContext). `setInputFiles` sends in-memory `payloads` (name + base64 buffer), not host `localPaths`.

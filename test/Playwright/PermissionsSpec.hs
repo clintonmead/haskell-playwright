@@ -8,6 +8,7 @@ import Data.Text
 import Playwright
   ( Page
   , PermissionName (PermissionName)
+  , clearPermissions
   , defaultGotoOptions
   , evaluateTextWith
   , goto
@@ -65,6 +66,31 @@ tests =
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           grantPermissions (pageContext page) [PermissionName "geolocation"]
           assertEqual "state" "granted" =<< permissionState page "geolocation"
+    , testCase "should accumulate when adding" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          grantPermissions (pageContext page) [PermissionName "geolocation"]
+          grantPermissions (pageContext page) [PermissionName "notifications"]
+          assertEqual "geo" "granted" =<< permissionState page "geolocation"
+          assertEqual "notify" "granted" =<< permissionState page "notifications"
+    , testCase "should clear permissions" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          grantPermissions (pageContext page) [PermissionName "geolocation"]
+          clearPermissions (pageContext page)
+          grantPermissions (pageContext page) [PermissionName "notifications"]
+          geo <- permissionState page "geolocation"
+          assertEqual "geo not granted" False (geo == "granted")
+          assertEqual "notify" "granted" =<< permissionState page "notifications"
+    , testCase "should reset permissions" $
+        withAssets $ \prefix page -> do
+          let
+            empty = urlFromText (prefix <> "/empty.html")
+          _ <- goto page empty defaultGotoOptions
+          grantPermissionsFor (pageContext page) [PermissionName "geolocation"] empty
+          assertEqual "granted" "granted" =<< permissionState page "geolocation"
+          clearPermissions (pageContext page)
+          assertEqual "prompt" "prompt" =<< permissionState page "geolocation"
     ]
 
 permissionState :: Page -> Text -> IO Text

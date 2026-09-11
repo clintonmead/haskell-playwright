@@ -4,6 +4,7 @@ module Main
 
 import Playwright.BrowserContextAddCookiesSpec qualified as BrowserContextAddCookiesSpec
 import Playwright.BrowserContextCookiesSpec qualified as BrowserContextCookiesSpec
+import Playwright.BrowserContextOfflineSpec qualified as BrowserContextOfflineSpec
 import Playwright.ConnectionSpec qualified as ConnectionSpec
 import Playwright.ElementHandleBoundingBoxSpec qualified as ElementHandleBoundingBoxSpec
 import Playwright.ElementHandleClickSpec qualified as ElementHandleClickSpec
@@ -98,6 +99,7 @@ main =
         [ TransportSpec.tests
         , BrowserContextAddCookiesSpec.tests
         , BrowserContextCookiesSpec.tests
+        , BrowserContextOfflineSpec.tests
         , ConnectionSpec.tests
         , ElementHandleBoundingBoxSpec.tests
         , ElementHandleClickSpec.tests

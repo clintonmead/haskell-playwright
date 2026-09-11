@@ -157,6 +157,7 @@ test-suite playwright-test
   other-modules:
       Playwright.BrowserContextAddCookiesSpec
       Playwright.BrowserContextCookiesSpec
+      Playwright.BrowserContextOfflineSpec
       Playwright.ConnectionSpec
       Playwright.ElementHandleBoundingBoxSpec
       Playwright.ElementHandleClickSpec

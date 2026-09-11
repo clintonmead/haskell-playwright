@@ -5,15 +5,16 @@ module Playwright.BrowserContext
   , clearCookiesNamed
   , clearGeolocation
   , clearPermissions
+  , closeContext
   , contextFromRef
   , cookies
   , cookiesFor
   , grantPermissions
   , grantPermissionsFor
   , newPage
-  , closeContext
   , pageContext
   , setGeolocation
+  , setOffline
   ) where
 
 import Playwright.Channel
@@ -61,6 +62,7 @@ import Playwright.Protocol
   , BrowserContextNewPageResult (browserContextNewPageResultPage)
   , BrowserContextSetGeolocationParams (browserContextSetGeolocationParamsGeolocation)
   , BrowserContextSetGeolocationResult
+  , BrowserContextSetOfflineResult
   , mkBrowserContextAddCookiesParams
   , mkBrowserContextClearCookiesParams
   , mkBrowserContextClearPermissionsParams
@@ -70,6 +72,7 @@ import Playwright.Protocol
   , mkBrowserContextNewPageParams
   , mkBrowserContextSetGeolocationParams
   , mkBrowserContextSetGeolocationParamsGeolocation
+  , mkBrowserContextSetOfflineParams
   )
 import Playwright.Url
   ( Url
@@ -195,4 +198,13 @@ clearGeolocation ctx = do
       (browserContextChannel ctx)
       (MethodName "setGeolocation")
       mkBrowserContextSetGeolocationParams
+  pure ()
+
+setOffline :: BrowserContext -> Bool -> IO ()
+setOffline ctx offline = do
+  _ :: BrowserContextSetOfflineResult <-
+    send
+      (browserContextChannel ctx)
+      (MethodName "setOffline")
+      (mkBrowserContextSetOfflineParams offline)
   pure ()

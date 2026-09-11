@@ -298,6 +298,7 @@ module Playwright
   , setGeolocation
   , setInputFiles
   , setInputFilesHandle
+  , setOffline
   , setViewportSize
   , specialArgument
   , storageClear
@@ -380,6 +381,7 @@ import Playwright.BrowserContext
   , newPage
   , pageContext
   , setGeolocation
+  , setOffline
   )
 import Playwright.BrowserName
   ( BrowserName (Chromium, Firefox, WebKit)
