@@ -10,7 +10,10 @@ module Playwright.ElementHandle
   , innerHtmlHandle
   , innerTextHandle
   , inputValueHandle
+  , scrollIntoViewIfNeeded
+  , scrollIntoViewIfNeededWith
   , textContentHandle
+  , typeHandle
   ) where
 
 import Data.Aeson
@@ -53,7 +56,9 @@ import Playwright.Protocol
   , ElementHandleInnerTextResult (elementHandleInnerTextResultValue)
   , ElementHandleInputValueResult (elementHandleInputValueResultValue)
   , ElementHandleOwnerFrameResult (elementHandleOwnerFrameResultFrame)
+  , ElementHandleScrollIntoViewIfNeededResult
   , ElementHandleTextContentResult (elementHandleTextContentResultValue)
+  , ElementHandleTypeResult
   , Rect (rectHeight, rectWidth, rectX, rectY)
   , mkElementHandleBoundingBoxParams
   , mkElementHandleClickParams
@@ -63,14 +68,17 @@ import Playwright.Protocol
   , mkElementHandleInnerTextParams
   , mkElementHandleInputValueParams
   , mkElementHandleOwnerFrameParams
+  , mkElementHandleScrollIntoViewIfNeededParams
   , mkElementHandleTextContentParams
+  , mkElementHandleTypeParams
   )
 import Playwright.SerializedArgument
   ( SerializedArgument
   , channelArgument
   )
 import Playwright.Timeout
-  ( defaultTimeout
+  ( Timeout
+  , defaultTimeout
   )
 
 newtype ElementHandle = ElementHandle
@@ -151,3 +159,19 @@ ownerFrameHandle handle = do
       pure Nothing
     Just ref ->
       Just <$> frameFromRef (channelConnection (elementHandleChannel handle)) ref
+
+typeHandle :: ElementHandle -> Text -> IO ()
+typeHandle handle text = do
+  _ :: ElementHandleTypeResult <-
+    handleSend handle "type" (mkElementHandleTypeParams text defaultTimeout)
+  pure ()
+
+scrollIntoViewIfNeeded :: ElementHandle -> IO ()
+scrollIntoViewIfNeeded handle =
+  scrollIntoViewIfNeededWith handle defaultTimeout
+
+scrollIntoViewIfNeededWith :: ElementHandle -> Timeout -> IO ()
+scrollIntoViewIfNeededWith handle timeout = do
+  _ :: ElementHandleScrollIntoViewIfNeededResult <-
+    handleSend handle "scrollIntoViewIfNeeded" (mkElementHandleScrollIntoViewIfNeededParams timeout)
+  pure ()

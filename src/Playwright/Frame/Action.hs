@@ -10,6 +10,7 @@ module Playwright.Frame.Action
   , selectOptionFrame
   , typeTextFrame
   , uncheckFrame
+  , dragAndDropFrame
   ) where
 
 import Data.Text
@@ -38,6 +39,8 @@ import Playwright.Protocol
   , FrameDblclickResult
   , FrameDispatchEventParams (frameDispatchEventParamsStrict)
   , FrameDispatchEventResult
+  , FrameDragAndDropParams (frameDragAndDropParamsStrict)
+  , FrameDragAndDropResult
   , FrameFillParams (frameFillParamsStrict)
   , FrameFillResult
   , FrameFocusParams (frameFocusParamsStrict)
@@ -57,6 +60,7 @@ import Playwright.Protocol
   , mkFrameClickParams
   , mkFrameDblclickParams
   , mkFrameDispatchEventParams
+  , mkFrameDragAndDropParams
   , mkFrameFillParams
   , mkFrameFocusParams
   , mkFrameHoverParams
@@ -171,6 +175,15 @@ typeTextFrame frame selector text timeout =
     "type"
     (mkFrameTypeParams selector text timeout)
       { frameTypeParamsStrict = Just True
+      }
+
+dragAndDropFrame :: Frame -> Selector -> Selector -> Timeout -> IO ()
+dragAndDropFrame frame source target timeout =
+  frameSend_ @FrameDragAndDropResult
+    frame
+    "dragAndDrop"
+    (mkFrameDragAndDropParams source target timeout)
+      { frameDragAndDropParamsStrict = Just True
       }
 
 selectOptionFrame :: Frame -> Selector -> [SelectOption] -> Timeout -> IO [Text]

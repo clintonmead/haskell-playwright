@@ -126,4 +126,6 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - `evaluateHandle` is `Frame.evaluateExpressionHandle`. `asElement` checks `ChannelTypeElementHandle`.
 - Web storage is `Page.webStorage*` with `kind: local|session`.
 - Workers are Page-channel objects (`worker` events are not behind `updateSubscription`). `workers` omits channels that have emitted `close`.
-- `pageerror` is a BrowserContext event and is not behind `updateSubscription`.
+- `JSHandle.getProperty` / `getPropertyList` wrap the JSHandle mixin. `jsonValueSpecial` / `jsonValueTexts` decode specials and string arrays.
+- `Frame.dragAndDrop` is exposed on locators. Official drag tests also use hover + mouse down/up.
+- ElementHandle `type` and `scrollIntoViewIfNeeded` take the same default timeout as other actions; `scrollIntoViewIfNeededWith` exposes the protocol timeout. A timeout waiting for visibility is reported as `Timeout <n>ms exceeded` on the protocol (the JS client adds extra "element is not visible" wrapping).

@@ -9,6 +9,7 @@ module Playwright.Evaluate
   , evaluateHandleOnFrame
   , evaluateHandleWith
   , evaluateOnElement
+  , evaluateOnElementNumber
   , evaluateOnElementText
   , evaluateOnFrame
   , evaluateOnFrameText
@@ -138,6 +139,10 @@ evaluateOnElement handle expression = do
 evaluateOnElementText :: ElementHandle -> Text -> IO Text
 evaluateOnElementText handle expression =
   requireText =<< evaluateOnElement handle expression
+
+evaluateOnElementNumber :: ElementHandle -> Text -> IO Double
+evaluateOnElementNumber handle expression =
+  requireNumber =<< evaluateOnElement handle expression
 
 evaluateOnLocator :: Locator -> Text -> IO SerializedValue
 evaluateOnLocator loc expression =

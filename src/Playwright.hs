@@ -44,6 +44,7 @@ module Playwright
   , PageError (..)
   , Playwright (..)
   , Point (..)
+  , PropertyName (..)
   , Request (..)
   , ResourceType (..)
   , Response (..)
@@ -115,6 +116,7 @@ module Playwright
   , defaultScreenshotOptions
   , defaultTimeout
   , dispatchEvent
+  , dragAndDrop
   , dismissDialog
   , elementArgument
   , elementHandle
@@ -132,6 +134,7 @@ module Playwright
   , evaluateNumberWith
   , evaluateNumbersWith
   , evaluateOnElement
+  , evaluateOnElementNumber
   , evaluateOnElementText
   , evaluateOnFrame
   , evaluateOnFrameText
@@ -161,6 +164,8 @@ module Playwright
   , getByRole
   , getByTestId
   , getByText
+  , getProperty
+  , getPropertyList
   , goBack
   , goForward
   , goto
@@ -182,7 +187,9 @@ module Playwright
   , jsHandleArgument
   , jsonValue
   , jsonValueNumber
+  , jsonValueSpecial
   , jsonValueText
+  , jsonValueTexts
   , keyboardDown
   , keyboardInsertText
   , keyboardPress
@@ -231,6 +238,8 @@ module Playwright
   , responseText
   , responseUrl
   , screenshot
+  , scrollIntoViewIfNeeded
+  , scrollIntoViewIfNeededWith
   , selectOption
   , selectorFromText
   , selectorToText
@@ -251,6 +260,7 @@ module Playwright
   , textContentHandle
   , timeoutToDouble
   , title
+  , typeHandle
   , typeText
   , uncheck
   , uncheckWith
@@ -374,7 +384,10 @@ import Playwright.ElementHandle
   , innerTextHandle
   , inputValueHandle
   , ownerFrameHandle
+  , scrollIntoViewIfNeeded
+  , scrollIntoViewIfNeededWith
   , textContentHandle
+  , typeHandle
   )
 import Playwright.EmulateMedia
   ( EmulateMedia (EmulateMedia, emulateMediaColorScheme, emulateMediaType)
@@ -392,6 +405,7 @@ import Playwright.Evaluate
   , evaluateNumberWith
   , evaluateNumbersWith
   , evaluateOnElement
+  , evaluateOnElementNumber
   , evaluateOnElementText
   , evaluateOnFrame
   , evaluateOnFrameText
@@ -448,10 +462,14 @@ import Playwright.Instance
 import Playwright.JsHandle
   ( JsHandle (JsHandle)
   , asElement
+  , getProperty
+  , getPropertyList
   , jsHandleArgument
   , jsonValue
   , jsonValueNumber
+  , jsonValueSpecial
   , jsonValueText
+  , jsonValueTexts
   )
 import Playwright.Key
   ( Key (Key, keyToText)
@@ -480,6 +498,7 @@ import Playwright.Locator
   , click
   , dblclick
   , dispatchEvent
+  , dragAndDrop
   , elementHandle
   , elementHandles
   , fill
@@ -575,6 +594,9 @@ import Playwright.PageError
   )
 import Playwright.Point
   ( Point (Point)
+  )
+import Playwright.PropertyName
+  ( PropertyName (PropertyName, propertyNameToText)
   )
 import Playwright.Request
   ( Request (Request, requestChannel)

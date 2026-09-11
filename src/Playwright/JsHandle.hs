@@ -1,11 +1,15 @@
 module Playwright.JsHandle
   ( JsHandle (..)
   , asElement
+  , getProperty
+  , getPropertyList
   , jsHandleArgument
   , jsHandleFromRef
   , jsonValue
   , jsonValueNumber
+  , jsonValueSpecial
   , jsonValueText
+  , jsonValueTexts
   ) where
 
 import Control.Exception
@@ -37,8 +41,16 @@ import Playwright.MethodName
   )
 import Playwright.Protocol
   ( ChannelType (ChannelTypeElementHandle)
+  , JSHandleGetPropertyListResult (jSHandleGetPropertyListResultProperties)
+  , JSHandleGetPropertyListResultProperties (jSHandleGetPropertyListResultPropertiesName, jSHandleGetPropertyListResultPropertiesValue)
+  , JSHandleGetPropertyResult (jSHandleGetPropertyResultHandle)
   , JSHandleJsonValueResult (jSHandleJsonValueResultValue)
+  , mkJSHandleGetPropertyListParams
+  , mkJSHandleGetPropertyParams
   , mkJSHandleJsonValueParams
+  )
+import Playwright.PropertyName
+  ( PropertyName (PropertyName, propertyNameToText)
   )
 import Playwright.RemoteObject
   ( RemoteObject (remoteType)
@@ -48,8 +60,11 @@ import Playwright.SerializedArgument
   , channelArgument
   )
 import Playwright.SerializedValue
-  ( SerializedPayload (PayloadNumber, PayloadString)
+  ( SerializedPayload (PayloadArray, PayloadNumber, PayloadSpecial, PayloadString)
   , SerializedValue (SerializedNode)
+  )
+import Playwright.SpecialJsValue
+  ( SpecialJsValue
   )
 
 newtype JsHandle = JsHandle
@@ -102,3 +117,60 @@ jsonValueText handle = do
       pure text
     _ ->
       throwIO (EvaluateUnexpected value)
+
+jsonValueTexts :: JsHandle -> IO [Text]
+jsonValueTexts handle = do
+  value <- jsonValue handle
+  case value of
+    SerializedNode (PayloadArray items) _ ->
+      traverse requireJsonText items
+    _ ->
+      throwIO (EvaluateUnexpected value)
+
+requireJsonText :: SerializedValue -> IO Text
+requireJsonText value =
+  case value of
+    SerializedNode (PayloadString text) _ ->
+      pure text
+    _ ->
+      throwIO (EvaluateUnexpected value)
+
+jsonValueSpecial :: JsHandle -> IO SpecialJsValue
+jsonValueSpecial handle = do
+  value <- jsonValue handle
+  case value of
+    SerializedNode (PayloadSpecial special) _ ->
+      pure special
+    _ ->
+      throwIO (EvaluateUnexpected value)
+
+getProperty :: JsHandle -> PropertyName -> IO JsHandle
+getProperty handle name = do
+  result <-
+    send
+      (jsHandleChannel handle)
+      (MethodName "getProperty")
+      (mkJSHandleGetPropertyParams (propertyNameToText name))
+  pure
+    ( jsHandleFromRef
+        (channelConnection (jsHandleChannel handle))
+        (jSHandleGetPropertyResultHandle result)
+    )
+
+getPropertyList :: JsHandle -> IO [(PropertyName, JsHandle)]
+getPropertyList handle = do
+  result <-
+    send
+      (jsHandleChannel handle)
+      (MethodName "getPropertyList")
+      mkJSHandleGetPropertyListParams
+  let conn = channelConnection (jsHandleChannel handle)
+  pure
+    ( fmap
+        ( \prop ->
+            ( PropertyName (jSHandleGetPropertyListResultPropertiesName prop)
+            , jsHandleFromRef conn (jSHandleGetPropertyListResultPropertiesValue prop)
+            )
+        )
+        (jSHandleGetPropertyListResultProperties result)
+    )

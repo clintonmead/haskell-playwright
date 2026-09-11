@@ -11,10 +11,13 @@ import Playwright.ElementHandleContentFrameSpec qualified as ElementHandleConten
 import Playwright.ElementHandleConvenienceSpec qualified as ElementHandleConvenienceSpec
 import Playwright.ElementHandleOwnerFrameSpec qualified as ElementHandleOwnerFrameSpec
 import Playwright.ElementHandlePressSpec qualified as ElementHandlePressSpec
+import Playwright.ElementHandleScrollIntoViewSpec qualified as ElementHandleScrollIntoViewSpec
+import Playwright.ElementHandleTypeSpec qualified as ElementHandleTypeSpec
 import Playwright.FrameEvaluateSpec qualified as FrameEvaluateSpec
 import Playwright.FrameHierarchySpec qualified as FrameHierarchySpec
 import Playwright.IntegrationSpec qualified as IntegrationSpec
 import Playwright.JsHandleJsonValueSpec qualified as JsHandleJsonValueSpec
+import Playwright.JsHandlePropertiesSpec qualified as JsHandlePropertiesSpec
 import Playwright.LocatorClickSpec qualified as LocatorClickSpec
 import Playwright.LocatorElementHandleSpec qualified as LocatorElementHandleSpec
 import Playwright.LocatorEvaluateSpec qualified as LocatorEvaluateSpec
@@ -31,6 +34,7 @@ import Playwright.PageCheckSpec qualified as PageCheckSpec
 import Playwright.PageClickSpec qualified as PageClickSpec
 import Playwright.PageDispatchEventSpec qualified as PageDispatchEventSpec
 import Playwright.PageDialogSpec qualified as PageDialogSpec
+import Playwright.PageDragSpec qualified as PageDragSpec
 import Playwright.PageEventConsoleSpec qualified as PageEventConsoleSpec
 import Playwright.PageEventPopupSpec qualified as PageEventPopupSpec
 import Playwright.PageEvaluateSpec qualified as PageEvaluateSpec
@@ -87,10 +91,13 @@ main =
         , ElementHandleConvenienceSpec.tests
         , ElementHandleOwnerFrameSpec.tests
         , ElementHandlePressSpec.tests
+        , ElementHandleScrollIntoViewSpec.tests
+        , ElementHandleTypeSpec.tests
         , FrameEvaluateSpec.tests
         , FrameHierarchySpec.tests
         , IntegrationSpec.tests
         , JsHandleJsonValueSpec.tests
+        , JsHandlePropertiesSpec.tests
         , LocatorSpec.tests
         , LocatorClickSpec.tests
         , LocatorElementHandleSpec.tests
@@ -107,6 +114,7 @@ main =
         , PageClickSpec.tests
         , PageDispatchEventSpec.tests
         , PageDialogSpec.tests
+        , PageDragSpec.tests
         , PageEmulateMediaSpec.tests
         , PageEventConsoleSpec.tests
         , PageEventPageErrorSpec.tests

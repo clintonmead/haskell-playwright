@@ -8,6 +8,7 @@ module Playwright.Locator
   , click
   , dblclick
   , dispatchEvent
+  , dragAndDrop
   , elementHandle
   , elementHandles
   , fill
@@ -70,6 +71,7 @@ import Playwright.Frame.Action
   , clickFrame
   , dblclickFrame
   , dispatchEventFrame
+  , dragAndDropFrame
   , fillFrame
   , focusFrame
   , hoverFrame
@@ -236,6 +238,14 @@ press loc key =
 typeText :: Locator -> Text -> IO ()
 typeText loc text =
   typeTextFrame (locatorFrame loc) (locatorSelector loc) text defaultTimeout
+
+dragAndDrop :: Locator -> Locator -> IO ()
+dragAndDrop source target =
+  dragAndDropFrame
+    (locatorFrame source)
+    (locatorSelector source)
+    (locatorSelector target)
+    defaultTimeout
 
 selectOption :: Locator -> [SelectOption] -> IO [Text]
 selectOption loc options =

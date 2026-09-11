@@ -75,6 +75,7 @@ library
       Playwright.Page
       Playwright.PageError
       Playwright.Point
+      Playwright.PropertyName
       Playwright.Protocol
       Playwright.RemoteObject
       Playwright.Request
@@ -150,11 +151,14 @@ test-suite playwright-test
       Playwright.ElementHandleConvenienceSpec
       Playwright.ElementHandleOwnerFrameSpec
       Playwright.ElementHandlePressSpec
+      Playwright.ElementHandleScrollIntoViewSpec
+      Playwright.ElementHandleTypeSpec
       Playwright.FrameEvaluateSpec
       Playwright.FrameHierarchySpec
       Playwright.Harness
       Playwright.IntegrationSpec
       Playwright.JsHandleJsonValueSpec
+      Playwright.JsHandlePropertiesSpec
       Playwright.LocatorClickSpec
       Playwright.LocatorElementHandleSpec
       Playwright.LocatorEvaluateSpec
@@ -171,6 +175,7 @@ test-suite playwright-test
       Playwright.PageClickSpec
       Playwright.PageDialogSpec
       Playwright.PageDispatchEventSpec
+      Playwright.PageDragSpec
       Playwright.PageEmulateMediaSpec
       Playwright.PageEvaluateHandleSpec
       Playwright.PageEvaluateSpec
