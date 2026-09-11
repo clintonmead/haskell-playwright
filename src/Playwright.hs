@@ -128,6 +128,7 @@ module Playwright
   , closePage
   , content
   , contentFrameHandle
+  , contextExposeFunction
   , contextFromRef
   , contextRoute
   , contextRouteWith
@@ -523,7 +524,8 @@ import Playwright.Exactness
   ( Exactness (Exact, Inexact)
   )
 import Playwright.Expose
-  ( exposeFunction
+  ( contextExposeFunction
+  , exposeFunction
   )
 import Playwright.FileChooser
   ( FileChooser (FileChooser, fileChooserElement, fileChooserMultiple)

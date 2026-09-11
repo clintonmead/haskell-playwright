@@ -1,5 +1,6 @@
 module Playwright.Expose
-  ( exposeFunction
+  ( contextExposeFunction
+  , exposeFunction
   ) where
 
 import Control.Exception
@@ -17,13 +18,17 @@ import Data.Text
 import Playwright.BindingName
   ( BindingName (bindingNameToText)
   )
+import Playwright.BrowserContext
+  ( BrowserContext (browserContextChannel)
+  )
 import Playwright.Channel
   ( BindingCallTag
   , Channel (Channel, channelConnection, channelGuid)
   , send
   )
 import Playwright.Connection
-  ( lookupObject
+  ( Connection
+  , lookupObject
   , registerEventHandler
   )
 import Playwright.Disposable
@@ -46,10 +51,13 @@ import Playwright.Protocol
   ( BindingCallInitializer (bindingCallInitializerArgs, bindingCallInitializerName)
   , BindingCallRejectResult
   , BindingCallResolveResult
+  , BrowserContextBindingCallEvent (browserContextBindingCallEventBinding)
+  , BrowserContextExposeBindingResult (browserContextExposeBindingResultDisposable)
   , PageBindingCallEvent (pageBindingCallEventBinding)
   , PageExposeBindingResult (pageExposeBindingResultDisposable)
   , mkBindingCallRejectParams
   , mkBindingCallResolveParams
+  , mkBrowserContextExposeBindingParams
   , mkPageExposeBindingParams
   )
 import Playwright.RemoteObject
@@ -72,9 +80,9 @@ exposeFunction :: Page -> BindingName -> ([SerializedValue] -> IO SerializedArgu
 exposeFunction page name handler = do
   let
     conn = channelConnection (pageChannel page)
-    pageGuid = channelGuid (pageChannel page)
-  registerEventHandler conn pageGuid (MethodName "bindingCall") $ \params ->
-    handleBindingCall page name handler params
+    guid = channelGuid (pageChannel page)
+  registerEventHandler conn guid (MethodName "bindingCall") $ \params ->
+    handlePageBindingCall conn name handler params
   result <-
     send
       (pageChannel page)
@@ -82,17 +90,48 @@ exposeFunction page name handler = do
       (mkPageExposeBindingParams (bindingNameToText name))
   pure (disposableFromRef conn (pageExposeBindingResultDisposable result))
 
-handleBindingCall ::
-  Page ->
+contextExposeFunction :: BrowserContext -> BindingName -> ([SerializedValue] -> IO SerializedArgument) -> IO Disposable
+contextExposeFunction ctx name handler = do
+  let
+    conn = channelConnection (browserContextChannel ctx)
+    guid = channelGuid (browserContextChannel ctx)
+  registerEventHandler conn guid (MethodName "bindingCall") $ \params ->
+    handleContextBindingCall conn name handler params
+  result <-
+    send
+      (browserContextChannel ctx)
+      (MethodName "exposeBinding")
+      (mkBrowserContextExposeBindingParams (bindingNameToText name))
+  pure (disposableFromRef conn (browserContextExposeBindingResultDisposable result))
+
+handlePageBindingCall ::
+  Connection ->
   BindingName ->
   ([SerializedValue] -> IO SerializedArgument) ->
   Value ->
   IO ()
-handleBindingCall page name handler params = do
+handlePageBindingCall conn name handler params = do
   event <- either throwIO pure (fromJsonValue params)
+  handleNamedBinding conn name handler (pageBindingCallEventBinding event)
+
+handleContextBindingCall ::
+  Connection ->
+  BindingName ->
+  ([SerializedValue] -> IO SerializedArgument) ->
+  Value ->
+  IO ()
+handleContextBindingCall conn name handler params = do
+  event <- either throwIO pure (fromJsonValue params)
+  handleNamedBinding conn name handler (browserContextBindingCallEventBinding event)
+
+handleNamedBinding ::
+  Connection ->
+  BindingName ->
+  ([SerializedValue] -> IO SerializedArgument) ->
+  ChannelRef ->
+  IO ()
+handleNamedBinding conn name handler bindingRef = do
   let
-    conn = channelConnection (pageChannel page)
-    bindingRef = pageBindingCallEventBinding event
     call = Channel conn (channelRefGuid bindingRef) :: Channel BindingCallTag
   obj <- lookupObject conn (channelRefGuid bindingRef)
   initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))

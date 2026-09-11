@@ -6,6 +6,7 @@ import Playwright.BrowserContextAddCookiesSpec qualified as BrowserContextAddCoo
 import Playwright.BrowserContextCookiesSpec qualified as BrowserContextCookiesSpec
 import Playwright.BrowserContextCredentialsSpec qualified as BrowserContextCredentialsSpec
 import Playwright.BrowserContextCspSpec qualified as BrowserContextCspSpec
+import Playwright.BrowserContextExposeFunctionSpec qualified as BrowserContextExposeFunctionSpec
 import Playwright.BrowserContextLocaleSpec qualified as BrowserContextLocaleSpec
 import Playwright.BrowserContextOfflineSpec qualified as BrowserContextOfflineSpec
 import Playwright.BrowserContextRouteSpec qualified as BrowserContextRouteSpec
@@ -108,6 +109,7 @@ main =
         , BrowserContextCookiesSpec.tests
         , BrowserContextCredentialsSpec.tests
         , BrowserContextCspSpec.tests
+        , BrowserContextExposeFunctionSpec.tests
         , BrowserContextLocaleSpec.tests
         , BrowserContextOfflineSpec.tests
         , BrowserContextRouteSpec.tests

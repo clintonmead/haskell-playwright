@@ -164,6 +164,7 @@ test-suite playwright-test
       Playwright.BrowserContextCookiesSpec
       Playwright.BrowserContextCredentialsSpec
       Playwright.BrowserContextCspSpec
+      Playwright.BrowserContextExposeFunctionSpec
       Playwright.BrowserContextLocaleSpec
       Playwright.BrowserContextOfflineSpec
       Playwright.BrowserContextRouteSpec
