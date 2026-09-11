@@ -17,6 +17,7 @@ module Playwright.Page
   , goBack
   , goForward
   , reload
+  , setViewportSize
   ) where
 
 import Control.Exception
@@ -90,11 +91,14 @@ import Playwright.Protocol
   , PageReloadResult (pageReloadResultResponse)
   , PageScreenshotParams (pageScreenshotParamsFullPage)
   , PageScreenshotResult (pageScreenshotResultBinary)
+  , PageSetViewportSizeResult
   , mkPageCloseParams
   , mkPageGoBackParams
   , mkPageGoForwardParams
   , mkPageReloadParams
   , mkPageScreenshotParams
+  , mkPageSetViewportSizeParams
+  , mkPageSetViewportSizeParamsViewportSize
   )
 import Playwright.RemoteObject
   ( RemoteObject (remoteInitializer)
@@ -114,6 +118,11 @@ import Playwright.Timeout
   )
 import Playwright.Url
   ( Url
+  )
+import Playwright.ViewportSize
+  ( ViewportSize (viewportHeight, viewportWidth)
+  , viewportHeightToInt
+  , viewportWidthToInt
   )
 import Playwright.WaitForState
   ( WaitForState
@@ -159,6 +168,20 @@ content page = contentFrame (pageMainFrame page)
 setContent :: Page -> Text -> IO ()
 setContent page html =
   setContentFrame (pageMainFrame page) html defaultTimeout
+
+setViewportSize :: Page -> ViewportSize -> IO ()
+setViewportSize page size = do
+  _ :: PageSetViewportSizeResult <-
+    send
+      (pageChannel page)
+      (MethodName "setViewportSize")
+      ( mkPageSetViewportSizeParams
+          ( mkPageSetViewportSizeParamsViewportSize
+              (viewportHeightToInt (viewportHeight size))
+              (viewportWidthToInt (viewportWidth size))
+          )
+      )
+  pure ()
 
 screenshot :: Page -> ScreenshotOptions -> IO ByteString
 screenshot page opts = do

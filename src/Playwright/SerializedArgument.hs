@@ -1,5 +1,6 @@
 module Playwright.SerializedArgument
   ( SerializedArgument (..)
+  , boolArgument
   , numberArgument
   , specialArgument
   , textArgument
@@ -24,7 +25,7 @@ import Playwright.Json.ChannelRef
   ( ChannelRef
   )
 import Playwright.SerializedValue
-  ( SerializedPayload (PayloadNumber, PayloadSpecial, PayloadString)
+  ( SerializedPayload (PayloadBool, PayloadNumber, PayloadSpecial, PayloadString)
   , SerializedValue (SerializedNode)
   , undefinedValue
   )
@@ -50,6 +51,13 @@ textArgument :: Text -> SerializedArgument
 textArgument text =
   SerializedArgument
     { serializedArgumentValue = SerializedNode (PayloadString text) Nothing
+    , serializedArgumentHandles = []
+    }
+
+boolArgument :: Bool -> SerializedArgument
+boolArgument flag =
+  SerializedArgument
+    { serializedArgumentValue = SerializedNode (PayloadBool flag) Nothing
     , serializedArgumentHandles = []
     }
 

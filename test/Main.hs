@@ -17,6 +17,7 @@ import Playwright.PageFocusSpec qualified as PageFocusSpec
 import Playwright.PageGotoSpec qualified as PageGotoSpec
 import Playwright.PageHistorySpec qualified as PageHistorySpec
 import Playwright.PageKeyboardSpec qualified as PageKeyboardSpec
+import Playwright.PageMouseSpec qualified as PageMouseSpec
 import Playwright.PageSetContentSpec qualified as PageSetContentSpec
 import Playwright.PageSelectOptionSpec qualified as PageSelectOptionSpec
 import Playwright.PageWaitForSelectorSpec qualified as PageWaitForSelectorSpec
@@ -53,6 +54,7 @@ main =
         , PageGotoSpec.tests
         , PageHistorySpec.tests
         , PageKeyboardSpec.tests
+        , PageMouseSpec.tests
         , PageSelectOptionSpec.tests
         , PageSetContentSpec.tests
         , PageWaitForSelectorSpec.tests

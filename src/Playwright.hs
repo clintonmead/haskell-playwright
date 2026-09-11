@@ -5,6 +5,7 @@ module Playwright
   , BrowserType (..)
   , AriaRole (..)
   , CheckOptions (..)
+  , CssPixel (..)
   , Exactness (..)
   , Frame (..)
   , GetByRoleOptions (..)
@@ -15,6 +16,7 @@ module Playwright
   , Locator (..)
   , Page (..)
   , Playwright (..)
+  , Point (..)
   , Response (..)
   , ScreenshotOptions (..)
   , SelectOption (..)
@@ -22,7 +24,12 @@ module Playwright
   , SpecialJsValue (..)
   , Timeout
   , Url
+  , ViewportHeight (..)
+  , ViewportSize (..)
+  , ViewportWidth (..)
   , WaitForState (..)
+  , WheelDelta (..)
+  , boolArgument
   , browserFromRef
   , browserTypeFromRef
   , check
@@ -35,6 +42,7 @@ module Playwright
   , closePage
   , content
   , contextFromRef
+  , cssPixelFromInt
   , dblclick
   , defaultCheckOptions
   , defaultGetByRoleOptions
@@ -44,14 +52,18 @@ module Playwright
   , defaultTimeout
   , evaluate
   , evaluateBool
+  , evaluateBoolWith
   , evaluateNumber
+  , evaluateNumberWith
   , evaluateOnLocator
   , evaluateOnLocatorAllTexts
   , evaluateOnLocatorBool
   , evaluateOnLocatorText
   , evaluateOnLocatorWith
   , evaluateSpecial
+  , evaluateSpecialWith
   , evaluateText
+  , evaluateTextWith
   , evaluateTexts
   , evaluateWith
   , fill
@@ -88,6 +100,11 @@ module Playwright
   , locator
   , locatorCount
   , milliseconds
+  , mouseClick
+  , mouseDown
+  , mouseMove
+  , mouseUp
+  , mouseWheel
   , nestedSelector
   , newContext
   , newPage
@@ -105,6 +122,7 @@ module Playwright
   , selectorToText
   , setChecked
   , setContent
+  , setViewportSize
   , specialArgument
   , textArgument
   , textContent
@@ -120,6 +138,7 @@ module Playwright
   , waitForSelector
   , waitForWith
   , webkit
+  , wheelDeltaFromInt
   , withBrowser
   , withPage
   , withPlaywright
@@ -154,17 +173,25 @@ import Playwright.CheckOptions
   ( CheckOptions (CheckOptions, checkOptionsForce, checkOptionsTimeout, checkOptionsTrial)
   , defaultCheckOptions
   )
+import Playwright.CssPixel
+  ( CssPixel (CssPixel)
+  , cssPixelFromInt
+  )
 import Playwright.Evaluate
   ( evaluate
   , evaluateBool
+  , evaluateBoolWith
   , evaluateNumber
+  , evaluateNumberWith
   , evaluateOnLocator
   , evaluateOnLocatorAllTexts
   , evaluateOnLocatorBool
   , evaluateOnLocatorText
   , evaluateOnLocatorWith
   , evaluateSpecial
+  , evaluateSpecialWith
   , evaluateText
+  , evaluateTextWith
   , evaluateTexts
   , evaluateWith
   )
@@ -242,6 +269,13 @@ import Playwright.Locator
   , waitFor
   , waitForWith
   )
+import Playwright.Mouse
+  ( mouseClick
+  , mouseDown
+  , mouseMove
+  , mouseUp
+  , mouseWheel
+  )
 import Playwright.Page
   ( Page (Page, pageChannel, pageMainFrame)
   , closePage
@@ -258,9 +292,13 @@ import Playwright.Page
   , reload
   , screenshot
   , setContent
+  , setViewportSize
   , title
   , url
   , waitForSelector
+  )
+import Playwright.Point
+  ( Point (Point)
   )
 import Playwright.Response
   ( Response (Response, responseChannel)
@@ -282,7 +320,8 @@ import Playwright.Selector
   , selectorToText
   )
 import Playwright.SerializedArgument
-  ( numberArgument
+  ( boolArgument
+  , numberArgument
   , specialArgument
   , textArgument
   )
@@ -300,6 +339,15 @@ import Playwright.Url
   , urlFromText
   , urlToText
   )
+import Playwright.ViewportSize
+  ( ViewportHeight (ViewportHeight)
+  , ViewportSize (ViewportSize)
+  , ViewportWidth (ViewportWidth)
+  )
 import Playwright.WaitForState
   ( WaitForState (WaitForAttached, WaitForDetached, WaitForHidden, WaitForVisible)
+  )
+import Playwright.WheelDelta
+  ( WheelDelta (WheelDelta)
+  , wheelDeltaFromInt
   )

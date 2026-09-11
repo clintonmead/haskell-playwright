@@ -7,10 +7,15 @@ import Data.Text
   ( isInfixOf
   )
 import Playwright
-  ( content
+  ( ViewportHeight (ViewportHeight)
+  , ViewportSize (ViewportSize)
+  , ViewportWidth (ViewportWidth)
+  , content
   , defaultScreenshotOptions
+  , evaluateNumber
   , screenshot
   , setContent
+  , setViewportSize
   , title
   )
 import Playwright.Harness
@@ -44,4 +49,11 @@ tests =
         withAssetPage "title.html" $ \page -> do
           pageTitle <- title page
           assertEqual "title" "Woof-Woof" pageTitle
+    , testCase "should set viewport size" $
+        withChromiumPage $ \page -> do
+          setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 600))
+          width <- evaluateNumber page "() => window.innerWidth"
+          height <- evaluateNumber page "() => window.innerHeight"
+          assertEqual "width" (500 :: Double) width
+          assertEqual "height" (600 :: Double) height
     ]

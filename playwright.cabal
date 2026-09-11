@@ -29,6 +29,7 @@ library
       Playwright.Channel
       Playwright.CheckOptions
       Playwright.Connection
+      Playwright.CssPixel
       Playwright.Driver
       Playwright.Error
       Playwright.Evaluate
@@ -54,7 +55,9 @@ library
       Playwright.LaunchOptions
       Playwright.Locator
       Playwright.MethodName
+      Playwright.Mouse
       Playwright.Page
+      Playwright.Point
       Playwright.Protocol
       Playwright.RemoteObject
       Playwright.RequestId
@@ -74,7 +77,9 @@ library
       Playwright.Transport.Stdio
       Playwright.TypedArrayKind
       Playwright.Url
+      Playwright.ViewportSize
       Playwright.WaitForState
+      Playwright.WheelDelta
   other-modules:
       Paths_playwright
   hs-source-dirs:
@@ -125,6 +130,7 @@ test-suite playwright-test
       Playwright.PageGotoSpec
       Playwright.PageHistorySpec
       Playwright.PageKeyboardSpec
+      Playwright.PageMouseSpec
       Playwright.PageSelectOptionSpec
       Playwright.PageSetContentSpec
       Playwright.PageWaitForSelectorSpec

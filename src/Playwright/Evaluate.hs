@@ -1,14 +1,18 @@
 module Playwright.Evaluate
   ( evaluate
   , evaluateBool
+  , evaluateBoolWith
   , evaluateNumber
+  , evaluateNumberWith
   , evaluateOnLocator
   , evaluateOnLocatorAllTexts
   , evaluateOnLocatorBool
   , evaluateOnLocatorText
   , evaluateOnLocatorWith
   , evaluateSpecial
+  , evaluateSpecialWith
   , evaluateText
+  , evaluateTextWith
   , evaluateTexts
   , evaluateWith
   ) where
@@ -70,9 +74,17 @@ evaluateText :: Page -> Text -> IO Text
 evaluateText page expression =
   requireText =<< evaluate page expression
 
+evaluateTextWith :: Page -> Text -> SerializedArgument -> IO Text
+evaluateTextWith page expression arg =
+  requireText =<< evaluateWith page expression arg
+
 evaluateBool :: Page -> Text -> IO Bool
 evaluateBool page expression =
   requireBool =<< evaluate page expression
+
+evaluateBoolWith :: Page -> Text -> SerializedArgument -> IO Bool
+evaluateBoolWith page expression arg =
+  requireBool =<< evaluateWith page expression arg
 
 evaluateOnLocatorText :: Locator -> Text -> IO Text
 evaluateOnLocatorText loc expression =
@@ -86,9 +98,17 @@ evaluateNumber :: Page -> Text -> IO Double
 evaluateNumber page expression =
   requireNumber =<< evaluate page expression
 
+evaluateNumberWith :: Page -> Text -> SerializedArgument -> IO Double
+evaluateNumberWith page expression arg =
+  requireNumber =<< evaluateWith page expression arg
+
 evaluateSpecial :: Page -> Text -> IO SpecialJsValue
 evaluateSpecial page expression =
   requireSpecial =<< evaluate page expression
+
+evaluateSpecialWith :: Page -> Text -> SerializedArgument -> IO SpecialJsValue
+evaluateSpecialWith page expression arg =
+  requireSpecial =<< evaluateWith page expression arg
 
 evaluateTexts :: Page -> Text -> IO [Text]
 evaluateTexts page expression =

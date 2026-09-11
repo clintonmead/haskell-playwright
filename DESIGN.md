@@ -108,3 +108,5 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - Locator `evaluate` is `Frame.evalOnSelector` with `strict: true`. Page `evaluate` is `Frame.evaluateExpression` with `isFunction: true`.
 - `Frame.navigated` updates the stored initializer URL so `page.url` is live after navigation (including hash changes).
 - `getByRole`/`getByText`/`getByLabel`/`getByTestId` are client-side `internal:` selectors, matching Playwright's locatorUtils.
+- `Page.setViewportSize` generated `mkPageSetViewportSizeParamsViewportSize` takes height then width (required-field hash order).
+- Mouse coordinates are `CssPixel` (`Scientific` on the wire). Protocol methods are `mouseClick` / `mouseMove` / `mouseDown` / `mouseUp` / `mouseWheel`.
