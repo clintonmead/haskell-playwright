@@ -2,6 +2,7 @@ module Playwright.Route
   ( Route (..)
   , abortRoute
   , continueRoute
+  , continueRouteWith
   , fallbackRoute
   , fulfillRoute
   , route
@@ -44,6 +45,10 @@ import Playwright.Connection
   , registerEventHandler
   , routeHandlersFor
   )
+import Playwright.ContinueOptions
+  ( ContinueOptions (continueHeaders)
+  , defaultContinueOptions
+  )
 import Playwright.FulfillOptions
   ( ContentType (contentTypeToText)
   , FulfillBody (FulfillBytes, FulfillText)
@@ -75,6 +80,7 @@ import Playwright.Protocol
   , PageSetNetworkInterceptionPatternsParamsPatterns (pageSetNetworkInterceptionPatternsParamsPatternsGlob)
   , PageSetNetworkInterceptionPatternsResult
   , RouteAbortResult
+  , RouteContinueParams (routeContinueParamsHeaders)
   , RouteContinueResult
   , RouteFulfillParams (routeFulfillParamsBody, routeFulfillParamsHeaders, routeFulfillParamsIsBase64, routeFulfillParamsStatus)
   , RouteFulfillResult
@@ -114,9 +120,18 @@ routeRequest handled = do
     )
 
 continueRoute :: Route -> IO ()
-continueRoute handled = do
+continueRoute handled =
+  continueRouteWith handled defaultContinueOptions
+
+continueRouteWith :: Route -> ContinueOptions -> IO ()
+continueRouteWith handled opts = do
   _ :: RouteContinueResult <-
-    send (routeChannel handled) (MethodName "continue") (mkRouteContinueParams False)
+    send
+      (routeChannel handled)
+      (MethodName "continue")
+      (mkRouteContinueParams False)
+        { routeContinueParamsHeaders = fmap (fmap toNameValue) (continueHeaders opts)
+        }
   pure ()
 
 fallbackRoute :: Route -> IO ()

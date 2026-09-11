@@ -11,6 +11,7 @@ module Playwright
   , ConsoleMessage (..)
   , ConsoleType (..)
   , ContentType (..)
+  , ContinueOptions (..)
   , Cookie (..)
   , CookieDomain (..)
   , CookieExpires (..)
@@ -113,6 +114,7 @@ module Playwright
   , contentFrameHandle
   , contextFromRef
   , continueRoute
+  , continueRouteWith
   , cookieForUrl
   , cookies
   , cookiesFor
@@ -121,6 +123,7 @@ module Playwright
   , currentUrl
   , dblclick
   , defaultCheckOptions
+  , defaultContinueOptions
   , defaultEmulateMedia
   , defaultFulfillOptions
   , defaultGetByRoleOptions
@@ -258,6 +261,7 @@ module Playwright
   , responseOk
   , responseRequest
   , responseStatus
+  , responseStatusText
   , responseText
   , responseUrl
   , route
@@ -375,6 +379,10 @@ import Playwright.ConsoleMessage
   )
 import Playwright.ConsoleType
   ( ConsoleType (ConsoleAssert, ConsoleClear, ConsoleCount, ConsoleDebug, ConsoleDir, ConsoleDirXml, ConsoleError, ConsoleInfo, ConsoleLog, ConsoleProfile, ConsoleProfileEnd, ConsoleTable, ConsoleTimeEnd, ConsoleTrace, ConsoleVerbose, ConsoleWarning)
+  )
+import Playwright.ContinueOptions
+  ( ContinueOptions (ContinueOptions, continueHeaders)
+  , defaultContinueOptions
   )
 import Playwright.Cookie
   ( Cookie (Cookie, cookieDomain, cookieExpires, cookieHttpOnly, cookieName, cookiePath, cookieSameSite, cookieSecure, cookieValue)
@@ -688,6 +696,7 @@ import Playwright.Response
   , responseOk
   , responseRequest
   , responseStatus
+  , responseStatusText
   , responseText
   , responseUrl
   )
@@ -695,6 +704,7 @@ import Playwright.Route
   ( Route (Route, routeChannel)
   , abortRoute
   , continueRoute
+  , continueRouteWith
   , fallbackRoute
   , fulfillRoute
   , route

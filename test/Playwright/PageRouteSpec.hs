@@ -3,7 +3,8 @@ module Playwright.PageRouteSpec
   ) where
 
 import Data.IORef
-  ( newIORef
+  ( modifyIORef'
+  , newIORef
   , readIORef
   , writeIORef
   )
@@ -17,9 +18,9 @@ import Data.Text
   , toLower
   )
 import Playwright
-  ( HeaderName (headerNameToText)
-  , HeaderValue (headerValueToText)
-  , HttpHeader (httpHeaderName, httpHeaderValue)
+  ( HeaderName (HeaderName, headerNameToText)
+  , HeaderValue (HeaderValue, headerValueToText)
+  , HttpHeader (HttpHeader, httpHeaderName, httpHeaderValue)
   , HttpMethod (httpMethodToText)
   , ResourceType (resourceTypeToText)
   , UrlGlob (UrlGlob)
@@ -39,6 +40,7 @@ import Playwright
   , responseOk
   , route
   , routeRequest
+  , setExtraHTTPHeaders
   , urlFromText
   , urlToText
   )
@@ -94,6 +96,43 @@ tests =
             Just value ->
               assertEqual "ok" True =<< responseOk value
           assertEqual "intercepted" True =<< readIORef captured
+    , testCase "should show custom HTTP headers" $
+        withAssets $ \prefix page -> do
+          setExtraHTTPHeaders
+            page
+            [HttpHeader (HeaderName "foo") (HeaderValue "bar")]
+          route page (UrlGlob "**/*") $ \handled -> do
+            request <- routeRequest handled
+            headers <- requestHeaders request
+            assertEqual "foo" (Just "bar") (headerValue "foo" headers)
+            continueRoute handled
+          response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          case response of
+            Nothing ->
+              assertFailure "missing response"
+            Just value ->
+              assertEqual "ok" True =<< responseOk value
+    , testCase "should contain referer header" $
+        withAssets $ \prefix page -> do
+          captured <- newIORef []
+          route page (UrlGlob "**/*") $ \handled -> do
+            request <- routeRequest handled
+            modifyIORef' captured (request :)
+            continueRoute handled
+          _ <- goto page (urlFromText (prefix <> "/one-style.html")) defaultGotoOptions
+          requests <- reverse <$> readIORef captured
+          case requests of
+            (_ : css : _) -> do
+              url <- requestUrl css
+              assertBool "css" ("/one-style.css" `isInfixOf` urlToText url)
+              headers <- requestHeaders css
+              case headerValue "referer" headers of
+                Nothing ->
+                  assertFailure "missing referer"
+                Just referer ->
+                  assertBool "html" ("/one-style.html" `isInfixOf` referer)
+            _ ->
+              assertFailure "expected stylesheet request"
     ]
 
 headerValue :: Text -> [HttpHeader] -> Maybe Text
