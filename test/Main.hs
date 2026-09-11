@@ -4,6 +4,9 @@ module Main
 
 import Playwright.ConnectionSpec qualified as ConnectionSpec
 import Playwright.ElementHandleBoundingBoxSpec qualified as ElementHandleBoundingBoxSpec
+import Playwright.ElementHandleClickSpec qualified as ElementHandleClickSpec
+import Playwright.ElementHandleConvenienceSpec qualified as ElementHandleConvenienceSpec
+import Playwright.FrameHierarchySpec qualified as FrameHierarchySpec
 import Playwright.IntegrationSpec qualified as IntegrationSpec
 import Playwright.LocatorClickSpec qualified as LocatorClickSpec
 import Playwright.LocatorEvaluateSpec qualified as LocatorEvaluateSpec
@@ -13,6 +16,8 @@ import Playwright.LocatorQuerySpec qualified as LocatorQuerySpec
 import Playwright.LocatorSpec qualified as LocatorSpec
 import Playwright.PageAddInitScriptSpec qualified as PageAddInitScriptSpec
 import Playwright.PageAddScriptTagSpec qualified as PageAddScriptTagSpec
+import Playwright.PageAddStyleTagSpec qualified as PageAddStyleTagSpec
+import Playwright.PageBasicSpec qualified as PageBasicSpec
 import Playwright.PageCheckSpec qualified as PageCheckSpec
 import Playwright.PageClickSpec qualified as PageClickSpec
 import Playwright.PageDispatchEventSpec qualified as PageDispatchEventSpec
@@ -29,6 +34,7 @@ import Playwright.PageSetExtraHTTPHeadersSpec qualified as PageSetExtraHTTPHeade
 import Playwright.PageWaitForFunctionSpec qualified as PageWaitForFunctionSpec
 import Playwright.PageWaitForLoadStateSpec qualified as PageWaitForLoadStateSpec
 import Playwright.PageWaitForSelectorSpec qualified as PageWaitForSelectorSpec
+import Playwright.QuerySelectorSpec qualified as QuerySelectorSpec
 import Playwright.SelectorsGetBySpec qualified as SelectorsGetBySpec
 import Playwright.TransportSpec qualified as TransportSpec
 import Playwright.WheelSpec qualified as WheelSpec
@@ -50,6 +56,9 @@ main =
         [ TransportSpec.tests
         , ConnectionSpec.tests
         , ElementHandleBoundingBoxSpec.tests
+        , ElementHandleClickSpec.tests
+        , ElementHandleConvenienceSpec.tests
+        , FrameHierarchySpec.tests
         , IntegrationSpec.tests
         , LocatorSpec.tests
         , LocatorClickSpec.tests
@@ -59,6 +68,8 @@ main =
         , LocatorQuerySpec.tests
         , PageAddInitScriptSpec.tests
         , PageAddScriptTagSpec.tests
+        , PageAddStyleTagSpec.tests
+        , PageBasicSpec.tests
         , PageCheckSpec.tests
         , PageClickSpec.tests
         , PageDispatchEventSpec.tests
@@ -75,6 +86,7 @@ main =
         , PageWaitForFunctionSpec.tests
         , PageWaitForLoadStateSpec.tests
         , PageWaitForSelectorSpec.tests
+        , QuerySelectorSpec.tests
         , SelectorsGetBySpec.tests
         , WheelSpec.tests
         ]

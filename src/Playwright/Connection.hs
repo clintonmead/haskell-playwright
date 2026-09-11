@@ -2,6 +2,7 @@ module Playwright.Connection
   ( Connection
   , withConnection
   , sendCommand
+  , guidsOfType
   , lookupObject
   , waitForLifecycle
   ) where
@@ -83,7 +84,7 @@ import Playwright.Protocol
   ( ChannelType (ChannelTypeRoot)
   , FrameInitializer (frameInitializerLoadStates)
   , FrameLoadstateEvent (frameLoadstateEventAdd, frameLoadstateEventRemove)
-  , FrameNavigatedEvent (frameNavigatedEventUrl)
+  , FrameNavigatedEvent (frameNavigatedEventName, frameNavigatedEventUrl)
   , LifecycleEvent
   )
 import Playwright.RemoteObject
@@ -202,6 +203,15 @@ lookupObject conn guid = do
       throwIO (MissingObject guid)
     Just obj ->
       pure obj
+
+guidsOfType :: Connection -> ChannelType -> IO [Guid]
+guidsOfType conn ty = do
+  objects <- atomically (readTVar (connectionObjects conn))
+  pure
+    [ remoteGuid obj
+    | obj <- Map.elems objects
+    , remoteType obj == ty
+    ]
 
 waitForLifecycle :: Connection -> Guid -> LifecycleEvent -> IO ()
 waitForLifecycle conn guid wanted =
@@ -333,17 +343,24 @@ applyNavigated conn guid params = do
   event <- either throwIO pure (fromJsonValue params)
   atomically $
     modifyTVar' (connectionObjects conn) $
-      Map.adjust (setInitializerUrl (frameNavigatedEventUrl event)) guid
+      Map.adjust
+        (setInitializerNavigation (frameNavigatedEventName event) (frameNavigatedEventUrl event))
+        guid
 
-setInitializerUrl :: Url -> RemoteObject -> RemoteObject
-setInitializerUrl url obj =
-  obj {remoteInitializer = patchUrl url (remoteInitializer obj)}
+setInitializerNavigation :: Text.Text -> Url -> RemoteObject -> RemoteObject
+setInitializerNavigation name url obj =
+  obj {remoteInitializer = patchNavigation name url (remoteInitializer obj)}
 
-patchUrl :: Url -> Value -> Value
-patchUrl url value =
+patchNavigation :: Text.Text -> Url -> Value -> Value
+patchNavigation name url value =
   case value of
     Object keys ->
-      Object (KeyMap.insert (Key.fromText "url") (toJSON url) keys)
+      Object
+        ( KeyMap.insert
+            (Key.fromText "name")
+            (toJSON name)
+            (KeyMap.insert (Key.fromText "url") (toJSON url) keys)
+        )
     _ ->
       value
 

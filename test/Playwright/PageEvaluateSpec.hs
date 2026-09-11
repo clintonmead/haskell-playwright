@@ -21,7 +21,8 @@ import Playwright
   , textArgument
   )
 import Playwright.Harness
-  ( withChromiumPage
+  ( withAssetPage
+  , withChromiumPage
   )
 import Test.Tasty
   ( TestTree
@@ -107,6 +108,10 @@ tests =
     , testCase "should modify global environment" $
         withChromiumPage $ \page -> do
           _ <- evaluateNumber page "() => { window.globalVar = 123; return 123; }"
+          result <- evaluateNumber page "() => window.globalVar"
+          assertEqual "global" (123 :: Double) result
+    , testCase "should evaluate in the page context" $
+        withAssetPage "global-var.html" $ \page -> do
           result <- evaluateNumber page "() => window.globalVar"
           assertEqual "global" (123 :: Double) result
     ]

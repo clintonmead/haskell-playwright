@@ -31,6 +31,7 @@ module Playwright
   , SelectOption (..)
   , Selector
   , SpecialJsValue (..)
+  , StyleTag (..)
   , Timeout
   , Url
   , ViewportHeight (..)
@@ -40,6 +41,7 @@ module Playwright
   , WheelDelta (..)
   , addInitScript
   , addScriptTag
+  , addStyleTag
   , boolArgument
   , boundingBox
   , browserFromRef
@@ -47,15 +49,19 @@ module Playwright
   , check
   , checkWith
   , childLocator
+  , childFrames
   , chromium
   , clear
   , click
+  , clickHandle
   , closeBrowser
   , closeContext
   , closePage
   , content
   , contextFromRef
   , cssPixelFromInt
+  , currentName
+  , currentUrl
   , dblclick
   , defaultCheckOptions
   , defaultGetByRoleOptions
@@ -66,12 +72,17 @@ module Playwright
   , dispatchEvent
   , elementHandle
   , emptyScriptTag
+  , emptyStyleTag
   , evaluate
   , evaluateBool
   , evaluateBoolWith
   , evaluateNumber
   , evaluateNumberWith
   , evaluateNumbersWith
+  , evaluateOnElement
+  , evaluateOnElementText
+  , evaluateOnFrame
+  , evaluateOnFrameText
   , evaluateOnLocator
   , evaluateOnLocatorAllTexts
   , evaluateOnLocatorBool
@@ -87,7 +98,10 @@ module Playwright
   , firefox
   , first
   , focus
+  , frameByName
+  , frames
   , getAttribute
+  , getAttributeHandle
   , getByLabel
   , getByRole
   , getByTestId
@@ -99,8 +113,11 @@ module Playwright
   , httpStatusOk
   , initializePlaywright
   , innerHtml
+  , innerHtmlHandle
   , innerText
+  , innerTextHandle
   , inputValue
+  , inputValueHandle
   , isChecked
   , isDisabled
   , isEditable
@@ -117,6 +134,7 @@ module Playwright
   , launch
   , locator
   , locatorCount
+  , mainFrame
   , milliseconds
   , mouseClick
   , mouseDown
@@ -147,6 +165,7 @@ module Playwright
   , specialArgument
   , textArgument
   , textContent
+  , textContentHandle
   , timeoutToDouble
   , title
   , typeText
@@ -210,6 +229,12 @@ import Playwright.DomEventType
 import Playwright.ElementHandle
   ( ElementHandle (ElementHandle)
   , boundingBox
+  , clickHandle
+  , getAttributeHandle
+  , innerHtmlHandle
+  , innerTextHandle
+  , inputValueHandle
+  , textContentHandle
   )
 import Playwright.Evaluate
   ( evaluate
@@ -218,6 +243,10 @@ import Playwright.Evaluate
   , evaluateNumber
   , evaluateNumberWith
   , evaluateNumbersWith
+  , evaluateOnElement
+  , evaluateOnElementText
+  , evaluateOnFrame
+  , evaluateOnFrameText
   , evaluateOnLocator
   , evaluateOnLocatorAllTexts
   , evaluateOnLocatorBool
@@ -235,6 +264,9 @@ import Playwright.Exactness
   )
 import Playwright.Frame
   ( Frame (Frame, frameChannel, frameParent, frameUrl)
+  , childFrames
+  , currentName
+  , currentUrl
   )
 import Playwright.GetByRoleOptions
   ( GetByRoleOptions (GetByRoleOptions, getByRoleExact, getByRoleName)
@@ -330,6 +362,7 @@ import Playwright.Page
   ( Page (Page, pageChannel, pageMainFrame)
   , addInitScript
   , addScriptTag
+  , addStyleTag
   , closePage
   , content
   , getByLabel
@@ -353,6 +386,9 @@ import Playwright.Page
   , waitForLoadState
   , waitForSelector
   , waitForTimeout
+  , frameByName
+  , frames
+  , mainFrame
   )
 import Playwright.Point
   ( Point (Point)
@@ -389,6 +425,10 @@ import Playwright.SerializedArgument
   )
 import Playwright.SpecialJsValue
   ( SpecialJsValue (SpecialInfinity, SpecialNaN, SpecialNegInfinity, SpecialNegZero, SpecialNull, SpecialUndefined)
+  )
+import Playwright.StyleTag
+  ( StyleTag (StyleTag, styleTagContent, styleTagUrl)
+  , emptyStyleTag
   )
 import Playwright.Timeout
   ( Timeout

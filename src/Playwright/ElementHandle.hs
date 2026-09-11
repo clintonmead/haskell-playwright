@@ -1,9 +1,22 @@
 module Playwright.ElementHandle
   ( ElementHandle (..)
   , boundingBox
+  , clickHandle
   , elementHandleFromRef
+  , getAttributeHandle
+  , innerHtmlHandle
+  , innerTextHandle
+  , inputValueHandle
+  , textContentHandle
   ) where
 
+import Data.Aeson
+  ( FromJSON
+  , ToJSON
+  )
+import Data.Text
+  ( Text
+  )
 import Playwright.BoundingBox
   ( BoundingBox (BoundingBox, boundingBoxHeight, boundingBoxWidth, boundingBoxX, boundingBoxY)
   )
@@ -26,8 +39,23 @@ import Playwright.MethodName
   )
 import Playwright.Protocol
   ( ElementHandleBoundingBoxResult (elementHandleBoundingBoxResultValue)
+  , ElementHandleClickResult
+  , ElementHandleGetAttributeResult (elementHandleGetAttributeResultValue)
+  , ElementHandleInnerHTMLResult (elementHandleInnerHTMLResultValue)
+  , ElementHandleInnerTextResult (elementHandleInnerTextResultValue)
+  , ElementHandleInputValueResult (elementHandleInputValueResultValue)
+  , ElementHandleTextContentResult (elementHandleTextContentResultValue)
   , Rect (rectHeight, rectWidth, rectX, rectY)
   , mkElementHandleBoundingBoxParams
+  , mkElementHandleClickParams
+  , mkElementHandleGetAttributeParams
+  , mkElementHandleInnerHTMLParams
+  , mkElementHandleInnerTextParams
+  , mkElementHandleInputValueParams
+  , mkElementHandleTextContentParams
+  )
+import Playwright.Timeout
+  ( defaultTimeout
   )
 
 newtype ElementHandle = ElementHandle
@@ -38,13 +66,19 @@ elementHandleFromRef :: Connection -> ChannelRef -> ElementHandle
 elementHandleFromRef conn ref =
   ElementHandle (Channel conn (channelRefGuid ref))
 
+handleSend :: (ToJSON params, FromJSON result) => ElementHandle -> Text -> params -> IO result
+handleSend handle method =
+  send (elementHandleChannel handle) (MethodName method)
+
+clickHandle :: ElementHandle -> IO ()
+clickHandle handle = do
+  _ :: ElementHandleClickResult <-
+    handleSend handle "click" (mkElementHandleClickParams defaultTimeout)
+  pure ()
+
 boundingBox :: ElementHandle -> IO (Maybe BoundingBox)
 boundingBox handle = do
-  result <-
-    send
-      (elementHandleChannel handle)
-      (MethodName "boundingBox")
-      mkElementHandleBoundingBoxParams
+  result <- handleSend handle "boundingBox" mkElementHandleBoundingBoxParams
   pure (fmap fromRect (elementHandleBoundingBoxResultValue result))
 
 fromRect :: Rect -> BoundingBox
@@ -55,3 +89,28 @@ fromRect rect =
     , boundingBoxWidth = CssPixel (rectWidth rect)
     , boundingBoxHeight = CssPixel (rectHeight rect)
     }
+
+innerTextHandle :: ElementHandle -> IO Text
+innerTextHandle handle = do
+  result <- handleSend handle "innerText" mkElementHandleInnerTextParams
+  pure (elementHandleInnerTextResultValue result)
+
+innerHtmlHandle :: ElementHandle -> IO Text
+innerHtmlHandle handle = do
+  result <- handleSend handle "innerHTML" mkElementHandleInnerHTMLParams
+  pure (elementHandleInnerHTMLResultValue result)
+
+textContentHandle :: ElementHandle -> IO (Maybe Text)
+textContentHandle handle = do
+  result <- handleSend handle "textContent" mkElementHandleTextContentParams
+  pure (elementHandleTextContentResultValue result)
+
+getAttributeHandle :: ElementHandle -> Text -> IO (Maybe Text)
+getAttributeHandle handle name = do
+  result <- handleSend handle "getAttribute" (mkElementHandleGetAttributeParams name)
+  pure (elementHandleGetAttributeResultValue result)
+
+inputValueHandle :: ElementHandle -> IO Text
+inputValueHandle handle = do
+  result <- handleSend handle "inputValue" mkElementHandleInputValueParams
+  pure (elementHandleInputValueResultValue result)

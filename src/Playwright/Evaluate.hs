@@ -5,6 +5,10 @@ module Playwright.Evaluate
   , evaluateNumber
   , evaluateNumberWith
   , evaluateNumbersWith
+  , evaluateOnElement
+  , evaluateOnElementText
+  , evaluateOnFrame
+  , evaluateOnFrameText
   , evaluateOnLocator
   , evaluateOnLocatorAllTexts
   , evaluateOnLocatorBool
@@ -24,11 +28,18 @@ import Control.Exception
 import Data.Text
   ( Text
   )
+import Playwright.Channel
+  ( send
+  )
+import Playwright.ElementHandle
+  ( ElementHandle (elementHandleChannel)
+  )
 import Playwright.Error
   ( PlaywrightError (EvaluateUnexpected)
   )
 import Playwright.Frame
-  ( evalOnSelectorAllFrame
+  ( Frame
+  , evalOnSelectorAllFrame
   , evalOnSelectorFrame
   , evaluateFrame
   , evaluateFrameWith
@@ -36,8 +47,16 @@ import Playwright.Frame
 import Playwright.Locator
   ( Locator (locatorFrame, locatorSelector)
   )
+import Playwright.MethodName
+  ( MethodName (MethodName)
+  )
 import Playwright.Page
   ( Page (pageMainFrame)
+  )
+import Playwright.Protocol
+  ( JSHandleEvaluateExpressionParams (jSHandleEvaluateExpressionParamsIsFunction)
+  , JSHandleEvaluateExpressionResult (jSHandleEvaluateExpressionResultValue)
+  , mkJSHandleEvaluateExpressionParams
   )
 import Playwright.SerializedArgument
   ( SerializedArgument
@@ -57,6 +76,29 @@ evaluate page = evaluateFrame (pageMainFrame page)
 evaluateWith :: Page -> Text -> SerializedArgument -> IO SerializedValue
 evaluateWith page =
   evaluateFrameWith (pageMainFrame page)
+
+evaluateOnFrame :: Frame -> Text -> IO SerializedValue
+evaluateOnFrame =
+  evaluateFrame
+
+evaluateOnFrameText :: Frame -> Text -> IO Text
+evaluateOnFrameText frame expression =
+  requireText =<< evaluateOnFrame frame expression
+
+evaluateOnElement :: ElementHandle -> Text -> IO SerializedValue
+evaluateOnElement handle expression = do
+  result <-
+    send
+      (elementHandleChannel handle)
+      (MethodName "evaluateExpression")
+      (mkJSHandleEvaluateExpressionParams undefinedArgument expression)
+        { jSHandleEvaluateExpressionParamsIsFunction = Just True
+        }
+  pure (jSHandleEvaluateExpressionResultValue result)
+
+evaluateOnElementText :: ElementHandle -> Text -> IO Text
+evaluateOnElementText handle expression =
+  requireText =<< evaluateOnElement handle expression
 
 evaluateOnLocator :: Locator -> Text -> IO SerializedValue
 evaluateOnLocator loc expression =

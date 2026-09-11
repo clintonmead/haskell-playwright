@@ -19,8 +19,12 @@ module Playwright.Page
   , reload
   , querySelector
   , setViewportSize
+  , frameByName
+  , frames
+  , mainFrame
   , addInitScript
   , addScriptTag
+  , addStyleTag
   , setExtraHTTPHeaders
   , waitForFunction
   , waitForLoadState
@@ -29,6 +33,9 @@ module Playwright.Page
 
 import Control.Exception
   ( throwIO
+  )
+import Data.List
+  ( find
   )
 import Data.ByteString
   ( ByteString
@@ -50,7 +57,9 @@ import Playwright.Connection
   )
 import Playwright.Frame
   ( Frame (frameChannel)
+  , childFrames
   , contentFrame
+  , currentName
   , currentUrl
   , frameFromRef
   , frameSend
@@ -115,6 +124,8 @@ import Playwright.MethodName
 import Playwright.Protocol
   ( FrameAddScriptTagParams (frameAddScriptTagParamsContent, frameAddScriptTagParamsType, frameAddScriptTagParamsUrl)
   , FrameAddScriptTagResult (frameAddScriptTagResultElement)
+  , FrameAddStyleTagParams (frameAddStyleTagParamsContent, frameAddStyleTagParamsUrl)
+  , FrameAddStyleTagResult (frameAddStyleTagResultElement)
   , NameValue
   , PageAddInitScriptResult
   , PageCloseResult
@@ -127,6 +138,7 @@ import Playwright.Protocol
   , PageSetExtraHTTPHeadersResult
   , PageSetViewportSizeResult
   , mkFrameAddScriptTagParams
+  , mkFrameAddStyleTagParams
   , mkNameValue
   , mkPageAddInitScriptParams
   , mkPageCloseParams
@@ -147,6 +159,9 @@ import Playwright.Response
   )
 import Playwright.ScriptTag
   ( ScriptTag (scriptTagContent, scriptTagType, scriptTagUrl)
+  )
+import Playwright.StyleTag
+  ( StyleTag (styleTagContent, styleTagUrl)
   )
 import Playwright.ScreenshotOptions
   ( ScreenshotOptions (screenshotOptionsFullPage, screenshotOptionsTimeout)
@@ -182,11 +197,11 @@ pageFromRef :: Connection -> ChannelRef -> IO Page
 pageFromRef conn ref = do
   obj <- lookupObject conn (channelRefGuid ref)
   initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
-  mainFrame <- frameFromRef conn (pageInitializerMainFrame initializer)
+  resolvedMainFrame <- frameFromRef conn (pageInitializerMainFrame initializer)
   pure
     Page
       { pageChannel = Channel conn (channelRefGuid ref)
-      , pageMainFrame = mainFrame
+      , pageMainFrame = resolvedMainFrame
       }
 
 closePage :: Page -> IO ()
@@ -304,6 +319,22 @@ addScriptTag page tag = do
         (frameAddScriptTagResultElement result)
     )
 
+addStyleTag :: Page -> StyleTag -> IO ElementHandle
+addStyleTag page tag = do
+  result <-
+    frameSend
+      (pageMainFrame page)
+      "addStyleTag"
+      mkFrameAddStyleTagParams
+        { frameAddStyleTagParamsContent = styleTagContent tag
+        , frameAddStyleTagParamsUrl = styleTagUrl tag
+        }
+  pure
+    ( elementHandleFromRef
+        (channelConnection (frameChannel (pageMainFrame page)))
+        (frameAddStyleTagResultElement result)
+    )
+
 setExtraHTTPHeaders :: Page -> [HttpHeader] -> IO ()
 setExtraHTTPHeaders page headers = do
   _ :: PageSetExtraHTTPHeadersResult <-
@@ -328,3 +359,26 @@ waitForTimeout page =
 waitForFunction :: Page -> Text -> IO JsHandle
 waitForFunction page expression =
   waitForFunctionFrame (pageMainFrame page) expression undefinedArgument defaultTimeout
+
+mainFrame :: Page -> Frame
+mainFrame =
+  pageMainFrame
+
+frames :: Page -> IO [Frame]
+frames page =
+  collect (pageMainFrame page)
+  where
+    collect current = do
+      children <- childFrames current
+      nested <- traverse collect children
+      pure (current : concat nested)
+
+frameByName :: Page -> Text -> IO (Maybe Frame)
+frameByName page name = do
+  allFrames <- frames page
+  named <- traverse pairName allFrames
+  pure (fmap fst (find (\(_, frameName) -> frameName == name) named))
+  where
+    pairName frame = do
+      frameName <- currentName frame
+      pure (frame, frameName)

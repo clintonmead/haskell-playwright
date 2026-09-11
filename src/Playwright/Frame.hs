@@ -1,5 +1,9 @@
 module Playwright.Frame
   ( Frame (..)
+  , childFrames
+  , contentFrame
+  , currentName
+  , currentUrl
   , evalOnSelectorAllFrame
   , evalOnSelectorFrame
   , evaluateFrame
@@ -7,8 +11,6 @@ module Playwright.Frame
   , frameFromRef
   , frameSend
   , frameSend_
-  , contentFrame
-  , currentUrl
   , gotoFrame
   , setContentFrame
   , titleFrame
@@ -31,13 +33,14 @@ import Playwright.Channel
   )
 import Playwright.Connection
   ( Connection
+  , guidsOfType
   , lookupObject
   )
 import Playwright.GotoOptions
   ( GotoOptions (gotoOptionsReferer, gotoOptionsTimeout, gotoOptionsWaitUntil)
   )
 import Playwright.Json.ChannelRef
-  ( ChannelRef (channelRefGuid)
+  ( ChannelRef (ChannelRef, channelRefGuid)
   )
 import Playwright.Json.Decode
   ( fromJsonValue
@@ -46,7 +49,8 @@ import Playwright.MethodName
   ( MethodName (MethodName)
   )
 import Playwright.Protocol
-  ( FrameContentResult (frameContentResultValue)
+  ( ChannelType (ChannelTypeFrame)
+  , FrameContentResult (frameContentResultValue)
   , FrameEvalOnSelectorAllParams (frameEvalOnSelectorAllParamsIsFunction)
   , FrameEvalOnSelectorAllResult (frameEvalOnSelectorAllResultValue)
   , FrameEvalOnSelectorParams (frameEvalOnSelectorParamsIsFunction, frameEvalOnSelectorParamsStrict)
@@ -55,7 +59,7 @@ import Playwright.Protocol
   , FrameEvaluateExpressionResult (frameEvaluateExpressionResultValue)
   , FrameGotoParams (frameGotoParamsReferer, frameGotoParamsWaitUntil)
   , FrameGotoResult (frameGotoResultResponse)
-  , FrameInitializer (frameInitializerParentFrame, frameInitializerUrl)
+  , FrameInitializer (frameInitializerName, frameInitializerParentFrame, frameInitializerUrl)
   , FrameSetContentResult
   , FrameTitleResult (frameTitleResultValue)
   , mkFrameContentParams
@@ -109,9 +113,29 @@ frameFromRef conn ref = do
 
 currentUrl :: Frame -> IO Url
 currentUrl frame = do
-  obj <- lookupObject (channelConnection (frameChannel frame)) (channelGuid (frameChannel frame))
-  initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
+  initializer <- frameInitializer frame
   pure (frameInitializerUrl initializer)
+
+currentName :: Frame -> IO Text
+currentName frame = do
+  initializer <- frameInitializer frame
+  pure (frameInitializerName initializer)
+
+frameInitializer :: Frame -> IO FrameInitializer
+frameInitializer frame = do
+  obj <- lookupObject (channelConnection (frameChannel frame)) (channelGuid (frameChannel frame))
+  either throwIO pure (fromJsonValue (remoteInitializer obj))
+
+childFrames :: Frame -> IO [Frame]
+childFrames frame = do
+  let conn = channelConnection (frameChannel frame)
+  guids <- guidsOfType conn ChannelTypeFrame
+  candidates <- traverse (\guid -> frameFromRef conn (ChannelRef guid)) guids
+  pure (filter (isChildOf frame) candidates)
+
+isChildOf :: Frame -> Frame -> Bool
+isChildOf parent child =
+  frameParent child == Just (ChannelRef (channelGuid (frameChannel parent)))
 
 frameSend :: forall result params. (ToJSON params, FromJSON result) => Frame -> Text -> params -> IO result
 frameSend frame methodName params =
