@@ -17,7 +17,12 @@ module Playwright.Page
   , goBack
   , goForward
   , reload
+  , querySelector
   , setViewportSize
+  , addInitScript
+  , waitForFunction
+  , waitForLoadState
+  , waitForTimeout
   ) where
 
 import Control.Exception
@@ -50,8 +55,17 @@ import Playwright.Frame
   , setContentFrame
   , titleFrame
   )
+import Playwright.Frame.Inspect
+  ( querySelectorFrame
+  )
 import Playwright.Frame.Wait
-  ( waitForSelectorFrame
+  ( waitForFunctionFrame
+  , waitForLoadStateFrame
+  , waitForSelectorFrame
+  , waitForTimeoutFrame
+  )
+import Playwright.ElementHandle
+  ( ElementHandle
   )
 import Playwright.Exactness
   ( Exactness
@@ -77,6 +91,12 @@ import Playwright.Json.Decode
 import Playwright.Json.ProtocolBinary
   ( protocolBinaryToByteString
   )
+import Playwright.JsHandle
+  ( JsHandle
+  )
+import Playwright.LoadState
+  ( LoadState
+  )
 import Playwright.Locator
   ( Locator (Locator, locatorFrame, locatorSelector)
   )
@@ -84,7 +104,8 @@ import Playwright.MethodName
   ( MethodName (MethodName)
   )
 import Playwright.Protocol
-  ( PageCloseResult
+  ( PageAddInitScriptResult
+  , PageCloseResult
   , PageGoBackResult (pageGoBackResultResponse)
   , PageGoForwardResult (pageGoForwardResultResponse)
   , PageInitializer (pageInitializerMainFrame)
@@ -92,6 +113,7 @@ import Playwright.Protocol
   , PageScreenshotParams (pageScreenshotParamsFullPage)
   , PageScreenshotResult (pageScreenshotResultBinary)
   , PageSetViewportSizeResult
+  , mkPageAddInitScriptParams
   , mkPageCloseParams
   , mkPageGoBackParams
   , mkPageGoForwardParams
@@ -113,8 +135,12 @@ import Playwright.ScreenshotOptions
 import Playwright.Selector
   ( Selector
   )
+import Playwright.SerializedArgument
+  ( undefinedArgument
+  )
 import Playwright.Timeout
-  ( defaultTimeout
+  ( Timeout
+  , defaultTimeout
   )
 import Playwright.Url
   ( Url
@@ -231,3 +257,25 @@ reload :: Page -> IO (Maybe Response)
 reload page = do
   result <- send (pageChannel page) (MethodName "reload") (mkPageReloadParams defaultTimeout)
   pure (fmap (responseFromRef (channelConnection (pageChannel page))) (pageReloadResultResponse result))
+
+querySelector :: Page -> Selector -> IO (Maybe ElementHandle)
+querySelector page selector =
+  querySelectorFrame (pageMainFrame page) selector Nothing
+
+addInitScript :: Page -> Text -> IO ()
+addInitScript page source = do
+  _ :: PageAddInitScriptResult <-
+    send (pageChannel page) (MethodName "addInitScript") (mkPageAddInitScriptParams source)
+  pure ()
+
+waitForLoadState :: Page -> LoadState -> IO ()
+waitForLoadState page =
+  waitForLoadStateFrame (pageMainFrame page)
+
+waitForTimeout :: Page -> Timeout -> IO ()
+waitForTimeout page =
+  waitForTimeoutFrame (pageMainFrame page)
+
+waitForFunction :: Page -> Text -> IO JsHandle
+waitForFunction page expression =
+  waitForFunctionFrame (pageMainFrame page) expression undefinedArgument defaultTimeout

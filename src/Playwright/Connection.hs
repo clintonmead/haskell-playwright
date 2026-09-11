@@ -3,6 +3,7 @@ module Playwright.Connection
   , withConnection
   , sendCommand
   , lookupObject
+  , waitForLifecycle
   ) where
 
 import Autodocodec
@@ -16,7 +17,8 @@ import Control.Concurrent.Async
   ( withAsync
   )
 import Control.Concurrent.STM
-  ( TMVar
+  ( STM
+  , TMVar
   , TVar
   , atomically
   , modifyTVar'
@@ -24,12 +26,17 @@ import Control.Concurrent.STM
   , newTVarIO
   , putTMVar
   , readTVar
+  , retry
   , takeTMVar
+  , throwSTM
   , writeTVar
   )
 import Control.Exception
   ( finally
   , throwIO
+  )
+import Control.Monad
+  ( unless
   )
 import Data.Aeson
   ( FromJSON
@@ -74,7 +81,10 @@ import Playwright.MethodName
   )
 import Playwright.Protocol
   ( ChannelType (ChannelTypeRoot)
+  , FrameInitializer (frameInitializerLoadStates)
+  , FrameLoadstateEvent (frameLoadstateEventAdd, frameLoadstateEventRemove)
   , FrameNavigatedEvent (frameNavigatedEventUrl)
+  , LifecycleEvent
   )
 import Playwright.RemoteObject
   ( RemoteObject (RemoteObject, remoteGuid, remoteInitializer, remoteParent, remoteType)
@@ -193,6 +203,28 @@ lookupObject conn guid = do
     Just obj ->
       pure obj
 
+waitForLifecycle :: Connection -> Guid -> LifecycleEvent -> IO ()
+waitForLifecycle conn guid wanted =
+  atomically (waitForLifecycleSTM conn guid wanted)
+
+waitForLifecycleSTM :: Connection -> Guid -> LifecycleEvent -> STM ()
+waitForLifecycleSTM conn guid wanted = do
+  closed <- readTVar (connectionClosed conn)
+  case closed of
+    Just err ->
+      throwSTM err
+    Nothing -> do
+      objects <- readTVar (connectionObjects conn)
+      case Map.lookup guid objects of
+        Nothing ->
+          retry
+        Just obj ->
+          case fromJsonValue (remoteInitializer obj) of
+            Left err ->
+              throwSTM err
+            Right initializer ->
+              unless (wanted `elem` frameInitializerLoadStates initializer) retry
+
 nextRequestId :: Connection -> IO RequestId
 nextRequestId conn =
   atomically $ do
@@ -245,8 +277,56 @@ handleEvent conn guid method params =
   case method of
     MethodName "navigated" ->
       applyNavigated conn guid params
+    MethodName "loadstate" ->
+      applyLoadstate conn guid params
     _ ->
       pure ()
+
+applyLoadstate :: Connection -> Guid -> Value -> IO ()
+applyLoadstate conn guid params = do
+  event <- either throwIO pure (fromJsonValue params)
+  atomically $ do
+    objects <- readTVar (connectionObjects conn)
+    case Map.lookup guid objects of
+      Nothing ->
+        pure ()
+      Just obj ->
+        case fromJsonValue (remoteInitializer obj) of
+          Left err ->
+            throwSTM err
+          Right initializer ->
+            writeTVar (connectionObjects conn) $
+              Map.insert
+                guid
+                obj
+                  { remoteInitializer =
+                      toJSON
+                        ( initializer
+                            { frameInitializerLoadStates =
+                                updateLoadStates event (frameInitializerLoadStates initializer)
+                            }
+                        )
+                  }
+                objects
+
+updateLoadStates :: FrameLoadstateEvent -> [LifecycleEvent] -> [LifecycleEvent]
+updateLoadStates event states =
+  let
+    afterRemove :: [LifecycleEvent]
+    afterRemove =
+      case frameLoadstateEventRemove event of
+        Nothing ->
+          states
+        Just removed ->
+          filter (/= removed) states
+  in
+    case frameLoadstateEventAdd event of
+      Nothing ->
+        afterRemove
+      Just added ->
+        if added `elem` afterRemove
+          then afterRemove
+          else afterRemove <> [added]
 
 applyNavigated :: Connection -> Guid -> Value -> IO ()
 applyNavigated conn guid params = do

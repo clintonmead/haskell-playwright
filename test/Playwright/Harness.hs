@@ -1,6 +1,7 @@
 module Playwright.Harness
   ( assertProtocolContains
   , locate
+  , requireHandle
   , withAssetPage
   , withAssets
   , withChromiumPage
@@ -23,7 +24,8 @@ import Network.Wai.Handler.Warp
   ( withApplication
   )
 import Playwright
-  ( Locator
+  ( ElementHandle
+  , Locator
   , Page
   , chromium
   , defaultGotoOptions
@@ -53,6 +55,14 @@ import Test.Tasty.HUnit
 locate :: Page -> Text -> Locator
 locate page =
   locator page . selectorFromText
+
+requireHandle :: Maybe ElementHandle -> IO ElementHandle
+requireHandle handle =
+  case handle of
+    Nothing ->
+      assertFailure "expected an element handle"
+    Just value ->
+      pure value
 
 withChromiumPage :: (Page -> IO a) -> IO a
 withChromiumPage action = do

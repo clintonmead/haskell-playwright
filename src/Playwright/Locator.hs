@@ -5,6 +5,8 @@ module Playwright.Locator
   , childLocator
   , click
   , dblclick
+  , dispatchEvent
+  , elementHandle
   , fill
   , first
   , focus
@@ -48,6 +50,12 @@ import Playwright.CheckOptions
   ( CheckOptions
   , defaultCheckOptions
   )
+import Playwright.DomEventType
+  ( DomEventType
+  )
+import Playwright.ElementHandle
+  ( ElementHandle
+  )
 import Playwright.Exactness
   ( Exactness
   )
@@ -58,6 +66,7 @@ import Playwright.Frame.Action
   ( checkFrame
   , clickFrame
   , dblclickFrame
+  , dispatchEventFrame
   , fillFrame
   , focusFrame
   , hoverFrame
@@ -78,6 +87,7 @@ import Playwright.Frame.Inspect
   , isHiddenFrame
   , isVisibleFrame
   , queryCountFrame
+  , querySelectorFrame
   , textContentFrame
   )
 import Playwright.Frame.Wait
@@ -108,7 +118,7 @@ import Playwright.Timeout
   , defaultTimeout
   )
 import Playwright.WaitForState
-  ( WaitForState
+  ( WaitForState (WaitForAttached)
   )
 
 data Locator = Locator
@@ -158,6 +168,15 @@ click loc =
 dblclick :: Locator -> IO ()
 dblclick loc =
   dblclickFrame (locatorFrame loc) (locatorSelector loc) defaultTimeout
+
+dispatchEvent :: Locator -> DomEventType -> IO ()
+dispatchEvent loc eventType =
+  dispatchEventFrame (locatorFrame loc) (locatorSelector loc) eventType defaultTimeout
+
+elementHandle :: Locator -> IO (Maybe ElementHandle)
+elementHandle loc = do
+  waitFor loc WaitForAttached
+  querySelectorFrame (locatorFrame loc) (locatorSelector loc) (Just True)
 
 fill :: Locator -> Text -> IO ()
 fill loc value =

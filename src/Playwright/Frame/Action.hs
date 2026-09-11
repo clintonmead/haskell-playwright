@@ -2,6 +2,7 @@ module Playwright.Frame.Action
   ( checkFrame
   , clickFrame
   , dblclickFrame
+  , dispatchEventFrame
   , fillFrame
   , focusFrame
   , hoverFrame
@@ -16,6 +17,9 @@ import Data.Text
   )
 import Playwright.CheckOptions
   ( CheckOptions (checkOptionsForce, checkOptionsTimeout, checkOptionsTrial)
+  )
+import Playwright.DomEventType
+  ( DomEventType (domEventTypeToText)
   )
 import Playwright.Frame
   ( Frame
@@ -32,6 +36,8 @@ import Playwright.Protocol
   , FrameClickResult
   , FrameDblclickParams (frameDblclickParamsStrict)
   , FrameDblclickResult
+  , FrameDispatchEventParams (frameDispatchEventParamsStrict)
+  , FrameDispatchEventResult
   , FrameFillParams (frameFillParamsStrict)
   , FrameFillResult
   , FrameFocusParams (frameFocusParamsStrict)
@@ -50,6 +56,7 @@ import Playwright.Protocol
   , mkFrameCheckParams
   , mkFrameClickParams
   , mkFrameDblclickParams
+  , mkFrameDispatchEventParams
   , mkFrameFillParams
   , mkFrameFocusParams
   , mkFrameHoverParams
@@ -58,6 +65,9 @@ import Playwright.Protocol
   , mkFrameSelectOptionParamsOptions
   , mkFrameTypeParams
   , mkFrameUncheckParams
+  )
+import Playwright.SerializedArgument
+  ( undefinedArgument
   )
 import Playwright.SelectOption
   ( SelectOption (SelectIndex, SelectLabel, SelectValue, SelectValueOrLabel)
@@ -85,6 +95,15 @@ dblclickFrame frame selector timeout =
     "dblclick"
     (mkFrameDblclickParams selector timeout)
       { frameDblclickParamsStrict = Just True
+      }
+
+dispatchEventFrame :: Frame -> Selector -> DomEventType -> Timeout -> IO ()
+dispatchEventFrame frame selector eventType timeout =
+  frameSend_ @FrameDispatchEventResult
+    frame
+    "dispatchEvent"
+    (mkFrameDispatchEventParams undefinedArgument selector timeout (domEventTypeToText eventType))
+      { frameDispatchEventParamsStrict = Just True
       }
 
 fillFrame :: Frame -> Selector -> Text -> Timeout -> IO ()

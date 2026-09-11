@@ -4,15 +4,20 @@ module Playwright
   , BrowserName (..)
   , BrowserType (..)
   , AriaRole (..)
+  , BoundingBox (..)
   , CheckOptions (..)
   , CssPixel (..)
+  , DomEventType (..)
+  , ElementHandle (..)
   , Exactness (..)
   , Frame (..)
   , GetByRoleOptions (..)
   , GotoOptions (..)
   , HttpStatus (..)
+  , JsHandle (..)
   , Key (..)
   , LaunchOptions (..)
+  , LoadState (..)
   , Locator (..)
   , Page (..)
   , Playwright (..)
@@ -29,7 +34,9 @@ module Playwright
   , ViewportWidth (..)
   , WaitForState (..)
   , WheelDelta (..)
+  , addInitScript
   , boolArgument
+  , boundingBox
   , browserFromRef
   , browserTypeFromRef
   , check
@@ -50,6 +57,8 @@ module Playwright
   , defaultLaunchOptions
   , defaultScreenshotOptions
   , defaultTimeout
+  , dispatchEvent
+  , elementHandle
   , evaluate
   , evaluateBool
   , evaluateBoolWith
@@ -112,6 +121,7 @@ module Playwright
   , numberArgument
   , pageFromRef
   , press
+  , querySelector
   , reload
   , responseOk
   , responseStatus
@@ -135,7 +145,10 @@ module Playwright
   , urlFromText
   , urlToText
   , waitFor
+  , waitForFunction
+  , waitForLoadState
   , waitForSelector
+  , waitForTimeout
   , waitForWith
   , webkit
   , wheelDeltaFromInt
@@ -146,6 +159,9 @@ module Playwright
 
 import Playwright.AriaRole
   ( AriaRole (AriaRole, ariaRoleToText)
+  )
+import Playwright.BoundingBox
+  ( BoundingBox (BoundingBox, boundingBoxHeight, boundingBoxWidth, boundingBoxX, boundingBoxY)
   )
 import Playwright.Browser
   ( Browser (Browser, browserChannel)
@@ -174,8 +190,15 @@ import Playwright.CheckOptions
   , defaultCheckOptions
   )
 import Playwright.CssPixel
-  ( CssPixel (CssPixel)
+  ( CssPixel (CssPixel, cssPixelToScientific)
   , cssPixelFromInt
+  )
+import Playwright.DomEventType
+  ( DomEventType (DomEventType)
+  )
+import Playwright.ElementHandle
+  ( ElementHandle (ElementHandle)
+  , boundingBox
   )
 import Playwright.Evaluate
   ( evaluate
@@ -221,6 +244,9 @@ import Playwright.Instance
   , webkit
   , withPlaywright
   )
+import Playwright.JsHandle
+  ( JsHandle (JsHandle)
+  )
 import Playwright.Key
   ( Key (Key, keyToText)
   )
@@ -235,6 +261,9 @@ import Playwright.LaunchOptions
   ( LaunchOptions (LaunchOptions, launchOptionsChromiumSandbox, launchOptionsHeadless, launchOptionsSlowMo, launchOptionsTimeout)
   , defaultLaunchOptions
   )
+import Playwright.LoadState
+  ( LoadState (LoadStateCommit, LoadStateDomContentLoaded, LoadStateLoad, LoadStateNetworkIdle)
+  )
 import Playwright.Locator
   ( Locator (Locator, locatorFrame, locatorSelector)
   , check
@@ -242,6 +271,8 @@ import Playwright.Locator
   , childLocator
   , click
   , dblclick
+  , dispatchEvent
+  , elementHandle
   , fill
   , first
   , focus
@@ -278,6 +309,7 @@ import Playwright.Mouse
   )
 import Playwright.Page
   ( Page (Page, pageChannel, pageMainFrame)
+  , addInitScript
   , closePage
   , content
   , getByLabel
@@ -289,13 +321,17 @@ import Playwright.Page
   , goto
   , locator
   , pageFromRef
+  , querySelector
   , reload
   , screenshot
   , setContent
   , setViewportSize
   , title
   , url
+  , waitForFunction
+  , waitForLoadState
   , waitForSelector
+  , waitForTimeout
   )
 import Playwright.Point
   ( Point (Point)

@@ -8,6 +8,8 @@ module Playwright.Channel
   , PageTag
   , FrameTag
   , ResponseTag
+  , ElementHandleTag
+  , JsHandleTag
   , send
   ) where
 
@@ -37,6 +39,8 @@ data BrowserContextTag
 data PageTag
 data FrameTag
 data ResponseTag
+data ElementHandleTag
+data JsHandleTag
 
 type Channel :: Type -> Type
 data Channel a = Channel

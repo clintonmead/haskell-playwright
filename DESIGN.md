@@ -110,3 +110,6 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - `getByRole`/`getByText`/`getByLabel`/`getByTestId` are client-side `internal:` selectors, matching Playwright's locatorUtils.
 - `Page.setViewportSize` generated `mkPageSetViewportSizeParamsViewportSize` takes height then width (required-field hash order).
 - Mouse coordinates are `CssPixel` (`Scientific` on the wire). Protocol methods are `mouseClick` / `mouseMove` / `mouseDown` / `mouseUp` / `mouseWheel`.
+- Protocol JSON field `source` is `Selector` only for drag-and-drop; init-script `source` is `Text`.
+- `Frame.loadstate` events patch the stored initializer `loadStates` so `waitForLoadState` can STM-retry until the lifecycle is present.
+- `page.$` is `querySelector` with `strict: false`; locator `elementHandle` waits attached then queries with `strict: true`.

@@ -22,6 +22,7 @@ library
   exposed-modules:
       Playwright
       Playwright.AriaRole
+      Playwright.BoundingBox
       Playwright.Browser
       Playwright.BrowserContext
       Playwright.BrowserName
@@ -30,7 +31,9 @@ library
       Playwright.CheckOptions
       Playwright.Connection
       Playwright.CssPixel
+      Playwright.DomEventType
       Playwright.Driver
+      Playwright.ElementHandle
       Playwright.Error
       Playwright.Evaluate
       Playwright.Exactness
@@ -46,6 +49,7 @@ library
       Playwright.Incoming
       Playwright.Instance
       Playwright.JsErrorValue
+      Playwright.JsHandle
       Playwright.Json.ChannelRef
       Playwright.Json.Decode
       Playwright.Json.OpenJson
@@ -53,6 +57,7 @@ library
       Playwright.Key
       Playwright.Keyboard
       Playwright.LaunchOptions
+      Playwright.LoadState
       Playwright.Locator
       Playwright.MethodName
       Playwright.Mouse
@@ -115,6 +120,7 @@ test-suite playwright-test
   main-is: Main.hs
   other-modules:
       Playwright.ConnectionSpec
+      Playwright.ElementHandleBoundingBoxSpec
       Playwright.Harness
       Playwright.IntegrationSpec
       Playwright.LocatorClickSpec
@@ -124,6 +130,7 @@ test-suite playwright-test
       Playwright.LocatorSpec
       Playwright.PageCheckSpec
       Playwright.PageClickSpec
+      Playwright.PageDispatchEventSpec
       Playwright.PageEvaluateSpec
       Playwright.PageFillSpec
       Playwright.PageFocusSpec
@@ -133,6 +140,8 @@ test-suite playwright-test
       Playwright.PageMouseSpec
       Playwright.PageSelectOptionSpec
       Playwright.PageSetContentSpec
+      Playwright.PageWaitForFunctionSpec
+      Playwright.PageWaitForLoadStateSpec
       Playwright.PageWaitForSelectorSpec
       Playwright.SelectorsGetBySpec
       Playwright.TransportSpec

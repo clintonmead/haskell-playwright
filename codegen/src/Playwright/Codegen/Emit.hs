@@ -148,7 +148,7 @@ typeToHs :: Spec -> Text -> JsonName -> ProtoType -> State EmitState Text
 typeToHs spec parent jsonName ty =
   case ty of
     TString ->
-      pure (stringType (jsonNameText jsonName))
+      pure (stringType parent (jsonNameText jsonName))
     TInt ->
       pure "Int"
     TFloat ->
@@ -177,12 +177,12 @@ typeToHs spec parent jsonName ty =
         recName = parent <> pascalCase (jsonNameText jsonName)
       recordFromFields spec recName props
 
-stringType :: Text -> Text
-stringType jsonName =
+stringType :: Text -> Text -> Text
+stringType parent jsonName =
   if jsonName `elem` urlFields
     then "Url"
     else
-      if jsonName `elem` selectorFields
+      if isSelectorField parent jsonName
         then "Selector"
         else "Text"
 
@@ -190,9 +190,10 @@ urlFields :: [Text]
 urlFields =
   ["url", "baseURL", "referer", "endpointURL"]
 
-selectorFields :: [Text]
-selectorFields =
-  ["selector", "resolvedSelector", "source", "target"]
+isSelectorField :: Text -> Text -> Bool
+isSelectorField parent jsonName =
+  jsonName `elem` ["selector", "resolvedSelector", "target"]
+    || (jsonName == "source" && "DragAndDrop" `Text.isInfixOf` parent)
 
 floatType :: Text -> Text
 floatType jsonName =
