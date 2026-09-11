@@ -1,0 +1,76 @@
+name: playwright
+version: 0.1.0.0
+synopsis: Haskell client for the Playwright browser automation protocol
+description: |
+  Typed Haskell bindings that speak Playwright's channel protocol to the
+  official Node.js driver.
+license: Apache-2.0
+license-file: LICENSE
+author: playwright-haskell contributors
+maintainer: playwright-haskell contributors
+category: Web
+extra-source-files:
+  - DESIGN.md
+
+language: GHC2021
+
+default-extensions:
+  - DerivingStrategies
+  - DerivingVia
+  - OverloadedStrings
+  - StrictData
+
+ghc-options:
+  - -Werror
+  - -Weverything
+  - -Wno-all-missed-specialisations
+  - -Wno-implicit-prelude
+  - -Wno-missing-safe-haskell-mode
+  - -Wno-prepositive-qualified-module
+  - -Wno-safe
+  - -Wno-unsafe
+  - -Wno-missing-kind-signatures
+  - -Wno-missing-role-annotations
+
+library:
+  source-dirs: src
+  build-tools:
+    - playwright-codegen:playwright-codegen
+  dependencies:
+    - aeson
+    - async
+    - autodocodec
+    - base >= 4.20 && < 4.21
+    - base64-bytestring
+    - binary
+    - bytestring
+    - containers
+    - directory
+    - filepath
+    - scientific
+    - stm
+    - text
+    - typed-process
+
+tests:
+  playwright-test:
+    main: Main.hs
+    source-dirs: test
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - aeson
+      - async
+      - base
+      - bytestring
+      - directory
+      - hedgehog
+      - playwright
+      - tasty
+      - tasty-hedgehog
+      - tasty-hunit
+      - text
+      - wai-app-static
+      - warp

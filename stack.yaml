@@ -1,0 +1,27 @@
+resolver: lts-24.58
+
+packages:
+  - .
+  - codegen
+
+system-ghc: true
+install-ghc: false
+
+# The flake dev shell already supplies GHC and C libraries.
+nix:
+  enable: false
+
+ghc-options:
+  "$locals": -O0 -fprint-error-index-links=never
+
+hide-source-paths: true
+hide-th-loading: true
+notify-if-nix-on-path: false
+notify-if-no-run-tests: false
+notify-if-ghc-untested: false
+notify-if-cabal-untested: false
+
+build:
+  cabal-verbose: false
+  cabal-verbosity: "0"
+  progress-bar: none

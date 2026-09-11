@@ -1,0 +1,16 @@
+packages:
+  .
+  codegen
+
+with-compiler: ghc-9.10.3
+
+tests: True
+
+optimization: False
+
+verbose: 0
+
+program-options
+  ghc-options:
+    -fhide-source-paths
+    -fprint-error-index-links=never

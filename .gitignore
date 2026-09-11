@@ -1,0 +1,16 @@
+dist-newstyle/
+dist/
+.stack-work/
+cabal.project.local
+*.hi
+*.o
+*.dyn_hi
+*.dyn_o
+.ghc.environment.*
+result
+result-*
+.direnv/
+generated/
+*~
+.cabal-sandbox/
+cabal.sandbox.config

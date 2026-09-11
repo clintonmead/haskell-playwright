@@ -1,0 +1,126 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.3.
+--
+-- see: https://github.com/sol/hpack
+
+name:           playwright
+version:        0.1.0.0
+synopsis:       Haskell client for the Playwright browser automation protocol
+description:    Typed Haskell bindings that speak Playwright's channel protocol to the
+                official Node.js driver.
+category:       Web
+author:         playwright-haskell contributors
+maintainer:     playwright-haskell contributors
+license:        Apache-2.0
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    DESIGN.md
+
+library
+  exposed-modules:
+      Playwright
+      Playwright.Browser
+      Playwright.BrowserContext
+      Playwright.BrowserName
+      Playwright.BrowserType
+      Playwright.Channel
+      Playwright.Connection
+      Playwright.Driver
+      Playwright.Error
+      Playwright.Evaluate
+      Playwright.Frame
+      Playwright.GotoOptions
+      Playwright.Guid
+      Playwright.Incoming
+      Playwright.Instance
+      Playwright.JsErrorValue
+      Playwright.Json.ChannelRef
+      Playwright.Json.Decode
+      Playwright.Json.OpenJson
+      Playwright.Json.ProtocolBinary
+      Playwright.LaunchOptions
+      Playwright.Locator
+      Playwright.MethodName
+      Playwright.Page
+      Playwright.Protocol
+      Playwright.RemoteObject
+      Playwright.RequestId
+      Playwright.Response
+      Playwright.ScreenshotOptions
+      Playwright.Selector
+      Playwright.SerializedArgument
+      Playwright.SerializedError
+      Playwright.SerializedErrorInfo
+      Playwright.SerializedValue
+      Playwright.SpecialJsValue
+      Playwright.Timeout
+      Playwright.Transport
+      Playwright.Transport.Frame
+      Playwright.Transport.Memory
+      Playwright.Transport.Stdio
+      Playwright.TypedArrayKind
+      Playwright.Url
+  other-modules:
+      Paths_playwright
+  hs-source-dirs:
+      src
+  default-extensions:
+      DerivingStrategies
+      DerivingVia
+      OverloadedStrings
+      StrictData
+  ghc-options: -Werror -Weverything -Wno-all-missed-specialisations -Wno-implicit-prelude -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-safe -Wno-unsafe -Wno-missing-kind-signatures -Wno-missing-role-annotations
+  build-tool-depends:
+      playwright-codegen:playwright-codegen
+  build-depends:
+      aeson
+    , async
+    , autodocodec
+    , base ==4.20.*
+    , base64-bytestring
+    , binary
+    , bytestring
+    , containers
+    , directory
+    , filepath
+    , scientific
+    , stm
+    , text
+    , typed-process
+  default-language: GHC2021
+
+test-suite playwright-test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      Playwright.ConnectionSpec
+      Playwright.Harness
+      Playwright.IntegrationSpec
+      Playwright.LocatorSpec
+      Playwright.TransportSpec
+      Paths_playwright
+  hs-source-dirs:
+      test
+  default-extensions:
+      DerivingStrategies
+      DerivingVia
+      OverloadedStrings
+      StrictData
+  ghc-options: -Werror -Weverything -Wno-all-missed-specialisations -Wno-implicit-prelude -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-safe -Wno-unsafe -Wno-missing-kind-signatures -Wno-missing-role-annotations -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      aeson
+    , async
+    , base
+    , bytestring
+    , directory
+    , hedgehog
+    , playwright
+    , tasty
+    , tasty-hedgehog
+    , tasty-hunit
+    , text
+    , wai-app-static
+    , warp
+  default-language: GHC2021

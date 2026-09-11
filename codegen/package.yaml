@@ -1,0 +1,53 @@
+name: playwright-codegen
+version: 0.1.0.0
+synopsis: Generate Haskell types from Playwright protocol YAML
+license: Apache-2.0
+author: playwright-haskell contributors
+maintainer: playwright-haskell contributors
+
+language: GHC2021
+
+default-extensions:
+  - DerivingStrategies
+  - OverloadedStrings
+  - StrictData
+
+ghc-options:
+  - -Werror
+  - -Weverything
+  - -Wno-all-missed-specialisations
+  - -Wno-implicit-prelude
+  - -Wno-missing-safe-haskell-mode
+  - -Wno-prepositive-qualified-module
+  - -Wno-safe
+  - -Wno-unsafe
+  - -Wno-missing-kind-signatures
+  - -Wno-missing-role-annotations
+
+dependencies:
+  - base >= 4.20 && < 4.21
+
+library:
+  source-dirs: src
+  dependencies:
+    - aeson
+    - containers
+    - directory
+    - filepath
+    - text
+    - text-manipulate
+    - transformers
+    - vector
+    - yaml
+
+executables:
+  playwright-codegen:
+    main: Main.hs
+    source-dirs: app
+    ghc-options:
+      - -threaded
+    dependencies:
+      - filepath
+      - opt-env-conf
+      - playwright-codegen
+      - text
