@@ -7,6 +7,9 @@ module Playwright.NewContextOptions
 import Playwright.ColorScheme
   ( ColorScheme (ColorSchemeDark, ColorSchemeLight, ColorSchemeNoOverride, ColorSchemeNoPreference)
   )
+import Playwright.DeviceScaleFactor
+  ( DeviceScaleFactor (deviceScaleFactorToScientific)
+  )
 import Playwright.Geolocation
   ( Accuracy (accuracyToScientific)
   , Geolocation (geolocationAccuracy, geolocationLatitude, geolocationLongitude)
@@ -29,7 +32,7 @@ import Playwright.PermissionName
   ( PermissionName (permissionNameToText)
   )
 import Playwright.Protocol
-  ( BrowserNewContextParams (browserNewContextParamsBypassCSP, browserNewContextParamsColorScheme, browserNewContextParamsExtraHTTPHeaders, browserNewContextParamsGeolocation, browserNewContextParamsHttpCredentials, browserNewContextParamsIgnoreHTTPSErrors, browserNewContextParamsJavaScriptEnabled, browserNewContextParamsLocale, browserNewContextParamsOffline, browserNewContextParamsPermissions, browserNewContextParamsTimezoneId, browserNewContextParamsUserAgent, browserNewContextParamsViewport)
+  ( BrowserNewContextParams (browserNewContextParamsBypassCSP, browserNewContextParamsColorScheme, browserNewContextParamsDeviceScaleFactor, browserNewContextParamsExtraHTTPHeaders, browserNewContextParamsGeolocation, browserNewContextParamsHttpCredentials, browserNewContextParamsIgnoreHTTPSErrors, browserNewContextParamsJavaScriptEnabled, browserNewContextParamsLocale, browserNewContextParamsOffline, browserNewContextParamsPermissions, browserNewContextParamsTimezoneId, browserNewContextParamsUserAgent, browserNewContextParamsViewport)
   , BrowserNewContextParamsColorScheme (BrowserNewContextParamsColorSchemeDark, BrowserNewContextParamsColorSchemeLight, BrowserNewContextParamsColorSchemeNoOverride, BrowserNewContextParamsColorSchemeNoPreference)
   , BrowserNewContextParamsGeolocation (browserNewContextParamsGeolocationAccuracy)
   , BrowserNewContextParamsHttpCredentials (browserNewContextParamsHttpCredentialsOrigin)
@@ -57,6 +60,7 @@ import Playwright.ViewportSize
 data NewContextOptions = NewContextOptions
   { newContextBypassCSP :: Maybe Bool
   , newContextColorScheme :: Maybe ColorScheme
+  , newContextDeviceScaleFactor :: Maybe DeviceScaleFactor
   , newContextExtraHTTPHeaders :: Maybe [HttpHeader]
   , newContextGeolocation :: Maybe Geolocation
   , newContextHttpCredentials :: Maybe HttpCredentials
@@ -76,6 +80,7 @@ defaultNewContextOptions =
   NewContextOptions
     { newContextBypassCSP = Nothing
     , newContextColorScheme = Nothing
+    , newContextDeviceScaleFactor = Nothing
     , newContextExtraHTTPHeaders = Nothing
     , newContextGeolocation = Nothing
     , newContextHttpCredentials = Nothing
@@ -94,6 +99,8 @@ toBrowserNewContextParams opts =
   mkBrowserNewContextParams
     { browserNewContextParamsBypassCSP = newContextBypassCSP opts
     , browserNewContextParamsColorScheme = fmap toProtocolColor (newContextColorScheme opts)
+    , browserNewContextParamsDeviceScaleFactor =
+        fmap deviceScaleFactorToScientific (newContextDeviceScaleFactor opts)
     , browserNewContextParamsExtraHTTPHeaders = fmap (fmap toNameValue) (newContextExtraHTTPHeaders opts)
     , browserNewContextParamsGeolocation = fmap toProtocolGeolocation (newContextGeolocation opts)
     , browserNewContextParamsHttpCredentials = fmap toProtocolCredentials (newContextHttpCredentials opts)

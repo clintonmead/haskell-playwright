@@ -3,12 +3,13 @@ module Playwright.BrowserContextViewportSpec
   ) where
 
 import Playwright
-  ( NewContextOptions (newContextUserAgent, newContextViewport)
+  ( NewContextOptions (newContextDeviceScaleFactor, newContextUserAgent, newContextViewport)
   , UserAgent (UserAgent)
   , ViewportHeight (ViewportHeight)
   , ViewportSize (ViewportSize)
   , ViewportWidth (ViewportWidth)
   , defaultNewContextOptions
+  , deviceScaleFactorFromInt
   , evaluateNumber
   , evaluateText
   )
@@ -44,4 +45,10 @@ tests =
           defaultNewContextOptions {newContextUserAgent = Just (UserAgent "foobar")}
           $ \_ page ->
             assertEqual "ua" "foobar" =<< evaluateText page "() => navigator.userAgent"
+    , testCase "should respect deviceScaleFactor" $
+        withChromiumContextWith
+          defaultNewContextOptions {newContextDeviceScaleFactor = Just (deviceScaleFactorFromInt 3)}
+          $ \_ page ->
+            assertEqual "ratio" (3 :: Double)
+              =<< evaluateNumber page "() => window.devicePixelRatio"
     ]

@@ -24,6 +24,7 @@ module Playwright
   , CookieToSet (..)
   , CookieValue (..)
   , CssPixel (..)
+  , DeviceScaleFactor (..)
   , Dialog (..)
   , DialogType (..)
   , Disposable (..)
@@ -152,6 +153,7 @@ module Playwright
   , defaultRouteOptions
   , defaultScreenshotOptions
   , defaultTimeout
+  , deviceScaleFactorFromInt
   , dispatchEvent
   , dispose
   , dragAndDrop
@@ -449,6 +451,10 @@ import Playwright.CssPixel
   ( CssPixel (CssPixel, cssPixelToScientific)
   , cssPixelFromInt
   )
+import Playwright.DeviceScaleFactor
+  ( DeviceScaleFactor (DeviceScaleFactor, deviceScaleFactorToScientific)
+  , deviceScaleFactorFromInt
+  )
 import Playwright.Dialog
   ( Dialog (Dialog, dialogChannel, dialogDefaultValue, dialogMessage, dialogType)
   , acceptDialog
@@ -676,7 +682,7 @@ import Playwright.MediaType
   ( MediaType (MediaNoOverride, MediaPrint, MediaScreen)
   )
 import Playwright.NewContextOptions
-  ( NewContextOptions (NewContextOptions, newContextBypassCSP, newContextColorScheme, newContextExtraHTTPHeaders, newContextGeolocation, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextJavaScriptEnabled, newContextLocale, newContextOffline, newContextPermissions, newContextTimezoneId, newContextUserAgent, newContextViewport)
+  ( NewContextOptions (NewContextOptions, newContextBypassCSP, newContextColorScheme, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextGeolocation, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextJavaScriptEnabled, newContextLocale, newContextOffline, newContextPermissions, newContextTimezoneId, newContextUserAgent, newContextViewport)
   , defaultNewContextOptions
   )
 import Playwright.Page

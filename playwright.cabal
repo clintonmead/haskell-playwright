@@ -38,6 +38,7 @@ library
       Playwright.Cookie
       Playwright.CookieSameSite
       Playwright.CssPixel
+      Playwright.DeviceScaleFactor
       Playwright.Dialog
       Playwright.DialogType
       Playwright.Disposable
@@ -165,6 +166,7 @@ test-suite playwright-test
       Playwright.BrowserContextCredentialsSpec
       Playwright.BrowserContextCspSpec
       Playwright.BrowserContextExposeFunctionSpec
+      Playwright.BrowserContextJavaScriptSpec
       Playwright.BrowserContextLocaleSpec
       Playwright.BrowserContextOfflineSpec
       Playwright.BrowserContextRouteSpec
