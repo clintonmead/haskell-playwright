@@ -3,12 +3,14 @@ module Playwright.PageSelectOptionSpec
   ) where
 
 import Playwright
-  ( SelectOption (SelectLabel, SelectValue, SelectValueOrLabel)
+  ( SelectOption (SelectIndex, SelectLabel, SelectValue, SelectValueOrLabel)
+  , evaluate
   , evaluateTexts
   , selectOption
   )
 import Playwright.Harness
-  ( locate
+  ( assertProtocolContains
+  , locate
   , withAssetPage
   )
 import Test.Tasty
@@ -41,4 +43,32 @@ tests =
         withAssetPage "input/select.html" $ \page -> do
           _ <- selectOption (locate page "select") [SelectLabel "Indigo"]
           assertEqual "input" ["indigo"] =<< evaluateTexts page "() => window.result.onInput"
+    , testCase "should select single option by index" $
+        withAssetPage "input/select.html" $ \page -> do
+          _ <- selectOption (locate page "select") [SelectIndex 2]
+          assertEqual "input" ["brown"] =<< evaluateTexts page "() => window.result.onInput"
+    , testCase "should select only first option" $
+        withAssetPage "input/select.html" $ \page -> do
+          _ <-
+            selectOption
+              (locate page "select")
+              [SelectValueOrLabel "blue", SelectValueOrLabel "green", SelectValueOrLabel "red"]
+          assertEqual "input" ["blue"] =<< evaluateTexts page "() => window.result.onInput"
+    , testCase "should select multiple options" $
+        withAssetPage "input/select.html" $ \page -> do
+          _ <- evaluate page "() => window.makeMultiple()"
+          _ <-
+            selectOption
+              (locate page "select")
+              [SelectValueOrLabel "blue", SelectValueOrLabel "green", SelectValueOrLabel "red"]
+          assertEqual "input" ["blue", "green", "red"] =<< evaluateTexts page "() => window.result.onInput"
+    , testCase "should throw when element is not a select" $
+        withAssetPage "input/select.html" $ \page ->
+          assertProtocolContains
+            "Element is not a <select> element"
+            (selectOption (locate page "body") [SelectValueOrLabel ""])
+    , testCase "should return empty list on no matched values" $
+        withAssetPage "input/select.html" $ \page -> do
+          selected <- selectOption (locate page "select") []
+          assertEqual "selected" [] selected
     ]

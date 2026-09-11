@@ -6,9 +6,13 @@ import Data.Text
   ( isInfixOf
   )
 import Playwright
-  ( Exactness (Exact, Inexact)
+  ( AriaRole (AriaRole)
+  , Exactness (Exact, Inexact)
+  , defaultGetByRoleOptions
+  , evaluateOnLocatorAllTexts
   , evaluateOnLocatorText
   , getByLabel
+  , getByRole
   , getByTestId
   , getByText
   , innerText
@@ -46,4 +50,24 @@ tests =
             =<< evaluateOnLocatorText (getByText page "Name" Inexact) "e => e.nodeName"
           assertEqual "label is input" "INPUT"
             =<< evaluateOnLocatorText (getByLabel page "Name" Inexact) "e => e.nodeName"
+    , testCase "getByRole should work" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<a href=\"https://playwright.dev\">issues 123</a><a href=\"https://playwright.dev\">he llo 56</a><button>Click me</button>"
+          buttons <-
+            evaluateOnLocatorAllTexts
+              (getByRole page (AriaRole "button") defaultGetByRoleOptions)
+              "els => els.map(e => e.outerHTML)"
+          assertEqual "button" ["<button>Click me</button>"] buttons
+          links <-
+            evaluateOnLocatorAllTexts
+              (getByRole page (AriaRole "link") defaultGetByRoleOptions)
+              "els => els.map(e => e.outerHTML)"
+          assertEqual
+            "links"
+            [ "<a href=\"https://playwright.dev\">issues 123</a>"
+            , "<a href=\"https://playwright.dev\">he llo 56</a>"
+            ]
+            links
     ]

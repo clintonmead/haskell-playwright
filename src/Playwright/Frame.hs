@@ -1,5 +1,6 @@
 module Playwright.Frame
   ( Frame (..)
+  , evalOnSelectorAllFrame
   , evalOnSelectorFrame
   , evaluateFrame
   , evaluateFrameWith
@@ -46,6 +47,8 @@ import Playwright.MethodName
   )
 import Playwright.Protocol
   ( FrameContentResult (frameContentResultValue)
+  , FrameEvalOnSelectorAllParams (frameEvalOnSelectorAllParamsIsFunction)
+  , FrameEvalOnSelectorAllResult (frameEvalOnSelectorAllResultValue)
   , FrameEvalOnSelectorParams (frameEvalOnSelectorParamsIsFunction, frameEvalOnSelectorParamsStrict)
   , FrameEvalOnSelectorResult (frameEvalOnSelectorResultValue)
   , FrameEvaluateExpressionParams (frameEvaluateExpressionParamsIsFunction)
@@ -56,6 +59,7 @@ import Playwright.Protocol
   , FrameSetContentResult
   , FrameTitleResult (frameTitleResultValue)
   , mkFrameContentParams
+  , mkFrameEvalOnSelectorAllParams
   , mkFrameEvalOnSelectorParams
   , mkFrameEvaluateExpressionParams
   , mkFrameGotoParams
@@ -174,3 +178,14 @@ evalOnSelectorFrame frame selector expression arg = do
         , frameEvalOnSelectorParamsStrict = Just True
         }
   pure (frameEvalOnSelectorResultValue result)
+
+evalOnSelectorAllFrame :: Frame -> Selector -> Text -> SerializedArgument -> IO SerializedValue
+evalOnSelectorAllFrame frame selector expression arg = do
+  result <-
+    frameSend
+      frame
+      "evalOnSelectorAll"
+      (mkFrameEvalOnSelectorAllParams arg expression selector)
+        { frameEvalOnSelectorAllParamsIsFunction = Just True
+        }
+  pure (frameEvalOnSelectorAllResultValue result)

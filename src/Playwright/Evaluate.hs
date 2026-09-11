@@ -3,6 +3,7 @@ module Playwright.Evaluate
   , evaluateBool
   , evaluateNumber
   , evaluateOnLocator
+  , evaluateOnLocatorAllTexts
   , evaluateOnLocatorBool
   , evaluateOnLocatorText
   , evaluateOnLocatorWith
@@ -22,7 +23,8 @@ import Playwright.Error
   ( PlaywrightError (EvaluateUnexpected)
   )
 import Playwright.Frame
-  ( evalOnSelectorFrame
+  ( evalOnSelectorAllFrame
+  , evalOnSelectorFrame
   , evaluateFrame
   , evaluateFrameWith
   )
@@ -58,6 +60,11 @@ evaluateOnLocator loc expression =
 evaluateOnLocatorWith :: Locator -> Text -> SerializedArgument -> IO SerializedValue
 evaluateOnLocatorWith loc expression arg =
   evalOnSelectorFrame (locatorFrame loc) (locatorSelector loc) expression arg
+
+evaluateOnLocatorAllTexts :: Locator -> Text -> IO [Text]
+evaluateOnLocatorAllTexts loc expression =
+  requireTexts
+    =<< evalOnSelectorAllFrame (locatorFrame loc) (locatorSelector loc) expression undefinedArgument
 
 evaluateText :: Page -> Text -> IO Text
 evaluateText page expression =

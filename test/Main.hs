@@ -5,6 +5,7 @@ module Main
 import Playwright.ConnectionSpec qualified as ConnectionSpec
 import Playwright.IntegrationSpec qualified as IntegrationSpec
 import Playwright.LocatorClickSpec qualified as LocatorClickSpec
+import Playwright.LocatorEvaluateSpec qualified as LocatorEvaluateSpec
 import Playwright.LocatorIsVisibleSpec qualified as LocatorIsVisibleSpec
 import Playwright.LocatorQuerySpec qualified as LocatorQuerySpec
 import Playwright.LocatorSpec qualified as LocatorSpec
@@ -41,6 +42,7 @@ main =
         , IntegrationSpec.tests
         , LocatorSpec.tests
         , LocatorClickSpec.tests
+        , LocatorEvaluateSpec.tests
         , LocatorIsVisibleSpec.tests
         , LocatorQuerySpec.tests
         , PageCheckSpec.tests

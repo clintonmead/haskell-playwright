@@ -46,6 +46,7 @@ module Playwright
   , evaluateBool
   , evaluateNumber
   , evaluateOnLocator
+  , evaluateOnLocatorAllTexts
   , evaluateOnLocatorBool
   , evaluateOnLocatorText
   , evaluateOnLocatorWith
@@ -158,6 +159,7 @@ import Playwright.Evaluate
   , evaluateBool
   , evaluateNumber
   , evaluateOnLocator
+  , evaluateOnLocatorAllTexts
   , evaluateOnLocatorBool
   , evaluateOnLocatorText
   , evaluateOnLocatorWith
