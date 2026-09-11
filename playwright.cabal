@@ -45,6 +45,7 @@ library
       Playwright.GetByRoleOptions
       Playwright.GotoOptions
       Playwright.Guid
+      Playwright.HttpHeader
       Playwright.HttpStatus
       Playwright.Incoming
       Playwright.Instance
@@ -142,6 +143,7 @@ test-suite playwright-test
       Playwright.PageMouseSpec
       Playwright.PageSelectOptionSpec
       Playwright.PageSetContentSpec
+      Playwright.PageSetExtraHTTPHeadersSpec
       Playwright.PageWaitForFunctionSpec
       Playwright.PageWaitForLoadStateSpec
       Playwright.PageWaitForSelectorSpec
@@ -165,11 +167,13 @@ test-suite playwright-test
     , bytestring
     , directory
     , hedgehog
+    , http-types
     , playwright
     , tasty
     , tasty-hedgehog
     , tasty-hunit
     , text
+    , wai
     , wai-app-static
     , warp
   default-language: GHC2021

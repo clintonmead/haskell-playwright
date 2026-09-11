@@ -70,4 +70,13 @@ tests =
             , "<a href=\"https://playwright.dev\">he llo 56</a>"
             ]
             links
+    , testCase "getByTestId should escape id" $
+        withChromiumPage $ \page -> do
+          setContent page "<div><div data-testid='He\"llo'>Hello world</div></div>"
+          assertEqual "text" "Hello world" =<< innerText (getByTestId page "He\"llo")
+    , testCase "getByText should work" $
+        withChromiumPage $ \page -> do
+          setContent page "<div>yo</div><div>ya</div><div>\nye  </div>"
+          html <- evaluateOnLocatorText (getByText page "ye" Inexact) "e => e.outerHTML"
+          assertEqual "ye" True (">\nye  </div>" `isInfixOf` html)
     ]

@@ -13,6 +13,9 @@ module Playwright
   , Frame (..)
   , GetByRoleOptions (..)
   , GotoOptions (..)
+  , HeaderName (..)
+  , HeaderValue (..)
+  , HttpHeader (..)
   , HttpStatus (..)
   , JsHandle (..)
   , Key (..)
@@ -65,6 +68,7 @@ module Playwright
   , evaluateBoolWith
   , evaluateNumber
   , evaluateNumberWith
+  , evaluateNumbersWith
   , evaluateOnLocator
   , evaluateOnLocatorAllTexts
   , evaluateOnLocatorBool
@@ -121,6 +125,7 @@ module Playwright
   , newPage
   , nth
   , numberArgument
+  , numbersArgument
   , pageFromRef
   , press
   , querySelector
@@ -134,6 +139,7 @@ module Playwright
   , selectorToText
   , setChecked
   , setContent
+  , setExtraHTTPHeaders
   , setViewportSize
   , specialArgument
   , textArgument
@@ -208,6 +214,7 @@ import Playwright.Evaluate
   , evaluateBoolWith
   , evaluateNumber
   , evaluateNumberWith
+  , evaluateNumbersWith
   , evaluateOnLocator
   , evaluateOnLocatorAllTexts
   , evaluateOnLocatorBool
@@ -233,6 +240,11 @@ import Playwright.GetByRoleOptions
 import Playwright.GotoOptions
   ( GotoOptions (GotoOptions, gotoOptionsReferer, gotoOptionsTimeout, gotoOptionsWaitUntil)
   , defaultGotoOptions
+  )
+import Playwright.HttpHeader
+  ( HeaderName (HeaderName)
+  , HeaderValue (HeaderValue)
+  , HttpHeader (HttpHeader)
   )
 import Playwright.HttpStatus
   ( HttpStatus (HttpStatus, httpStatusToInt)
@@ -329,6 +341,7 @@ import Playwright.Page
   , reload
   , screenshot
   , setContent
+  , setExtraHTTPHeaders
   , setViewportSize
   , title
   , url
@@ -362,6 +375,7 @@ import Playwright.Selector
 import Playwright.SerializedArgument
   ( boolArgument
   , numberArgument
+  , numbersArgument
   , specialArgument
   , textArgument
   )

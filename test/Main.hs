@@ -24,6 +24,7 @@ import Playwright.PageKeyboardSpec qualified as PageKeyboardSpec
 import Playwright.PageMouseSpec qualified as PageMouseSpec
 import Playwright.PageSetContentSpec qualified as PageSetContentSpec
 import Playwright.PageSelectOptionSpec qualified as PageSelectOptionSpec
+import Playwright.PageSetExtraHTTPHeadersSpec qualified as PageSetExtraHTTPHeadersSpec
 import Playwright.PageWaitForFunctionSpec qualified as PageWaitForFunctionSpec
 import Playwright.PageWaitForLoadStateSpec qualified as PageWaitForLoadStateSpec
 import Playwright.PageWaitForSelectorSpec qualified as PageWaitForSelectorSpec
@@ -68,6 +69,7 @@ main =
         , PageMouseSpec.tests
         , PageSelectOptionSpec.tests
         , PageSetContentSpec.tests
+        , PageSetExtraHTTPHeadersSpec.tests
         , PageWaitForFunctionSpec.tests
         , PageWaitForLoadStateSpec.tests
         , PageWaitForSelectorSpec.tests

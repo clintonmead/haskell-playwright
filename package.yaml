@@ -68,10 +68,12 @@ tests:
       - bytestring
       - directory
       - hedgehog
+      - http-types
       - playwright
       - tasty
       - tasty-hedgehog
       - tasty-hunit
       - text
+      - wai
       - wai-app-static
       - warp

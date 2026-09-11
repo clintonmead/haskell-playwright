@@ -4,6 +4,7 @@ module Playwright.Evaluate
   , evaluateBoolWith
   , evaluateNumber
   , evaluateNumberWith
+  , evaluateNumbersWith
   , evaluateOnLocator
   , evaluateOnLocatorAllTexts
   , evaluateOnLocatorBool
@@ -102,6 +103,10 @@ evaluateNumberWith :: Page -> Text -> SerializedArgument -> IO Double
 evaluateNumberWith page expression arg =
   requireNumber =<< evaluateWith page expression arg
 
+evaluateNumbersWith :: Page -> Text -> SerializedArgument -> IO [Double]
+evaluateNumbersWith page expression arg =
+  requireNumbers =<< evaluateWith page expression arg
+
 evaluateSpecial :: Page -> Text -> IO SpecialJsValue
 evaluateSpecial page expression =
   requireSpecial =<< evaluate page expression
@@ -135,6 +140,14 @@ requireNumber value =
   case value of
     SerializedNode (PayloadNumber number) _ ->
       pure number
+    _ ->
+      throwIO (EvaluateUnexpected value)
+
+requireNumbers :: SerializedValue -> IO [Double]
+requireNumbers value =
+  case value of
+    SerializedNode (PayloadArray items) _ ->
+      traverse requireNumber items
     _ ->
       throwIO (EvaluateUnexpected value)
 

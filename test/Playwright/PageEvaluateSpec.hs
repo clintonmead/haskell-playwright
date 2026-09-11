@@ -11,10 +11,12 @@ import Playwright
   , evaluateBoolWith
   , evaluateNumber
   , evaluateNumberWith
+  , evaluateNumbersWith
   , evaluateSpecial
   , evaluateSpecialWith
   , evaluateTextWith
   , numberArgument
+  , numbersArgument
   , specialArgument
   , textArgument
   )
@@ -94,4 +96,17 @@ tests =
         withChromiumPage $ \page -> do
           special <- evaluateSpecial page "() => {}"
           assertEqual "undefined" SpecialUndefined special
+    , testCase "should transfer arrays" $
+        withChromiumPage $ \page -> do
+          result <- evaluateNumbersWith page "a => a" (numbersArgument [1, 2, 3])
+          assertEqual "array" [1, 2, 3 :: Double] result
+    , testCase "should transfer arrays as arrays, not objects" $
+        withChromiumPage $ \page -> do
+          result <- evaluateBoolWith page "a => Array.isArray(a)" (numbersArgument [1, 2, 3])
+          assertEqual "isArray" True result
+    , testCase "should modify global environment" $
+        withChromiumPage $ \page -> do
+          _ <- evaluateNumber page "() => { window.globalVar = 123; return 123; }"
+          result <- evaluateNumber page "() => window.globalVar"
+          assertEqual "global" (123 :: Double) result
     ]

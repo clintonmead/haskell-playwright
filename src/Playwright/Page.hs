@@ -20,6 +20,7 @@ module Playwright.Page
   , querySelector
   , setViewportSize
   , addInitScript
+  , setExtraHTTPHeaders
   , waitForFunction
   , waitForLoadState
   , waitForTimeout
@@ -82,6 +83,11 @@ import Playwright.GetByRoleOptions
 import Playwright.GotoOptions
   ( GotoOptions
   )
+import Playwright.HttpHeader
+  ( HeaderName (headerNameToText)
+  , HeaderValue (headerValueToText)
+  , HttpHeader (httpHeaderName, httpHeaderValue)
+  )
 import Playwright.Json.ChannelRef
   ( ChannelRef (channelRefGuid)
   )
@@ -104,7 +110,8 @@ import Playwright.MethodName
   ( MethodName (MethodName)
   )
 import Playwright.Protocol
-  ( PageAddInitScriptResult
+  ( NameValue
+  , PageAddInitScriptResult
   , PageCloseResult
   , PageGoBackResult (pageGoBackResultResponse)
   , PageGoForwardResult (pageGoForwardResultResponse)
@@ -112,13 +119,16 @@ import Playwright.Protocol
   , PageReloadResult (pageReloadResultResponse)
   , PageScreenshotParams (pageScreenshotParamsFullPage)
   , PageScreenshotResult (pageScreenshotResultBinary)
+  , PageSetExtraHTTPHeadersResult
   , PageSetViewportSizeResult
+  , mkNameValue
   , mkPageAddInitScriptParams
   , mkPageCloseParams
   , mkPageGoBackParams
   , mkPageGoForwardParams
   , mkPageReloadParams
   , mkPageScreenshotParams
+  , mkPageSetExtraHTTPHeadersParams
   , mkPageSetViewportSizeParams
   , mkPageSetViewportSizeParamsViewportSize
   )
@@ -267,6 +277,19 @@ addInitScript page source = do
   _ :: PageAddInitScriptResult <-
     send (pageChannel page) (MethodName "addInitScript") (mkPageAddInitScriptParams source)
   pure ()
+
+setExtraHTTPHeaders :: Page -> [HttpHeader] -> IO ()
+setExtraHTTPHeaders page headers = do
+  _ :: PageSetExtraHTTPHeadersResult <-
+    send
+      (pageChannel page)
+      (MethodName "setExtraHTTPHeaders")
+      (mkPageSetExtraHTTPHeadersParams (fmap toNameValue headers))
+  pure ()
+
+toNameValue :: HttpHeader -> NameValue
+toNameValue header =
+  mkNameValue (headerNameToText (httpHeaderName header)) (headerValueToText (httpHeaderValue header))
 
 waitForLoadState :: Page -> LoadState -> IO ()
 waitForLoadState page =
