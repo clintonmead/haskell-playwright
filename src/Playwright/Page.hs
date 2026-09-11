@@ -29,6 +29,8 @@ module Playwright.Page
   , setExtraHTTPHeaders
   , waitForFunction
   , waitForLoadState
+  , waitForNavigation
+  , waitForNavigationWith
   , waitForTimeout
   , waitForURL
   , waitForURLWith
@@ -82,6 +84,7 @@ import Playwright.Connection
   ( lookupObject
   , registerEventWaiter
   , waitForChannelEvent
+  , waitForFutureChannelEvent
   , waitUntilUrl
   )
 import Playwright.ConsoleMessage
@@ -173,6 +176,8 @@ import Playwright.Protocol
   , FrameAddScriptTagResult (frameAddScriptTagResultElement)
   , FrameAddStyleTagParams (frameAddStyleTagParamsContent, frameAddStyleTagParamsUrl)
   , FrameAddStyleTagResult (frameAddStyleTagResultElement)
+  , FrameNavigatedEvent (frameNavigatedEventNewDocument, frameNavigatedEventUrl)
+  , FrameNavigatedEventNewDocument (frameNavigatedEventNewDocumentRequest)
   , NameValue
   , PageAddInitScriptResult
   , PageCloseResult
@@ -204,6 +209,7 @@ import Playwright.RemoteObject
 import Playwright.Request
   ( Request
   , requestFromRef
+  , requestResponseRef
   , requestUrl
   )
 import Playwright.Response
@@ -474,6 +480,34 @@ waitForURLWith page glob timeout =
       (channelGuid (frameChannel (pageMainFrame page)))
       (matchesUrlGlob glob)
     waitForLoadState page LoadStateLoad
+
+waitForNavigation :: Page -> IO (Maybe Response)
+waitForNavigation page =
+  waitForNavigationWith page defaultTimeout Nothing
+
+waitForNavigationWith :: Page -> Timeout -> Maybe UrlGlob -> IO (Maybe Response)
+waitForNavigationWith page timeout glob =
+  waitWithTimeout timeout (collectNavigation page glob)
+
+collectNavigation :: Page -> Maybe UrlGlob -> IO (Maybe Response)
+collectNavigation page glob = do
+  let
+    conn = channelConnection (pageChannel page)
+    frameGuid = channelGuid (frameChannel (pageMainFrame page))
+  params <- waitForFutureChannelEvent conn frameGuid (MethodName "navigated")
+  event <- either throwIO pure (fromJsonValue params)
+  let matches = maybe True (`matchesUrlGlob` frameNavigatedEventUrl event) glob
+  if matches
+    then do
+      waitForLoadState page LoadStateLoad
+      case frameNavigatedEventNewDocument event >>= frameNavigatedEventNewDocumentRequest of
+        Nothing ->
+          pure Nothing
+        Just requestRef -> do
+          responseRef <- requestResponseRef (requestFromRef conn requestRef)
+          pure (fmap (responseFromRef conn) responseRef)
+    else
+      collectNavigation page glob
 
 subscribeContext :: Page -> BrowserContextUpdateSubscriptionParamsEvent -> IO ()
 subscribeContext page event = do

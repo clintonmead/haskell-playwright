@@ -13,6 +13,10 @@ module Playwright.Evaluate
   , evaluateOnElementText
   , evaluateOnFrame
   , evaluateOnFrameText
+  , evaluateOnHandle
+  , evaluateOnHandleExpression
+  , evaluateOnHandleExpressionNumbers
+  , evaluateOnHandleNumbers
   , evaluateOnLocator
   , evaluateOnLocatorAllTexts
   , evaluateOnLocatorBool
@@ -51,7 +55,7 @@ import Playwright.Frame
   , frameSend
   )
 import Playwright.JsHandle
-  ( JsHandle
+  ( JsHandle (jsHandleChannel)
   , jsHandleFromRef
   )
 import Playwright.Locator
@@ -143,6 +147,33 @@ evaluateOnElementText handle expression =
 evaluateOnElementNumber :: ElementHandle -> Text -> IO Double
 evaluateOnElementNumber handle expression =
   requireNumber =<< evaluateOnElement handle expression
+
+evaluateOnHandle :: JsHandle -> Text -> IO SerializedValue
+evaluateOnHandle handle expression =
+  evaluateOnHandleIsFunction handle expression True
+
+evaluateOnHandleExpression :: JsHandle -> Text -> IO SerializedValue
+evaluateOnHandleExpression handle expression =
+  evaluateOnHandleIsFunction handle expression False
+
+evaluateOnHandleNumbers :: JsHandle -> Text -> IO [Double]
+evaluateOnHandleNumbers handle expression =
+  requireNumbers =<< evaluateOnHandle handle expression
+
+evaluateOnHandleExpressionNumbers :: JsHandle -> Text -> IO [Double]
+evaluateOnHandleExpressionNumbers handle expression =
+  requireNumbers =<< evaluateOnHandleExpression handle expression
+
+evaluateOnHandleIsFunction :: JsHandle -> Text -> Bool -> IO SerializedValue
+evaluateOnHandleIsFunction handle expression isFunction = do
+  result <-
+    send
+      (jsHandleChannel handle)
+      (MethodName "evaluateExpression")
+      (mkJSHandleEvaluateExpressionParams undefinedArgument expression)
+        { jSHandleEvaluateExpressionParamsIsFunction = Just isFunction
+        }
+  pure (jSHandleEvaluateExpressionResultValue result)
 
 evaluateOnLocator :: Locator -> Text -> IO SerializedValue
 evaluateOnLocator loc expression =

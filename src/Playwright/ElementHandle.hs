@@ -12,6 +12,8 @@ module Playwright.ElementHandle
   , inputValueHandle
   , scrollIntoViewIfNeeded
   , scrollIntoViewIfNeededWith
+  , selectText
+  , selectTextWith
   , textContentHandle
   , typeHandle
   ) where
@@ -57,6 +59,7 @@ import Playwright.Protocol
   , ElementHandleInputValueResult (elementHandleInputValueResultValue)
   , ElementHandleOwnerFrameResult (elementHandleOwnerFrameResultFrame)
   , ElementHandleScrollIntoViewIfNeededResult
+  , ElementHandleSelectTextResult
   , ElementHandleTextContentResult (elementHandleTextContentResultValue)
   , ElementHandleTypeResult
   , Rect (rectHeight, rectWidth, rectX, rectY)
@@ -69,6 +72,7 @@ import Playwright.Protocol
   , mkElementHandleInputValueParams
   , mkElementHandleOwnerFrameParams
   , mkElementHandleScrollIntoViewIfNeededParams
+  , mkElementHandleSelectTextParams
   , mkElementHandleTextContentParams
   , mkElementHandleTypeParams
   )
@@ -174,4 +178,14 @@ scrollIntoViewIfNeededWith :: ElementHandle -> Timeout -> IO ()
 scrollIntoViewIfNeededWith handle timeout = do
   _ :: ElementHandleScrollIntoViewIfNeededResult <-
     handleSend handle "scrollIntoViewIfNeeded" (mkElementHandleScrollIntoViewIfNeededParams timeout)
+  pure ()
+
+selectText :: ElementHandle -> IO ()
+selectText handle =
+  selectTextWith handle defaultTimeout
+
+selectTextWith :: ElementHandle -> Timeout -> IO ()
+selectTextWith handle timeout = do
+  _ :: ElementHandleSelectTextResult <-
+    handleSend handle "selectText" (mkElementHandleSelectTextParams timeout)
   pure ()

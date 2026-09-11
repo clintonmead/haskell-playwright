@@ -4,8 +4,10 @@ module Playwright.Connection
   , sendCommand
   , guidsOfType
   , lookupObject
+  , registerEventHandler
   , registerEventWaiter
   , waitForChannelEvent
+  , waitForFutureChannelEvent
   , waitForLifecycle
   , waitUntilUrl
   , closedGuids
@@ -17,6 +19,9 @@ import Autodocodec
   , object
   , requiredField'
   , (.=)
+  )
+import Control.Concurrent
+  ( forkIO
   )
 import Control.Concurrent.Async
   ( withAsync
@@ -37,11 +42,14 @@ import Control.Concurrent.STM
   , writeTVar
   )
 import Control.Exception
-  ( finally
+  ( SomeException
+  , catch
+  , finally
   , throwIO
   )
 import Control.Monad
   ( unless
+  , void
   )
 import Data.Aeson
   ( FromJSON
@@ -59,6 +67,9 @@ import Data.Aeson qualified as Aeson
   )
 import Data.ByteString.Lazy
   ( toStrict
+  )
+import Data.Foldable
+  ( traverse_
   )
 import Data.Map.Strict
   ( Map
@@ -121,12 +132,19 @@ data Connection = Connection
   , connectionEventWaiters :: TVar [EventWaiter]
   , connectionEventBuffer :: TVar (Map (Guid, MethodName) (Seq Value))
   , connectionClosedGuids :: TVar (Set Guid)
+  , connectionEventHandlers :: TVar [EventHandler]
   }
 
 data EventWaiter = EventWaiter
   { eventWaiterGuid :: Guid
   , eventWaiterMethod :: MethodName
   , eventWaiterBox :: TMVar Value
+  }
+
+data EventHandler = EventHandler
+  { eventHandlerGuid :: Guid
+  , eventHandlerMethod :: MethodName
+  , eventHandlerRun :: Value -> IO ()
   }
 
 data OutgoingCall = OutgoingCall
@@ -158,6 +176,7 @@ withConnection transport action = do
   eventWaiters <- newTVarIO []
   eventBuffer <- newTVarIO Map.empty
   closedGuidsVar <- newTVarIO Set.empty
+  eventHandlers <- newTVarIO []
   let
     conn :: Connection
     conn =
@@ -170,6 +189,7 @@ withConnection transport action = do
         , connectionEventWaiters = eventWaiters
         , connectionEventBuffer = eventBuffer
         , connectionClosedGuids = closedGuidsVar
+        , connectionEventHandlers = eventHandlers
         }
   withAsync (readerLoop conn) $ \_ ->
     action conn `finally` closeTransport transport
@@ -326,6 +346,7 @@ handleEvent conn guid method params = do
     _ ->
       pure ()
   deliverEvent conn guid method params
+  runEventHandlers conn guid method params
 
 deliverEvent :: Connection -> Guid -> MethodName -> Value -> IO ()
 deliverEvent conn guid method params =
@@ -341,6 +362,32 @@ deliverEvent conn guid method params =
   where
     matches waiter =
       eventWaiterGuid waiter == guid && eventWaiterMethod waiter == method
+
+registerEventHandler :: Connection -> Guid -> MethodName -> (Value -> IO ()) -> IO ()
+registerEventHandler conn guid method run =
+  atomically $
+    modifyTVar' (connectionEventHandlers conn) (EventHandler guid method run :)
+
+runEventHandlers :: Connection -> Guid -> MethodName -> Value -> IO ()
+runEventHandlers conn guid method params = do
+  handlers <- atomically (readTVar (connectionEventHandlers conn))
+  let
+    matching =
+      filter
+        ( \handler ->
+            eventHandlerGuid handler == guid && eventHandlerMethod handler == method
+        )
+        handlers
+  traverse_ (forkHandler params) matching
+
+forkHandler :: Value -> EventHandler -> IO ()
+forkHandler params handler =
+  void
+    ( forkIO
+        ( eventHandlerRun handler params
+            `catch` (\(_ :: SomeException) -> pure ())
+        )
+    )
 
 registerEventWaiter :: Connection -> Guid -> MethodName -> IO (TMVar Value)
 registerEventWaiter conn guid method = do
@@ -358,6 +405,13 @@ registerEventWaiter conn guid method = do
 waitForChannelEvent :: Connection -> Guid -> MethodName -> IO Value
 waitForChannelEvent conn guid method = do
   box <- registerEventWaiter conn guid method
+  atomically (takeTMVar box)
+
+waitForFutureChannelEvent :: Connection -> Guid -> MethodName -> IO Value
+waitForFutureChannelEvent conn guid method = do
+  box <- newEmptyTMVarIO
+  atomically $
+    modifyTVar' (connectionEventWaiters conn) (EventWaiter guid method box :)
   atomically (takeTMVar box)
 
 waitUntilUrl :: Connection -> Guid -> (Url -> Bool) -> IO ()

@@ -6,6 +6,7 @@ module Playwright.Request
   , requestIsNavigation
   , requestMethod
   , requestResourceType
+  , requestResponseRef
   , requestUrl
   ) where
 
@@ -15,6 +16,7 @@ import Control.Exception
 import Playwright.Channel
   ( Channel (Channel, channelConnection, channelGuid)
   , RequestTag
+  , send
   )
 import Playwright.Connection
   ( Connection
@@ -34,9 +36,14 @@ import Playwright.Json.ChannelRef
 import Playwright.Json.Decode
   ( fromJsonValue
   )
+import Playwright.MethodName
+  ( MethodName (MethodName)
+  )
 import Playwright.Protocol
   ( NameValue (nameValueName, nameValueValue)
   , RequestInitializer (requestInitializerFrame, requestInitializerHeaders, requestInitializerIsNavigationRequest, requestInitializerMethod, requestInitializerResourceType, requestInitializerUrl)
+  , RequestResponseResult (requestResponseResultResponse)
+  , mkRequestResponseParams
   )
 import Playwright.RemoteObject
   ( RemoteObject (remoteInitializer)
@@ -84,6 +91,15 @@ requestHeaders request =
 requestFrameRef :: Request -> IO (Maybe ChannelRef)
 requestFrameRef request =
   requestInitializerFrame <$> requestInitializer request
+
+requestResponseRef :: Request -> IO (Maybe ChannelRef)
+requestResponseRef request = do
+  result <-
+    send
+      (requestChannel request)
+      (MethodName "response")
+      mkRequestResponseParams
+  pure (requestResponseResultResponse result)
 
 fromNameValue :: NameValue -> HttpHeader
 fromNameValue header =

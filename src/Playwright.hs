@@ -5,6 +5,7 @@ module Playwright
   , BrowserType (..)
   , AriaRole (..)
   , BoundingBox (..)
+  , BindingName (..)
   , CheckOptions (..)
   , ColorScheme (..)
   , ConsoleMessage (..)
@@ -22,6 +23,7 @@ module Playwright
   , CssPixel (..)
   , Dialog (..)
   , DialogType (..)
+  , Disposable (..)
   , DomEventType (..)
   , ElementHandle (..)
   , EmulateMedia (..)
@@ -116,6 +118,7 @@ module Playwright
   , defaultScreenshotOptions
   , defaultTimeout
   , dispatchEvent
+  , dispose
   , dragAndDrop
   , dismissDialog
   , elementArgument
@@ -138,6 +141,10 @@ module Playwright
   , evaluateOnElementText
   , evaluateOnFrame
   , evaluateOnFrameText
+  , evaluateOnHandle
+  , evaluateOnHandleExpression
+  , evaluateOnHandleExpressionNumbers
+  , evaluateOnHandleNumbers
   , evaluateOnLocator
   , evaluateOnLocatorAllTexts
   , evaluateOnLocatorBool
@@ -151,6 +158,7 @@ module Playwright
   , evaluateTextWith
   , evaluateTexts
   , evaluateWith
+  , exposeFunction
   , fill
   , firefox
   , first
@@ -241,6 +249,8 @@ module Playwright
   , scrollIntoViewIfNeeded
   , scrollIntoViewIfNeededWith
   , selectOption
+  , selectText
+  , selectTextWith
   , selectorFromText
   , selectorToText
   , sessionExpires
@@ -272,6 +282,8 @@ module Playwright
   , waitForDialog
   , waitForFunction
   , waitForLoadState
+  , waitForNavigation
+  , waitForNavigationWith
   , waitForPageError
   , waitForPopup
   , waitForRequest
@@ -296,6 +308,9 @@ module Playwright
 
 import Playwright.AriaRole
   ( AriaRole (AriaRole, ariaRoleToText)
+  )
+import Playwright.BindingName
+  ( BindingName (BindingName, bindingNameToText)
   )
 import Playwright.BoundingBox
   ( BoundingBox (BoundingBox, boundingBoxHeight, boundingBoxWidth, boundingBoxX, boundingBoxY)
@@ -370,6 +385,10 @@ import Playwright.Dialog
 import Playwright.DialogType
   ( DialogType (DialogAlert, DialogBeforeUnload, DialogConfirm, DialogPrompt)
   )
+import Playwright.Disposable
+  ( Disposable (Disposable)
+  , dispose
+  )
 import Playwright.DomEventType
   ( DomEventType (DomEventType)
   )
@@ -386,6 +405,8 @@ import Playwright.ElementHandle
   , ownerFrameHandle
   , scrollIntoViewIfNeeded
   , scrollIntoViewIfNeededWith
+  , selectText
+  , selectTextWith
   , textContentHandle
   , typeHandle
   )
@@ -409,6 +430,10 @@ import Playwright.Evaluate
   , evaluateOnElementText
   , evaluateOnFrame
   , evaluateOnFrameText
+  , evaluateOnHandle
+  , evaluateOnHandleExpression
+  , evaluateOnHandleExpressionNumbers
+  , evaluateOnHandleNumbers
   , evaluateOnLocator
   , evaluateOnLocatorAllTexts
   , evaluateOnLocatorBool
@@ -423,6 +448,9 @@ import Playwright.Evaluate
   )
 import Playwright.Exactness
   ( Exactness (Exact, Inexact)
+  )
+import Playwright.Expose
+  ( exposeFunction
   )
 import Playwright.Frame
   ( Frame (Frame, frameChannel, frameParent, frameUrl)
@@ -572,6 +600,8 @@ import Playwright.Page
   , waitForDialog
   , waitForFunction
   , waitForLoadState
+  , waitForNavigation
+  , waitForNavigationWith
   , waitForPopup
   , waitForRequest
   , waitForRequestWith

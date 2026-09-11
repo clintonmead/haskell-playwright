@@ -12,10 +12,13 @@ import Playwright.ElementHandleConvenienceSpec qualified as ElementHandleConveni
 import Playwright.ElementHandleOwnerFrameSpec qualified as ElementHandleOwnerFrameSpec
 import Playwright.ElementHandlePressSpec qualified as ElementHandlePressSpec
 import Playwright.ElementHandleScrollIntoViewSpec qualified as ElementHandleScrollIntoViewSpec
+import Playwright.ElementHandleSelectTextSpec qualified as ElementHandleSelectTextSpec
 import Playwright.ElementHandleTypeSpec qualified as ElementHandleTypeSpec
 import Playwright.FrameEvaluateSpec qualified as FrameEvaluateSpec
 import Playwright.FrameHierarchySpec qualified as FrameHierarchySpec
 import Playwright.IntegrationSpec qualified as IntegrationSpec
+import Playwright.JsHandleAsElementSpec qualified as JsHandleAsElementSpec
+import Playwright.JsHandleEvaluateSpec qualified as JsHandleEvaluateSpec
 import Playwright.JsHandleJsonValueSpec qualified as JsHandleJsonValueSpec
 import Playwright.JsHandlePropertiesSpec qualified as JsHandlePropertiesSpec
 import Playwright.LocatorClickSpec qualified as LocatorClickSpec
@@ -41,6 +44,7 @@ import Playwright.PageEvaluateSpec qualified as PageEvaluateSpec
 import Playwright.PageEvaluateHandleSpec qualified as PageEvaluateHandleSpec
 import Playwright.PageEmulateMediaSpec qualified as PageEmulateMediaSpec
 import Playwright.PageEventPageErrorSpec qualified as PageEventPageErrorSpec
+import Playwright.PageExposeFunctionSpec qualified as PageExposeFunctionSpec
 import Playwright.PageFillSpec qualified as PageFillSpec
 import Playwright.PageFocusSpec qualified as PageFocusSpec
 import Playwright.PageGotoSpec qualified as PageGotoSpec
@@ -57,6 +61,7 @@ import Playwright.PageSetExtraHTTPHeadersSpec qualified as PageSetExtraHTTPHeade
 import Playwright.PageStrictSpec qualified as PageStrictSpec
 import Playwright.PageWaitForFunctionSpec qualified as PageWaitForFunctionSpec
 import Playwright.PageWaitForLoadStateSpec qualified as PageWaitForLoadStateSpec
+import Playwright.PageWaitForNavigationSpec qualified as PageWaitForNavigationSpec
 import Playwright.PageWaitForResponseSpec qualified as PageWaitForResponseSpec
 import Playwright.PageWaitForRequestSpec qualified as PageWaitForRequestSpec
 import Playwright.PageWaitForSelectorSpec qualified as PageWaitForSelectorSpec
@@ -92,10 +97,13 @@ main =
         , ElementHandleOwnerFrameSpec.tests
         , ElementHandlePressSpec.tests
         , ElementHandleScrollIntoViewSpec.tests
+        , ElementHandleSelectTextSpec.tests
         , ElementHandleTypeSpec.tests
         , FrameEvaluateSpec.tests
         , FrameHierarchySpec.tests
         , IntegrationSpec.tests
+        , JsHandleAsElementSpec.tests
+        , JsHandleEvaluateSpec.tests
         , JsHandleJsonValueSpec.tests
         , JsHandlePropertiesSpec.tests
         , LocatorSpec.tests
@@ -121,6 +129,7 @@ main =
         , PageEventPopupSpec.tests
         , PageEvaluateSpec.tests
         , PageEvaluateHandleSpec.tests
+        , PageExposeFunctionSpec.tests
         , PageFillSpec.tests
         , PageFocusSpec.tests
         , PageGotoSpec.tests
@@ -137,6 +146,7 @@ main =
         , PageStrictSpec.tests
         , PageWaitForFunctionSpec.tests
         , PageWaitForLoadStateSpec.tests
+        , PageWaitForNavigationSpec.tests
         , PageWaitForRequestSpec.tests
         , PageWaitForResponseSpec.tests
         , PageWaitForSelectorSpec.tests

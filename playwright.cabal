@@ -22,6 +22,7 @@ library
   exposed-modules:
       Playwright
       Playwright.AriaRole
+      Playwright.BindingName
       Playwright.BoundingBox
       Playwright.Browser
       Playwright.BrowserContext
@@ -38,6 +39,7 @@ library
       Playwright.CssPixel
       Playwright.Dialog
       Playwright.DialogType
+      Playwright.Disposable
       Playwright.DomEventType
       Playwright.Driver
       Playwright.ElementHandle
@@ -45,6 +47,7 @@ library
       Playwright.Error
       Playwright.Evaluate
       Playwright.Exactness
+      Playwright.Expose
       Playwright.Frame
       Playwright.Frame.Action
       Playwright.Frame.Inspect
@@ -152,11 +155,14 @@ test-suite playwright-test
       Playwright.ElementHandleOwnerFrameSpec
       Playwright.ElementHandlePressSpec
       Playwright.ElementHandleScrollIntoViewSpec
+      Playwright.ElementHandleSelectTextSpec
       Playwright.ElementHandleTypeSpec
       Playwright.FrameEvaluateSpec
       Playwright.FrameHierarchySpec
       Playwright.Harness
       Playwright.IntegrationSpec
+      Playwright.JsHandleAsElementSpec
+      Playwright.JsHandleEvaluateSpec
       Playwright.JsHandleJsonValueSpec
       Playwright.JsHandlePropertiesSpec
       Playwright.LocatorClickSpec
@@ -182,6 +188,7 @@ test-suite playwright-test
       Playwright.PageEventConsoleSpec
       Playwright.PageEventPageErrorSpec
       Playwright.PageEventPopupSpec
+      Playwright.PageExposeFunctionSpec
       Playwright.PageFillSpec
       Playwright.PageFocusSpec
       Playwright.PageGotoSpec
@@ -198,6 +205,7 @@ test-suite playwright-test
       Playwright.PageStrictSpec
       Playwright.PageWaitForFunctionSpec
       Playwright.PageWaitForLoadStateSpec
+      Playwright.PageWaitForNavigationSpec
       Playwright.PageWaitForRequestSpec
       Playwright.PageWaitForResponseSpec
       Playwright.PageWaitForSelectorSpec

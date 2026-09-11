@@ -4,6 +4,7 @@ module Playwright.Channel
   , PlaywrightTag
   , BrowserTypeTag
   , BrowserTag
+  , BindingCallTag
   , BrowserContextTag
   , PageTag
   , FrameTag
@@ -13,6 +14,7 @@ module Playwright.Channel
   , DialogTag
   , RequestTag
   , WorkerTag
+  , DisposableTag
   , send
   ) where
 
@@ -47,6 +49,8 @@ data JsHandleTag
 data DialogTag
 data RequestTag
 data WorkerTag
+data BindingCallTag
+data DisposableTag
 
 type Channel :: Type -> Type
 data Channel a = Channel
