@@ -3,6 +3,7 @@ module Playwright
   , BrowserContext (..)
   , BrowserName (..)
   , BrowserType (..)
+  , Accuracy (..)
   , AriaRole (..)
   , BoundingBox (..)
   , BindingName (..)
@@ -34,6 +35,7 @@ module Playwright
   , Frame (..)
   , FulfillBody (..)
   , FulfillOptions (..)
+  , Geolocation (..)
   , GetByRoleOptions (..)
   , GotoOptions (..)
   , HeaderName (..)
@@ -45,12 +47,15 @@ module Playwright
   , InputFileName (..)
   , JsHandle (..)
   , Key (..)
+  , Latitude (..)
   , LaunchOptions (..)
   , LoadState (..)
   , Locator (..)
+  , Longitude (..)
   , MediaType (..)
   , Page (..)
   , PageError (..)
+  , PermissionName (..)
   , Playwright (..)
   , Point (..)
   , PropertyName (..)
@@ -106,7 +111,9 @@ module Playwright
   , clear
   , clearCookies
   , clearCookiesNamed
+  , clearGeolocation
   , clearPageErrors
+  , clearPermissions
   , click
   , clickHandle
   , closeBrowser
@@ -197,6 +204,8 @@ module Playwright
   , goBack
   , goForward
   , goto
+  , grantPermissions
+  , grantPermissionsFor
   , hover
   , httpStatusOk
   , initializePlaywright
@@ -224,10 +233,12 @@ module Playwright
   , keyboardType
   , keyboardUp
   , lastLocator
+  , latitudeFromInt
   , launch
   , localStorage
   , locator
   , locatorCount
+  , longitudeFromInt
   , mainFrame
   , milliseconds
   , mouseClick
@@ -284,6 +295,7 @@ module Playwright
   , setChecked
   , setContent
   , setExtraHTTPHeaders
+  , setGeolocation
   , setInputFiles
   , setInputFilesHandle
   , setViewportSize
@@ -357,12 +369,17 @@ import Playwright.BrowserContext
   , addCookies
   , clearCookies
   , clearCookiesNamed
+  , clearGeolocation
+  , clearPermissions
   , closeContext
   , contextFromRef
   , cookies
   , cookiesFor
+  , grantPermissions
+  , grantPermissionsFor
   , newPage
   , pageContext
+  , setGeolocation
   )
 import Playwright.BrowserName
   ( BrowserName (Chromium, Firefox, WebKit)
@@ -504,6 +521,14 @@ import Playwright.FulfillOptions
   , FulfillBody (FulfillBytes, FulfillText)
   , FulfillOptions (FulfillOptions, fulfillBody, fulfillContentType, fulfillHeaders, fulfillStatus)
   , defaultFulfillOptions
+  )
+import Playwright.Geolocation
+  ( Accuracy (Accuracy, accuracyToScientific)
+  , Geolocation (Geolocation, geolocationAccuracy, geolocationLatitude, geolocationLongitude)
+  , Latitude (Latitude, latitudeToScientific)
+  , Longitude (Longitude, longitudeToScientific)
+  , latitudeFromInt
+  , longitudeFromInt
   )
 import Playwright.GetByRoleOptions
   ( GetByRoleOptions (GetByRoleOptions, getByRoleExact, getByRoleName)
@@ -674,6 +699,9 @@ import Playwright.PageError
   , clearPageErrors
   , pageErrors
   , waitForPageError
+  )
+import Playwright.PermissionName
+  ( PermissionName (PermissionName, permissionNameToText)
   )
 import Playwright.Point
   ( Point (Point)

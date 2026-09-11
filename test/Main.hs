@@ -16,6 +16,7 @@ import Playwright.ElementHandleSelectTextSpec qualified as ElementHandleSelectTe
 import Playwright.ElementHandleTypeSpec qualified as ElementHandleTypeSpec
 import Playwright.FrameEvaluateSpec qualified as FrameEvaluateSpec
 import Playwright.FrameHierarchySpec qualified as FrameHierarchySpec
+import Playwright.GeolocationSpec qualified as GeolocationSpec
 import Playwright.IntegrationSpec qualified as IntegrationSpec
 import Playwright.JsHandleAsElementSpec qualified as JsHandleAsElementSpec
 import Playwright.JsHandleEvaluateSpec qualified as JsHandleEvaluateSpec
@@ -73,6 +74,7 @@ import Playwright.PageWaitForResponseSpec qualified as PageWaitForResponseSpec
 import Playwright.PageWaitForRequestSpec qualified as PageWaitForRequestSpec
 import Playwright.PageWaitForSelectorSpec qualified as PageWaitForSelectorSpec
 import Playwright.PageWaitForUrlSpec qualified as PageWaitForUrlSpec
+import Playwright.PermissionsSpec qualified as PermissionsSpec
 import Playwright.QuerySelectorSpec qualified as QuerySelectorSpec
 import Playwright.SelectorsGetBySpec qualified as SelectorsGetBySpec
 import Playwright.TransportSpec qualified as TransportSpec
@@ -108,6 +110,7 @@ main =
         , ElementHandleTypeSpec.tests
         , FrameEvaluateSpec.tests
         , FrameHierarchySpec.tests
+        , GeolocationSpec.tests
         , IntegrationSpec.tests
         , JsHandleAsElementSpec.tests
         , JsHandleEvaluateSpec.tests
@@ -165,6 +168,7 @@ main =
         , PageWaitForResponseSpec.tests
         , PageWaitForSelectorSpec.tests
         , PageWaitForUrlSpec.tests
+        , PermissionsSpec.tests
         , QuerySelectorSpec.tests
         , SelectorsGetBySpec.tests
         , WheelSpec.tests

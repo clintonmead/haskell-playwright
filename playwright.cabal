@@ -55,6 +55,7 @@ library
       Playwright.Frame.Inspect
       Playwright.Frame.Wait
       Playwright.FulfillOptions
+      Playwright.Geolocation
       Playwright.GetBy
       Playwright.GetByRoleOptions
       Playwright.GotoOptions
@@ -82,6 +83,7 @@ library
       Playwright.Mouse
       Playwright.Page
       Playwright.PageError
+      Playwright.PermissionName
       Playwright.Point
       Playwright.PropertyName
       Playwright.Protocol
@@ -167,6 +169,7 @@ test-suite playwright-test
       Playwright.ElementHandleTypeSpec
       Playwright.FrameEvaluateSpec
       Playwright.FrameHierarchySpec
+      Playwright.GeolocationSpec
       Playwright.Harness
       Playwright.IntegrationSpec
       Playwright.JsHandleAsElementSpec
@@ -225,6 +228,7 @@ test-suite playwright-test
       Playwright.PageWaitForResponseSpec
       Playwright.PageWaitForSelectorSpec
       Playwright.PageWaitForUrlSpec
+      Playwright.PermissionsSpec
       Playwright.QuerySelectorSpec
       Playwright.SelectorsGetBySpec
       Playwright.TransportSpec

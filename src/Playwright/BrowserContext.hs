@@ -3,12 +3,17 @@ module Playwright.BrowserContext
   , addCookies
   , clearCookies
   , clearCookiesNamed
+  , clearGeolocation
+  , clearPermissions
   , contextFromRef
   , cookies
   , cookiesFor
+  , grantPermissions
+  , grantPermissionsFor
   , newPage
   , closeContext
   , pageContext
+  , setGeolocation
   ) where
 
 import Playwright.Channel
@@ -26,6 +31,11 @@ import Playwright.Cookie
   , fromNetworkCookie
   , toSetNetworkCookie
   )
+import Playwright.Geolocation
+  ( Geolocation (geolocationLatitude, geolocationLongitude)
+  , Latitude (latitudeToScientific)
+  , Longitude (longitudeToScientific)
+  )
 import Playwright.Json.ChannelRef
   ( ChannelRef (channelRefGuid)
   )
@@ -36,18 +46,30 @@ import Playwright.Page
   ( Page (pageContextChannel)
   , pageFromRef
   )
+import Playwright.PermissionName
+  ( PermissionName (permissionNameToText)
+  )
 import Playwright.Protocol
   ( BrowserContextAddCookiesResult
   , BrowserContextClearCookiesParams (browserContextClearCookiesParamsName)
   , BrowserContextClearCookiesResult
+  , BrowserContextClearPermissionsResult
   , BrowserContextCloseResult
   , BrowserContextCookiesResult (browserContextCookiesResultCookies)
+  , BrowserContextGrantPermissionsParams (browserContextGrantPermissionsParamsOrigin)
+  , BrowserContextGrantPermissionsResult
   , BrowserContextNewPageResult (browserContextNewPageResultPage)
+  , BrowserContextSetGeolocationParams (browserContextSetGeolocationParamsGeolocation)
+  , BrowserContextSetGeolocationResult
   , mkBrowserContextAddCookiesParams
   , mkBrowserContextClearCookiesParams
+  , mkBrowserContextClearPermissionsParams
   , mkBrowserContextCloseParams
   , mkBrowserContextCookiesParams
+  , mkBrowserContextGrantPermissionsParams
   , mkBrowserContextNewPageParams
+  , mkBrowserContextSetGeolocationParams
+  , mkBrowserContextSetGeolocationParamsGeolocation
   )
 import Playwright.Url
   ( Url
@@ -123,4 +145,54 @@ clearCookiesNamed ctx name = do
       mkBrowserContextClearCookiesParams
         { browserContextClearCookiesParamsName = Just (cookieNameToText name)
         }
+  pure ()
+
+grantPermissions :: BrowserContext -> [PermissionName] -> IO ()
+grantPermissions ctx names =
+  grantPermissionsForOrigin ctx names Nothing
+
+grantPermissionsFor :: BrowserContext -> [PermissionName] -> Url -> IO ()
+grantPermissionsFor ctx names origin =
+  grantPermissionsForOrigin ctx names (Just origin)
+
+grantPermissionsForOrigin :: BrowserContext -> [PermissionName] -> Maybe Url -> IO ()
+grantPermissionsForOrigin ctx names origin = do
+  _ :: BrowserContextGrantPermissionsResult <-
+    send
+      (browserContextChannel ctx)
+      (MethodName "grantPermissions")
+      (mkBrowserContextGrantPermissionsParams (fmap permissionNameToText names))
+        { browserContextGrantPermissionsParamsOrigin = fmap urlToText origin
+        }
+  pure ()
+
+clearPermissions :: BrowserContext -> IO ()
+clearPermissions ctx = do
+  _ :: BrowserContextClearPermissionsResult <-
+    send (browserContextChannel ctx) (MethodName "clearPermissions") mkBrowserContextClearPermissionsParams
+  pure ()
+
+setGeolocation :: BrowserContext -> Geolocation -> IO ()
+setGeolocation ctx location = do
+  _ :: BrowserContextSetGeolocationResult <-
+    send
+      (browserContextChannel ctx)
+      (MethodName "setGeolocation")
+      mkBrowserContextSetGeolocationParams
+        { browserContextSetGeolocationParamsGeolocation =
+            Just
+              ( mkBrowserContextSetGeolocationParamsGeolocation
+                  (latitudeToScientific (geolocationLatitude location))
+                  (longitudeToScientific (geolocationLongitude location))
+              )
+        }
+  pure ()
+
+clearGeolocation :: BrowserContext -> IO ()
+clearGeolocation ctx = do
+  _ :: BrowserContextSetGeolocationResult <-
+    send
+      (browserContextChannel ctx)
+      (MethodName "setGeolocation")
+      mkBrowserContextSetGeolocationParams
   pure ()
