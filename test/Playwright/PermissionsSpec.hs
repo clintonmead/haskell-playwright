@@ -6,8 +6,8 @@ import Data.Text
   ( Text
   )
 import Playwright
-  ( Page
-  , NewContextOptions (newContextPermissions)
+  ( NewContextOptions (newContextPermissions)
+  , Page
   , PermissionName (PermissionName)
   , clearPermissions
   , defaultGotoOptions

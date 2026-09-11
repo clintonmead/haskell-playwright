@@ -129,6 +129,8 @@ module Playwright
   , content
   , contentFrameHandle
   , contextFromRef
+  , contextRoute
+  , contextRouteWith
   , continueRoute
   , continueRouteWith
   , cookieForUrl
@@ -327,6 +329,7 @@ module Playwright
   , uncheck
   , uncheckWith
   , unroute
+  , unrouteContext
   , url
   , urlFromText
   , urlToText
@@ -769,6 +772,8 @@ import Playwright.Route
   , abortRoute
   , continueRoute
   , continueRouteWith
+  , contextRoute
+  , contextRouteWith
   , fallbackRoute
   , fallbackRouteWith
   , fulfillRoute
@@ -776,6 +781,7 @@ import Playwright.Route
   , routeRequest
   , routeWith
   , unroute
+  , unrouteContext
   )
 import Playwright.RouteOptions
   ( RouteOptions (RouteOptions, routeTimes)

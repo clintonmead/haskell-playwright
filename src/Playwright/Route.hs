@@ -10,6 +10,9 @@ module Playwright.Route
   , routeRequest
   , routeWith
   , unroute
+  , contextRoute
+  , contextRouteWith
+  , unrouteContext
   ) where
 
 import Control.Concurrent.STM
@@ -49,13 +52,17 @@ import Data.Text.Encoding
   ( decodeLatin1
   , encodeUtf8
   )
+import Playwright.BrowserContext
+  ( BrowserContext (browserContextChannel)
+  )
 import Playwright.Channel
   ( Channel (Channel, channelConnection, channelGuid)
   , RouteTag
   , send
   )
 import Playwright.Connection
-  ( lookupObject
+  ( Connection
+  , lookupObject
   , lookupRequestOverrides
   , pushRouteHandler
   , registerEventHandler
@@ -74,6 +81,9 @@ import Playwright.FulfillOptions
   ( ContentType (contentTypeToText)
   , FulfillBody (FulfillBytes, FulfillText)
   , FulfillOptions (fulfillBody, fulfillContentType, fulfillHeaders, fulfillStatus)
+  )
+import Playwright.Guid
+  ( Guid
   )
 import Playwright.HttpHeader
   ( HeaderName (HeaderName, headerNameToText)
@@ -99,10 +109,13 @@ import Playwright.MethodName
   ( MethodName (MethodName)
   )
 import Playwright.Page
-  ( Page (pageChannel)
+  ( Page (pageChannel, pageContextChannel)
   )
 import Playwright.Protocol
-  ( NameValue
+  ( BrowserContextRouteEvent (browserContextRouteEventRoute)
+  , BrowserContextSetNetworkInterceptionPatternsParamsPatterns (browserContextSetNetworkInterceptionPatternsParamsPatternsGlob)
+  , BrowserContextSetNetworkInterceptionPatternsResult
+  , NameValue
   , PageRouteEvent (pageRouteEventRoute)
   , PageSetNetworkInterceptionPatternsParamsPatterns (pageSetNetworkInterceptionPatternsParamsPatternsGlob)
   , PageSetNetworkInterceptionPatternsResult
@@ -112,6 +125,8 @@ import Playwright.Protocol
   , RouteFulfillParams (routeFulfillParamsBody, routeFulfillParamsHeaders, routeFulfillParamsIsBase64, routeFulfillParamsStatus)
   , RouteFulfillResult
   , RouteInitializer (routeInitializerRequest)
+  , mkBrowserContextSetNetworkInterceptionPatternsParams
+  , mkBrowserContextSetNetworkInterceptionPatternsParamsPatterns
   , mkNameValue
   , mkPageSetNetworkInterceptionPatternsParams
   , mkPageSetNetworkInterceptionPatternsParamsPatterns
@@ -220,19 +235,35 @@ routeWith page glob opts handler = do
   let
     conn = channelConnection (pageChannel page)
     guid = channelGuid (pageChannel page)
-  remaining <- newTVarIO (fmap routeTimesToInt (routeTimes opts))
-  first <-
-    pushRouteHandler conn guid glob $ \ref -> do
-      live <- atomically (consumeRouteTime remaining)
-      if live
-        then do
-          box <- newEmptyTMVarIO
-          handler (Route (Channel conn (channelRefGuid ref)) box)
-          atomically (takeTMVar box)
-        else
-          pure False
+  first <- installRouteHandler conn guid glob opts handler
   when first (registerEventHandler conn guid (MethodName "route") (dispatchPageRoute page))
   updateInterceptionPatterns page
+
+contextRoute :: BrowserContext -> UrlGlob -> (Route -> IO ()) -> IO ()
+contextRoute ctx glob =
+  contextRouteWith ctx glob defaultRouteOptions
+
+contextRouteWith :: BrowserContext -> UrlGlob -> RouteOptions -> (Route -> IO ()) -> IO ()
+contextRouteWith ctx glob opts handler = do
+  let
+    conn = channelConnection (browserContextChannel ctx)
+    guid = channelGuid (browserContextChannel ctx)
+  first <- installRouteHandler conn guid glob opts handler
+  when first (registerEventHandler conn guid (MethodName "route") (dispatchContextRoute ctx))
+  updateContextInterceptionPatterns ctx
+
+installRouteHandler :: Connection -> Guid -> UrlGlob -> RouteOptions -> (Route -> IO ()) -> IO Bool
+installRouteHandler conn guid glob opts handler = do
+  remaining <- newTVarIO (fmap routeTimesToInt (routeTimes opts))
+  pushRouteHandler conn guid glob $ \ref -> do
+    live <- atomically (consumeRouteTime remaining)
+    if live
+      then do
+        box <- newEmptyTMVarIO
+        handler (Route (Channel conn (channelRefGuid ref)) box)
+        atomically (takeTMVar box)
+      else
+        pure False
 
 consumeRouteTime :: TVar (Maybe Int) -> STM Bool
 consumeRouteTime remaining = do
@@ -255,6 +286,14 @@ unroute page glob = do
     glob
   updateInterceptionPatterns page
 
+unrouteContext :: BrowserContext -> UrlGlob -> IO ()
+unrouteContext ctx glob = do
+  removeRouteHandlers
+    (channelConnection (browserContextChannel ctx))
+    (channelGuid (browserContextChannel ctx))
+    glob
+  updateContextInterceptionPatterns ctx
+
 dispatchPageRoute :: Page -> Value -> IO ()
 dispatchPageRoute page params = do
   event <- either throwIO pure (fromJsonValue params)
@@ -263,7 +302,19 @@ dispatchPageRoute page params = do
     chan :: Channel RouteTag
     chan = Channel conn (channelRefGuid (pageRouteEventRoute event))
   request <- requestFromChannel chan
-  handlers <- routeHandlersFor conn (channelGuid (pageChannel page))
+  pageHandlers <- routeHandlersFor conn (channelGuid (pageChannel page))
+  contextHandlers <- routeHandlersFor conn (channelGuid (pageContextChannel page))
+  chainRoutes chan request (pageHandlers <> contextHandlers)
+
+dispatchContextRoute :: BrowserContext -> Value -> IO ()
+dispatchContextRoute ctx params = do
+  event <- either throwIO pure (fromJsonValue params)
+  let
+    conn = channelConnection (browserContextChannel ctx)
+    chan :: Channel RouteTag
+    chan = Channel conn (channelRefGuid (browserContextRouteEventRoute event))
+  request <- requestFromChannel chan
+  handlers <- routeHandlersFor conn (channelGuid (browserContextChannel ctx))
   chainRoutes chan request handlers
 
 chainRoutes :: Channel RouteTag -> Request -> [(UrlGlob, ChannelRef -> IO Bool)] -> IO ()
@@ -316,10 +367,29 @@ updateInterceptionPatterns page = do
       (mkPageSetNetworkInterceptionPatternsParams (fmap (globPattern . fst) handlers))
   pure ()
 
+updateContextInterceptionPatterns :: BrowserContext -> IO ()
+updateContextInterceptionPatterns ctx = do
+  handlers <-
+    routeHandlersFor
+      (channelConnection (browserContextChannel ctx))
+      (channelGuid (browserContextChannel ctx))
+  _ :: BrowserContextSetNetworkInterceptionPatternsResult <-
+    send
+      (browserContextChannel ctx)
+      (MethodName "setNetworkInterceptionPatterns")
+      (mkBrowserContextSetNetworkInterceptionPatternsParams (fmap (contextGlobPattern . fst) handlers))
+  pure ()
+
 globPattern :: UrlGlob -> PageSetNetworkInterceptionPatternsParamsPatterns
 globPattern glob =
   mkPageSetNetworkInterceptionPatternsParamsPatterns
     { pageSetNetworkInterceptionPatternsParamsPatternsGlob = Just (urlGlobToText glob)
+    }
+
+contextGlobPattern :: UrlGlob -> BrowserContextSetNetworkInterceptionPatternsParamsPatterns
+contextGlobPattern glob =
+  mkBrowserContextSetNetworkInterceptionPatternsParamsPatterns
+    { browserContextSetNetworkInterceptionPatternsParamsPatternsGlob = Just (urlGlobToText glob)
     }
 
 encodeFulfillBody :: Maybe FulfillBody -> (Maybe Text, Bool, Int)

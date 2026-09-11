@@ -8,6 +8,7 @@ import Playwright.BrowserContextCredentialsSpec qualified as BrowserContextCrede
 import Playwright.BrowserContextCspSpec qualified as BrowserContextCspSpec
 import Playwright.BrowserContextLocaleSpec qualified as BrowserContextLocaleSpec
 import Playwright.BrowserContextOfflineSpec qualified as BrowserContextOfflineSpec
+import Playwright.BrowserContextRouteSpec qualified as BrowserContextRouteSpec
 import Playwright.BrowserContextSetExtraHTTPHeadersSpec qualified as BrowserContextSetExtraHTTPHeadersSpec
 import Playwright.BrowserContextTimezoneSpec qualified as BrowserContextTimezoneSpec
 import Playwright.BrowserContextViewportSpec qualified as BrowserContextViewportSpec
@@ -109,6 +110,7 @@ main =
         , BrowserContextCspSpec.tests
         , BrowserContextLocaleSpec.tests
         , BrowserContextOfflineSpec.tests
+        , BrowserContextRouteSpec.tests
         , BrowserContextSetExtraHTTPHeadersSpec.tests
         , BrowserContextTimezoneSpec.tests
         , BrowserContextViewportSpec.tests

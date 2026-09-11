@@ -166,6 +166,7 @@ test-suite playwright-test
       Playwright.BrowserContextCspSpec
       Playwright.BrowserContextLocaleSpec
       Playwright.BrowserContextOfflineSpec
+      Playwright.BrowserContextRouteSpec
       Playwright.BrowserContextSetExtraHTTPHeadersSpec
       Playwright.BrowserContextTimezoneSpec
       Playwright.BrowserContextViewportSpec
