@@ -1,5 +1,6 @@
 module Playwright.Locator
   ( Locator (..)
+  , allLocators
   , check
   , checkWith
   , childLocator
@@ -8,6 +9,7 @@ module Playwright.Locator
   , dblclick
   , dispatchEvent
   , elementHandle
+  , elementHandles
   , fill
   , first
   , focus
@@ -88,6 +90,7 @@ import Playwright.Frame.Inspect
   , isHiddenFrame
   , isVisibleFrame
   , queryCountFrame
+  , querySelectorAllFrame
   , querySelectorFrame
   , textContentFrame
   )
@@ -178,6 +181,15 @@ elementHandle :: Locator -> IO (Maybe ElementHandle)
 elementHandle loc = do
   waitFor loc WaitForAttached
   querySelectorFrame (locatorFrame loc) (locatorSelector loc) (Just True)
+
+elementHandles :: Locator -> IO [ElementHandle]
+elementHandles loc =
+  querySelectorAllFrame (locatorFrame loc) (locatorSelector loc)
+
+allLocators :: Locator -> IO [Locator]
+allLocators loc = do
+  n <- locatorCount loc
+  pure [nth loc i | i <- [0 .. n - 1]]
 
 fill :: Locator -> Text -> IO ()
 fill loc value =

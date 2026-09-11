@@ -1,5 +1,6 @@
 module Playwright.Harness
   ( assertProtocolContains
+  , assertWaitTimeout
   , locate
   , requireHandle
   , withAssetPage
@@ -39,7 +40,7 @@ import Playwright
   , withPlaywright
   )
 import Playwright.Error
-  ( PlaywrightError (ProtocolRpc)
+  ( PlaywrightError (ProtocolRpc, WaitTimeout)
   , ProtocolFailure (protocolFailureMessage)
   )
 import System.Directory
@@ -114,6 +115,17 @@ assertProtocolContains needle action = do
       assertFailure ("expected ProtocolRpc, got: " <> show err)
     Right _ ->
       assertFailure ("expected protocol error containing " <> unpack needle)
+
+assertWaitTimeout :: IO a -> IO ()
+assertWaitTimeout action = do
+  result <- try action
+  case result of
+    Left (WaitTimeout _) ->
+      pure ()
+    Left err ->
+      assertFailure ("expected WaitTimeout, got: " <> show err)
+    Right _ ->
+      assertFailure "expected WaitTimeout"
 
 requireNonEmptyEnv :: String -> IO String
 requireNonEmptyEnv name = do

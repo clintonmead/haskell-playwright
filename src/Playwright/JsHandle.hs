@@ -3,10 +3,14 @@ module Playwright.JsHandle
   , jsHandleFromRef
   , jsonValue
   , jsonValueNumber
+  , jsonValueText
   ) where
 
 import Control.Exception
   ( throwIO
+  )
+import Data.Text
+  ( Text
   )
 import Playwright.Channel
   ( Channel (Channel)
@@ -30,7 +34,7 @@ import Playwright.Protocol
   , mkJSHandleJsonValueParams
   )
 import Playwright.SerializedValue
-  ( SerializedPayload (PayloadNumber)
+  ( SerializedPayload (PayloadNumber, PayloadString)
   , SerializedValue (SerializedNode)
   )
 
@@ -57,5 +61,14 @@ jsonValueNumber handle = do
   case value of
     SerializedNode (PayloadNumber number) _ ->
       pure number
+    _ ->
+      throwIO (EvaluateUnexpected value)
+
+jsonValueText :: JsHandle -> IO Text
+jsonValueText handle = do
+  value <- jsonValue handle
+  case value of
+    SerializedNode (PayloadString text) _ ->
+      pure text
     _ ->
       throwIO (EvaluateUnexpected value)

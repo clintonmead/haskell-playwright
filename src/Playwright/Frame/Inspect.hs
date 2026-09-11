@@ -10,6 +10,7 @@ module Playwright.Frame.Inspect
   , isHiddenFrame
   , isVisibleFrame
   , queryCountFrame
+  , querySelectorAllFrame
   , querySelectorFrame
   , textContentFrame
   ) where
@@ -54,6 +55,7 @@ import Playwright.Protocol
   , FrameIsVisibleParams (frameIsVisibleParamsStrict)
   , FrameIsVisibleResult (frameIsVisibleResultValue)
   , FrameQueryCountResult (frameQueryCountResultValue)
+  , FrameQuerySelectorAllResult (frameQuerySelectorAllResultElements)
   , FrameQuerySelectorParams (frameQuerySelectorParamsStrict)
   , FrameQuerySelectorResult (frameQuerySelectorResultElement)
   , FrameTextContentParams (frameTextContentParamsStrict)
@@ -69,6 +71,7 @@ import Playwright.Protocol
   , mkFrameIsHiddenParams
   , mkFrameIsVisibleParams
   , mkFrameQueryCountParams
+  , mkFrameQuerySelectorAllParams
   , mkFrameQuerySelectorParams
   , mkFrameTextContentParams
   )
@@ -193,6 +196,15 @@ queryCountFrame :: Frame -> Selector -> IO Int
 queryCountFrame frame selector = do
   result <- frameSend frame "queryCount" (mkFrameQueryCountParams selector)
   pure (frameQueryCountResultValue result)
+
+querySelectorAllFrame :: Frame -> Selector -> IO [ElementHandle]
+querySelectorAllFrame frame selector = do
+  result <- frameSend frame "querySelectorAll" (mkFrameQuerySelectorAllParams selector)
+  pure
+    ( fmap
+        (elementHandleFromRef (channelConnection (frameChannel frame)))
+        (frameQuerySelectorAllResultElements result)
+    )
 
 querySelectorFrame :: Frame -> Selector -> Maybe Bool -> IO (Maybe ElementHandle)
 querySelectorFrame frame selector strict = do

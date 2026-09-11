@@ -2,6 +2,7 @@ module Playwright.SerializedArgument
   ( SerializedArgument (..)
   , boolArgument
   , numberArgument
+  , channelArgument
   , numbersArgument
   , specialArgument
   , textArgument
@@ -26,7 +27,7 @@ import Playwright.Json.ChannelRef
   ( ChannelRef
   )
 import Playwright.SerializedValue
-  ( SerializedPayload (PayloadArray, PayloadBool, PayloadNumber, PayloadSpecial, PayloadString)
+  ( SerializedPayload (PayloadArray, PayloadBool, PayloadHandle, PayloadNumber, PayloadSpecial, PayloadString)
   , SerializedValue (SerializedNode)
   , undefinedValue
   )
@@ -84,6 +85,13 @@ specialArgument special =
   SerializedArgument
     { serializedArgumentValue = SerializedNode (PayloadSpecial special) Nothing
     , serializedArgumentHandles = []
+    }
+
+channelArgument :: ChannelRef -> SerializedArgument
+channelArgument ref =
+  SerializedArgument
+    { serializedArgumentValue = SerializedNode (PayloadHandle 0) Nothing
+    , serializedArgumentHandles = [ref]
     }
 
 instance HasCodec SerializedArgument where

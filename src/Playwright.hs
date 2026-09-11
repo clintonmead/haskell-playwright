@@ -6,7 +6,11 @@ module Playwright
   , AriaRole (..)
   , BoundingBox (..)
   , CheckOptions (..)
+  , ConsoleMessage (..)
+  , ConsoleType (..)
   , CssPixel (..)
+  , Dialog (..)
+  , DialogType (..)
   , DomEventType (..)
   , ElementHandle (..)
   , Exactness (..)
@@ -34,6 +38,7 @@ module Playwright
   , StyleTag (..)
   , Timeout
   , Url
+  , UrlGlob (..)
   , ViewportHeight (..)
   , ViewportSize (..)
   , ViewportWidth (..)
@@ -42,12 +47,18 @@ module Playwright
   , addInitScript
   , addScriptTag
   , addStyleTag
+  , acceptDialog
+  , acceptDialogWith
+  , allLocators
+  , armConsole
+  , armDialog
   , boolArgument
   , boundingBox
   , browserFromRef
   , browserTypeFromRef
   , check
   , checkWith
+  , channelArgument
   , childLocator
   , childFrames
   , chromium
@@ -70,7 +81,10 @@ module Playwright
   , defaultScreenshotOptions
   , defaultTimeout
   , dispatchEvent
+  , dismissDialog
+  , elementArgument
   , elementHandle
+  , elementHandles
   , emptyScriptTag
   , emptyStyleTag
   , evaluate
@@ -124,7 +138,9 @@ module Playwright
   , isEnabled
   , isHidden
   , isVisible
+  , jsonValue
   , jsonValueNumber
+  , jsonValueText
   , keyboardDown
   , keyboardInsertText
   , keyboardPress
@@ -175,10 +191,14 @@ module Playwright
   , urlFromText
   , urlToText
   , waitFor
+  , waitForConsole
+  , waitForDialog
   , waitForFunction
   , waitForLoadState
   , waitForSelector
   , waitForTimeout
+  , waitForURL
+  , waitForURLWith
   , waitForWith
   , webkit
   , wheelDeltaFromInt
@@ -219,9 +239,24 @@ import Playwright.CheckOptions
   ( CheckOptions (CheckOptions, checkOptionsForce, checkOptionsTimeout, checkOptionsTrial)
   , defaultCheckOptions
   )
+import Playwright.ConsoleMessage
+  ( ConsoleMessage (ConsoleMessage, consoleMessageArgs, consoleMessageText, consoleMessageType)
+  )
+import Playwright.ConsoleType
+  ( ConsoleType (ConsoleAssert, ConsoleClear, ConsoleCount, ConsoleDebug, ConsoleDir, ConsoleDirXml, ConsoleError, ConsoleInfo, ConsoleLog, ConsoleProfile, ConsoleProfileEnd, ConsoleTable, ConsoleTimeEnd, ConsoleTrace, ConsoleVerbose, ConsoleWarning)
+  )
 import Playwright.CssPixel
   ( CssPixel (CssPixel, cssPixelToScientific)
   , cssPixelFromInt
+  )
+import Playwright.Dialog
+  ( Dialog (Dialog, dialogChannel, dialogDefaultValue, dialogMessage, dialogType)
+  , acceptDialog
+  , acceptDialogWith
+  , dismissDialog
+  )
+import Playwright.DialogType
+  ( DialogType (DialogAlert, DialogBeforeUnload, DialogConfirm, DialogPrompt)
   )
 import Playwright.DomEventType
   ( DomEventType (DomEventType)
@@ -230,6 +265,7 @@ import Playwright.ElementHandle
   ( ElementHandle (ElementHandle)
   , boundingBox
   , clickHandle
+  , elementArgument
   , getAttributeHandle
   , innerHtmlHandle
   , innerTextHandle
@@ -295,7 +331,9 @@ import Playwright.Instance
   )
 import Playwright.JsHandle
   ( JsHandle (JsHandle)
+  , jsonValue
   , jsonValueNumber
+  , jsonValueText
   )
 import Playwright.Key
   ( Key (Key, keyToText)
@@ -316,6 +354,7 @@ import Playwright.LoadState
   )
 import Playwright.Locator
   ( Locator (Locator, locatorFrame, locatorSelector)
+  , allLocators
   , check
   , checkWith
   , childLocator
@@ -324,6 +363,7 @@ import Playwright.Locator
   , dblclick
   , dispatchEvent
   , elementHandle
+  , elementHandles
   , fill
   , first
   , focus
@@ -359,10 +399,12 @@ import Playwright.Mouse
   , mouseWheel
   )
 import Playwright.Page
-  ( Page (Page, pageChannel, pageMainFrame)
+  ( Page (Page, pageChannel, pageContextChannel, pageMainFrame)
   , addInitScript
   , addScriptTag
   , addStyleTag
+  , armConsole
+  , armDialog
   , closePage
   , content
   , getByLabel
@@ -382,10 +424,14 @@ import Playwright.Page
   , setViewportSize
   , title
   , url
+  , waitForConsole
+  , waitForDialog
   , waitForFunction
   , waitForLoadState
   , waitForSelector
   , waitForTimeout
+  , waitForURL
+  , waitForURLWith
   , frameByName
   , frames
   , mainFrame
@@ -418,6 +464,7 @@ import Playwright.Selector
   )
 import Playwright.SerializedArgument
   ( boolArgument
+  , channelArgument
   , numberArgument
   , numbersArgument
   , specialArgument
@@ -440,6 +487,9 @@ import Playwright.Url
   ( Url
   , urlFromText
   , urlToText
+  )
+import Playwright.UrlGlob
+  ( UrlGlob (UrlGlob)
   )
 import Playwright.ViewportSize
   ( ViewportHeight (ViewportHeight)

@@ -2,6 +2,7 @@ module Playwright.ElementHandle
   ( ElementHandle (..)
   , boundingBox
   , clickHandle
+  , elementArgument
   , elementHandleFromRef
   , getAttributeHandle
   , innerHtmlHandle
@@ -21,7 +22,7 @@ import Playwright.BoundingBox
   ( BoundingBox (BoundingBox, boundingBoxHeight, boundingBoxWidth, boundingBoxX, boundingBoxY)
   )
 import Playwright.Channel
-  ( Channel (Channel)
+  ( Channel (Channel, channelGuid)
   , ElementHandleTag
   , send
   )
@@ -32,7 +33,7 @@ import Playwright.CssPixel
   ( CssPixel (CssPixel)
   )
 import Playwright.Json.ChannelRef
-  ( ChannelRef (channelRefGuid)
+  ( ChannelRef (ChannelRef, channelRefGuid)
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -54,6 +55,10 @@ import Playwright.Protocol
   , mkElementHandleInputValueParams
   , mkElementHandleTextContentParams
   )
+import Playwright.SerializedArgument
+  ( SerializedArgument
+  , channelArgument
+  )
 import Playwright.Timeout
   ( defaultTimeout
   )
@@ -65,6 +70,10 @@ newtype ElementHandle = ElementHandle
 elementHandleFromRef :: Connection -> ChannelRef -> ElementHandle
 elementHandleFromRef conn ref =
   ElementHandle (Channel conn (channelRefGuid ref))
+
+elementArgument :: ElementHandle -> SerializedArgument
+elementArgument handle =
+  channelArgument (ChannelRef (channelGuid (elementHandleChannel handle)))
 
 handleSend :: (ToJSON params, FromJSON result) => ElementHandle -> Text -> params -> IO result
 handleSend handle method =

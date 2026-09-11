@@ -4,7 +4,10 @@ module Playwright.Connection
   , sendCommand
   , guidsOfType
   , lookupObject
+  , registerEventWaiter
+  , waitForChannelEvent
   , waitForLifecycle
+  , waitUntilUrl
   ) where
 
 import Autodocodec
@@ -60,6 +63,10 @@ import Data.Map.Strict
   ( Map
   )
 import Data.Map.Strict qualified as Map
+import Data.Sequence
+  ( Seq
+  )
+import Data.Sequence qualified as Seq
 import Data.Text qualified as Text
 import Playwright.Error
   ( PlaywrightError (ConnectionClosed, DecodeFailure, MissingObject, ProtocolRpc, UnexpectedResponse)
@@ -82,7 +89,7 @@ import Playwright.MethodName
   )
 import Playwright.Protocol
   ( ChannelType (ChannelTypeRoot)
-  , FrameInitializer (frameInitializerLoadStates)
+  , FrameInitializer (frameInitializerLoadStates, frameInitializerUrl)
   , FrameLoadstateEvent (frameLoadstateEventAdd, frameLoadstateEventRemove)
   , FrameNavigatedEvent (frameNavigatedEventName, frameNavigatedEventUrl)
   , LifecycleEvent
@@ -106,6 +113,14 @@ data Connection = Connection
   , connectionCallbacks :: TVar (Map RequestId (TMVar (Either PlaywrightError Value)))
   , connectionNextId :: TVar RequestId
   , connectionClosed :: TVar (Maybe PlaywrightError)
+  , connectionEventWaiters :: TVar [EventWaiter]
+  , connectionEventBuffer :: TVar (Map (Guid, MethodName) (Seq Value))
+  }
+
+data EventWaiter = EventWaiter
+  { eventWaiterGuid :: Guid
+  , eventWaiterMethod :: MethodName
+  , eventWaiterBox :: TMVar Value
   }
 
 data OutgoingCall = OutgoingCall
@@ -134,6 +149,8 @@ withConnection transport action = do
   callbacks <- newTVarIO Map.empty
   nextId <- newTVarIO (RequestId 1)
   closed <- newTVarIO Nothing
+  eventWaiters <- newTVarIO []
+  eventBuffer <- newTVarIO Map.empty
   let
     conn :: Connection
     conn =
@@ -143,6 +160,8 @@ withConnection transport action = do
         , connectionCallbacks = callbacks
         , connectionNextId = nextId
         , connectionClosed = closed
+        , connectionEventWaiters = eventWaiters
+        , connectionEventBuffer = eventBuffer
         }
   withAsync (readerLoop conn) $ \_ ->
     action conn `finally` closeTransport transport
@@ -283,7 +302,7 @@ dispatch conn incoming =
       handleEvent conn guid method params
 
 handleEvent :: Connection -> Guid -> MethodName -> Value -> IO ()
-handleEvent conn guid method params =
+handleEvent conn guid method params = do
   case method of
     MethodName "navigated" ->
       applyNavigated conn guid params
@@ -291,6 +310,62 @@ handleEvent conn guid method params =
       applyLoadstate conn guid params
     _ ->
       pure ()
+  deliverEvent conn guid method params
+
+deliverEvent :: Connection -> Guid -> MethodName -> Value -> IO ()
+deliverEvent conn guid method params =
+  atomically $ do
+    waiters <- readTVar (connectionEventWaiters conn)
+    case break matches waiters of
+      (before, waiter : after) -> do
+        writeTVar (connectionEventWaiters conn) (before <> after)
+        putTMVar (eventWaiterBox waiter) params
+      (_, []) ->
+        modifyTVar' (connectionEventBuffer conn) $
+          Map.insertWith (flip (<>)) (guid, method) (Seq.singleton params)
+  where
+    matches waiter =
+      eventWaiterGuid waiter == guid && eventWaiterMethod waiter == method
+
+registerEventWaiter :: Connection -> Guid -> MethodName -> IO (TMVar Value)
+registerEventWaiter conn guid method = do
+  box <- newEmptyTMVarIO
+  atomically $ do
+    buffer <- readTVar (connectionEventBuffer conn)
+    case Seq.viewl (Map.findWithDefault Seq.empty (guid, method) buffer) of
+      params Seq.:< rest -> do
+        writeTVar (connectionEventBuffer conn) (Map.insert (guid, method) rest buffer)
+        putTMVar box params
+      Seq.EmptyL ->
+        modifyTVar' (connectionEventWaiters conn) (EventWaiter guid method box :)
+  pure box
+
+waitForChannelEvent :: Connection -> Guid -> MethodName -> IO Value
+waitForChannelEvent conn guid method = do
+  box <- registerEventWaiter conn guid method
+  atomically (takeTMVar box)
+
+waitUntilUrl :: Connection -> Guid -> (Url -> Bool) -> IO ()
+waitUntilUrl conn guid predicate =
+  atomically (waitUntilUrlSTM conn guid predicate)
+
+waitUntilUrlSTM :: Connection -> Guid -> (Url -> Bool) -> STM ()
+waitUntilUrlSTM conn guid predicate = do
+  closed <- readTVar (connectionClosed conn)
+  case closed of
+    Just err ->
+      throwSTM err
+    Nothing -> do
+      objects <- readTVar (connectionObjects conn)
+      case Map.lookup guid objects of
+        Nothing ->
+          retry
+        Just obj ->
+          case fromJsonValue (remoteInitializer obj) of
+            Left err ->
+              throwSTM err
+            Right initializer ->
+              unless (predicate (frameInitializerUrl initializer)) retry
 
 applyLoadstate :: Connection -> Guid -> Value -> IO ()
 applyLoadstate conn guid params = do

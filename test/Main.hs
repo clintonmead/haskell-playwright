@@ -6,11 +6,14 @@ import Playwright.ConnectionSpec qualified as ConnectionSpec
 import Playwright.ElementHandleBoundingBoxSpec qualified as ElementHandleBoundingBoxSpec
 import Playwright.ElementHandleClickSpec qualified as ElementHandleClickSpec
 import Playwright.ElementHandleConvenienceSpec qualified as ElementHandleConvenienceSpec
+import Playwright.FrameEvaluateSpec qualified as FrameEvaluateSpec
 import Playwright.FrameHierarchySpec qualified as FrameHierarchySpec
 import Playwright.IntegrationSpec qualified as IntegrationSpec
 import Playwright.LocatorClickSpec qualified as LocatorClickSpec
+import Playwright.LocatorElementHandleSpec qualified as LocatorElementHandleSpec
 import Playwright.LocatorEvaluateSpec qualified as LocatorEvaluateSpec
 import Playwright.LocatorIsVisibleSpec qualified as LocatorIsVisibleSpec
+import Playwright.LocatorListSpec qualified as LocatorListSpec
 import Playwright.LocatorMiscSpec qualified as LocatorMiscSpec
 import Playwright.LocatorQuerySpec qualified as LocatorQuerySpec
 import Playwright.LocatorSpec qualified as LocatorSpec
@@ -21,6 +24,8 @@ import Playwright.PageBasicSpec qualified as PageBasicSpec
 import Playwright.PageCheckSpec qualified as PageCheckSpec
 import Playwright.PageClickSpec qualified as PageClickSpec
 import Playwright.PageDispatchEventSpec qualified as PageDispatchEventSpec
+import Playwright.PageDialogSpec qualified as PageDialogSpec
+import Playwright.PageEventConsoleSpec qualified as PageEventConsoleSpec
 import Playwright.PageEvaluateSpec qualified as PageEvaluateSpec
 import Playwright.PageFillSpec qualified as PageFillSpec
 import Playwright.PageFocusSpec qualified as PageFocusSpec
@@ -34,6 +39,7 @@ import Playwright.PageSetExtraHTTPHeadersSpec qualified as PageSetExtraHTTPHeade
 import Playwright.PageWaitForFunctionSpec qualified as PageWaitForFunctionSpec
 import Playwright.PageWaitForLoadStateSpec qualified as PageWaitForLoadStateSpec
 import Playwright.PageWaitForSelectorSpec qualified as PageWaitForSelectorSpec
+import Playwright.PageWaitForUrlSpec qualified as PageWaitForUrlSpec
 import Playwright.QuerySelectorSpec qualified as QuerySelectorSpec
 import Playwright.SelectorsGetBySpec qualified as SelectorsGetBySpec
 import Playwright.TransportSpec qualified as TransportSpec
@@ -58,12 +64,15 @@ main =
         , ElementHandleBoundingBoxSpec.tests
         , ElementHandleClickSpec.tests
         , ElementHandleConvenienceSpec.tests
+        , FrameEvaluateSpec.tests
         , FrameHierarchySpec.tests
         , IntegrationSpec.tests
         , LocatorSpec.tests
         , LocatorClickSpec.tests
+        , LocatorElementHandleSpec.tests
         , LocatorEvaluateSpec.tests
         , LocatorIsVisibleSpec.tests
+        , LocatorListSpec.tests
         , LocatorMiscSpec.tests
         , LocatorQuerySpec.tests
         , PageAddInitScriptSpec.tests
@@ -73,6 +82,8 @@ main =
         , PageCheckSpec.tests
         , PageClickSpec.tests
         , PageDispatchEventSpec.tests
+        , PageDialogSpec.tests
+        , PageEventConsoleSpec.tests
         , PageEvaluateSpec.tests
         , PageFillSpec.tests
         , PageFocusSpec.tests
@@ -86,6 +97,7 @@ main =
         , PageWaitForFunctionSpec.tests
         , PageWaitForLoadStateSpec.tests
         , PageWaitForSelectorSpec.tests
+        , PageWaitForUrlSpec.tests
         , QuerySelectorSpec.tests
         , SelectorsGetBySpec.tests
         , WheelSpec.tests

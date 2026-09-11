@@ -30,6 +30,9 @@ import Playwright.RequestId
 import Playwright.SerializedValue
   ( SerializedValue
   )
+import Playwright.Timeout
+  ( Timeout
+  )
 import Playwright.Transport.Frame
   ( FrameError
   )
@@ -61,6 +64,7 @@ data PlaywrightError
   | FrameCodec FrameError
   | BrowserPathMissing
   | EvaluateUnexpected SerializedValue
+  | WaitTimeout Timeout
   deriving stock (Eq, Show)
 
 instance Exception PlaywrightError

@@ -115,3 +115,5 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - `page.$` is `querySelector` with `strict: false`; locator `elementHandle` waits attached then queries with `strict: true`.
 - Frame objects are created under BrowserContext on the wire. `childFrames` uses `FrameInitializer.parentFrame`, not the transport parent guid.
 - ElementHandle `evaluateExpression` is the JSHandle mixin method on the same channel.
+- Console and dialog events are BrowserContext protocol events; Page waits subscribe via `updateSubscription` then STM-wait on the context guid.
+- `waitForURL` glob-matches the live frame URL (`**` / `*` / `?`) then waits for load.

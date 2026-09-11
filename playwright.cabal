@@ -30,7 +30,11 @@ library
       Playwright.Channel
       Playwright.CheckOptions
       Playwright.Connection
+      Playwright.ConsoleMessage
+      Playwright.ConsoleType
       Playwright.CssPixel
+      Playwright.Dialog
+      Playwright.DialogType
       Playwright.DomEventType
       Playwright.Driver
       Playwright.ElementHandle
@@ -85,6 +89,7 @@ library
       Playwright.Transport.Stdio
       Playwright.TypedArrayKind
       Playwright.Url
+      Playwright.UrlGlob
       Playwright.ViewportSize
       Playwright.WaitForState
       Playwright.WheelDelta
@@ -126,12 +131,15 @@ test-suite playwright-test
       Playwright.ElementHandleBoundingBoxSpec
       Playwright.ElementHandleClickSpec
       Playwright.ElementHandleConvenienceSpec
+      Playwright.FrameEvaluateSpec
       Playwright.FrameHierarchySpec
       Playwright.Harness
       Playwright.IntegrationSpec
       Playwright.LocatorClickSpec
+      Playwright.LocatorElementHandleSpec
       Playwright.LocatorEvaluateSpec
       Playwright.LocatorIsVisibleSpec
+      Playwright.LocatorListSpec
       Playwright.LocatorMiscSpec
       Playwright.LocatorQuerySpec
       Playwright.LocatorSpec
@@ -141,8 +149,10 @@ test-suite playwright-test
       Playwright.PageBasicSpec
       Playwright.PageCheckSpec
       Playwright.PageClickSpec
+      Playwright.PageDialogSpec
       Playwright.PageDispatchEventSpec
       Playwright.PageEvaluateSpec
+      Playwright.PageEventConsoleSpec
       Playwright.PageFillSpec
       Playwright.PageFocusSpec
       Playwright.PageGotoSpec
@@ -155,6 +165,7 @@ test-suite playwright-test
       Playwright.PageWaitForFunctionSpec
       Playwright.PageWaitForLoadStateSpec
       Playwright.PageWaitForSelectorSpec
+      Playwright.PageWaitForUrlSpec
       Playwright.QuerySelectorSpec
       Playwright.SelectorsGetBySpec
       Playwright.TransportSpec

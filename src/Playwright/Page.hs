@@ -29,8 +29,24 @@ module Playwright.Page
   , waitForFunction
   , waitForLoadState
   , waitForTimeout
+  , waitForURL
+  , waitForURLWith
+  , armConsole
+  , armDialog
+  , waitForConsole
+  , waitForDialog
   ) where
 
+import Control.Concurrent
+  ( threadDelay
+  )
+import Control.Concurrent.Async
+  ( race
+  )
+import Control.Concurrent.STM
+  ( atomically
+  , takeTMVar
+  )
 import Control.Exception
   ( throwIO
   )
@@ -47,13 +63,23 @@ import Playwright.AriaRole
   ( AriaRole
   )
 import Playwright.Channel
-  ( Channel (Channel, channelConnection)
+  ( BrowserContextTag
+  , Channel (Channel, channelConnection, channelGuid)
   , PageTag
   , send
   )
 import Playwright.Connection
-  ( Connection
-  , lookupObject
+  ( lookupObject
+  , registerEventWaiter
+  , waitUntilUrl
+  )
+import Playwright.ConsoleMessage
+  ( ConsoleMessage
+  , consoleMessageFromEvent
+  )
+import Playwright.Dialog
+  ( Dialog
+  , dialogFromRef
   )
 import Playwright.Frame
   ( Frame (frameChannel)
@@ -79,6 +105,9 @@ import Playwright.Frame.Wait
 import Playwright.ElementHandle
   ( ElementHandle
   , elementHandleFromRef
+  )
+import Playwright.Error
+  ( PlaywrightError (WaitTimeout)
   )
 import Playwright.Exactness
   ( Exactness
@@ -113,7 +142,7 @@ import Playwright.JsHandle
   ( JsHandle
   )
 import Playwright.LoadState
-  ( LoadState
+  ( LoadState (LoadStateLoad)
   )
 import Playwright.Locator
   ( Locator (Locator, locatorFrame, locatorSelector)
@@ -122,10 +151,15 @@ import Playwright.MethodName
   ( MethodName (MethodName)
   )
 import Playwright.Protocol
-  ( FrameAddScriptTagParams (frameAddScriptTagParamsContent, frameAddScriptTagParamsType, frameAddScriptTagParamsUrl)
+  ( BrowserContextConsoleEvent
+  , BrowserContextDialogEvent (browserContextDialogEventDialog)
+  , BrowserContextUpdateSubscriptionParamsEvent (BrowserContextUpdateSubscriptionParamsEventConsole, BrowserContextUpdateSubscriptionParamsEventDialog)
+  , BrowserContextUpdateSubscriptionResult
+  , FrameAddScriptTagParams (frameAddScriptTagParamsContent, frameAddScriptTagParamsType, frameAddScriptTagParamsUrl)
   , FrameAddScriptTagResult (frameAddScriptTagResultElement)
   , FrameAddStyleTagParams (frameAddStyleTagParamsContent, frameAddStyleTagParamsUrl)
   , FrameAddStyleTagResult (frameAddStyleTagResultElement)
+  , BrowserContextUpdateSubscriptionResult
   , NameValue
   , PageAddInitScriptResult
   , PageCloseResult
@@ -137,6 +171,7 @@ import Playwright.Protocol
   , PageScreenshotResult (pageScreenshotResultBinary)
   , PageSetExtraHTTPHeadersResult
   , PageSetViewportSizeResult
+  , mkBrowserContextUpdateSubscriptionParams
   , mkFrameAddScriptTagParams
   , mkFrameAddStyleTagParams
   , mkNameValue
@@ -175,9 +210,14 @@ import Playwright.SerializedArgument
 import Playwright.Timeout
   ( Timeout
   , defaultTimeout
+  , timeoutToDouble
   )
 import Playwright.Url
   ( Url
+  )
+import Playwright.UrlGlob
+  ( UrlGlob
+  , matchesUrlGlob
   )
 import Playwright.ViewportSize
   ( ViewportSize (viewportHeight, viewportWidth)
@@ -191,10 +231,12 @@ import Playwright.WaitForState
 data Page = Page
   { pageChannel :: Channel PageTag
   , pageMainFrame :: Frame
+  , pageContextChannel :: Channel BrowserContextTag
   }
 
-pageFromRef :: Connection -> ChannelRef -> IO Page
-pageFromRef conn ref = do
+pageFromRef :: Channel BrowserContextTag -> ChannelRef -> IO Page
+pageFromRef contextChannel ref = do
+  let conn = channelConnection contextChannel
   obj <- lookupObject conn (channelRefGuid ref)
   initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
   resolvedMainFrame <- frameFromRef conn (pageInitializerMainFrame initializer)
@@ -202,6 +244,7 @@ pageFromRef conn ref = do
     Page
       { pageChannel = Channel conn (channelRefGuid ref)
       , pageMainFrame = resolvedMainFrame
+      , pageContextChannel = contextChannel
       }
 
 closePage :: Page -> IO ()
@@ -382,3 +425,72 @@ frameByName page name = do
     pairName frame = do
       frameName <- currentName frame
       pure (frame, frameName)
+
+waitWithTimeout :: Timeout -> IO a -> IO a
+waitWithTimeout timeout action = do
+  result <- race (threadDelay (round (timeoutToDouble timeout * 1000))) action
+  case result of
+    Left () ->
+      throwIO (WaitTimeout timeout)
+    Right value ->
+      pure value
+
+waitForURL :: Page -> UrlGlob -> IO ()
+waitForURL page glob =
+  waitForURLWith page glob defaultTimeout
+
+waitForURLWith :: Page -> UrlGlob -> Timeout -> IO ()
+waitForURLWith page glob timeout =
+  waitWithTimeout timeout $ do
+    waitUntilUrl
+      (channelConnection (pageChannel page))
+      (channelGuid (frameChannel (pageMainFrame page)))
+      (matchesUrlGlob glob)
+    waitForLoadState page LoadStateLoad
+
+subscribeContext :: Page -> BrowserContextUpdateSubscriptionParamsEvent -> IO ()
+subscribeContext page event = do
+  _ :: BrowserContextUpdateSubscriptionResult <-
+    send
+      (pageContextChannel page)
+      (MethodName "updateSubscription")
+      (mkBrowserContextUpdateSubscriptionParams True event)
+  pure ()
+
+armDialog :: Page -> IO (IO Dialog)
+armDialog page = do
+  subscribeContext page BrowserContextUpdateSubscriptionParamsEventDialog
+  box <-
+    registerEventWaiter
+      (channelConnection (pageContextChannel page))
+      (channelGuid (pageContextChannel page))
+      (MethodName "dialog")
+  pure $ do
+    params <- atomically (takeTMVar box)
+    event <- either throwIO pure (fromJsonValue params)
+    dialogFromRef
+      (channelConnection (pageContextChannel page))
+      (browserContextDialogEventDialog event)
+
+waitForDialog :: Page -> IO Dialog
+waitForDialog page = do
+  takeDialog <- armDialog page
+  takeDialog
+
+armConsole :: Page -> IO (IO ConsoleMessage)
+armConsole page = do
+  subscribeContext page BrowserContextUpdateSubscriptionParamsEventConsole
+  box <-
+    registerEventWaiter
+      (channelConnection (pageContextChannel page))
+      (channelGuid (pageContextChannel page))
+      (MethodName "console")
+  pure $ do
+    params <- atomically (takeTMVar box)
+    event <- either throwIO pure (fromJsonValue params :: Either PlaywrightError BrowserContextConsoleEvent)
+    consoleMessageFromEvent (channelConnection (pageContextChannel page)) event
+
+waitForConsole :: Page -> IO ConsoleMessage
+waitForConsole page = do
+  takeMessage <- armConsole page
+  takeMessage

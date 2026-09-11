@@ -7,7 +7,7 @@ module Playwright.BrowserContext
 
 import Playwright.Channel
   ( BrowserContextTag
-  , Channel (Channel, channelConnection)
+  , Channel (Channel)
   , send
   )
 import Playwright.Connection
@@ -46,7 +46,7 @@ newPage ctx = do
       (MethodName "newPage")
       mkBrowserContextNewPageParams
   pageFromRef
-    (channelConnection (browserContextChannel ctx))
+    (browserContextChannel ctx)
     (browserContextNewPageResultPage result)
 
 closeContext :: BrowserContext -> IO ()
