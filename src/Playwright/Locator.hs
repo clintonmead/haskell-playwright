@@ -6,8 +6,13 @@ module Playwright.Locator
   , click
   , dblclick
   , fill
+  , first
   , focus
   , getAttribute
+  , getByLabel
+  , getByRole
+  , getByTestId
+  , getByText
   , hover
   , innerHtml
   , innerText
@@ -18,8 +23,11 @@ module Playwright.Locator
   , isEnabled
   , isHidden
   , isVisible
+  , lastLocator
   , locatorCount
+  , nth
   , press
+  , selectOption
   , setChecked
   , textContent
   , typeText
@@ -31,10 +39,17 @@ module Playwright.Locator
 
 import Data.Text
   ( Text
+  , pack
+  )
+import Playwright.AriaRole
+  ( AriaRole
   )
 import Playwright.CheckOptions
   ( CheckOptions
   , defaultCheckOptions
+  )
+import Playwright.Exactness
+  ( Exactness
   )
 import Playwright.Frame
   ( Frame
@@ -47,6 +62,7 @@ import Playwright.Frame.Action
   , focusFrame
   , hoverFrame
   , pressFrame
+  , selectOptionFrame
   , typeTextFrame
   , uncheckFrame
   )
@@ -67,12 +83,25 @@ import Playwright.Frame.Inspect
 import Playwright.Frame.Wait
   ( waitForSelectorFrame
   )
+import Playwright.GetBy
+  ( getByLabelSelector
+  , getByRoleSelector
+  , getByTestIdSelector
+  , getByTextSelector
+  )
+import Playwright.GetByRoleOptions
+  ( GetByRoleOptions
+  )
 import Playwright.Key
   ( Key
+  )
+import Playwright.SelectOption
+  ( SelectOption
   )
 import Playwright.Selector
   ( Selector
   , nestedSelector
+  , selectorFromText
   )
 import Playwright.Timeout
   ( Timeout
@@ -93,6 +122,34 @@ childLocator parent child =
     { locatorFrame = locatorFrame parent
     , locatorSelector = nestedSelector (locatorSelector parent) child
     }
+
+nth :: Locator -> Int -> Locator
+nth loc index =
+  childLocator loc (selectorFromText ("nth=" <> pack (show index)))
+
+first :: Locator -> Locator
+first loc =
+  nth loc 0
+
+lastLocator :: Locator -> Locator
+lastLocator loc =
+  nth loc (-1)
+
+getByText :: Locator -> Text -> Exactness -> Locator
+getByText loc text exactness =
+  childLocator loc (getByTextSelector text exactness)
+
+getByLabel :: Locator -> Text -> Exactness -> Locator
+getByLabel loc text exactness =
+  childLocator loc (getByLabelSelector text exactness)
+
+getByTestId :: Locator -> Text -> Locator
+getByTestId loc testId =
+  childLocator loc (getByTestIdSelector testId)
+
+getByRole :: Locator -> AriaRole -> GetByRoleOptions -> Locator
+getByRole loc role opts =
+  childLocator loc (getByRoleSelector role opts)
 
 click :: Locator -> IO ()
 click loc =
@@ -143,6 +200,10 @@ press loc key =
 typeText :: Locator -> Text -> IO ()
 typeText loc text =
   typeTextFrame (locatorFrame loc) (locatorSelector loc) text defaultTimeout
+
+selectOption :: Locator -> [SelectOption] -> IO [Text]
+selectOption loc options =
+  selectOptionFrame (locatorFrame loc) (locatorSelector loc) options defaultTimeout
 
 innerText :: Locator -> IO Text
 innerText loc =

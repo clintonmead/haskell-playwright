@@ -2,6 +2,7 @@ module Playwright.Frame
   ( Frame (..)
   , evalOnSelectorFrame
   , evaluateFrame
+  , evaluateFrameWith
   , frameFromRef
   , frameSend
   , frameSend_
@@ -65,7 +66,8 @@ import Playwright.RemoteObject
   ( RemoteObject (remoteInitializer)
   )
 import Playwright.Response
-  ( Response (Response)
+  ( Response
+  , responseFromRef
   )
 import Playwright.Selector
   ( Selector
@@ -130,15 +132,7 @@ gotoFrame frame url opts = do
     Nothing ->
       pure Nothing
     Just responseRef ->
-      pure
-        ( Just
-            ( Response
-                ( Channel
-                    (channelConnection (frameChannel frame))
-                    (channelRefGuid responseRef)
-                )
-            )
-        )
+      pure (Just (responseFromRef (channelConnection (frameChannel frame)) responseRef))
 
 titleFrame :: Frame -> IO Text
 titleFrame frame = do
@@ -155,12 +149,16 @@ setContentFrame frame html timeout =
   frameSend_ @FrameSetContentResult frame "setContent" (mkFrameSetContentParams html timeout)
 
 evaluateFrame :: Frame -> Text -> IO SerializedValue
-evaluateFrame frame expression = do
+evaluateFrame frame expression =
+  evaluateFrameWith frame expression undefinedArgument
+
+evaluateFrameWith :: Frame -> Text -> SerializedArgument -> IO SerializedValue
+evaluateFrameWith frame expression arg = do
   result <-
     frameSend
       frame
       "evaluateExpression"
-      (mkFrameEvaluateExpressionParams undefinedArgument expression)
+      (mkFrameEvaluateExpressionParams arg expression)
         { frameEvaluateExpressionParamsIsFunction = Just True
         }
   pure (frameEvaluateExpressionResultValue result)

@@ -6,6 +6,7 @@ module Playwright.Frame.Action
   , focusFrame
   , hoverFrame
   , pressFrame
+  , selectOptionFrame
   , typeTextFrame
   , uncheckFrame
   ) where
@@ -18,6 +19,7 @@ import Playwright.CheckOptions
   )
 import Playwright.Frame
   ( Frame
+  , frameSend
   , frameSend_
   )
 import Playwright.Key
@@ -38,6 +40,9 @@ import Playwright.Protocol
   , FrameHoverResult
   , FramePressParams (framePressParamsStrict)
   , FramePressResult
+  , FrameSelectOptionParams (frameSelectOptionParamsOptions, frameSelectOptionParamsStrict)
+  , FrameSelectOptionParamsOptions (frameSelectOptionParamsOptionsIndex, frameSelectOptionParamsOptionsLabel, frameSelectOptionParamsOptionsValue, frameSelectOptionParamsOptionsValueOrLabel)
+  , FrameSelectOptionResult (frameSelectOptionResultValues)
   , FrameTypeParams (frameTypeParamsStrict)
   , FrameTypeResult
   , FrameUncheckParams (frameUncheckParamsForce, frameUncheckParamsStrict, frameUncheckParamsTrial)
@@ -49,8 +54,13 @@ import Playwright.Protocol
   , mkFrameFocusParams
   , mkFrameHoverParams
   , mkFramePressParams
+  , mkFrameSelectOptionParams
+  , mkFrameSelectOptionParamsOptions
   , mkFrameTypeParams
   , mkFrameUncheckParams
+  )
+import Playwright.SelectOption
+  ( SelectOption (SelectIndex, SelectLabel, SelectValue, SelectValueOrLabel)
   )
 import Playwright.Selector
   ( Selector
@@ -143,3 +153,27 @@ typeTextFrame frame selector text timeout =
     (mkFrameTypeParams selector text timeout)
       { frameTypeParamsStrict = Just True
       }
+
+selectOptionFrame :: Frame -> Selector -> [SelectOption] -> Timeout -> IO [Text]
+selectOptionFrame frame selector options timeout = do
+  result <-
+    frameSend
+      frame
+      "selectOption"
+      (mkFrameSelectOptionParams selector timeout)
+        { frameSelectOptionParamsStrict = Just True
+        , frameSelectOptionParamsOptions = Just (fmap toProtocolOption options)
+        }
+  pure (frameSelectOptionResultValues result)
+
+toProtocolOption :: SelectOption -> FrameSelectOptionParamsOptions
+toProtocolOption option =
+  case option of
+    SelectValueOrLabel text ->
+      mkFrameSelectOptionParamsOptions {frameSelectOptionParamsOptionsValueOrLabel = Just text}
+    SelectValue text ->
+      mkFrameSelectOptionParamsOptions {frameSelectOptionParamsOptionsValue = Just text}
+    SelectLabel text ->
+      mkFrameSelectOptionParamsOptions {frameSelectOptionParamsOptionsLabel = Just text}
+    SelectIndex index ->
+      mkFrameSelectOptionParamsOptions {frameSelectOptionParamsOptionsIndex = Just index}

@@ -107,3 +107,4 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - Cabal `verbose: 0` plus the flake `cabal` wrapper (`-v0`) and Stack `cabal-verbosity: 0` keep successful builds quiet; GHC errors and test output still show.
 - Locator `evaluate` is `Frame.evalOnSelector` with `strict: true`. Page `evaluate` is `Frame.evaluateExpression` with `isFunction: true`.
 - `Frame.navigated` updates the stored initializer URL so `page.url` is live after navigation (including hash changes).
+- `getByRole`/`getByText`/`getByLabel`/`getByTestId` are client-side `internal:` selectors, matching Playwright's locatorUtils.

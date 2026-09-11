@@ -1,12 +1,63 @@
 module Playwright.Response
   ( Response (..)
+  , responseFromRef
+  , responseOk
+  , responseStatus
+  , responseUrl
   ) where
 
+import Control.Exception
+  ( throwIO
+  )
 import Playwright.Channel
-  ( Channel
+  ( Channel (Channel, channelConnection, channelGuid)
   , ResponseTag
+  )
+import Playwright.Connection
+  ( Connection
+  , lookupObject
+  )
+import Playwright.HttpStatus
+  ( HttpStatus (HttpStatus)
+  , httpStatusOk
+  )
+import Playwright.Json.ChannelRef
+  ( ChannelRef (channelRefGuid)
+  )
+import Playwright.Json.Decode
+  ( fromJsonValue
+  )
+import Playwright.Protocol
+  ( ResponseInitializer (responseInitializerStatus, responseInitializerUrl)
+  )
+import Playwright.RemoteObject
+  ( RemoteObject (remoteInitializer)
+  )
+import Playwright.Url
+  ( Url
   )
 
 newtype Response = Response
   { responseChannel :: Channel ResponseTag
   }
+
+responseFromRef :: Connection -> ChannelRef -> Response
+responseFromRef conn ref =
+  Response (Channel conn (channelRefGuid ref))
+
+responseInitializer :: Response -> IO ResponseInitializer
+responseInitializer response = do
+  obj <- lookupObject (channelConnection (responseChannel response)) (channelGuid (responseChannel response))
+  either throwIO pure (fromJsonValue (remoteInitializer obj))
+
+responseUrl :: Response -> IO Url
+responseUrl response =
+  responseInitializerUrl <$> responseInitializer response
+
+responseStatus :: Response -> IO HttpStatus
+responseStatus response =
+  HttpStatus . responseInitializerStatus <$> responseInitializer response
+
+responseOk :: Response -> IO Bool
+responseOk response =
+  httpStatusOk <$> responseStatus response

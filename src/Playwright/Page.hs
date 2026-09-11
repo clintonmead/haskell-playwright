@@ -10,6 +10,13 @@ module Playwright.Page
   , title
   , url
   , waitForSelector
+  , getByLabel
+  , getByRole
+  , getByTestId
+  , getByText
+  , goBack
+  , goForward
+  , reload
   ) where
 
 import Control.Exception
@@ -21,8 +28,11 @@ import Data.ByteString
 import Data.Text
   ( Text
   )
+import Playwright.AriaRole
+  ( AriaRole
+  )
 import Playwright.Channel
-  ( Channel (Channel)
+  ( Channel (Channel, channelConnection)
   , PageTag
   , send
   )
@@ -41,6 +51,18 @@ import Playwright.Frame
   )
 import Playwright.Frame.Wait
   ( waitForSelectorFrame
+  )
+import Playwright.Exactness
+  ( Exactness
+  )
+import Playwright.GetBy
+  ( getByLabelSelector
+  , getByRoleSelector
+  , getByTestIdSelector
+  , getByTextSelector
+  )
+import Playwright.GetByRoleOptions
+  ( GetByRoleOptions
   )
 import Playwright.GotoOptions
   ( GotoOptions
@@ -62,10 +84,16 @@ import Playwright.MethodName
   )
 import Playwright.Protocol
   ( PageCloseResult
+  , PageGoBackResult (pageGoBackResultResponse)
+  , PageGoForwardResult (pageGoForwardResultResponse)
   , PageInitializer (pageInitializerMainFrame)
+  , PageReloadResult (pageReloadResultResponse)
   , PageScreenshotParams (pageScreenshotParamsFullPage)
   , PageScreenshotResult (pageScreenshotResultBinary)
   , mkPageCloseParams
+  , mkPageGoBackParams
+  , mkPageGoForwardParams
+  , mkPageReloadParams
   , mkPageScreenshotParams
   )
 import Playwright.RemoteObject
@@ -73,6 +101,7 @@ import Playwright.RemoteObject
   )
 import Playwright.Response
   ( Response
+  , responseFromRef
   )
 import Playwright.ScreenshotOptions
   ( ScreenshotOptions (screenshotOptionsFullPage, screenshotOptionsTimeout)
@@ -148,3 +177,34 @@ locator page selector =
     { locatorFrame = pageMainFrame page
     , locatorSelector = selector
     }
+
+getByTestId :: Page -> Text -> Locator
+getByTestId page testId =
+  locator page (getByTestIdSelector testId)
+
+getByText :: Page -> Text -> Exactness -> Locator
+getByText page text exactness =
+  locator page (getByTextSelector text exactness)
+
+getByLabel :: Page -> Text -> Exactness -> Locator
+getByLabel page text exactness =
+  locator page (getByLabelSelector text exactness)
+
+getByRole :: Page -> AriaRole -> GetByRoleOptions -> Locator
+getByRole page role opts =
+  locator page (getByRoleSelector role opts)
+
+goBack :: Page -> IO (Maybe Response)
+goBack page = do
+  result <- send (pageChannel page) (MethodName "goBack") (mkPageGoBackParams defaultTimeout)
+  pure (fmap (responseFromRef (channelConnection (pageChannel page))) (pageGoBackResultResponse result))
+
+goForward :: Page -> IO (Maybe Response)
+goForward page = do
+  result <- send (pageChannel page) (MethodName "goForward") (mkPageGoForwardParams defaultTimeout)
+  pure (fmap (responseFromRef (channelConnection (pageChannel page))) (pageGoForwardResultResponse result))
+
+reload :: Page -> IO (Maybe Response)
+reload page = do
+  result <- send (pageChannel page) (MethodName "reload") (mkPageReloadParams defaultTimeout)
+  pure (fmap (responseFromRef (channelConnection (pageChannel page))) (pageReloadResultResponse result))

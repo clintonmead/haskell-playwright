@@ -3,9 +3,13 @@ module Playwright
   , BrowserContext (..)
   , BrowserName (..)
   , BrowserType (..)
+  , AriaRole (..)
   , CheckOptions (..)
+  , Exactness (..)
   , Frame (..)
+  , GetByRoleOptions (..)
   , GotoOptions (..)
+  , HttpStatus (..)
   , Key (..)
   , LaunchOptions (..)
   , Locator (..)
@@ -13,7 +17,9 @@ module Playwright
   , Playwright (..)
   , Response (..)
   , ScreenshotOptions (..)
+  , SelectOption (..)
   , Selector
+  , SpecialJsValue (..)
   , Timeout
   , Url
   , WaitForState (..)
@@ -31,6 +37,7 @@ module Playwright
   , contextFromRef
   , dblclick
   , defaultCheckOptions
+  , defaultGetByRoleOptions
   , defaultGotoOptions
   , defaultLaunchOptions
   , defaultScreenshotOptions
@@ -42,13 +49,24 @@ module Playwright
   , evaluateOnLocatorBool
   , evaluateOnLocatorText
   , evaluateOnLocatorWith
+  , evaluateSpecial
   , evaluateText
+  , evaluateTexts
+  , evaluateWith
   , fill
   , firefox
+  , first
   , focus
   , getAttribute
+  , getByLabel
+  , getByRole
+  , getByTestId
+  , getByText
+  , goBack
+  , goForward
   , goto
   , hover
+  , httpStatusOk
   , initializePlaywright
   , innerHtml
   , innerText
@@ -64,6 +82,7 @@ module Playwright
   , keyboardPress
   , keyboardType
   , keyboardUp
+  , lastLocator
   , launch
   , locator
   , locatorCount
@@ -71,13 +90,21 @@ module Playwright
   , nestedSelector
   , newContext
   , newPage
+  , nth
+  , numberArgument
   , pageFromRef
   , press
+  , reload
+  , responseOk
+  , responseStatus
+  , responseUrl
   , screenshot
+  , selectOption
   , selectorFromText
   , selectorToText
   , setChecked
   , setContent
+  , specialArgument
   , textArgument
   , textContent
   , timeoutToDouble
@@ -97,6 +124,9 @@ module Playwright
   , withPlaywright
   ) where
 
+import Playwright.AriaRole
+  ( AriaRole (AriaRole, ariaRoleToText)
+  )
 import Playwright.Browser
   ( Browser (Browser, browserChannel)
   , browserFromRef
@@ -131,14 +161,28 @@ import Playwright.Evaluate
   , evaluateOnLocatorBool
   , evaluateOnLocatorText
   , evaluateOnLocatorWith
+  , evaluateSpecial
   , evaluateText
+  , evaluateTexts
+  , evaluateWith
+  )
+import Playwright.Exactness
+  ( Exactness (Exact, Inexact)
   )
 import Playwright.Frame
   ( Frame (Frame, frameChannel, frameParent, frameUrl)
   )
+import Playwright.GetByRoleOptions
+  ( GetByRoleOptions (GetByRoleOptions, getByRoleExact, getByRoleName)
+  , defaultGetByRoleOptions
+  )
 import Playwright.GotoOptions
   ( GotoOptions (GotoOptions, gotoOptionsReferer, gotoOptionsTimeout, gotoOptionsWaitUntil)
   , defaultGotoOptions
+  )
+import Playwright.HttpStatus
+  ( HttpStatus (HttpStatus, httpStatusToInt)
+  , httpStatusOk
   )
 import Playwright.Instance
   ( Playwright (Playwright, playwrightChannel, playwrightChromium, playwrightFirefox, playwrightWebkit)
@@ -170,6 +214,7 @@ import Playwright.Locator
   , click
   , dblclick
   , fill
+  , first
   , focus
   , getAttribute
   , hover
@@ -182,8 +227,11 @@ import Playwright.Locator
   , isEnabled
   , isHidden
   , isVisible
+  , lastLocator
   , locatorCount
+  , nth
   , press
+  , selectOption
   , setChecked
   , textContent
   , typeText
@@ -196,9 +244,16 @@ import Playwright.Page
   ( Page (Page, pageChannel, pageMainFrame)
   , closePage
   , content
+  , getByLabel
+  , getByRole
+  , getByTestId
+  , getByText
+  , goBack
+  , goForward
   , goto
   , locator
   , pageFromRef
+  , reload
   , screenshot
   , setContent
   , title
@@ -207,10 +262,16 @@ import Playwright.Page
   )
 import Playwright.Response
   ( Response (Response, responseChannel)
+  , responseOk
+  , responseStatus
+  , responseUrl
   )
 import Playwright.ScreenshotOptions
   ( ScreenshotOptions (ScreenshotOptions, screenshotOptionsFullPage, screenshotOptionsTimeout)
   , defaultScreenshotOptions
+  )
+import Playwright.SelectOption
+  ( SelectOption (SelectIndex, SelectLabel, SelectValue, SelectValueOrLabel)
   )
 import Playwright.Selector
   ( Selector
@@ -219,7 +280,12 @@ import Playwright.Selector
   , selectorToText
   )
 import Playwright.SerializedArgument
-  ( textArgument
+  ( numberArgument
+  , specialArgument
+  , textArgument
+  )
+import Playwright.SpecialJsValue
+  ( SpecialJsValue (SpecialInfinity, SpecialNaN, SpecialNegInfinity, SpecialNegZero, SpecialNull, SpecialUndefined)
   )
 import Playwright.Timeout
   ( Timeout

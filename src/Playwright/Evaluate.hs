@@ -6,7 +6,10 @@ module Playwright.Evaluate
   , evaluateOnLocatorBool
   , evaluateOnLocatorText
   , evaluateOnLocatorWith
+  , evaluateSpecial
   , evaluateText
+  , evaluateTexts
+  , evaluateWith
   ) where
 
 import Control.Exception
@@ -21,6 +24,7 @@ import Playwright.Error
 import Playwright.Frame
   ( evalOnSelectorFrame
   , evaluateFrame
+  , evaluateFrameWith
   )
 import Playwright.Locator
   ( Locator (locatorFrame, locatorSelector)
@@ -33,12 +37,19 @@ import Playwright.SerializedArgument
   , undefinedArgument
   )
 import Playwright.SerializedValue
-  ( SerializedPayload (PayloadBool, PayloadNumber, PayloadString)
+  ( SerializedPayload (PayloadArray, PayloadBool, PayloadNumber, PayloadSpecial, PayloadString)
   , SerializedValue (SerializedNode)
+  )
+import Playwright.SpecialJsValue
+  ( SpecialJsValue
   )
 
 evaluate :: Page -> Text -> IO SerializedValue
 evaluate page = evaluateFrame (pageMainFrame page)
+
+evaluateWith :: Page -> Text -> SerializedArgument -> IO SerializedValue
+evaluateWith page =
+  evaluateFrameWith (pageMainFrame page)
 
 evaluateOnLocator :: Locator -> Text -> IO SerializedValue
 evaluateOnLocator loc expression =
@@ -68,6 +79,14 @@ evaluateNumber :: Page -> Text -> IO Double
 evaluateNumber page expression =
   requireNumber =<< evaluate page expression
 
+evaluateSpecial :: Page -> Text -> IO SpecialJsValue
+evaluateSpecial page expression =
+  requireSpecial =<< evaluate page expression
+
+evaluateTexts :: Page -> Text -> IO [Text]
+evaluateTexts page expression =
+  requireTexts =<< evaluate page expression
+
 requireText :: SerializedValue -> IO Text
 requireText value =
   case value of
@@ -89,5 +108,21 @@ requireNumber value =
   case value of
     SerializedNode (PayloadNumber number) _ ->
       pure number
+    _ ->
+      throwIO (EvaluateUnexpected value)
+
+requireSpecial :: SerializedValue -> IO SpecialJsValue
+requireSpecial value =
+  case value of
+    SerializedNode (PayloadSpecial special) _ ->
+      pure special
+    _ ->
+      throwIO (EvaluateUnexpected value)
+
+requireTexts :: SerializedValue -> IO [Text]
+requireTexts value =
+  case value of
+    SerializedNode (PayloadArray items) _ ->
+      traverse requireText items
     _ ->
       throwIO (EvaluateUnexpected value)

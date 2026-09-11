@@ -3,7 +3,9 @@ module Playwright.PageEvaluateSpec
   ) where
 
 import Playwright
-  ( evaluateNumber
+  ( SpecialJsValue (SpecialNaN)
+  , evaluateNumber
+  , evaluateSpecial
   )
 import Playwright.Harness
   ( withChromiumPage
@@ -25,4 +27,8 @@ tests =
         withChromiumPage $ \page -> do
           result <- evaluateNumber page "() => 7 * 3"
           assertEqual "21" (21 :: Double) result
+    , testCase "should transfer NaN" $
+        withChromiumPage $ \page -> do
+          special <- evaluateSpecial page "() => NaN"
+          assertEqual "NaN" SpecialNaN special
     ]
