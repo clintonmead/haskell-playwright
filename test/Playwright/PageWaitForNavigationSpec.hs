@@ -10,18 +10,23 @@ import Data.Text
   ( isInfixOf
   )
 import Playwright
-  ( defaultGotoOptions
+  ( UrlGlob (UrlGlob)
+  , defaultGotoOptions
   , evaluateTextWith
   , goto
+  , milliseconds
   , responseOk
   , responseUrl
   , textArgument
   , urlFromText
   , urlToText
   , waitForNavigation
+  , waitForNavigationWith
   )
 import Playwright.Harness
-  ( withAssets
+  ( assertWaitTimeout
+  , withAssetPage
+  , withAssets
   )
 import Test.Tasty
   ( TestTree
@@ -55,4 +60,11 @@ tests =
                 assertEqual "ok" True =<< responseOk value
                 url <- responseUrl value
                 assertBool "grid.html" ("grid.html" `isInfixOf` urlToText url)
+    , testCase "should respect timeout" $
+        withAssetPage "empty.html" $ \page ->
+          case milliseconds 1000 of
+            Nothing ->
+              assertFailure "timeout"
+            Just timeout ->
+              assertWaitTimeout (waitForNavigationWith page timeout (Just (UrlGlob "**/frame.html")))
     ]

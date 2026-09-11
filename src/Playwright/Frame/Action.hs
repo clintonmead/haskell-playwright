@@ -11,6 +11,7 @@ module Playwright.Frame.Action
   , typeTextFrame
   , uncheckFrame
   , dragAndDropFrame
+  , setInputFilesFrame
   ) where
 
 import Data.Text
@@ -26,6 +27,15 @@ import Playwright.Frame
   ( Frame
   , frameSend
   , frameSend_
+  )
+import Playwright.InputFile
+  ( InputFile (inputFileBytes, inputFileName)
+  )
+import Playwright.InputFileName
+  ( inputFileNameToText
+  )
+import Playwright.Json.ProtocolBinary
+  ( protocolBinaryFromByteString
   )
 import Playwright.Key
   ( Key (keyToText)
@@ -52,6 +62,9 @@ import Playwright.Protocol
   , FrameSelectOptionParams (frameSelectOptionParamsOptions, frameSelectOptionParamsStrict)
   , FrameSelectOptionParamsOptions (frameSelectOptionParamsOptionsIndex, frameSelectOptionParamsOptionsLabel, frameSelectOptionParamsOptionsValue, frameSelectOptionParamsOptionsValueOrLabel)
   , FrameSelectOptionResult (frameSelectOptionResultValues)
+  , FrameSetInputFilesParams (frameSetInputFilesParamsPayloads, frameSetInputFilesParamsStrict)
+  , FrameSetInputFilesParamsPayloads
+  , FrameSetInputFilesResult
   , FrameTypeParams (frameTypeParamsStrict)
   , FrameTypeResult
   , FrameUncheckParams (frameUncheckParamsForce, frameUncheckParamsStrict, frameUncheckParamsTrial)
@@ -67,6 +80,8 @@ import Playwright.Protocol
   , mkFramePressParams
   , mkFrameSelectOptionParams
   , mkFrameSelectOptionParamsOptions
+  , mkFrameSetInputFilesParams
+  , mkFrameSetInputFilesParamsPayloads
   , mkFrameTypeParams
   , mkFrameUncheckParams
   )
@@ -185,6 +200,22 @@ dragAndDropFrame frame source target timeout =
     (mkFrameDragAndDropParams source target timeout)
       { frameDragAndDropParamsStrict = Just True
       }
+
+setInputFilesFrame :: Frame -> Selector -> [InputFile] -> Timeout -> IO ()
+setInputFilesFrame frame selector files timeout =
+  frameSend_ @FrameSetInputFilesResult
+    frame
+    "setInputFiles"
+    (mkFrameSetInputFilesParams selector timeout)
+      { frameSetInputFilesParamsStrict = Just True
+      , frameSetInputFilesParamsPayloads = Just (fmap toPayload files)
+      }
+
+toPayload :: InputFile -> FrameSetInputFilesParamsPayloads
+toPayload file =
+  mkFrameSetInputFilesParamsPayloads
+    (protocolBinaryFromByteString (inputFileBytes file))
+    (inputFileNameToText (inputFileName file))
 
 selectOptionFrame :: Frame -> Selector -> [SelectOption] -> Timeout -> IO [Text]
 selectOptionFrame frame selector options timeout = do

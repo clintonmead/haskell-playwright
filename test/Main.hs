@@ -45,6 +45,7 @@ import Playwright.PageEvaluateHandleSpec qualified as PageEvaluateHandleSpec
 import Playwright.PageEmulateMediaSpec qualified as PageEmulateMediaSpec
 import Playwright.PageEventPageErrorSpec qualified as PageEventPageErrorSpec
 import Playwright.PageExposeFunctionSpec qualified as PageExposeFunctionSpec
+import Playwright.PageFileChooserSpec qualified as PageFileChooserSpec
 import Playwright.PageFillSpec qualified as PageFillSpec
 import Playwright.PageFocusSpec qualified as PageFocusSpec
 import Playwright.PageGotoSpec qualified as PageGotoSpec
@@ -58,6 +59,7 @@ import Playwright.PageScreenshotSpec qualified as PageScreenshotSpec
 import Playwright.PageSetContentSpec qualified as PageSetContentSpec
 import Playwright.PageSelectOptionSpec qualified as PageSelectOptionSpec
 import Playwright.PageSetExtraHTTPHeadersSpec qualified as PageSetExtraHTTPHeadersSpec
+import Playwright.PageSetInputFilesSpec qualified as PageSetInputFilesSpec
 import Playwright.PageStrictSpec qualified as PageStrictSpec
 import Playwright.PageWaitForFunctionSpec qualified as PageWaitForFunctionSpec
 import Playwright.PageWaitForLoadStateSpec qualified as PageWaitForLoadStateSpec
@@ -130,6 +132,7 @@ main =
         , PageEvaluateSpec.tests
         , PageEvaluateHandleSpec.tests
         , PageExposeFunctionSpec.tests
+        , PageFileChooserSpec.tests
         , PageFillSpec.tests
         , PageFocusSpec.tests
         , PageGotoSpec.tests
@@ -143,6 +146,7 @@ main =
         , PageScreenshotSpec.tests
         , PageSetContentSpec.tests
         , PageSetExtraHTTPHeadersSpec.tests
+        , PageSetInputFilesSpec.tests
         , PageStrictSpec.tests
         , PageWaitForFunctionSpec.tests
         , PageWaitForLoadStateSpec.tests

@@ -35,6 +35,7 @@ module Playwright.Locator
   , press
   , selectOption
   , setChecked
+  , setInputFiles
   , textContent
   , typeText
   , uncheck
@@ -73,6 +74,7 @@ import Playwright.Frame.Action
   , dispatchEventFrame
   , dragAndDropFrame
   , fillFrame
+  , setInputFilesFrame
   , focusFrame
   , hoverFrame
   , pressFrame
@@ -107,6 +109,9 @@ import Playwright.GetBy
   )
 import Playwright.GetByRoleOptions
   ( GetByRoleOptions
+  )
+import Playwright.InputFile
+  ( InputFile
   )
 import Playwright.Key
   ( Key
@@ -238,6 +243,10 @@ press loc key =
 typeText :: Locator -> Text -> IO ()
 typeText loc text =
   typeTextFrame (locatorFrame loc) (locatorSelector loc) text defaultTimeout
+
+setInputFiles :: Locator -> [InputFile] -> IO ()
+setInputFiles loc files =
+  setInputFilesFrame (locatorFrame loc) (locatorSelector loc) files defaultTimeout
 
 dragAndDrop :: Locator -> Locator -> IO ()
 dragAndDrop source target =

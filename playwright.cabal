@@ -48,6 +48,7 @@ library
       Playwright.Evaluate
       Playwright.Exactness
       Playwright.Expose
+      Playwright.FileChooser
       Playwright.Frame
       Playwright.Frame.Action
       Playwright.Frame.Inspect
@@ -60,6 +61,8 @@ library
       Playwright.HttpMethod
       Playwright.HttpStatus
       Playwright.Incoming
+      Playwright.InputFile
+      Playwright.InputFileName
       Playwright.Instance
       Playwright.JsErrorValue
       Playwright.JsHandle
@@ -189,6 +192,7 @@ test-suite playwright-test
       Playwright.PageEventPageErrorSpec
       Playwright.PageEventPopupSpec
       Playwright.PageExposeFunctionSpec
+      Playwright.PageFileChooserSpec
       Playwright.PageFillSpec
       Playwright.PageFocusSpec
       Playwright.PageGotoSpec
@@ -202,6 +206,7 @@ test-suite playwright-test
       Playwright.PageSelectOptionSpec
       Playwright.PageSetContentSpec
       Playwright.PageSetExtraHTTPHeadersSpec
+      Playwright.PageSetInputFilesSpec
       Playwright.PageStrictSpec
       Playwright.PageWaitForFunctionSpec
       Playwright.PageWaitForLoadStateSpec

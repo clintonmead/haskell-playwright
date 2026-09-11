@@ -14,6 +14,7 @@ module Playwright.ElementHandle
   , scrollIntoViewIfNeededWith
   , selectText
   , selectTextWith
+  , setInputFilesHandle
   , textContentHandle
   , typeHandle
   ) where
@@ -43,8 +44,17 @@ import Playwright.Frame
   ( Frame
   , frameFromRef
   )
+import Playwright.InputFile
+  ( InputFile (inputFileBytes, inputFileName)
+  )
+import Playwright.InputFileName
+  ( inputFileNameToText
+  )
 import Playwright.Json.ChannelRef
   ( ChannelRef (ChannelRef, channelRefGuid)
+  )
+import Playwright.Json.ProtocolBinary
+  ( protocolBinaryFromByteString
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -60,6 +70,9 @@ import Playwright.Protocol
   , ElementHandleOwnerFrameResult (elementHandleOwnerFrameResultFrame)
   , ElementHandleScrollIntoViewIfNeededResult
   , ElementHandleSelectTextResult
+  , ElementHandleSetInputFilesParams (elementHandleSetInputFilesParamsPayloads)
+  , ElementHandleSetInputFilesParamsPayloads
+  , ElementHandleSetInputFilesResult
   , ElementHandleTextContentResult (elementHandleTextContentResultValue)
   , ElementHandleTypeResult
   , Rect (rectHeight, rectWidth, rectX, rectY)
@@ -73,6 +86,8 @@ import Playwright.Protocol
   , mkElementHandleOwnerFrameParams
   , mkElementHandleScrollIntoViewIfNeededParams
   , mkElementHandleSelectTextParams
+  , mkElementHandleSetInputFilesParams
+  , mkElementHandleSetInputFilesParamsPayloads
   , mkElementHandleTextContentParams
   , mkElementHandleTypeParams
   )
@@ -189,3 +204,20 @@ selectTextWith handle timeout = do
   _ :: ElementHandleSelectTextResult <-
     handleSend handle "selectText" (mkElementHandleSelectTextParams timeout)
   pure ()
+
+setInputFilesHandle :: ElementHandle -> [InputFile] -> IO ()
+setInputFilesHandle handle files = do
+  _ :: ElementHandleSetInputFilesResult <-
+    handleSend
+      handle
+      "setInputFiles"
+      (mkElementHandleSetInputFilesParams defaultTimeout)
+        { elementHandleSetInputFilesParamsPayloads = Just (fmap toPayload files)
+        }
+  pure ()
+
+toPayload :: InputFile -> ElementHandleSetInputFilesParamsPayloads
+toPayload file =
+  mkElementHandleSetInputFilesParamsPayloads
+    (protocolBinaryFromByteString (inputFileBytes file))
+    (inputFileNameToText (inputFileName file))

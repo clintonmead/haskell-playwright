@@ -28,6 +28,7 @@ module Playwright
   , ElementHandle (..)
   , EmulateMedia (..)
   , Exactness (..)
+  , FileChooser (..)
   , Frame (..)
   , GetByRoleOptions (..)
   , GotoOptions (..)
@@ -36,6 +37,8 @@ module Playwright
   , HttpHeader (..)
   , HttpMethod (..)
   , HttpStatus (..)
+  , InputFile (..)
+  , InputFileName (..)
   , JsHandle (..)
   , Key (..)
   , LaunchOptions (..)
@@ -79,6 +82,7 @@ module Playwright
   , allLocators
   , armConsole
   , armDialog
+  , armFileChooser
   , armPopup
   , asElement
   , boolArgument
@@ -258,6 +262,8 @@ module Playwright
   , setChecked
   , setContent
   , setExtraHTTPHeaders
+  , setInputFiles
+  , setInputFilesHandle
   , setViewportSize
   , specialArgument
   , storageClear
@@ -280,6 +286,7 @@ module Playwright
   , waitFor
   , waitForConsole
   , waitForDialog
+  , waitForFileChooser
   , waitForFunction
   , waitForLoadState
   , waitForNavigation
@@ -407,6 +414,7 @@ import Playwright.ElementHandle
   , scrollIntoViewIfNeededWith
   , selectText
   , selectTextWith
+  , setInputFilesHandle
   , textContentHandle
   , typeHandle
   )
@@ -452,6 +460,11 @@ import Playwright.Exactness
 import Playwright.Expose
   ( exposeFunction
   )
+import Playwright.FileChooser
+  ( FileChooser (FileChooser, fileChooserElement, fileChooserMultiple)
+  , armFileChooser
+  , waitForFileChooser
+  )
 import Playwright.Frame
   ( Frame (Frame, frameChannel, frameParent, frameUrl)
   , childFrames
@@ -478,6 +491,12 @@ import Playwright.HttpMethod
 import Playwright.HttpStatus
   ( HttpStatus (HttpStatus, httpStatusToInt)
   , httpStatusOk
+  )
+import Playwright.InputFile
+  ( InputFile (InputFile, inputFileBytes, inputFileName)
+  )
+import Playwright.InputFileName
+  ( InputFileName (InputFileName, inputFileNameToText)
   )
 import Playwright.Instance
   ( Playwright (Playwright, playwrightChannel, playwrightChromium, playwrightFirefox, playwrightWebkit)
@@ -549,6 +568,7 @@ import Playwright.Locator
   , press
   , selectOption
   , setChecked
+  , setInputFiles
   , textContent
   , typeText
   , uncheck

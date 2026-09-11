@@ -2,6 +2,7 @@ module Playwright.Harness
   ( assertProtocolContains
   , assertWaitTimeout
   , locate
+  , readTestAsset
   , requireHandle
   , withAssetPage
   , withAssets
@@ -13,6 +14,10 @@ import Control.Exception
   ( bracket
   , try
   )
+import Data.ByteString
+  ( ByteString
+  )
+import Data.ByteString qualified as ByteString
 import Data.Text
   ( Text
   , isInfixOf
@@ -108,6 +113,11 @@ withAssets action = do
   withApplication (pure (staticApp (defaultFileServerSettings assets))) $ \port ->
     withChromiumPage $ \page ->
       action ("http://127.0.0.1:" <> pack (show port)) page
+
+readTestAsset :: FilePath -> IO ByteString
+readTestAsset relativePath = do
+  dir <- requireAssets
+  ByteString.readFile (dir <> "/" <> relativePath)
 
 requireAssets :: IO FilePath
 requireAssets = do

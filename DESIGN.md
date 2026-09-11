@@ -132,3 +132,4 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - Persistent `registerEventHandler` callbacks run on `forkIO` from the connection reader so they can `send` without deadlocking. `exposeFunction` is `Page.exposeBinding` plus a `bindingCall` handler that `resolve`/`reject`s the BindingCall.
 - `waitForNavigation` waits for the next `Frame.navigated` (not a buffered prior navigation), optionally glob-filtered, then load, then `Request.response` for `newDocument.request`.
 - JSHandle `evaluateExpression` uses `isFunction: true` for function source and `false` for raw expressions.
+- `fileChooser` is a Page `updateSubscription` event (not BrowserContext). `setInputFiles` sends in-memory `payloads` (name + base64 buffer), not host `localPaths`.
