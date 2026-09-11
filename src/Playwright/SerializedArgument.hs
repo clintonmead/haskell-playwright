@@ -4,6 +4,7 @@ module Playwright.SerializedArgument
   , numberArgument
   , channelArgument
   , numbersArgument
+  , objectNumberArgument
   , specialArgument
   , textArgument
   , undefinedArgument
@@ -27,7 +28,7 @@ import Playwright.Json.ChannelRef
   ( ChannelRef
   )
 import Playwright.SerializedValue
-  ( SerializedPayload (PayloadArray, PayloadBool, PayloadHandle, PayloadNumber, PayloadSpecial, PayloadString)
+  ( SerializedPayload (PayloadArray, PayloadBool, PayloadHandle, PayloadNumber, PayloadObject, PayloadSpecial, PayloadString)
   , SerializedValue (SerializedNode)
   , undefinedValue
   )
@@ -92,6 +93,23 @@ channelArgument ref =
   SerializedArgument
     { serializedArgumentValue = SerializedNode (PayloadHandle 0) Nothing
     , serializedArgumentHandles = [ref]
+    }
+
+objectNumberArgument :: [(Text, Double)] -> SerializedArgument
+objectNumberArgument fields =
+  SerializedArgument
+    { serializedArgumentValue =
+        SerializedNode
+          ( PayloadObject
+              ( fmap
+                  ( \(name, number) ->
+                      (name, SerializedNode (PayloadNumber number) Nothing)
+                  )
+                  fields
+              )
+          )
+          Nothing
+    , serializedArgumentHandles = []
     }
 
 instance HasCodec SerializedArgument where

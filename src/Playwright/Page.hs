@@ -35,6 +35,8 @@ module Playwright.Page
   , armDialog
   , waitForConsole
   , waitForDialog
+  , waitForResponse
+  , waitForResponseWith
   ) where
 
 import Control.Concurrent
@@ -71,6 +73,7 @@ import Playwright.Channel
 import Playwright.Connection
   ( lookupObject
   , registerEventWaiter
+  , waitForChannelEvent
   , waitUntilUrl
   )
 import Playwright.ConsoleMessage
@@ -153,13 +156,13 @@ import Playwright.MethodName
 import Playwright.Protocol
   ( BrowserContextConsoleEvent
   , BrowserContextDialogEvent (browserContextDialogEventDialog)
-  , BrowserContextUpdateSubscriptionParamsEvent (BrowserContextUpdateSubscriptionParamsEventConsole, BrowserContextUpdateSubscriptionParamsEventDialog)
+  , BrowserContextResponseEvent (browserContextResponseEventResponse)
+  , BrowserContextUpdateSubscriptionParamsEvent (BrowserContextUpdateSubscriptionParamsEventConsole, BrowserContextUpdateSubscriptionParamsEventDialog, BrowserContextUpdateSubscriptionParamsEventResponse)
   , BrowserContextUpdateSubscriptionResult
   , FrameAddScriptTagParams (frameAddScriptTagParamsContent, frameAddScriptTagParamsType, frameAddScriptTagParamsUrl)
   , FrameAddScriptTagResult (frameAddScriptTagResultElement)
   , FrameAddStyleTagParams (frameAddStyleTagParamsContent, frameAddStyleTagParamsUrl)
   , FrameAddStyleTagResult (frameAddStyleTagResultElement)
-  , BrowserContextUpdateSubscriptionResult
   , NameValue
   , PageAddInitScriptResult
   , PageCloseResult
@@ -191,6 +194,7 @@ import Playwright.RemoteObject
 import Playwright.Response
   ( Response
   , responseFromRef
+  , responseUrl
   )
 import Playwright.ScriptTag
   ( ScriptTag (scriptTagContent, scriptTagType, scriptTagUrl)
@@ -494,3 +498,24 @@ waitForConsole :: Page -> IO ConsoleMessage
 waitForConsole page = do
   takeMessage <- armConsole page
   takeMessage
+
+waitForResponse :: Page -> UrlGlob -> IO Response
+waitForResponse page glob =
+  waitForResponseWith page glob defaultTimeout
+
+waitForResponseWith :: Page -> UrlGlob -> Timeout -> IO Response
+waitForResponseWith page glob timeout =
+  waitWithTimeout timeout $ do
+    subscribeContext page BrowserContextUpdateSubscriptionParamsEventResponse
+    collectResponse
+  where
+    conn = channelConnection (pageContextChannel page)
+    guid = channelGuid (pageContextChannel page)
+    collectResponse = do
+      params <- waitForChannelEvent conn guid (MethodName "response")
+      event <- either throwIO pure (fromJsonValue params)
+      let response = responseFromRef conn (browserContextResponseEventResponse event)
+      current <- responseUrl response
+      if matchesUrlGlob glob current
+        then pure response
+        else collectResponse

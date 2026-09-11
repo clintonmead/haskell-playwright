@@ -163,12 +163,14 @@ module Playwright
   , nth
   , numberArgument
   , numbersArgument
+  , objectNumberArgument
   , pageFromRef
   , press
   , querySelector
   , reload
   , responseOk
   , responseStatus
+  , responseText
   , responseUrl
   , screenshot
   , selectOption
@@ -195,6 +197,8 @@ module Playwright
   , waitForDialog
   , waitForFunction
   , waitForLoadState
+  , waitForResponse
+  , waitForResponseWith
   , waitForSelector
   , waitForTimeout
   , waitForURL
@@ -428,6 +432,8 @@ import Playwright.Page
   , waitForDialog
   , waitForFunction
   , waitForLoadState
+  , waitForResponse
+  , waitForResponseWith
   , waitForSelector
   , waitForTimeout
   , waitForURL
@@ -443,6 +449,7 @@ import Playwright.Response
   ( Response (Response, responseChannel)
   , responseOk
   , responseStatus
+  , responseText
   , responseUrl
   )
 import Playwright.ScreenshotOptions
@@ -467,6 +474,7 @@ import Playwright.SerializedArgument
   , channelArgument
   , numberArgument
   , numbersArgument
+  , objectNumberArgument
   , specialArgument
   , textArgument
   )

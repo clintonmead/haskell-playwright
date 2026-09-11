@@ -131,6 +131,7 @@ test-suite playwright-test
       Playwright.ElementHandleBoundingBoxSpec
       Playwright.ElementHandleClickSpec
       Playwright.ElementHandleConvenienceSpec
+      Playwright.ElementHandlePressSpec
       Playwright.FrameEvaluateSpec
       Playwright.FrameHierarchySpec
       Playwright.Harness
@@ -159,11 +160,13 @@ test-suite playwright-test
       Playwright.PageHistorySpec
       Playwright.PageKeyboardSpec
       Playwright.PageMouseSpec
+      Playwright.PageNetworkResponseSpec
       Playwright.PageSelectOptionSpec
       Playwright.PageSetContentSpec
       Playwright.PageSetExtraHTTPHeadersSpec
       Playwright.PageWaitForFunctionSpec
       Playwright.PageWaitForLoadStateSpec
+      Playwright.PageWaitForResponseSpec
       Playwright.PageWaitForSelectorSpec
       Playwright.PageWaitForUrlSpec
       Playwright.QuerySelectorSpec

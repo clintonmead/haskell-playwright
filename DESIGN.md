@@ -117,3 +117,4 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - ElementHandle `evaluateExpression` is the JSHandle mixin method on the same channel.
 - Console and dialog events are BrowserContext protocol events; Page waits subscribe via `updateSubscription` then STM-wait on the context guid.
 - `waitForURL` glob-matches the live frame URL (`**` / `*` / `?`) then waits for load.
+- `waitForResponse` subscribes to BrowserContext `response` events and filters by URL glob.

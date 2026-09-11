@@ -3,15 +3,23 @@ module Playwright.Response
   , responseFromRef
   , responseOk
   , responseStatus
+  , responseText
   , responseUrl
   ) where
 
 import Control.Exception
   ( throwIO
   )
+import Data.Text
+  ( Text
+  )
+import Data.Text.Encoding
+  ( decodeUtf8
+  )
 import Playwright.Channel
   ( Channel (Channel, channelConnection, channelGuid)
   , ResponseTag
+  , send
   )
 import Playwright.Connection
   ( Connection
@@ -27,8 +35,16 @@ import Playwright.Json.ChannelRef
 import Playwright.Json.Decode
   ( fromJsonValue
   )
+import Playwright.Json.ProtocolBinary
+  ( protocolBinaryToByteString
+  )
+import Playwright.MethodName
+  ( MethodName (MethodName)
+  )
 import Playwright.Protocol
-  ( ResponseInitializer (responseInitializerStatus, responseInitializerUrl)
+  ( ResponseBodyResult (responseBodyResultBinary)
+  , ResponseInitializer (responseInitializerStatus, responseInitializerUrl)
+  , mkResponseBodyParams
   )
 import Playwright.RemoteObject
   ( RemoteObject (remoteInitializer)
@@ -61,3 +77,12 @@ responseStatus response =
 responseOk :: Response -> IO Bool
 responseOk response =
   httpStatusOk <$> responseStatus response
+
+responseText :: Response -> IO Text
+responseText response = do
+  result <-
+    send
+      (responseChannel response)
+      (MethodName "body")
+      mkResponseBodyParams
+  pure (decodeUtf8 (protocolBinaryToByteString (responseBodyResultBinary result)))

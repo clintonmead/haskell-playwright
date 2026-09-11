@@ -6,6 +6,7 @@ import Playwright.ConnectionSpec qualified as ConnectionSpec
 import Playwright.ElementHandleBoundingBoxSpec qualified as ElementHandleBoundingBoxSpec
 import Playwright.ElementHandleClickSpec qualified as ElementHandleClickSpec
 import Playwright.ElementHandleConvenienceSpec qualified as ElementHandleConvenienceSpec
+import Playwright.ElementHandlePressSpec qualified as ElementHandlePressSpec
 import Playwright.FrameEvaluateSpec qualified as FrameEvaluateSpec
 import Playwright.FrameHierarchySpec qualified as FrameHierarchySpec
 import Playwright.IntegrationSpec qualified as IntegrationSpec
@@ -33,11 +34,13 @@ import Playwright.PageGotoSpec qualified as PageGotoSpec
 import Playwright.PageHistorySpec qualified as PageHistorySpec
 import Playwright.PageKeyboardSpec qualified as PageKeyboardSpec
 import Playwright.PageMouseSpec qualified as PageMouseSpec
+import Playwright.PageNetworkResponseSpec qualified as PageNetworkResponseSpec
 import Playwright.PageSetContentSpec qualified as PageSetContentSpec
 import Playwright.PageSelectOptionSpec qualified as PageSelectOptionSpec
 import Playwright.PageSetExtraHTTPHeadersSpec qualified as PageSetExtraHTTPHeadersSpec
 import Playwright.PageWaitForFunctionSpec qualified as PageWaitForFunctionSpec
 import Playwright.PageWaitForLoadStateSpec qualified as PageWaitForLoadStateSpec
+import Playwright.PageWaitForResponseSpec qualified as PageWaitForResponseSpec
 import Playwright.PageWaitForSelectorSpec qualified as PageWaitForSelectorSpec
 import Playwright.PageWaitForUrlSpec qualified as PageWaitForUrlSpec
 import Playwright.QuerySelectorSpec qualified as QuerySelectorSpec
@@ -64,6 +67,7 @@ main =
         , ElementHandleBoundingBoxSpec.tests
         , ElementHandleClickSpec.tests
         , ElementHandleConvenienceSpec.tests
+        , ElementHandlePressSpec.tests
         , FrameEvaluateSpec.tests
         , FrameHierarchySpec.tests
         , IntegrationSpec.tests
@@ -91,11 +95,13 @@ main =
         , PageHistorySpec.tests
         , PageKeyboardSpec.tests
         , PageMouseSpec.tests
+        , PageNetworkResponseSpec.tests
         , PageSelectOptionSpec.tests
         , PageSetContentSpec.tests
         , PageSetExtraHTTPHeadersSpec.tests
         , PageWaitForFunctionSpec.tests
         , PageWaitForLoadStateSpec.tests
+        , PageWaitForResponseSpec.tests
         , PageWaitForSelectorSpec.tests
         , PageWaitForUrlSpec.tests
         , QuerySelectorSpec.tests

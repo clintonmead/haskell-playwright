@@ -5,6 +5,7 @@ module Playwright.PageEvaluateSpec
 import Data.Text
   ( Text
   )
+import Data.Text qualified as Text
 import Playwright
   ( SpecialJsValue (SpecialInfinity, SpecialNaN, SpecialNegInfinity, SpecialNegZero, SpecialNull, SpecialUndefined)
   , boolArgument
@@ -17,11 +18,13 @@ import Playwright
   , evaluateTextWith
   , numberArgument
   , numbersArgument
+  , objectNumberArgument
   , specialArgument
   , textArgument
   )
 import Playwright.Harness
-  ( withAssetPage
+  ( assertProtocolContains
+  , withAssetPage
   , withChromiumPage
   )
 import Test.Tasty
@@ -114,4 +117,25 @@ tests =
         withAssetPage "global-var.html" $ \page -> do
           result <- evaluateNumber page "() => window.globalVar"
           assertEqual "global" (123 :: Double) result
+    , testCase "should work with unicode chars" $
+        withChromiumPage $ \page -> do
+          result <-
+            evaluateNumberWith
+              page
+              "a => a['中文字符']"
+              (objectNumberArgument [("中文字符", 42)])
+          assertEqual "unicode field" (42 :: Double) result
+    , testCase "should work with large strings" $
+        withChromiumPage $ \page -> do
+          let expected :: Text
+              expected = Text.replicate 40000 "x"
+          result <- evaluateTextWith page "data => data" (textArgument expected)
+          assertEqual "large" expected result
+    , testCase "should await promise" $
+        withChromiumPage $ \page -> do
+          result <- evaluateNumber page "() => Promise.resolve(8 * 7)"
+          assertEqual "56" (56 :: Double) result
+    , testCase "should reject promise with exception" $
+        withChromiumPage $ \page ->
+          assertProtocolContains "not_existing_object" (evaluateNumber page "() => not_existing_object.property")
     ]
