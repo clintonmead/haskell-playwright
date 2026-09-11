@@ -5,6 +5,7 @@ module Playwright.Request
   , requestHeaders
   , requestIsNavigation
   , requestMethod
+  , requestPostData
   , requestResourceType
   , requestResponseRef
   , requestUrl
@@ -12,6 +13,9 @@ module Playwright.Request
 
 import Control.Exception
   ( throwIO
+  )
+import Data.ByteString
+  ( ByteString
   )
 import Playwright.Channel
   ( Channel (Channel, channelConnection, channelGuid)
@@ -36,12 +40,15 @@ import Playwright.Json.ChannelRef
 import Playwright.Json.Decode
   ( fromJsonValue
   )
+import Playwright.Json.ProtocolBinary
+  ( protocolBinaryToByteString
+  )
 import Playwright.MethodName
   ( MethodName (MethodName)
   )
 import Playwright.Protocol
   ( NameValue (nameValueName, nameValueValue)
-  , RequestInitializer (requestInitializerFrame, requestInitializerHeaders, requestInitializerIsNavigationRequest, requestInitializerMethod, requestInitializerResourceType, requestInitializerUrl)
+  , RequestInitializer (requestInitializerFrame, requestInitializerHeaders, requestInitializerIsNavigationRequest, requestInitializerMethod, requestInitializerPostData, requestInitializerResourceType, requestInitializerUrl)
   , RequestResponseResult (requestResponseResultResponse)
   , mkRequestResponseParams
   )
@@ -83,6 +90,10 @@ requestResourceType request =
 requestIsNavigation :: Request -> IO Bool
 requestIsNavigation request =
   requestInitializerIsNavigationRequest <$> requestInitializer request
+
+requestPostData :: Request -> IO (Maybe ByteString)
+requestPostData request =
+  fmap (fmap protocolBinaryToByteString . requestInitializerPostData) (requestInitializer request)
 
 requestHeaders :: Request -> IO [HttpHeader]
 requestHeaders request =

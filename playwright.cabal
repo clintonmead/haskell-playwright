@@ -53,6 +53,7 @@ library
       Playwright.Frame.Action
       Playwright.Frame.Inspect
       Playwright.Frame.Wait
+      Playwright.FulfillOptions
       Playwright.GetBy
       Playwright.GetByRoleOptions
       Playwright.GotoOptions
@@ -89,6 +90,7 @@ library
       Playwright.RequestId
       Playwright.ResourceType
       Playwright.Response
+      Playwright.Route
       Playwright.ScreenshotOptions
       Playwright.ScriptTag
       Playwright.SelectOption
@@ -202,6 +204,10 @@ test-suite playwright-test
       Playwright.PageMouseSpec
       Playwright.PageNetworkRequestSpec
       Playwright.PageNetworkResponseSpec
+      Playwright.PageRequestAbortSpec
+      Playwright.PageRequestContinueSpec
+      Playwright.PageRequestFulfillSpec
+      Playwright.PageRouteSpec
       Playwright.PageScreenshotSpec
       Playwright.PageSelectOptionSpec
       Playwright.PageSetContentSpec

@@ -15,6 +15,7 @@ module Playwright.Channel
   , RequestTag
   , WorkerTag
   , DisposableTag
+  , RouteTag
   , send
   ) where
 
@@ -51,6 +52,7 @@ data RequestTag
 data WorkerTag
 data BindingCallTag
 data DisposableTag
+data RouteTag
 
 type Channel :: Type -> Type
 data Channel a = Channel

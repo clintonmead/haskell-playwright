@@ -10,6 +10,7 @@ module Playwright
   , ColorScheme (..)
   , ConsoleMessage (..)
   , ConsoleType (..)
+  , ContentType (..)
   , Cookie (..)
   , CookieDomain (..)
   , CookieExpires (..)
@@ -30,6 +31,8 @@ module Playwright
   , Exactness (..)
   , FileChooser (..)
   , Frame (..)
+  , FulfillBody (..)
+  , FulfillOptions (..)
   , GetByRoleOptions (..)
   , GotoOptions (..)
   , HeaderName (..)
@@ -53,6 +56,7 @@ module Playwright
   , Request (..)
   , ResourceType (..)
   , Response (..)
+  , Route (..)
   , ScreenshotOptions (..)
   , ScriptTag (..)
   , SelectOption (..)
@@ -73,12 +77,13 @@ module Playwright
   , WebStorage (..)
   , WheelDelta (..)
   , Worker (..)
+  , abortRoute
+  , acceptDialog
+  , acceptDialogWith
   , addCookies
   , addInitScript
   , addScriptTag
   , addStyleTag
-  , acceptDialog
-  , acceptDialogWith
   , allLocators
   , armConsole
   , armDialog
@@ -107,6 +112,7 @@ module Playwright
   , content
   , contentFrameHandle
   , contextFromRef
+  , continueRoute
   , cookieForUrl
   , cookies
   , cookiesFor
@@ -116,6 +122,7 @@ module Playwright
   , dblclick
   , defaultCheckOptions
   , defaultEmulateMedia
+  , defaultFulfillOptions
   , defaultGetByRoleOptions
   , defaultGotoOptions
   , defaultLaunchOptions
@@ -163,6 +170,7 @@ module Playwright
   , evaluateTexts
   , evaluateWith
   , exposeFunction
+  , fallbackRoute
   , fill
   , firefox
   , first
@@ -170,6 +178,7 @@ module Playwright
   , frameByName
   , frames
   , framesEqual
+  , fulfillRoute
   , getAttribute
   , getAttributeHandle
   , getByLabel
@@ -242,13 +251,17 @@ module Playwright
   , requestHeaders
   , requestIsNavigation
   , requestMethod
+  , requestPostData
   , requestResourceType
   , requestUrl
+  , responseHeaders
   , responseOk
   , responseRequest
   , responseStatus
   , responseText
   , responseUrl
+  , route
+  , routeRequest
   , screenshot
   , scrollIntoViewIfNeeded
   , scrollIntoViewIfNeededWith
@@ -472,6 +485,12 @@ import Playwright.Frame
   , currentUrl
   , framesEqual
   )
+import Playwright.FulfillOptions
+  ( ContentType (ContentType, contentTypeToText)
+  , FulfillBody (FulfillBytes, FulfillText)
+  , FulfillOptions (FulfillOptions, fulfillBody, fulfillContentType, fulfillHeaders, fulfillStatus)
+  , defaultFulfillOptions
+  )
 import Playwright.GetByRoleOptions
   ( GetByRoleOptions (GetByRoleOptions, getByRoleExact, getByRoleName)
   , defaultGetByRoleOptions
@@ -653,6 +672,7 @@ import Playwright.Request
   , requestHeaders
   , requestIsNavigation
   , requestMethod
+  , requestPostData
   , requestResourceType
   , requestUrl
   )
@@ -664,11 +684,21 @@ import Playwright.ResourceType
   )
 import Playwright.Response
   ( Response (Response, responseChannel)
+  , responseHeaders
   , responseOk
   , responseRequest
   , responseStatus
   , responseText
   , responseUrl
+  )
+import Playwright.Route
+  ( Route (Route, routeChannel)
+  , abortRoute
+  , continueRoute
+  , fallbackRoute
+  , fulfillRoute
+  , route
+  , routeRequest
   )
 import Playwright.ScreenshotOptions
   ( ScreenshotOptions (ScreenshotOptions, screenshotOptionsFullPage, screenshotOptionsTimeout)

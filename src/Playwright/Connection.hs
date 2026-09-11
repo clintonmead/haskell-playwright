@@ -11,6 +11,8 @@ module Playwright.Connection
   , waitForLifecycle
   , waitUntilUrl
   , closedGuids
+  , pushRouteHandler
+  , routeHandlersFor
   ) where
 
 import Autodocodec
@@ -50,6 +52,7 @@ import Control.Exception
 import Control.Monad
   ( unless
   , void
+  , when
   )
 import Data.Aeson
   ( FromJSON
@@ -92,6 +95,9 @@ import Playwright.Guid
   ( Guid
   , rootGuid
   )
+import Playwright.Json.ChannelRef
+  ( ChannelRef
+  )
 import Playwright.Incoming
   ( CreateParams (createGuid, createInitializer, createType)
   , Incoming (IncomingAdopt, IncomingCreate, IncomingDispose, IncomingEvent, IncomingResponse)
@@ -122,6 +128,9 @@ import Playwright.Transport
 import Playwright.Url
   ( Url
   )
+import Playwright.UrlGlob
+  ( UrlGlob
+  )
 
 data Connection = Connection
   { connectionTransport :: Transport
@@ -133,6 +142,8 @@ data Connection = Connection
   , connectionEventBuffer :: TVar (Map (Guid, MethodName) (Seq Value))
   , connectionClosedGuids :: TVar (Set Guid)
   , connectionEventHandlers :: TVar [EventHandler]
+  , connectionRouteHandlers :: TVar (Map Guid [(UrlGlob, ChannelRef -> IO ())])
+  , connectionRouteListening :: TVar (Set Guid)
   }
 
 data EventWaiter = EventWaiter
@@ -177,6 +188,8 @@ withConnection transport action = do
   eventBuffer <- newTVarIO Map.empty
   closedGuidsVar <- newTVarIO Set.empty
   eventHandlers <- newTVarIO []
+  routeHandlers <- newTVarIO Map.empty
+  routeListening <- newTVarIO Set.empty
   let
     conn :: Connection
     conn =
@@ -190,6 +203,8 @@ withConnection transport action = do
         , connectionEventBuffer = eventBuffer
         , connectionClosedGuids = closedGuidsVar
         , connectionEventHandlers = eventHandlers
+        , connectionRouteHandlers = routeHandlers
+        , connectionRouteListening = routeListening
         }
   withAsync (readerLoop conn) $ \_ ->
     action conn `finally` closeTransport transport
@@ -367,6 +382,23 @@ registerEventHandler :: Connection -> Guid -> MethodName -> (Value -> IO ()) -> 
 registerEventHandler conn guid method run =
   atomically $
     modifyTVar' (connectionEventHandlers conn) (EventHandler guid method run :)
+
+pushRouteHandler :: Connection -> Guid -> UrlGlob -> (ChannelRef -> IO ()) -> IO Bool
+pushRouteHandler conn guid glob run =
+  atomically $ do
+    listening <- readTVar (connectionRouteListening conn)
+    let
+      first = Set.notMember guid listening
+    when first (modifyTVar' (connectionRouteListening conn) (Set.insert guid))
+    modifyTVar'
+      (connectionRouteHandlers conn)
+      (Map.insertWith (++) guid [(glob, run)])
+    pure first
+
+routeHandlersFor :: Connection -> Guid -> IO [(UrlGlob, ChannelRef -> IO ())]
+routeHandlersFor conn guid = do
+  handlers <- atomically (readTVar (connectionRouteHandlers conn))
+  pure (Map.findWithDefault [] guid handlers)
 
 runEventHandlers :: Connection -> Guid -> MethodName -> Value -> IO ()
 runEventHandlers conn guid method params = do

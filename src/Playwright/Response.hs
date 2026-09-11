@@ -1,6 +1,7 @@
 module Playwright.Response
   ( Response (..)
   , responseFromRef
+  , responseHeaders
   , responseOk
   , responseRequest
   , responseStatus
@@ -26,6 +27,11 @@ import Playwright.Connection
   ( Connection
   , lookupObject
   )
+import Playwright.HttpHeader
+  ( HeaderName (HeaderName)
+  , HeaderValue (HeaderValue)
+  , HttpHeader (HttpHeader)
+  )
 import Playwright.HttpStatus
   ( HttpStatus (HttpStatus)
   , httpStatusOk
@@ -43,8 +49,9 @@ import Playwright.MethodName
   ( MethodName (MethodName)
   )
 import Playwright.Protocol
-  ( ResponseBodyResult (responseBodyResultBinary)
-  , ResponseInitializer (responseInitializerRequest, responseInitializerStatus, responseInitializerUrl)
+  ( NameValue (nameValueName, nameValueValue)
+  , ResponseBodyResult (responseBodyResultBinary)
+  , ResponseInitializer (responseInitializerHeaders, responseInitializerRequest, responseInitializerStatus, responseInitializerUrl)
   , mkResponseBodyParams
   )
 import Playwright.RemoteObject
@@ -84,6 +91,10 @@ responseStatus :: Response -> IO HttpStatus
 responseStatus response =
   HttpStatus . responseInitializerStatus <$> responseInitializer response
 
+responseHeaders :: Response -> IO [HttpHeader]
+responseHeaders response =
+  fmap (fmap fromNameValue . responseInitializerHeaders) (responseInitializer response)
+
 responseOk :: Response -> IO Bool
 responseOk response =
   httpStatusOk <$> responseStatus response
@@ -96,3 +107,7 @@ responseText response = do
       (MethodName "body")
       mkResponseBodyParams
   pure (decodeUtf8 (protocolBinaryToByteString (responseBodyResultBinary result)))
+
+fromNameValue :: NameValue -> HttpHeader
+fromNameValue header =
+  HttpHeader (HeaderName (nameValueName header)) (HeaderValue (nameValueValue header))
