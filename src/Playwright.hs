@@ -177,6 +177,7 @@ module Playwright
   , evaluateWith
   , exposeFunction
   , fallbackRoute
+  , fallbackRouteWith
   , fill
   , firefox
   , first
@@ -386,7 +387,7 @@ import Playwright.ConsoleType
   ( ConsoleType (ConsoleAssert, ConsoleClear, ConsoleCount, ConsoleDebug, ConsoleDir, ConsoleDirXml, ConsoleError, ConsoleInfo, ConsoleLog, ConsoleProfile, ConsoleProfileEnd, ConsoleTable, ConsoleTimeEnd, ConsoleTrace, ConsoleVerbose, ConsoleWarning)
   )
 import Playwright.ContinueOptions
-  ( ContinueOptions (ContinueOptions, continueHeaders)
+  ( ContinueOptions (ContinueOptions, continueHeaders, continueMethod, continuePostData, continueUrl)
   , defaultContinueOptions
   )
 import Playwright.Cookie
@@ -711,6 +712,7 @@ import Playwright.Route
   , continueRoute
   , continueRouteWith
   , fallbackRoute
+  , fallbackRouteWith
   , fulfillRoute
   , route
   , routeRequest

@@ -25,6 +25,7 @@ import Playwright.Channel
 import Playwright.Connection
   ( Connection
   , lookupObject
+  , lookupRequestOverrides
   )
 import Playwright.HttpHeader
   ( HeaderName (HeaderName)
@@ -55,6 +56,9 @@ import Playwright.Protocol
 import Playwright.RemoteObject
   ( RemoteObject (remoteInitializer)
   )
+import Playwright.RequestOverrides
+  ( RequestOverrides (requestOverrideHeaders, requestOverrideMethod, requestOverridePostData, requestOverrideUrl)
+  )
 import Playwright.ResourceType
   ( ResourceType (ResourceType)
   )
@@ -75,13 +79,29 @@ requestInitializer request = do
   obj <- lookupObject (channelConnection (requestChannel request)) (channelGuid (requestChannel request))
   either throwIO pure (fromJsonValue (remoteInitializer obj))
 
+requestOverrides :: Request -> IO RequestOverrides
+requestOverrides request =
+  lookupRequestOverrides
+    (channelConnection (requestChannel request))
+    (channelGuid (requestChannel request))
+
 requestUrl :: Request -> IO Url
-requestUrl request =
-  requestInitializerUrl <$> requestInitializer request
+requestUrl request = do
+  overrides <- requestOverrides request
+  case requestOverrideUrl overrides of
+    Just url ->
+      pure url
+    Nothing ->
+      requestInitializerUrl <$> requestInitializer request
 
 requestMethod :: Request -> IO HttpMethod
-requestMethod request =
-  HttpMethod . requestInitializerMethod <$> requestInitializer request
+requestMethod request = do
+  overrides <- requestOverrides request
+  case requestOverrideMethod overrides of
+    Just method ->
+      pure method
+    Nothing ->
+      HttpMethod . requestInitializerMethod <$> requestInitializer request
 
 requestResourceType :: Request -> IO ResourceType
 requestResourceType request =
@@ -92,12 +112,22 @@ requestIsNavigation request =
   requestInitializerIsNavigationRequest <$> requestInitializer request
 
 requestPostData :: Request -> IO (Maybe ByteString)
-requestPostData request =
-  fmap (fmap protocolBinaryToByteString . requestInitializerPostData) (requestInitializer request)
+requestPostData request = do
+  overrides <- requestOverrides request
+  case requestOverridePostData overrides of
+    Just bytes ->
+      pure (Just bytes)
+    Nothing ->
+      fmap (fmap protocolBinaryToByteString . requestInitializerPostData) (requestInitializer request)
 
 requestHeaders :: Request -> IO [HttpHeader]
-requestHeaders request =
-  fmap (fmap fromNameValue . requestInitializerHeaders) (requestInitializer request)
+requestHeaders request = do
+  overrides <- requestOverrides request
+  case requestOverrideHeaders overrides of
+    Just headers ->
+      pure headers
+    Nothing ->
+      fmap (fmap fromNameValue . requestInitializerHeaders) (requestInitializer request)
 
 requestFrameRef :: Request -> IO (Maybe ChannelRef)
 requestFrameRef request =

@@ -14,6 +14,8 @@ module Playwright.Connection
   , pushRouteHandler
   , removeRouteHandlers
   , routeHandlersFor
+  , lookupRequestOverrides
+  , writeRequestOverrides
   ) where
 
 import Autodocodec
@@ -123,6 +125,10 @@ import Playwright.RemoteObject
 import Playwright.RequestId
   ( RequestId (RequestId)
   )
+import Playwright.RequestOverrides
+  ( RequestOverrides
+  , emptyRequestOverrides
+  )
 import Playwright.Transport
   ( Transport (closeTransport, recvPayload, sendPayload)
   )
@@ -145,6 +151,7 @@ data Connection = Connection
   , connectionEventHandlers :: TVar [EventHandler]
   , connectionRouteHandlers :: TVar (Map Guid [(UrlGlob, ChannelRef -> IO Bool)])
   , connectionRouteListening :: TVar (Set Guid)
+  , connectionRequestOverrides :: TVar (Map Guid RequestOverrides)
   }
 
 data EventWaiter = EventWaiter
@@ -191,6 +198,7 @@ withConnection transport action = do
   eventHandlers <- newTVarIO []
   routeHandlers <- newTVarIO Map.empty
   routeListening <- newTVarIO Set.empty
+  requestOverrides <- newTVarIO Map.empty
   let
     conn :: Connection
     conn =
@@ -206,6 +214,7 @@ withConnection transport action = do
         , connectionEventHandlers = eventHandlers
         , connectionRouteHandlers = routeHandlers
         , connectionRouteListening = routeListening
+        , connectionRequestOverrides = requestOverrides
         }
   withAsync (readerLoop conn) $ \_ ->
     action conn `finally` closeTransport transport
@@ -407,6 +416,16 @@ routeHandlersFor :: Connection -> Guid -> IO [(UrlGlob, ChannelRef -> IO Bool)]
 routeHandlersFor conn guid = do
   handlers <- atomically (readTVar (connectionRouteHandlers conn))
   pure (Map.findWithDefault [] guid handlers)
+
+lookupRequestOverrides :: Connection -> Guid -> IO RequestOverrides
+lookupRequestOverrides conn guid = do
+  overrides <- atomically (readTVar (connectionRequestOverrides conn))
+  pure (Map.findWithDefault emptyRequestOverrides guid overrides)
+
+writeRequestOverrides :: Connection -> Guid -> RequestOverrides -> IO ()
+writeRequestOverrides conn guid overrides =
+  atomically $
+    modifyTVar' (connectionRequestOverrides conn) (Map.insert guid overrides)
 
 runEventHandlers :: Connection -> Guid -> MethodName -> Value -> IO ()
 runEventHandlers conn guid method params = do

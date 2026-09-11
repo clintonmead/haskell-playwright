@@ -4,6 +4,7 @@ module Playwright.Route
   , continueRoute
   , continueRouteWith
   , fallbackRoute
+  , fallbackRouteWith
   , fulfillRoute
   , route
   , routeRequest
@@ -55,13 +56,15 @@ import Playwright.Channel
   )
 import Playwright.Connection
   ( lookupObject
+  , lookupRequestOverrides
   , pushRouteHandler
   , registerEventHandler
   , removeRouteHandlers
   , routeHandlersFor
+  , writeRequestOverrides
   )
 import Playwright.ContinueOptions
-  ( ContinueOptions (continueHeaders)
+  ( ContinueOptions
   , defaultContinueOptions
   )
 import Playwright.Error
@@ -77,14 +80,20 @@ import Playwright.HttpHeader
   , HeaderValue (HeaderValue, headerValueToText)
   , HttpHeader (HttpHeader, httpHeaderName, httpHeaderValue)
   )
+import Playwright.HttpMethod
+  ( HttpMethod (httpMethodToText)
+  )
 import Playwright.HttpStatus
   ( HttpStatus (httpStatusToInt)
   )
 import Playwright.Json.ChannelRef
-  ( ChannelRef (channelRefGuid)
+  ( ChannelRef (ChannelRef, channelRefGuid)
   )
 import Playwright.Json.Decode
   ( fromJsonValue
+  )
+import Playwright.Json.ProtocolBinary
+  ( protocolBinaryFromByteString
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -98,7 +107,7 @@ import Playwright.Protocol
   , PageSetNetworkInterceptionPatternsParamsPatterns (pageSetNetworkInterceptionPatternsParamsPatternsGlob)
   , PageSetNetworkInterceptionPatternsResult
   , RouteAbortResult
-  , RouteContinueParams (routeContinueParamsHeaders)
+  , RouteContinueParams (routeContinueParamsHeaders, routeContinueParamsMethod, routeContinueParamsPostData, routeContinueParamsUrl)
   , RouteContinueResult
   , RouteFulfillParams (routeFulfillParamsBody, routeFulfillParamsHeaders, routeFulfillParamsIsBase64, routeFulfillParamsStatus)
   , RouteFulfillResult
@@ -114,9 +123,13 @@ import Playwright.RemoteObject
   ( RemoteObject (remoteInitializer)
   )
 import Playwright.Request
-  ( Request
+  ( Request (requestChannel)
   , requestFromRef
   , requestUrl
+  )
+import Playwright.RequestOverrides
+  ( RequestOverrides (requestOverrideHeaders, requestOverrideMethod, requestOverridePostData, requestOverrideUrl)
+  , overlayContinueOptions
   )
 import Playwright.RouteOptions
   ( RouteOptions (routeTimes)
@@ -149,12 +162,31 @@ continueRoute handled =
 
 continueRouteWith :: Route -> ContinueOptions -> IO ()
 continueRouteWith handled opts = do
-  sendContinue (routeChannel handled) False (continueHeaders opts)
+  request <- routeRequest handled
+  overrides <- applyContinueOverrides request opts
+  sendContinue (routeChannel handled) False overrides
   settleRoute handled True
 
 fallbackRoute :: Route -> IO ()
 fallbackRoute handled =
+  fallbackRouteWith handled defaultContinueOptions
+
+fallbackRouteWith :: Route -> ContinueOptions -> IO ()
+fallbackRouteWith handled opts = do
+  request <- routeRequest handled
+  _ <- applyContinueOverrides request opts
   settleRoute handled False
+
+applyContinueOverrides :: Request -> ContinueOptions -> IO RequestOverrides
+applyContinueOverrides request opts = do
+  let
+    conn = channelConnection (requestChannel request)
+    guid = channelGuid (requestChannel request)
+  current <- lookupRequestOverrides conn guid
+  let
+    next = overlayContinueOptions current opts
+  writeRequestOverrides conn guid next
+  pure next
 
 abortRoute :: Route -> IO ()
 abortRoute handled = do
@@ -231,21 +263,26 @@ dispatchPageRoute page params = do
     chan :: Channel RouteTag
     chan = Channel conn (channelRefGuid (pageRouteEventRoute event))
   request <- requestFromChannel chan
-  current <- requestUrl request
   handlers <- routeHandlersFor conn (channelGuid (pageChannel page))
-  let
-    matching =
-      [run | (glob, run) <- handlers, matchesUrlGlob glob current]
-  chainRoutes chan (pageRouteEventRoute event) matching
+  chainRoutes chan request handlers
 
-chainRoutes :: Channel RouteTag -> ChannelRef -> [ChannelRef -> IO Bool] -> IO ()
-chainRoutes chan ref runs =
-  case runs of
-    [] ->
-      sendContinue chan True Nothing
-    run : rest -> do
-      done <- run ref
-      unless done (chainRoutes chan ref rest)
+chainRoutes :: Channel RouteTag -> Request -> [(UrlGlob, ChannelRef -> IO Bool)] -> IO ()
+chainRoutes chan request handlers =
+  case handlers of
+    [] -> do
+      overrides <-
+        lookupRequestOverrides
+          (channelConnection (requestChannel request))
+          (channelGuid (requestChannel request))
+      sendContinue chan True overrides
+    (glob, run) : rest -> do
+      current <- requestUrl request
+      if matchesUrlGlob glob current
+        then do
+          done <- run (ChannelRef (channelGuid chan))
+          unless done (chainRoutes chan request rest)
+        else
+          chainRoutes chan request rest
 
 settleRoute :: Route -> Bool -> IO ()
 settleRoute handled settled =
@@ -255,14 +292,17 @@ settleRoute handled settled =
       then putTMVar (routeOutcome handled) settled
       else throwSTM RouteAlreadyHandled
 
-sendContinue :: Channel RouteTag -> Bool -> Maybe [HttpHeader] -> IO ()
-sendContinue chan isFallback headers = do
+sendContinue :: Channel RouteTag -> Bool -> RequestOverrides -> IO ()
+sendContinue chan isFallback overrides = do
   _ :: RouteContinueResult <-
     send
       chan
       (MethodName "continue")
       (mkRouteContinueParams isFallback)
-        { routeContinueParamsHeaders = fmap (fmap toNameValue) headers
+        { routeContinueParamsHeaders = fmap (fmap toNameValue) (requestOverrideHeaders overrides)
+        , routeContinueParamsMethod = fmap httpMethodToText (requestOverrideMethod overrides)
+        , routeContinueParamsPostData = fmap protocolBinaryFromByteString (requestOverridePostData overrides)
+        , routeContinueParamsUrl = requestOverrideUrl overrides
         }
   pure ()
 

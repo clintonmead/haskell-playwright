@@ -89,6 +89,7 @@ library
       Playwright.Request
       Playwright.RequestFrame
       Playwright.RequestId
+      Playwright.RequestOverrides
       Playwright.ResourceType
       Playwright.Response
       Playwright.Route
