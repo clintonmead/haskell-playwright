@@ -1,6 +1,7 @@
 module Playwright.Evaluate
   ( evaluate
   , evaluateBool
+  , evaluateNumber
   , evaluateOnLocator
   , evaluateOnLocatorBool
   , evaluateOnLocatorText
@@ -32,7 +33,7 @@ import Playwright.SerializedArgument
   , undefinedArgument
   )
 import Playwright.SerializedValue
-  ( SerializedPayload (PayloadBool, PayloadString)
+  ( SerializedPayload (PayloadBool, PayloadNumber, PayloadString)
   , SerializedValue (SerializedNode)
   )
 
@@ -63,6 +64,10 @@ evaluateOnLocatorBool :: Locator -> Text -> IO Bool
 evaluateOnLocatorBool loc expression =
   requireBool =<< evaluateOnLocator loc expression
 
+evaluateNumber :: Page -> Text -> IO Double
+evaluateNumber page expression =
+  requireNumber =<< evaluate page expression
+
 requireText :: SerializedValue -> IO Text
 requireText value =
   case value of
@@ -76,5 +81,13 @@ requireBool value =
   case value of
     SerializedNode (PayloadBool flag) _ ->
       pure flag
+    _ ->
+      throwIO (EvaluateUnexpected value)
+
+requireNumber :: SerializedValue -> IO Double
+requireNumber value =
+  case value of
+    SerializedNode (PayloadNumber number) _ ->
+      pure number
     _ ->
       throwIO (EvaluateUnexpected value)

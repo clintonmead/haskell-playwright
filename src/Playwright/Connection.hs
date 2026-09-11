@@ -35,10 +35,12 @@ import Data.Aeson
   ( FromJSON
   , Result (Error, Success)
   , ToJSON (toJSON)
-  , Value
+  , Value (Object)
   , encode
   , fromJSON
   )
+import Data.Aeson.Key qualified as Key
+import Data.Aeson.KeyMap qualified as KeyMap
 import Data.Aeson qualified as Aeson
   ( object
   , (.=)
@@ -64,11 +66,15 @@ import Playwright.Incoming
   , Incoming (IncomingAdopt, IncomingCreate, IncomingDispose, IncomingEvent, IncomingResponse)
   , parseIncoming
   )
+import Playwright.Json.Decode
+  ( fromJsonValue
+  )
 import Playwright.MethodName
-  ( MethodName
+  ( MethodName (MethodName)
   )
 import Playwright.Protocol
   ( ChannelType (ChannelTypeRoot)
+  , FrameNavigatedEvent (frameNavigatedEventUrl)
   )
 import Playwright.RemoteObject
   ( RemoteObject (RemoteObject, remoteGuid, remoteInitializer, remoteParent, remoteType)
@@ -78,6 +84,9 @@ import Playwright.RequestId
   )
 import Playwright.Transport
   ( Transport (closeTransport, recvPayload, sendPayload)
+  )
+import Playwright.Url
+  ( Url
   )
 
 data Connection = Connection
@@ -228,8 +237,35 @@ dispatch conn incoming =
     IncomingDispose guid ->
       atomically $
         modifyTVar' (connectionObjects conn) (disposeTree guid)
-    IncomingEvent _ _ _ ->
+    IncomingEvent guid method params ->
+      handleEvent conn guid method params
+
+handleEvent :: Connection -> Guid -> MethodName -> Value -> IO ()
+handleEvent conn guid method params =
+  case method of
+    MethodName "navigated" ->
+      applyNavigated conn guid params
+    _ ->
       pure ()
+
+applyNavigated :: Connection -> Guid -> Value -> IO ()
+applyNavigated conn guid params = do
+  event <- either throwIO pure (fromJsonValue params)
+  atomically $
+    modifyTVar' (connectionObjects conn) $
+      Map.adjust (setInitializerUrl (frameNavigatedEventUrl event)) guid
+
+setInitializerUrl :: Url -> RemoteObject -> RemoteObject
+setInitializerUrl url obj =
+  obj {remoteInitializer = patchUrl url (remoteInitializer obj)}
+
+patchUrl :: Url -> Value -> Value
+patchUrl url value =
+  case value of
+    Object keys ->
+      Object (KeyMap.insert (Key.fromText "url") (toJSON url) keys)
+    _ ->
+      value
 
 completeCallback ::
   Connection ->

@@ -8,6 +8,8 @@ module Playwright.Page
   , screenshot
   , setContent
   , title
+  , url
+  , waitForSelector
   ) where
 
 import Control.Exception
@@ -31,10 +33,14 @@ import Playwright.Connection
 import Playwright.Frame
   ( Frame
   , contentFrame
+  , currentUrl
   , frameFromRef
   , gotoFrame
   , setContentFrame
   , titleFrame
+  )
+import Playwright.Frame.Wait
+  ( waitForSelectorFrame
   )
 import Playwright.GotoOptions
   ( GotoOptions
@@ -80,6 +86,9 @@ import Playwright.Timeout
 import Playwright.Url
   ( Url
   )
+import Playwright.WaitForState
+  ( WaitForState
+  )
 
 data Page = Page
   { pageChannel :: Channel PageTag
@@ -107,6 +116,13 @@ goto page = gotoFrame (pageMainFrame page)
 
 title :: Page -> IO Text
 title page = titleFrame (pageMainFrame page)
+
+url :: Page -> IO Url
+url page = currentUrl (pageMainFrame page)
+
+waitForSelector :: Page -> Selector -> WaitForState -> IO ()
+waitForSelector page selector state =
+  waitForSelectorFrame (pageMainFrame page) selector state defaultTimeout Nothing
 
 content :: Page -> IO Text
 content page = contentFrame (pageMainFrame page)

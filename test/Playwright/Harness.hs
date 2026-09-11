@@ -2,6 +2,7 @@ module Playwright.Harness
   ( assertProtocolContains
   , locate
   , withAssetPage
+  , withAssets
   , withChromiumPage
   ) where
 
@@ -61,16 +62,21 @@ withChromiumPage action = do
       withPage browser action
 
 withAssetPage :: FilePath -> (Page -> IO a) -> IO a
-withAssetPage relativePath action = do
+withAssetPage relativePath action =
+  withAssets $ \prefix page -> do
+    _ <-
+      goto
+        page
+        (urlFromText (prefix <> "/" <> pack relativePath))
+        defaultGotoOptions
+    action page
+
+withAssets :: (Text -> Page -> IO a) -> IO a
+withAssets action = do
   assets <- requireAssets
   withApplication (pure (staticApp (defaultFileServerSettings assets))) $ \port ->
-    withChromiumPage $ \page -> do
-      let
-        url =
-          urlFromText
-            ("http://127.0.0.1:" <> pack (show port) <> "/" <> pack relativePath)
-      _ <- goto page url defaultGotoOptions
-      action page
+    withChromiumPage $ \page ->
+      action ("http://127.0.0.1:" <> pack (show port)) page
 
 requireAssets :: IO FilePath
 requireAssets = do

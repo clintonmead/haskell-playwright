@@ -25,6 +25,8 @@ module Playwright.Locator
   , typeText
   , uncheck
   , uncheckWith
+  , waitFor
+  , waitForWith
   ) where
 
 import Data.Text
@@ -62,6 +64,9 @@ import Playwright.Frame.Inspect
   , queryCountFrame
   , textContentFrame
   )
+import Playwright.Frame.Wait
+  ( waitForSelectorFrame
+  )
 import Playwright.Key
   ( Key
   )
@@ -70,7 +75,11 @@ import Playwright.Selector
   , nestedSelector
   )
 import Playwright.Timeout
-  ( defaultTimeout
+  ( Timeout
+  , defaultTimeout
+  )
+import Playwright.WaitForState
+  ( WaitForState
   )
 
 data Locator = Locator
@@ -182,3 +191,11 @@ isEditable loc =
 locatorCount :: Locator -> IO Int
 locatorCount loc =
   queryCountFrame (locatorFrame loc) (locatorSelector loc)
+
+waitFor :: Locator -> WaitForState -> IO ()
+waitFor loc =
+  waitForWith loc defaultTimeout
+
+waitForWith :: Locator -> Timeout -> WaitForState -> IO ()
+waitForWith loc timeout state =
+  waitForSelectorFrame (locatorFrame loc) (locatorSelector loc) state timeout (Just True)

@@ -34,6 +34,7 @@ library
       Playwright.Frame
       Playwright.Frame.Action
       Playwright.Frame.Inspect
+      Playwright.Frame.Wait
       Playwright.GotoOptions
       Playwright.Guid
       Playwright.Incoming
@@ -44,6 +45,7 @@ library
       Playwright.Json.OpenJson
       Playwright.Json.ProtocolBinary
       Playwright.Key
+      Playwright.Keyboard
       Playwright.LaunchOptions
       Playwright.Locator
       Playwright.MethodName
@@ -66,6 +68,7 @@ library
       Playwright.Transport.Stdio
       Playwright.TypedArrayKind
       Playwright.Url
+      Playwright.WaitForState
   other-modules:
       Paths_playwright
   hs-source-dirs:
@@ -104,11 +107,17 @@ test-suite playwright-test
       Playwright.Harness
       Playwright.IntegrationSpec
       Playwright.LocatorClickSpec
+      Playwright.LocatorIsVisibleSpec
       Playwright.LocatorSpec
       Playwright.PageCheckSpec
+      Playwright.PageClickSpec
+      Playwright.PageEvaluateSpec
       Playwright.PageFillSpec
       Playwright.PageFocusSpec
+      Playwright.PageGotoSpec
+      Playwright.PageKeyboardSpec
       Playwright.PageSetContentSpec
+      Playwright.PageWaitForSelectorSpec
       Playwright.TransportSpec
       Paths_playwright
   hs-source-dirs:

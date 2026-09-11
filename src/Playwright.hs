@@ -16,6 +16,7 @@ module Playwright
   , Selector
   , Timeout
   , Url
+  , WaitForState (..)
   , browserFromRef
   , browserTypeFromRef
   , check
@@ -36,6 +37,7 @@ module Playwright
   , defaultTimeout
   , evaluate
   , evaluateBool
+  , evaluateNumber
   , evaluateOnLocator
   , evaluateOnLocatorBool
   , evaluateOnLocatorText
@@ -57,6 +59,11 @@ module Playwright
   , isEnabled
   , isHidden
   , isVisible
+  , keyboardDown
+  , keyboardInsertText
+  , keyboardPress
+  , keyboardType
+  , keyboardUp
   , launch
   , locator
   , locatorCount
@@ -78,8 +85,12 @@ module Playwright
   , typeText
   , uncheck
   , uncheckWith
+  , url
   , urlFromText
   , urlToText
+  , waitFor
+  , waitForSelector
+  , waitForWith
   , webkit
   , withBrowser
   , withPage
@@ -115,6 +126,7 @@ import Playwright.CheckOptions
 import Playwright.Evaluate
   ( evaluate
   , evaluateBool
+  , evaluateNumber
   , evaluateOnLocator
   , evaluateOnLocatorBool
   , evaluateOnLocatorText
@@ -138,6 +150,13 @@ import Playwright.Instance
   )
 import Playwright.Key
   ( Key (Key, keyToText)
+  )
+import Playwright.Keyboard
+  ( keyboardDown
+  , keyboardInsertText
+  , keyboardPress
+  , keyboardType
+  , keyboardUp
   )
 import Playwright.LaunchOptions
   ( LaunchOptions (LaunchOptions, launchOptionsChromiumSandbox, launchOptionsHeadless, launchOptionsSlowMo, launchOptionsTimeout)
@@ -170,6 +189,8 @@ import Playwright.Locator
   , typeText
   , uncheck
   , uncheckWith
+  , waitFor
+  , waitForWith
   )
 import Playwright.Page
   ( Page (Page, pageChannel, pageMainFrame)
@@ -181,6 +202,8 @@ import Playwright.Page
   , screenshot
   , setContent
   , title
+  , url
+  , waitForSelector
   )
 import Playwright.Response
   ( Response (Response, responseChannel)
@@ -208,4 +231,7 @@ import Playwright.Url
   ( Url
   , urlFromText
   , urlToText
+  )
+import Playwright.WaitForState
+  ( WaitForState (WaitForAttached, WaitForDetached, WaitForHidden, WaitForVisible)
   )

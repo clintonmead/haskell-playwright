@@ -6,6 +6,7 @@ module Playwright.Frame
   , frameSend
   , frameSend_
   , contentFrame
+  , currentUrl
   , gotoFrame
   , setContentFrame
   , titleFrame
@@ -22,7 +23,7 @@ import Data.Text
   ( Text
   )
 import Playwright.Channel
-  ( Channel (Channel, channelConnection)
+  ( Channel (Channel, channelConnection, channelGuid)
   , FrameTag
   , send
   )
@@ -99,6 +100,12 @@ frameFromRef conn ref = do
       , frameUrl = frameInitializerUrl initializer
       , frameParent = frameInitializerParentFrame initializer
       }
+
+currentUrl :: Frame -> IO Url
+currentUrl frame = do
+  obj <- lookupObject (channelConnection (frameChannel frame)) (channelGuid (frameChannel frame))
+  initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
+  pure (frameInitializerUrl initializer)
 
 frameSend :: forall result params. (ToJSON params, FromJSON result) => Frame -> Text -> params -> IO result
 frameSend frame methodName params =

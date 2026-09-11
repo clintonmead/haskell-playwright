@@ -106,4 +106,4 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - Local packages are built with `-O0` (`optimization: False` in `cabal.project`, `$locals` / local `ghc-options` in Stack). Snapshot/Hackage dependencies stay optimized.
 - Cabal `verbose: 0` plus the flake `cabal` wrapper (`-v0`) and Stack `cabal-verbosity: 0` keep successful builds quiet; GHC errors and test output still show.
 - Locator `evaluate` is `Frame.evalOnSelector` with `strict: true`. Page `evaluate` is `Frame.evaluateExpression` with `isFunction: true`.
-- `IncomingEvent` is still ignored; `Frame` URL is the initializer snapshot, so live `page.url()` after navigation is not implemented yet.
+- `Frame.navigated` updates the stored initializer URL so `page.url` is live after navigation (including hash changes).
