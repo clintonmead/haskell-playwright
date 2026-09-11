@@ -35,6 +35,7 @@ import Playwright.PageHistorySpec qualified as PageHistorySpec
 import Playwright.PageKeyboardSpec qualified as PageKeyboardSpec
 import Playwright.PageMouseSpec qualified as PageMouseSpec
 import Playwright.PageNetworkResponseSpec qualified as PageNetworkResponseSpec
+import Playwright.PageScreenshotSpec qualified as PageScreenshotSpec
 import Playwright.PageSetContentSpec qualified as PageSetContentSpec
 import Playwright.PageSelectOptionSpec qualified as PageSelectOptionSpec
 import Playwright.PageSetExtraHTTPHeadersSpec qualified as PageSetExtraHTTPHeadersSpec
@@ -97,6 +98,7 @@ main =
         , PageMouseSpec.tests
         , PageNetworkResponseSpec.tests
         , PageSelectOptionSpec.tests
+        , PageScreenshotSpec.tests
         , PageSetContentSpec.tests
         , PageSetExtraHTTPHeadersSpec.tests
         , PageWaitForFunctionSpec.tests

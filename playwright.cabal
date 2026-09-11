@@ -161,6 +161,7 @@ test-suite playwright-test
       Playwright.PageKeyboardSpec
       Playwright.PageMouseSpec
       Playwright.PageNetworkResponseSpec
+      Playwright.PageScreenshotSpec
       Playwright.PageSelectOptionSpec
       Playwright.PageSetContentSpec
       Playwright.PageSetExtraHTTPHeadersSpec

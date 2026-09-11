@@ -4,15 +4,19 @@ module Playwright.PageClickSpec
 
 import Playwright
   ( click
+  , defaultGotoOptions
   , evaluate
   , evaluateBool
   , evaluateNumber
   , evaluateText
+  , goto
   , setContent
+  , urlFromText
   )
 import Playwright.Harness
   ( locate
   , withAssetPage
+  , withAssets
   , withChromiumPage
   )
 import Test.Tasty
@@ -66,4 +70,33 @@ tests =
           setContent page "<div style=\"margin-left: 20.23px; margin-top: 11.65px; width: 1px; height: 1px;\" onclick=\"window.__clicked = true\"></div>"
           click (locate page "div")
           assertEqual "clicked" True =<< evaluateBool page "() => window.__clicked"
+    , testCase "should click the unaligned 1x1 div v2" $
+        withChromiumPage $ \page -> do
+          setContent page "<div style=\"margin-left: 20.68px; margin-top: 11.13px; width: 1px; height: 1px;\" onclick=\"window.__clicked = true\"></div>"
+          click (locate page "div")
+          assertEqual "clicked" True =<< evaluateBool page "() => window.__clicked"
+    , testCase "should click the unaligned 1x1 div v3" $
+        withChromiumPage $ \page -> do
+          setContent page "<div style=\"margin-left: 20.68px; margin-top: 11.52px; width: 1px; height: 1px;\" onclick=\"window.__clicked = true\"></div>"
+          click (locate page "div")
+          assertEqual "clicked" True =<< evaluateBool page "() => window.__clicked"
+    , testCase "should click the unaligned 1x1 div v4" $
+        withChromiumPage $ \page -> do
+          setContent page "<div style=\"margin-left: 20.15px; margin-top: 11.24px; width: 1px; height: 1px;\" onclick=\"window.__clicked = true\"></div>"
+          click (locate page "div")
+          assertEqual "clicked" True =<< evaluateBool page "() => window.__clicked"
+    , testCase "should click the button after navigation" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/input/button.html")) defaultGotoOptions
+          click (locate page "button")
+          _ <- goto page (urlFromText (prefix <> "/input/button.html")) defaultGotoOptions
+          click (locate page "button")
+          assertEqual "clicked" "Clicked" =<< evaluateText page "() => window.result"
+    , testCase "should click when one of inline box children is outside of viewport" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<style>i { position: absolute; top: -1000px; }</style><span onclick='window.CLICKED = 42;'><i>woof</i><b>doggo</b></span>"
+          click (locate page "span")
+          assertEqual "clicked" (42 :: Double) =<< evaluateNumber page "() => window.CLICKED"
     ]
