@@ -92,6 +92,7 @@ library
       Playwright.ResourceType
       Playwright.Response
       Playwright.Route
+      Playwright.RouteOptions
       Playwright.ScreenshotOptions
       Playwright.ScriptTag
       Playwright.SelectOption

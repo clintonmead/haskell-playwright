@@ -58,6 +58,8 @@ module Playwright
   , ResourceType (..)
   , Response (..)
   , Route
+  , RouteOptions (..)
+  , RouteTimes (..)
   , ScreenshotOptions (..)
   , ScriptTag (..)
   , SelectOption (..)
@@ -129,6 +131,7 @@ module Playwright
   , defaultGetByRoleOptions
   , defaultGotoOptions
   , defaultLaunchOptions
+  , defaultRouteOptions
   , defaultScreenshotOptions
   , defaultTimeout
   , dispatchEvent
@@ -266,6 +269,7 @@ module Playwright
   , responseUrl
   , route
   , routeRequest
+  , routeWith
   , screenshot
   , scrollIntoViewIfNeeded
   , scrollIntoViewIfNeededWith
@@ -710,7 +714,13 @@ import Playwright.Route
   , fulfillRoute
   , route
   , routeRequest
+  , routeWith
   , unroute
+  )
+import Playwright.RouteOptions
+  ( RouteOptions (RouteOptions, routeTimes)
+  , RouteTimes (RouteTimes, routeTimesToInt)
+  , defaultRouteOptions
   )
 import Playwright.ScreenshotOptions
   ( ScreenshotOptions (ScreenshotOptions, screenshotOptionsFullPage, screenshotOptionsTimeout)

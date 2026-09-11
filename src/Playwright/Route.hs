@@ -7,17 +7,23 @@ module Playwright.Route
   , fulfillRoute
   , route
   , routeRequest
+  , routeWith
   , unroute
   ) where
 
 import Control.Concurrent.STM
-  ( TMVar
+  ( STM
+  , TMVar
+  , TVar
   , atomically
   , isEmptyTMVar
   , newEmptyTMVarIO
+  , newTVarIO
   , putTMVar
+  , readTVar
   , takeTMVar
   , throwSTM
+  , writeTVar
   )
 import Control.Exception
   ( throwIO
@@ -112,6 +118,11 @@ import Playwright.Request
   , requestFromRef
   , requestUrl
   )
+import Playwright.RouteOptions
+  ( RouteOptions (routeTimes)
+  , RouteTimes (routeTimesToInt)
+  , defaultRouteOptions
+  )
 import Playwright.UrlGlob
   ( UrlGlob (urlGlobToText)
   , matchesUrlGlob
@@ -169,17 +180,40 @@ fulfillRoute handled opts = do
   settleRoute handled True
 
 route :: Page -> UrlGlob -> (Route -> IO ()) -> IO ()
-route page glob handler = do
+route page glob =
+  routeWith page glob defaultRouteOptions
+
+routeWith :: Page -> UrlGlob -> RouteOptions -> (Route -> IO ()) -> IO ()
+routeWith page glob opts handler = do
   let
     conn = channelConnection (pageChannel page)
     guid = channelGuid (pageChannel page)
+  remaining <- newTVarIO (fmap routeTimesToInt (routeTimes opts))
   first <-
     pushRouteHandler conn guid glob $ \ref -> do
-      box <- newEmptyTMVarIO
-      handler (Route (Channel conn (channelRefGuid ref)) box)
-      atomically (takeTMVar box)
+      live <- atomically (consumeRouteTime remaining)
+      if live
+        then do
+          box <- newEmptyTMVarIO
+          handler (Route (Channel conn (channelRefGuid ref)) box)
+          atomically (takeTMVar box)
+        else
+          pure False
   when first (registerEventHandler conn guid (MethodName "route") (dispatchPageRoute page))
   updateInterceptionPatterns page
+
+consumeRouteTime :: TVar (Maybe Int) -> STM Bool
+consumeRouteTime remaining = do
+  current <- readTVar remaining
+  case current of
+    Nothing ->
+      pure True
+    Just count ->
+      if count <= 0
+        then pure False
+        else do
+          writeTVar remaining (Just (count - 1))
+          pure True
 
 unroute :: Page -> UrlGlob -> IO ()
 unroute page glob = do

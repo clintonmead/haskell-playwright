@@ -13,15 +13,19 @@ import Playwright
   ( FulfillBody (FulfillText)
   , FulfillOptions (fulfillBody, fulfillStatus)
   , HttpStatus (HttpStatus)
+  , RouteOptions (routeTimes)
+  , RouteTimes (RouteTimes)
   , UrlGlob (UrlGlob)
   , abortRoute
   , defaultFulfillOptions
   , defaultGotoOptions
+  , defaultRouteOptions
   , fallbackRoute
   , fulfillRoute
   , goto
   , responseText
   , route
+  , routeWith
   , urlFromText
   )
 import Playwright.Harness
@@ -92,6 +96,30 @@ tests =
             "net::ERR_FAILED"
             (goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions)
           assertEqual "chained" False =<< readIORef failed
+    , testCase "should chain once" $
+        withAssets $ \prefix page -> do
+          routeWith
+            page
+            (UrlGlob "**/empty.html")
+            defaultRouteOptions {routeTimes = Just (RouteTimes 1)}
+            $ \handled ->
+              fulfillRoute
+                handled
+                defaultFulfillOptions
+                  { fulfillStatus = Just (HttpStatus 200)
+                  , fulfillBody = Just (FulfillText "fulfilled one")
+                  }
+          routeWith
+            page
+            (UrlGlob "**/empty.html")
+            defaultRouteOptions {routeTimes = Just (RouteTimes 1)}
+            fallbackRoute
+          response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          case response of
+            Nothing ->
+              assertFailure "missing response"
+            Just value ->
+              assertEqual "body" "fulfilled one" =<< responseText value
     ]
 
 writeTrue :: IORef Bool -> IO ()
