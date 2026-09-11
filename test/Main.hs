@@ -3,6 +3,7 @@ module Main
   ) where
 
 import Playwright.BrowserContextAddCookiesSpec qualified as BrowserContextAddCookiesSpec
+import Playwright.BrowserContextAddInitScriptSpec qualified as BrowserContextAddInitScriptSpec
 import Playwright.BrowserContextCookiesSpec qualified as BrowserContextCookiesSpec
 import Playwright.BrowserContextCredentialsSpec qualified as BrowserContextCredentialsSpec
 import Playwright.BrowserContextCspSpec qualified as BrowserContextCspSpec
@@ -107,6 +108,7 @@ main =
         "playwright"
         [ TransportSpec.tests
         , BrowserContextAddCookiesSpec.tests
+        , BrowserContextAddInitScriptSpec.tests
         , BrowserContextCookiesSpec.tests
         , BrowserContextCredentialsSpec.tests
         , BrowserContextCspSpec.tests

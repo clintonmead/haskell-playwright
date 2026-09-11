@@ -96,6 +96,7 @@ module Playwright
   , abortRoute
   , acceptDialog
   , acceptDialogWith
+  , addContextInitScript
   , addCookies
   , addInitScript
   , addScriptTag
@@ -387,6 +388,7 @@ import Playwright.Browser
   )
 import Playwright.BrowserContext
   ( BrowserContext (BrowserContext, browserContextChannel)
+  , addContextInitScript
   , addCookies
   , clearCookies
   , clearCookiesNamed

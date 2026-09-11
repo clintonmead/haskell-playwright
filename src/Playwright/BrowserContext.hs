@@ -1,5 +1,6 @@
 module Playwright.BrowserContext
   ( BrowserContext (..)
+  , addContextInitScript
   , addCookies
   , clearCookies
   , clearCookiesNamed
@@ -19,9 +20,12 @@ module Playwright.BrowserContext
   , setOffline
   ) where
 
+import Data.Text
+  ( Text
+  )
 import Playwright.Channel
   ( BrowserContextTag
-  , Channel (Channel)
+  , Channel (Channel, channelConnection)
   , send
   )
 import Playwright.Connection
@@ -33,6 +37,10 @@ import Playwright.Cookie
   , CookieToSet
   , fromNetworkCookie
   , toSetNetworkCookie
+  )
+import Playwright.Disposable
+  ( Disposable
+  , disposableFromRef
   )
 import Playwright.Geolocation
   ( Accuracy (accuracyToScientific)
@@ -64,6 +72,7 @@ import Playwright.PermissionName
   )
 import Playwright.Protocol
   ( BrowserContextAddCookiesResult
+  , BrowserContextAddInitScriptResult (browserContextAddInitScriptResultDisposable)
   , BrowserContextClearCookiesParams (browserContextClearCookiesParamsName)
   , BrowserContextClearCookiesResult
   , BrowserContextClearPermissionsResult
@@ -81,6 +90,7 @@ import Playwright.Protocol
   , BrowserContextSetHTTPCredentialsResult
   , BrowserContextSetOfflineResult
   , mkBrowserContextAddCookiesParams
+  , mkBrowserContextAddInitScriptParams
   , mkBrowserContextClearCookiesParams
   , mkBrowserContextClearPermissionsParams
   , mkBrowserContextCloseParams
@@ -117,6 +127,19 @@ newPage ctx = do
   pageFromRef
     (browserContextChannel ctx)
     (browserContextNewPageResultPage result)
+
+addContextInitScript :: BrowserContext -> Text -> IO Disposable
+addContextInitScript ctx source = do
+  result <-
+    send
+      (browserContextChannel ctx)
+      (MethodName "addInitScript")
+      (mkBrowserContextAddInitScriptParams source)
+  pure
+    ( disposableFromRef
+        (channelConnection (browserContextChannel ctx))
+        (browserContextAddInitScriptResultDisposable result)
+    )
 
 closeContext :: BrowserContext -> IO ()
 closeContext ctx = do
