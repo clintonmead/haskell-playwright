@@ -20,6 +20,7 @@ module Playwright.Page
   , querySelector
   , setViewportSize
   , addInitScript
+  , addScriptTag
   , setExtraHTTPHeaders
   , waitForFunction
   , waitForLoadState
@@ -48,10 +49,11 @@ import Playwright.Connection
   , lookupObject
   )
 import Playwright.Frame
-  ( Frame
+  ( Frame (frameChannel)
   , contentFrame
   , currentUrl
   , frameFromRef
+  , frameSend
   , gotoFrame
   , setContentFrame
   , titleFrame
@@ -67,6 +69,7 @@ import Playwright.Frame.Wait
   )
 import Playwright.ElementHandle
   ( ElementHandle
+  , elementHandleFromRef
   )
 import Playwright.Exactness
   ( Exactness
@@ -110,7 +113,9 @@ import Playwright.MethodName
   ( MethodName (MethodName)
   )
 import Playwright.Protocol
-  ( NameValue
+  ( FrameAddScriptTagParams (frameAddScriptTagParamsContent, frameAddScriptTagParamsType, frameAddScriptTagParamsUrl)
+  , FrameAddScriptTagResult (frameAddScriptTagResultElement)
+  , NameValue
   , PageAddInitScriptResult
   , PageCloseResult
   , PageGoBackResult (pageGoBackResultResponse)
@@ -121,6 +126,7 @@ import Playwright.Protocol
   , PageScreenshotResult (pageScreenshotResultBinary)
   , PageSetExtraHTTPHeadersResult
   , PageSetViewportSizeResult
+  , mkFrameAddScriptTagParams
   , mkNameValue
   , mkPageAddInitScriptParams
   , mkPageCloseParams
@@ -138,6 +144,9 @@ import Playwright.RemoteObject
 import Playwright.Response
   ( Response
   , responseFromRef
+  )
+import Playwright.ScriptTag
+  ( ScriptTag (scriptTagContent, scriptTagType, scriptTagUrl)
   )
 import Playwright.ScreenshotOptions
   ( ScreenshotOptions (screenshotOptionsFullPage, screenshotOptionsTimeout)
@@ -277,6 +286,23 @@ addInitScript page source = do
   _ :: PageAddInitScriptResult <-
     send (pageChannel page) (MethodName "addInitScript") (mkPageAddInitScriptParams source)
   pure ()
+
+addScriptTag :: Page -> ScriptTag -> IO ElementHandle
+addScriptTag page tag = do
+  result <-
+    frameSend
+      (pageMainFrame page)
+      "addScriptTag"
+      mkFrameAddScriptTagParams
+        { frameAddScriptTagParamsContent = scriptTagContent tag
+        , frameAddScriptTagParamsType = scriptTagType tag
+        , frameAddScriptTagParamsUrl = scriptTagUrl tag
+        }
+  pure
+    ( elementHandleFromRef
+        (channelConnection (frameChannel (pageMainFrame page)))
+        (frameAddScriptTagResultElement result)
+    )
 
 setExtraHTTPHeaders :: Page -> [HttpHeader] -> IO ()
 setExtraHTTPHeaders page headers = do

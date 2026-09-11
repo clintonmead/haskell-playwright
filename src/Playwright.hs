@@ -27,6 +27,7 @@ module Playwright
   , Point (..)
   , Response (..)
   , ScreenshotOptions (..)
+  , ScriptTag (..)
   , SelectOption (..)
   , Selector
   , SpecialJsValue (..)
@@ -38,6 +39,7 @@ module Playwright
   , WaitForState (..)
   , WheelDelta (..)
   , addInitScript
+  , addScriptTag
   , boolArgument
   , boundingBox
   , browserFromRef
@@ -63,6 +65,7 @@ module Playwright
   , defaultTimeout
   , dispatchEvent
   , elementHandle
+  , emptyScriptTag
   , evaluate
   , evaluateBool
   , evaluateBoolWith
@@ -326,6 +329,7 @@ import Playwright.Mouse
 import Playwright.Page
   ( Page (Page, pageChannel, pageMainFrame)
   , addInitScript
+  , addScriptTag
   , closePage
   , content
   , getByLabel
@@ -362,6 +366,10 @@ import Playwright.Response
 import Playwright.ScreenshotOptions
   ( ScreenshotOptions (ScreenshotOptions, screenshotOptionsFullPage, screenshotOptionsTimeout)
   , defaultScreenshotOptions
+  )
+import Playwright.ScriptTag
+  ( ScriptTag (ScriptTag, scriptTagContent, scriptTagType, scriptTagUrl)
+  , emptyScriptTag
   )
 import Playwright.SelectOption
   ( SelectOption (SelectIndex, SelectLabel, SelectValue, SelectValueOrLabel)

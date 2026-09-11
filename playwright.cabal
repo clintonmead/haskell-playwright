@@ -69,6 +69,7 @@ library
       Playwright.RequestId
       Playwright.Response
       Playwright.ScreenshotOptions
+      Playwright.ScriptTag
       Playwright.SelectOption
       Playwright.Selector
       Playwright.SerializedArgument
@@ -131,6 +132,7 @@ test-suite playwright-test
       Playwright.LocatorQuerySpec
       Playwright.LocatorSpec
       Playwright.PageAddInitScriptSpec
+      Playwright.PageAddScriptTagSpec
       Playwright.PageCheckSpec
       Playwright.PageClickSpec
       Playwright.PageDispatchEventSpec
