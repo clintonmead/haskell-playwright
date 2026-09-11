@@ -3,7 +3,9 @@ module Playwright.Browser
   , browserFromRef
   , closeBrowser
   , newContext
+  , newContextWith
   , withPage
+  , withPageWith
   ) where
 
 import Control.Exception
@@ -29,6 +31,11 @@ import Playwright.Json.ChannelRef
 import Playwright.MethodName
   ( MethodName (MethodName)
   )
+import Playwright.NewContextOptions
+  ( NewContextOptions
+  , defaultNewContextOptions
+  , toBrowserNewContextParams
+  )
 import Playwright.Page
   ( Page
   )
@@ -36,7 +43,6 @@ import Playwright.Protocol
   ( BrowserCloseResult
   , BrowserNewContextResult (browserNewContextResultContext)
   , mkBrowserCloseParams
-  , mkBrowserNewContextParams
   )
 
 newtype Browser = Browser
@@ -54,21 +60,29 @@ closeBrowser browser = do
   pure ()
 
 newContext :: Browser -> IO BrowserContext
-newContext browser = do
+newContext browser =
+  newContextWith browser defaultNewContextOptions
+
+newContextWith :: Browser -> NewContextOptions -> IO BrowserContext
+newContextWith browser opts = do
   result <-
     send
       (browserChannel browser)
       (MethodName "newContext")
-      mkBrowserNewContextParams
+      (toBrowserNewContextParams opts)
   contextFromRef
     (channelConnection (browserChannel browser))
     (browserNewContextResultContext result)
 
 withPage :: Browser -> (Page -> IO a) -> IO a
-withPage browser action =
+withPage browser =
+  withPageWith browser defaultNewContextOptions
+
+withPageWith :: Browser -> NewContextOptions -> (Page -> IO a) -> IO a
+withPageWith browser opts action =
   bracket
     ( do
-        ctx <- newContext browser
+        ctx <- newContextWith browser opts
         page <- newPage ctx
         pure (ctx, page)
     )

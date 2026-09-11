@@ -6,7 +6,11 @@ module Playwright.Harness
   , requireHandle
   , withAssetPage
   , withAssets
+  , withAssetsContextWith
+  , withAssetsWith
+  , withChromiumBrowser
   , withChromiumContext
+  , withChromiumContextWith
   , withChromiumPage
   ) where
 
@@ -32,17 +36,20 @@ import Network.Wai.Handler.Warp
   ( withApplication
   )
 import Playwright
-  ( BrowserContext
+  ( Browser
+  , BrowserContext
   , ElementHandle
   , Locator
+  , NewContextOptions
   , Page
   , closeContext
   , chromium
   , defaultGotoOptions
   , defaultLaunchOptions
+  , defaultNewContextOptions
   , goto
   , locator
-  , newContext
+  , newContextWith
   , newPage
   , selectorFromText
   , urlFromText
@@ -76,26 +83,32 @@ requireHandle handle =
     Just value ->
       pure value
 
-withChromiumPage :: (Page -> IO a) -> IO a
-withChromiumPage action = do
+withChromiumBrowser :: (Browser -> IO a) -> IO a
+withChromiumBrowser action = do
   _ <- requireNonEmptyEnv "PLAYWRIGHT_BROWSERS_PATH"
   withPlaywright $ \pw ->
-    withBrowser (chromium pw) defaultLaunchOptions $ \browser ->
-      withPage browser action
+    withBrowser (chromium pw) defaultLaunchOptions action
+
+withChromiumPage :: (Page -> IO a) -> IO a
+withChromiumPage action =
+  withChromiumBrowser $ \browser ->
+    withPage browser action
+
+withChromiumContextWith :: NewContextOptions -> (BrowserContext -> Page -> IO a) -> IO a
+withChromiumContextWith opts action =
+  withChromiumBrowser $ \browser ->
+    bracket
+      ( do
+          ctx <- newContextWith browser opts
+          page <- newPage ctx
+          pure (ctx, page)
+      )
+      (\(ctx, _) -> closeContext ctx)
+      (\(ctx, page) -> action ctx page)
 
 withChromiumContext :: (BrowserContext -> Page -> IO a) -> IO a
-withChromiumContext action = do
-  _ <- requireNonEmptyEnv "PLAYWRIGHT_BROWSERS_PATH"
-  withPlaywright $ \pw ->
-    withBrowser (chromium pw) defaultLaunchOptions $ \browser ->
-      bracket
-        ( do
-            ctx <- newContext browser
-            page <- newPage ctx
-            pure (ctx, page)
-        )
-        (\(ctx, _) -> closeContext ctx)
-        (\(ctx, page) -> action ctx page)
+withChromiumContext =
+  withChromiumContextWith defaultNewContextOptions
 
 withAssetPage :: FilePath -> (Page -> IO a) -> IO a
 withAssetPage relativePath action =
@@ -107,12 +120,20 @@ withAssetPage relativePath action =
         defaultGotoOptions
     action page
 
-withAssets :: (Text -> Page -> IO a) -> IO a
-withAssets action = do
+withAssetsContextWith :: NewContextOptions -> (Text -> BrowserContext -> Page -> IO a) -> IO a
+withAssetsContextWith opts action = do
   assets <- requireAssets
   withApplication (pure (staticApp (defaultFileServerSettings assets))) $ \port ->
-    withChromiumPage $ \page ->
-      action ("http://127.0.0.1:" <> pack (show port)) page
+    withChromiumContextWith opts $ \ctx page ->
+      action ("http://127.0.0.1:" <> pack (show port)) ctx page
+
+withAssetsWith :: NewContextOptions -> (Text -> Page -> IO a) -> IO a
+withAssetsWith opts action =
+  withAssetsContextWith opts (\prefix _ page -> action prefix page)
+
+withAssets :: (Text -> Page -> IO a) -> IO a
+withAssets =
+  withAssetsWith defaultNewContextOptions
 
 readTestAsset :: FilePath -> IO ByteString
 readTestAsset relativePath = do

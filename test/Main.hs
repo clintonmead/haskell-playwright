@@ -4,7 +4,13 @@ module Main
 
 import Playwright.BrowserContextAddCookiesSpec qualified as BrowserContextAddCookiesSpec
 import Playwright.BrowserContextCookiesSpec qualified as BrowserContextCookiesSpec
+import Playwright.BrowserContextCredentialsSpec qualified as BrowserContextCredentialsSpec
+import Playwright.BrowserContextCspSpec qualified as BrowserContextCspSpec
+import Playwright.BrowserContextLocaleSpec qualified as BrowserContextLocaleSpec
 import Playwright.BrowserContextOfflineSpec qualified as BrowserContextOfflineSpec
+import Playwright.BrowserContextSetExtraHTTPHeadersSpec qualified as BrowserContextSetExtraHTTPHeadersSpec
+import Playwright.BrowserContextTimezoneSpec qualified as BrowserContextTimezoneSpec
+import Playwright.BrowserContextViewportSpec qualified as BrowserContextViewportSpec
 import Playwright.ConnectionSpec qualified as ConnectionSpec
 import Playwright.ElementHandleBoundingBoxSpec qualified as ElementHandleBoundingBoxSpec
 import Playwright.ElementHandleClickSpec qualified as ElementHandleClickSpec
@@ -99,7 +105,13 @@ main =
         [ TransportSpec.tests
         , BrowserContextAddCookiesSpec.tests
         , BrowserContextCookiesSpec.tests
+        , BrowserContextCredentialsSpec.tests
+        , BrowserContextCspSpec.tests
+        , BrowserContextLocaleSpec.tests
         , BrowserContextOfflineSpec.tests
+        , BrowserContextSetExtraHTTPHeadersSpec.tests
+        , BrowserContextTimezoneSpec.tests
+        , BrowserContextViewportSpec.tests
         , ConnectionSpec.tests
         , ElementHandleBoundingBoxSpec.tests
         , ElementHandleClickSpec.tests

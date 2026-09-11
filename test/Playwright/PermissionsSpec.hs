@@ -7,9 +7,11 @@ import Data.Text
   )
 import Playwright
   ( Page
+  , NewContextOptions (newContextPermissions)
   , PermissionName (PermissionName)
   , clearPermissions
   , defaultGotoOptions
+  , defaultNewContextOptions
   , evaluateTextWith
   , goto
   , grantPermissions
@@ -21,6 +23,7 @@ import Playwright
 import Playwright.Harness
   ( assertProtocolContains
   , withAssets
+  , withAssetsWith
   )
 import Test.Tasty
   ( TestTree
@@ -91,6 +94,12 @@ tests =
           assertEqual "granted" "granted" =<< permissionState page "geolocation"
           clearPermissions (pageContext page)
           assertEqual "prompt" "prompt" =<< permissionState page "geolocation"
+    , testCase "should grant permission when specified on context" $
+        withAssetsWith
+          defaultNewContextOptions {newContextPermissions = Just [PermissionName "geolocation"]}
+          $ \prefix page -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            assertEqual "state" "granted" =<< permissionState page "geolocation"
     ]
 
 permissionState :: Page -> Text -> IO Text

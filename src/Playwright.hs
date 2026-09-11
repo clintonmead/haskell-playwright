@@ -40,9 +40,12 @@ module Playwright
   , GotoOptions (..)
   , HeaderName (..)
   , HeaderValue (..)
+  , HttpCredentials (..)
   , HttpHeader (..)
   , HttpMethod (..)
+  , HttpPassword (..)
   , HttpStatus (..)
+  , HttpUsername (..)
   , InputFile (..)
   , InputFileName (..)
   , JsHandle (..)
@@ -50,9 +53,11 @@ module Playwright
   , Latitude (..)
   , LaunchOptions (..)
   , LoadState (..)
+  , Locale (..)
   , Locator (..)
   , Longitude (..)
   , MediaType (..)
+  , NewContextOptions (..)
   , Page (..)
   , PageError (..)
   , PermissionName (..)
@@ -76,8 +81,10 @@ module Playwright
   , StorageValue (..)
   , StyleTag (..)
   , Timeout
+  , TimezoneId (..)
   , Url
   , UrlGlob (..)
+  , UserAgent (..)
   , ViewportHeight (..)
   , ViewportSize (..)
   , ViewportWidth (..)
@@ -138,6 +145,7 @@ module Playwright
   , defaultGetByRoleOptions
   , defaultGotoOptions
   , defaultLaunchOptions
+  , defaultNewContextOptions
   , defaultRouteOptions
   , defaultScreenshotOptions
   , defaultTimeout
@@ -248,6 +256,7 @@ module Playwright
   , mouseWheel
   , nestedSelector
   , newContext
+  , newContextWith
   , newPage
   , nth
   , numberArgument
@@ -294,8 +303,10 @@ module Playwright
   , sessionStorage
   , setChecked
   , setContent
+  , setContextExtraHTTPHeaders
   , setExtraHTTPHeaders
   , setGeolocation
+  , setHTTPCredentials
   , setInputFiles
   , setInputFilesHandle
   , setOffline
@@ -344,6 +355,7 @@ module Playwright
   , wheelDeltaFromInt
   , withBrowser
   , withPage
+  , withPageWith
   , withPlaywright
   , workerUrl
   , workers
@@ -363,7 +375,9 @@ import Playwright.Browser
   , browserFromRef
   , closeBrowser
   , newContext
+  , newContextWith
   , withPage
+  , withPageWith
   )
 import Playwright.BrowserContext
   ( BrowserContext (BrowserContext, browserContextChannel)
@@ -380,7 +394,9 @@ import Playwright.BrowserContext
   , grantPermissionsFor
   , newPage
   , pageContext
+  , setContextExtraHTTPHeaders
   , setGeolocation
+  , setHTTPCredentials
   , setOffline
   )
 import Playwright.BrowserName
@@ -540,6 +556,11 @@ import Playwright.GotoOptions
   ( GotoOptions (GotoOptions, gotoOptionsReferer, gotoOptionsTimeout, gotoOptionsWaitUntil)
   , defaultGotoOptions
   )
+import Playwright.HttpCredentials
+  ( HttpCredentials (HttpCredentials, httpCredentialsOrigin, httpCredentialsPassword, httpCredentialsUsername)
+  , HttpPassword (HttpPassword, httpPasswordToText)
+  , HttpUsername (HttpUsername, httpUsernameToText)
+  )
 import Playwright.HttpHeader
   ( HeaderName (HeaderName, headerNameToText)
   , HeaderValue (HeaderValue, headerValueToText)
@@ -595,6 +616,9 @@ import Playwright.LaunchOptions
 import Playwright.LoadState
   ( LoadState (LoadStateCommit, LoadStateDomContentLoaded, LoadStateLoad, LoadStateNetworkIdle)
   )
+import Playwright.Locale
+  ( Locale (Locale, localeToText)
+  )
 import Playwright.Locator
   ( Locator (Locator, locatorFrame, locatorSelector)
   , allLocators
@@ -645,6 +669,10 @@ import Playwright.Mouse
   )
 import Playwright.MediaType
   ( MediaType (MediaNoOverride, MediaPrint, MediaScreen)
+  )
+import Playwright.NewContextOptions
+  ( NewContextOptions (NewContextOptions, newContextBypassCSP, newContextColorScheme, newContextExtraHTTPHeaders, newContextGeolocation, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextJavaScriptEnabled, newContextLocale, newContextOffline, newContextPermissions, newContextTimezoneId, newContextUserAgent, newContextViewport)
+  , defaultNewContextOptions
   )
 import Playwright.Page
   ( Page (Page, pageChannel, pageContextChannel, pageMainFrame)
@@ -803,6 +831,9 @@ import Playwright.Timeout
   , milliseconds
   , timeoutToDouble
   )
+import Playwright.TimezoneId
+  ( TimezoneId (TimezoneId, timezoneIdToText)
+  )
 import Playwright.Url
   ( Url
   , urlFromText
@@ -811,9 +842,12 @@ import Playwright.Url
 import Playwright.UrlGlob
   ( UrlGlob (UrlGlob)
   )
+import Playwright.UserAgent
+  ( UserAgent (UserAgent, userAgentToText)
+  )
 import Playwright.ViewportSize
   ( ViewportHeight (ViewportHeight)
-  , ViewportSize (ViewportSize)
+  , ViewportSize (ViewportSize, viewportHeight, viewportWidth)
   , ViewportWidth (ViewportWidth)
   )
 import Playwright.WaitForState

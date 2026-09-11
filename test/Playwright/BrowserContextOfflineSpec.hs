@@ -3,15 +3,21 @@ module Playwright.BrowserContextOfflineSpec
   ) where
 
 import Playwright
-  ( defaultGotoOptions
+  ( HttpStatus (httpStatusToInt)
+  , NewContextOptions (newContextOffline)
+  , defaultGotoOptions
+  , defaultNewContextOptions
   , evaluateBool
   , goto
   , pageContext
+  , responseStatus
   , setOffline
   , urlFromText
   )
 import Playwright.Harness
-  ( withAssets
+  ( assertProtocolContains
+  , withAssets
+  , withAssetsContextWith
   )
 import Test.Tasty
   ( TestTree
@@ -19,6 +25,7 @@ import Test.Tasty
   )
 import Test.Tasty.HUnit
   ( assertEqual
+  , assertFailure
   , testCase
   )
 
@@ -36,4 +43,16 @@ tests =
           assertEqual "offline" False =<< evaluateBool page "() => window.navigator.onLine"
           setOffline ctx False
           assertEqual "online again" True =<< evaluateBool page "() => window.navigator.onLine"
+    , testCase "should work with offline option" $
+        withAssetsContextWith defaultNewContextOptions {newContextOffline = Just True} $ \prefix ctx page -> do
+          assertProtocolContains
+            "ERR_INTERNET_DISCONNECTED"
+            (goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions)
+          setOffline ctx False
+          response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          case response of
+            Nothing ->
+              assertFailure "missing response"
+            Just value ->
+              assertEqual "status" 200 . httpStatusToInt =<< responseStatus value
     ]

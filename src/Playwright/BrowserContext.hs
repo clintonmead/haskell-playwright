@@ -13,7 +13,9 @@ module Playwright.BrowserContext
   , grantPermissionsFor
   , newPage
   , pageContext
+  , setContextExtraHTTPHeaders
   , setGeolocation
+  , setHTTPCredentials
   , setOffline
   ) where
 
@@ -33,9 +35,19 @@ import Playwright.Cookie
   , toSetNetworkCookie
   )
 import Playwright.Geolocation
-  ( Geolocation (geolocationLatitude, geolocationLongitude)
+  ( Accuracy (accuracyToScientific)
+  , Geolocation (geolocationAccuracy, geolocationLatitude, geolocationLongitude)
   , Latitude (latitudeToScientific)
   , Longitude (longitudeToScientific)
+  )
+import Playwright.HttpCredentials
+  ( HttpCredentials (httpCredentialsOrigin, httpCredentialsPassword, httpCredentialsUsername)
+  , HttpPassword (httpPasswordToText)
+  , HttpUsername (httpUsernameToText)
+  )
+import Playwright.HttpHeader
+  ( HttpHeader
+  , toNameValue
   )
 import Playwright.Json.ChannelRef
   ( ChannelRef (channelRefGuid)
@@ -60,8 +72,13 @@ import Playwright.Protocol
   , BrowserContextGrantPermissionsParams (browserContextGrantPermissionsParamsOrigin)
   , BrowserContextGrantPermissionsResult
   , BrowserContextNewPageResult (browserContextNewPageResultPage)
+  , BrowserContextSetExtraHTTPHeadersResult
   , BrowserContextSetGeolocationParams (browserContextSetGeolocationParamsGeolocation)
+  , BrowserContextSetGeolocationParamsGeolocation (browserContextSetGeolocationParamsGeolocationAccuracy)
   , BrowserContextSetGeolocationResult
+  , BrowserContextSetHTTPCredentialsParams (browserContextSetHTTPCredentialsParamsHttpCredentials)
+  , BrowserContextSetHTTPCredentialsParamsHttpCredentials (browserContextSetHTTPCredentialsParamsHttpCredentialsOrigin)
+  , BrowserContextSetHTTPCredentialsResult
   , BrowserContextSetOfflineResult
   , mkBrowserContextAddCookiesParams
   , mkBrowserContextClearCookiesParams
@@ -70,8 +87,11 @@ import Playwright.Protocol
   , mkBrowserContextCookiesParams
   , mkBrowserContextGrantPermissionsParams
   , mkBrowserContextNewPageParams
+  , mkBrowserContextSetExtraHTTPHeadersParams
   , mkBrowserContextSetGeolocationParams
   , mkBrowserContextSetGeolocationParamsGeolocation
+  , mkBrowserContextSetHTTPCredentialsParams
+  , mkBrowserContextSetHTTPCredentialsParamsHttpCredentials
   , mkBrowserContextSetOfflineParams
   )
 import Playwright.Url
@@ -184,9 +204,13 @@ setGeolocation ctx location = do
       mkBrowserContextSetGeolocationParams
         { browserContextSetGeolocationParamsGeolocation =
             Just
-              ( mkBrowserContextSetGeolocationParamsGeolocation
-                  (latitudeToScientific (geolocationLatitude location))
-                  (longitudeToScientific (geolocationLongitude location))
+              ( ( mkBrowserContextSetGeolocationParamsGeolocation
+                    (latitudeToScientific (geolocationLatitude location))
+                    (longitudeToScientific (geolocationLongitude location))
+                )
+                  { browserContextSetGeolocationParamsGeolocationAccuracy =
+                      fmap accuracyToScientific (geolocationAccuracy location)
+                  }
               )
         }
   pure ()
@@ -207,4 +231,33 @@ setOffline ctx offline = do
       (browserContextChannel ctx)
       (MethodName "setOffline")
       (mkBrowserContextSetOfflineParams offline)
+  pure ()
+
+setContextExtraHTTPHeaders :: BrowserContext -> [HttpHeader] -> IO ()
+setContextExtraHTTPHeaders ctx headers = do
+  _ :: BrowserContextSetExtraHTTPHeadersResult <-
+    send
+      (browserContextChannel ctx)
+      (MethodName "setExtraHTTPHeaders")
+      (mkBrowserContextSetExtraHTTPHeadersParams (fmap toNameValue headers))
+  pure ()
+
+setHTTPCredentials :: BrowserContext -> HttpCredentials -> IO ()
+setHTTPCredentials ctx creds = do
+  _ :: BrowserContextSetHTTPCredentialsResult <-
+    send
+      (browserContextChannel ctx)
+      (MethodName "setHTTPCredentials")
+      mkBrowserContextSetHTTPCredentialsParams
+        { browserContextSetHTTPCredentialsParamsHttpCredentials =
+            Just
+              ( ( mkBrowserContextSetHTTPCredentialsParamsHttpCredentials
+                    (httpPasswordToText (httpCredentialsPassword creds))
+                    (httpUsernameToText (httpCredentialsUsername creds))
+                )
+                  { browserContextSetHTTPCredentialsParamsHttpCredentialsOrigin =
+                      fmap urlToText (httpCredentialsOrigin creds)
+                  }
+              )
+        }
   pure ()

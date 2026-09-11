@@ -139,9 +139,8 @@ import Playwright.GotoOptions
   ( GotoOptions
   )
 import Playwright.HttpHeader
-  ( HeaderName (headerNameToText)
-  , HeaderValue (headerValueToText)
-  , HttpHeader (httpHeaderName, httpHeaderValue)
+  ( HttpHeader
+  , toNameValue
   )
 import Playwright.Json.ChannelRef
   ( ChannelRef (channelRefGuid)
@@ -178,7 +177,6 @@ import Playwright.Protocol
   , FrameAddStyleTagResult (frameAddStyleTagResultElement)
   , FrameNavigatedEvent (frameNavigatedEventNewDocument, frameNavigatedEventUrl)
   , FrameNavigatedEventNewDocument (frameNavigatedEventNewDocumentRequest)
-  , NameValue
   , PageAddInitScriptResult
   , PageCloseResult
   , PageGoBackResult (pageGoBackResultResponse)
@@ -192,7 +190,6 @@ import Playwright.Protocol
   , mkBrowserContextUpdateSubscriptionParams
   , mkFrameAddScriptTagParams
   , mkFrameAddStyleTagParams
-  , mkNameValue
   , mkPageAddInitScriptParams
   , mkPageCloseParams
   , mkPageGoBackParams
@@ -419,10 +416,6 @@ setExtraHTTPHeaders page headers = do
       (MethodName "setExtraHTTPHeaders")
       (mkPageSetExtraHTTPHeadersParams (fmap toNameValue headers))
   pure ()
-
-toNameValue :: HttpHeader -> NameValue
-toNameValue header =
-  mkNameValue (headerNameToText (httpHeaderName header)) (headerValueToText (httpHeaderValue header))
 
 waitForLoadState :: Page -> LoadState -> IO ()
 waitForLoadState page =
