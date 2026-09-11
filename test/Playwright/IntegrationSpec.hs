@@ -14,7 +14,8 @@ import Playwright
   , title
   )
 import Playwright.Harness
-  ( withChromiumPage
+  ( withAssetPage
+  , withChromiumPage
   )
 import Test.Tasty
   ( TestTree
@@ -39,4 +40,8 @@ tests =
           assertBool "content includes body" ("ok" `isInfixOf` html)
           png <- screenshot page defaultScreenshotOptions
           assertBool "screenshot is not empty" (not (BS.null png))
+    , testCase "page.title should return the page title" $
+        withAssetPage "title.html" $ \page -> do
+          pageTitle <- title page
+          assertEqual "title" "Woof-Woof" pageTitle
     ]

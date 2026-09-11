@@ -3,8 +3,10 @@ module Playwright
   , BrowserContext (..)
   , BrowserName (..)
   , BrowserType (..)
+  , CheckOptions (..)
   , Frame (..)
   , GotoOptions (..)
+  , Key (..)
   , LaunchOptions (..)
   , Locator (..)
   , Page (..)
@@ -16,6 +18,8 @@ module Playwright
   , Url
   , browserFromRef
   , browserTypeFromRef
+  , check
+  , checkWith
   , childLocator
   , chromium
   , click
@@ -24,36 +28,56 @@ module Playwright
   , closePage
   , content
   , contextFromRef
+  , dblclick
+  , defaultCheckOptions
   , defaultGotoOptions
   , defaultLaunchOptions
   , defaultScreenshotOptions
   , defaultTimeout
   , evaluate
+  , evaluateBool
+  , evaluateOnLocator
+  , evaluateOnLocatorBool
+  , evaluateOnLocatorText
+  , evaluateOnLocatorWith
   , evaluateText
   , fill
   , firefox
+  , focus
   , getAttribute
   , goto
+  , hover
   , initializePlaywright
   , innerHtml
   , innerText
   , inputValue
+  , isChecked
+  , isDisabled
+  , isEditable
+  , isEnabled
   , isHidden
   , isVisible
   , launch
   , locator
+  , locatorCount
   , milliseconds
   , nestedSelector
   , newContext
   , newPage
   , pageFromRef
+  , press
   , screenshot
   , selectorFromText
   , selectorToText
+  , setChecked
   , setContent
+  , textArgument
   , textContent
   , timeoutToDouble
   , title
+  , typeText
+  , uncheck
+  , uncheckWith
   , urlFromText
   , urlToText
   , webkit
@@ -84,8 +108,17 @@ import Playwright.BrowserType
   , launch
   , withBrowser
   )
+import Playwright.CheckOptions
+  ( CheckOptions (CheckOptions, checkOptionsForce, checkOptionsTimeout, checkOptionsTrial)
+  , defaultCheckOptions
+  )
 import Playwright.Evaluate
   ( evaluate
+  , evaluateBool
+  , evaluateOnLocator
+  , evaluateOnLocatorBool
+  , evaluateOnLocatorText
+  , evaluateOnLocatorWith
   , evaluateText
   )
 import Playwright.Frame
@@ -103,22 +136,40 @@ import Playwright.Instance
   , webkit
   , withPlaywright
   )
+import Playwright.Key
+  ( Key (Key, keyToText)
+  )
 import Playwright.LaunchOptions
   ( LaunchOptions (LaunchOptions, launchOptionsChromiumSandbox, launchOptionsHeadless, launchOptionsSlowMo, launchOptionsTimeout)
   , defaultLaunchOptions
   )
 import Playwright.Locator
   ( Locator (Locator, locatorFrame, locatorSelector)
+  , check
+  , checkWith
   , childLocator
   , click
+  , dblclick
   , fill
+  , focus
   , getAttribute
+  , hover
   , innerHtml
   , innerText
   , inputValue
+  , isChecked
+  , isDisabled
+  , isEditable
+  , isEnabled
   , isHidden
   , isVisible
+  , locatorCount
+  , press
+  , setChecked
   , textContent
+  , typeText
+  , uncheck
+  , uncheckWith
   )
 import Playwright.Page
   ( Page (Page, pageChannel, pageMainFrame)
@@ -143,6 +194,9 @@ import Playwright.Selector
   , nestedSelector
   , selectorFromText
   , selectorToText
+  )
+import Playwright.SerializedArgument
+  ( textArgument
   )
 import Playwright.Timeout
   ( Timeout

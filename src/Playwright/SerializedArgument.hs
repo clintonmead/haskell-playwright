@@ -1,5 +1,6 @@
 module Playwright.SerializedArgument
   ( SerializedArgument (..)
+  , textArgument
   , undefinedArgument
   ) where
 
@@ -14,11 +15,15 @@ import Data.Aeson
   ( FromJSON
   , ToJSON
   )
+import Data.Text
+  ( Text
+  )
 import Playwright.Json.ChannelRef
   ( ChannelRef
   )
 import Playwright.SerializedValue
-  ( SerializedValue
+  ( SerializedPayload (PayloadString)
+  , SerializedValue (SerializedNode)
   , undefinedValue
   )
 
@@ -33,6 +38,13 @@ undefinedArgument :: SerializedArgument
 undefinedArgument =
   SerializedArgument
     { serializedArgumentValue = undefinedValue
+    , serializedArgumentHandles = []
+    }
+
+textArgument :: Text -> SerializedArgument
+textArgument text =
+  SerializedArgument
+    { serializedArgumentValue = SerializedNode (PayloadString text) Nothing
     , serializedArgumentHandles = []
     }
 

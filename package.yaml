@@ -15,6 +15,7 @@ extra-source-files:
 language: GHC2021
 
 default-extensions:
+  - AllowAmbiguousTypes
   - DerivingStrategies
   - DerivingVia
   - OverloadedStrings

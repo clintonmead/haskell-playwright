@@ -26,11 +26,14 @@ library
       Playwright.BrowserName
       Playwright.BrowserType
       Playwright.Channel
+      Playwright.CheckOptions
       Playwright.Connection
       Playwright.Driver
       Playwright.Error
       Playwright.Evaluate
       Playwright.Frame
+      Playwright.Frame.Action
+      Playwright.Frame.Inspect
       Playwright.GotoOptions
       Playwright.Guid
       Playwright.Incoming
@@ -40,6 +43,7 @@ library
       Playwright.Json.Decode
       Playwright.Json.OpenJson
       Playwright.Json.ProtocolBinary
+      Playwright.Key
       Playwright.LaunchOptions
       Playwright.Locator
       Playwright.MethodName
@@ -67,6 +71,7 @@ library
   hs-source-dirs:
       src
   default-extensions:
+      AllowAmbiguousTypes
       DerivingStrategies
       DerivingVia
       OverloadedStrings
@@ -98,12 +103,18 @@ test-suite playwright-test
       Playwright.ConnectionSpec
       Playwright.Harness
       Playwright.IntegrationSpec
+      Playwright.LocatorClickSpec
       Playwright.LocatorSpec
+      Playwright.PageCheckSpec
+      Playwright.PageFillSpec
+      Playwright.PageFocusSpec
+      Playwright.PageSetContentSpec
       Playwright.TransportSpec
       Paths_playwright
   hs-source-dirs:
       test
   default-extensions:
+      AllowAmbiguousTypes
       DerivingStrategies
       DerivingVia
       OverloadedStrings
