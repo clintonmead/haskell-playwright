@@ -29,15 +29,19 @@ library
       Playwright.BrowserType
       Playwright.Channel
       Playwright.CheckOptions
+      Playwright.ColorScheme
       Playwright.Connection
       Playwright.ConsoleMessage
       Playwright.ConsoleType
+      Playwright.Cookie
+      Playwright.CookieSameSite
       Playwright.CssPixel
       Playwright.Dialog
       Playwright.DialogType
       Playwright.DomEventType
       Playwright.Driver
       Playwright.ElementHandle
+      Playwright.EmulateMedia
       Playwright.Error
       Playwright.Evaluate
       Playwright.Exactness
@@ -50,6 +54,7 @@ library
       Playwright.GotoOptions
       Playwright.Guid
       Playwright.HttpHeader
+      Playwright.HttpMethod
       Playwright.HttpStatus
       Playwright.Incoming
       Playwright.Instance
@@ -64,13 +69,18 @@ library
       Playwright.LaunchOptions
       Playwright.LoadState
       Playwright.Locator
+      Playwright.MediaType
       Playwright.MethodName
       Playwright.Mouse
       Playwright.Page
+      Playwright.PageError
       Playwright.Point
       Playwright.Protocol
       Playwright.RemoteObject
+      Playwright.Request
+      Playwright.RequestFrame
       Playwright.RequestId
+      Playwright.ResourceType
       Playwright.Response
       Playwright.ScreenshotOptions
       Playwright.ScriptTag
@@ -81,6 +91,8 @@ library
       Playwright.SerializedErrorInfo
       Playwright.SerializedValue
       Playwright.SpecialJsValue
+      Playwright.StorageItem
+      Playwright.StorageKind
       Playwright.StyleTag
       Playwright.Timeout
       Playwright.Transport
@@ -92,7 +104,9 @@ library
       Playwright.UrlGlob
       Playwright.ViewportSize
       Playwright.WaitForState
+      Playwright.WebStorage
       Playwright.WheelDelta
+      Playwright.Worker
   other-modules:
       Paths_playwright
   hs-source-dirs:
@@ -127,15 +141,20 @@ test-suite playwright-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      Playwright.BrowserContextAddCookiesSpec
+      Playwright.BrowserContextCookiesSpec
       Playwright.ConnectionSpec
       Playwright.ElementHandleBoundingBoxSpec
       Playwright.ElementHandleClickSpec
+      Playwright.ElementHandleContentFrameSpec
       Playwright.ElementHandleConvenienceSpec
+      Playwright.ElementHandleOwnerFrameSpec
       Playwright.ElementHandlePressSpec
       Playwright.FrameEvaluateSpec
       Playwright.FrameHierarchySpec
       Playwright.Harness
       Playwright.IntegrationSpec
+      Playwright.JsHandleJsonValueSpec
       Playwright.LocatorClickSpec
       Playwright.LocatorElementHandleSpec
       Playwright.LocatorEvaluateSpec
@@ -152,22 +171,29 @@ test-suite playwright-test
       Playwright.PageClickSpec
       Playwright.PageDialogSpec
       Playwright.PageDispatchEventSpec
+      Playwright.PageEmulateMediaSpec
+      Playwright.PageEvaluateHandleSpec
       Playwright.PageEvaluateSpec
       Playwright.PageEventConsoleSpec
+      Playwright.PageEventPageErrorSpec
       Playwright.PageEventPopupSpec
       Playwright.PageFillSpec
       Playwright.PageFocusSpec
       Playwright.PageGotoSpec
       Playwright.PageHistorySpec
       Playwright.PageKeyboardSpec
+      Playwright.PageLocalStorageSpec
       Playwright.PageMouseSpec
+      Playwright.PageNetworkRequestSpec
       Playwright.PageNetworkResponseSpec
       Playwright.PageScreenshotSpec
       Playwright.PageSelectOptionSpec
       Playwright.PageSetContentSpec
       Playwright.PageSetExtraHTTPHeadersSpec
+      Playwright.PageStrictSpec
       Playwright.PageWaitForFunctionSpec
       Playwright.PageWaitForLoadStateSpec
+      Playwright.PageWaitForRequestSpec
       Playwright.PageWaitForResponseSpec
       Playwright.PageWaitForSelectorSpec
       Playwright.PageWaitForUrlSpec
@@ -175,6 +201,7 @@ test-suite playwright-test
       Playwright.SelectorsGetBySpec
       Playwright.TransportSpec
       Playwright.WheelSpec
+      Playwright.WorkersSpec
       Paths_playwright
   hs-source-dirs:
       test

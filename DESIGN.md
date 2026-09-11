@@ -120,3 +120,10 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - `waitForResponse` subscribes to BrowserContext `response` events and filters by URL glob.
 - Popups arrive as BrowserContext `page` events; `opener` is `PageInitializer.opener`.
 - BrowserContext always emits `page` (not behind `updateSubscription`). The first `newPage` is also buffered, so `waitForPopup` skips pages whose opener is not the waiting page.
+- Cookies use `BrowserContext.addCookies` / `cookies` / `clearCookies`. Session cookies have expires `-1`. Chromium reports `document.cookie` SameSite as Lax.
+- `Page.emulateMedia({})` omits fields (keeps the previous override); `media: no-override` resets.
+- Request events require `BrowserContext.updateSubscription` for `request`, same as `response`.
+- `evaluateHandle` is `Frame.evaluateExpressionHandle`. `asElement` checks `ChannelTypeElementHandle`.
+- Web storage is `Page.webStorage*` with `kind: local|session`.
+- Workers are Page-channel objects (`worker` events are not behind `updateSubscription`). `workers` omits channels that have emitted `close`.
+- `pageerror` is a BrowserContext event and is not behind `updateSubscription`.

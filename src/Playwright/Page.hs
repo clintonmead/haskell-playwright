@@ -18,6 +18,7 @@ module Playwright.Page
   , goForward
   , reload
   , querySelector
+  , querySelectorStrict
   , setViewportSize
   , frameByName
   , frames
@@ -37,6 +38,9 @@ module Playwright.Page
   , waitForDialog
   , waitForResponse
   , waitForResponseWith
+  , waitForRequest
+  , waitForRequestWith
+  , waitForSelectorStrict
   , armPopup
   , opener
   , pagesEqual
@@ -161,8 +165,9 @@ import Playwright.Protocol
   ( BrowserContextConsoleEvent
   , BrowserContextDialogEvent (browserContextDialogEventDialog)
   , BrowserContextPageEvent (browserContextPageEventPage)
+  , BrowserContextRequestEvent (browserContextRequestEventRequest)
   , BrowserContextResponseEvent (browserContextResponseEventResponse)
-  , BrowserContextUpdateSubscriptionParamsEvent (BrowserContextUpdateSubscriptionParamsEventConsole, BrowserContextUpdateSubscriptionParamsEventDialog, BrowserContextUpdateSubscriptionParamsEventResponse)
+  , BrowserContextUpdateSubscriptionParamsEvent (BrowserContextUpdateSubscriptionParamsEventConsole, BrowserContextUpdateSubscriptionParamsEventDialog, BrowserContextUpdateSubscriptionParamsEventRequest, BrowserContextUpdateSubscriptionParamsEventResponse)
   , BrowserContextUpdateSubscriptionResult
   , FrameAddScriptTagParams (frameAddScriptTagParamsContent, frameAddScriptTagParamsType, frameAddScriptTagParamsUrl)
   , FrameAddScriptTagResult (frameAddScriptTagResultElement)
@@ -195,6 +200,11 @@ import Playwright.Protocol
   )
 import Playwright.RemoteObject
   ( RemoteObject (remoteInitializer)
+  )
+import Playwright.Request
+  ( Request
+  , requestFromRef
+  , requestUrl
   )
 import Playwright.Response
   ( Response
@@ -347,6 +357,14 @@ reload page = do
 querySelector :: Page -> Selector -> IO (Maybe ElementHandle)
 querySelector page selector =
   querySelectorFrame (pageMainFrame page) selector Nothing
+
+querySelectorStrict :: Page -> Selector -> IO (Maybe ElementHandle)
+querySelectorStrict page selector =
+  querySelectorFrame (pageMainFrame page) selector (Just True)
+
+waitForSelectorStrict :: Page -> Selector -> WaitForState -> IO ()
+waitForSelectorStrict page selector state =
+  waitForSelectorFrame (pageMainFrame page) selector state defaultTimeout (Just True)
 
 addInitScript :: Page -> Text -> IO ()
 addInitScript page source = do
@@ -524,6 +542,27 @@ waitForResponseWith page glob timeout =
       if matchesUrlGlob glob current
         then pure response
         else collectResponse
+
+waitForRequest :: Page -> UrlGlob -> IO Request
+waitForRequest page glob =
+  waitForRequestWith page glob defaultTimeout
+
+waitForRequestWith :: Page -> UrlGlob -> Timeout -> IO Request
+waitForRequestWith page glob timeout =
+  waitWithTimeout timeout $ do
+    subscribeContext page BrowserContextUpdateSubscriptionParamsEventRequest
+    collectRequest
+  where
+    conn = channelConnection (pageContextChannel page)
+    guid = channelGuid (pageContextChannel page)
+    collectRequest = do
+      params <- waitForChannelEvent conn guid (MethodName "request")
+      event <- either throwIO pure (fromJsonValue params)
+      let request = requestFromRef conn (browserContextRequestEventRequest event)
+      current <- requestUrl request
+      if matchesUrlGlob glob current
+        then pure request
+        else collectRequest
 
 waitForPopup :: Page -> IO Page
 waitForPopup page = do

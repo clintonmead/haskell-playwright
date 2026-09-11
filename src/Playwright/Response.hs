@@ -2,6 +2,7 @@ module Playwright.Response
   ( Response (..)
   , responseFromRef
   , responseOk
+  , responseRequest
   , responseStatus
   , responseText
   , responseUrl
@@ -43,11 +44,15 @@ import Playwright.MethodName
   )
 import Playwright.Protocol
   ( ResponseBodyResult (responseBodyResultBinary)
-  , ResponseInitializer (responseInitializerStatus, responseInitializerUrl)
+  , ResponseInitializer (responseInitializerRequest, responseInitializerStatus, responseInitializerUrl)
   , mkResponseBodyParams
   )
 import Playwright.RemoteObject
   ( RemoteObject (remoteInitializer)
+  )
+import Playwright.Request
+  ( Request
+  , requestFromRef
   )
 import Playwright.Url
   ( Url
@@ -69,6 +74,11 @@ responseInitializer response = do
 responseUrl :: Response -> IO Url
 responseUrl response =
   responseInitializerUrl <$> responseInitializer response
+
+responseRequest :: Response -> IO Request
+responseRequest response = do
+  initializer <- responseInitializer response
+  pure (requestFromRef (channelConnection (responseChannel response)) (responseInitializerRequest initializer))
 
 responseStatus :: Response -> IO HttpStatus
 responseStatus response =

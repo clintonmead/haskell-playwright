@@ -5,11 +5,13 @@ module Playwright.Harness
   , requireHandle
   , withAssetPage
   , withAssets
+  , withChromiumContext
   , withChromiumPage
   ) where
 
 import Control.Exception
-  ( try
+  ( bracket
+  , try
   )
 import Data.Text
   ( Text
@@ -25,14 +27,18 @@ import Network.Wai.Handler.Warp
   ( withApplication
   )
 import Playwright
-  ( ElementHandle
+  ( BrowserContext
+  , ElementHandle
   , Locator
   , Page
+  , closeContext
   , chromium
   , defaultGotoOptions
   , defaultLaunchOptions
   , goto
   , locator
+  , newContext
+  , newPage
   , selectorFromText
   , urlFromText
   , withBrowser
@@ -71,6 +77,20 @@ withChromiumPage action = do
   withPlaywright $ \pw ->
     withBrowser (chromium pw) defaultLaunchOptions $ \browser ->
       withPage browser action
+
+withChromiumContext :: (BrowserContext -> Page -> IO a) -> IO a
+withChromiumContext action = do
+  _ <- requireNonEmptyEnv "PLAYWRIGHT_BROWSERS_PATH"
+  withPlaywright $ \pw ->
+    withBrowser (chromium pw) defaultLaunchOptions $ \browser ->
+      bracket
+        ( do
+            ctx <- newContext browser
+            page <- newPage ctx
+            pure (ctx, page)
+        )
+        (\(ctx, _) -> closeContext ctx)
+        (\(ctx, page) -> action ctx page)
 
 withAssetPage :: FilePath -> (Page -> IO a) -> IO a
 withAssetPage relativePath action =

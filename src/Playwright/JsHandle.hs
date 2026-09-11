@@ -1,5 +1,7 @@
 module Playwright.JsHandle
   ( JsHandle (..)
+  , asElement
+  , jsHandleArgument
   , jsHandleFromRef
   , jsonValue
   , jsonValueNumber
@@ -13,25 +15,37 @@ import Data.Text
   ( Text
   )
 import Playwright.Channel
-  ( Channel (Channel)
+  ( Channel (Channel, channelConnection, channelGuid)
   , JsHandleTag
   , send
   )
 import Playwright.Connection
   ( Connection
+  , lookupObject
+  )
+import Playwright.ElementHandle
+  ( ElementHandle (ElementHandle)
   )
 import Playwright.Error
   ( PlaywrightError (EvaluateUnexpected)
   )
 import Playwright.Json.ChannelRef
-  ( ChannelRef (channelRefGuid)
+  ( ChannelRef (ChannelRef, channelRefGuid)
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
   )
 import Playwright.Protocol
-  ( JSHandleJsonValueResult (jSHandleJsonValueResultValue)
+  ( ChannelType (ChannelTypeElementHandle)
+  , JSHandleJsonValueResult (jSHandleJsonValueResultValue)
   , mkJSHandleJsonValueParams
+  )
+import Playwright.RemoteObject
+  ( RemoteObject (remoteType)
+  )
+import Playwright.SerializedArgument
+  ( SerializedArgument
+  , channelArgument
   )
 import Playwright.SerializedValue
   ( SerializedPayload (PayloadNumber, PayloadString)
@@ -45,6 +59,22 @@ newtype JsHandle = JsHandle
 jsHandleFromRef :: Connection -> ChannelRef -> JsHandle
 jsHandleFromRef conn ref =
   JsHandle (Channel conn (channelRefGuid ref))
+
+jsHandleArgument :: JsHandle -> SerializedArgument
+jsHandleArgument handle =
+  channelArgument (ChannelRef (channelGuid (jsHandleChannel handle)))
+
+asElement :: JsHandle -> IO (Maybe ElementHandle)
+asElement handle = do
+  obj <-
+    lookupObject
+      (channelConnection (jsHandleChannel handle))
+      (channelGuid (jsHandleChannel handle))
+  case remoteType obj of
+    ChannelTypeElementHandle ->
+      pure (Just (ElementHandle (Channel (channelConnection (jsHandleChannel handle)) (channelGuid (jsHandleChannel handle)))))
+    _ ->
+      pure Nothing
 
 jsonValue :: JsHandle -> IO SerializedValue
 jsonValue handle = do

@@ -8,6 +8,7 @@ module Playwright.Connection
   , waitForChannelEvent
   , waitForLifecycle
   , waitUntilUrl
+  , closedGuids
   ) where
 
 import Autodocodec
@@ -63,6 +64,10 @@ import Data.Map.Strict
   ( Map
   )
 import Data.Map.Strict qualified as Map
+import Data.Set
+  ( Set
+  )
+import Data.Set qualified as Set
 import Data.Sequence
   ( Seq
   )
@@ -115,6 +120,7 @@ data Connection = Connection
   , connectionClosed :: TVar (Maybe PlaywrightError)
   , connectionEventWaiters :: TVar [EventWaiter]
   , connectionEventBuffer :: TVar (Map (Guid, MethodName) (Seq Value))
+  , connectionClosedGuids :: TVar (Set Guid)
   }
 
 data EventWaiter = EventWaiter
@@ -151,6 +157,7 @@ withConnection transport action = do
   closed <- newTVarIO Nothing
   eventWaiters <- newTVarIO []
   eventBuffer <- newTVarIO Map.empty
+  closedGuidsVar <- newTVarIO Set.empty
   let
     conn :: Connection
     conn =
@@ -162,6 +169,7 @@ withConnection transport action = do
         , connectionClosed = closed
         , connectionEventWaiters = eventWaiters
         , connectionEventBuffer = eventBuffer
+        , connectionClosedGuids = closedGuidsVar
         }
   withAsync (readerLoop conn) $ \_ ->
     action conn `finally` closeTransport transport
@@ -232,6 +240,10 @@ guidsOfType conn ty = do
     , remoteType obj == ty
     ]
 
+closedGuids :: Connection -> IO (Set Guid)
+closedGuids conn =
+  atomically (readTVar (connectionClosedGuids conn))
+
 waitForLifecycle :: Connection -> Guid -> LifecycleEvent -> IO ()
 waitForLifecycle conn guid wanted =
   atomically (waitForLifecycleSTM conn guid wanted)
@@ -281,7 +293,8 @@ dispatch conn incoming =
     IncomingResponse reqId result ->
       completeCallback conn reqId result
     IncomingCreate parent params ->
-      atomically $
+      atomically $ do
+        modifyTVar' (connectionClosedGuids conn) (Set.delete (createGuid params))
         modifyTVar' (connectionObjects conn) $
           Map.insert
             (createGuid params)
@@ -308,6 +321,8 @@ handleEvent conn guid method params = do
       applyNavigated conn guid params
     MethodName "loadstate" ->
       applyLoadstate conn guid params
+    MethodName "close" ->
+      atomically (modifyTVar' (connectionClosedGuids conn) (Set.insert guid))
     _ ->
       pure ()
   deliverEvent conn guid method params

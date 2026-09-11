@@ -5,6 +5,9 @@ module Playwright.Evaluate
   , evaluateNumber
   , evaluateNumberWith
   , evaluateNumbersWith
+  , evaluateHandle
+  , evaluateHandleOnFrame
+  , evaluateHandleWith
   , evaluateOnElement
   , evaluateOnElementText
   , evaluateOnFrame
@@ -29,7 +32,8 @@ import Data.Text
   ( Text
   )
 import Playwright.Channel
-  ( send
+  ( channelConnection
+  , send
   )
 import Playwright.ElementHandle
   ( ElementHandle (elementHandleChannel)
@@ -38,11 +42,16 @@ import Playwright.Error
   ( PlaywrightError (EvaluateUnexpected)
   )
 import Playwright.Frame
-  ( Frame
+  ( Frame (frameChannel)
   , evalOnSelectorAllFrame
   , evalOnSelectorFrame
   , evaluateFrame
   , evaluateFrameWith
+  , frameSend
+  )
+import Playwright.JsHandle
+  ( JsHandle
+  , jsHandleFromRef
   )
 import Playwright.Locator
   ( Locator (locatorFrame, locatorSelector)
@@ -54,8 +63,11 @@ import Playwright.Page
   ( Page (pageMainFrame)
   )
 import Playwright.Protocol
-  ( JSHandleEvaluateExpressionParams (jSHandleEvaluateExpressionParamsIsFunction)
+  ( FrameEvaluateExpressionHandleParams (frameEvaluateExpressionHandleParamsIsFunction)
+  , FrameEvaluateExpressionHandleResult (frameEvaluateExpressionHandleResultHandle)
+  , JSHandleEvaluateExpressionParams (jSHandleEvaluateExpressionParamsIsFunction)
   , JSHandleEvaluateExpressionResult (jSHandleEvaluateExpressionResultValue)
+  , mkFrameEvaluateExpressionHandleParams
   , mkJSHandleEvaluateExpressionParams
   )
 import Playwright.SerializedArgument
@@ -76,6 +88,33 @@ evaluate page = evaluateFrame (pageMainFrame page)
 evaluateWith :: Page -> Text -> SerializedArgument -> IO SerializedValue
 evaluateWith page =
   evaluateFrameWith (pageMainFrame page)
+
+evaluateHandle :: Page -> Text -> IO JsHandle
+evaluateHandle page =
+  evaluateHandleOnFrame (pageMainFrame page)
+
+evaluateHandleWith :: Page -> Text -> SerializedArgument -> IO JsHandle
+evaluateHandleWith page =
+  evaluateHandleOnFrameWith (pageMainFrame page)
+
+evaluateHandleOnFrame :: Frame -> Text -> IO JsHandle
+evaluateHandleOnFrame frame expression =
+  evaluateHandleOnFrameWith frame expression undefinedArgument
+
+evaluateHandleOnFrameWith :: Frame -> Text -> SerializedArgument -> IO JsHandle
+evaluateHandleOnFrameWith frame expression arg = do
+  result <-
+    frameSend
+      frame
+      "evaluateExpressionHandle"
+      (mkFrameEvaluateExpressionHandleParams arg expression)
+        { frameEvaluateExpressionHandleParamsIsFunction = Just True
+        }
+  pure
+    ( jsHandleFromRef
+        (channelConnection (frameChannel frame))
+        (frameEvaluateExpressionHandleResultHandle result)
+    )
 
 evaluateOnFrame :: Frame -> Text -> IO SerializedValue
 evaluateOnFrame =

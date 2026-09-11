@@ -9,6 +9,7 @@ import Data.Text qualified as Text
 import Playwright
   ( SpecialJsValue (SpecialInfinity, SpecialNaN, SpecialNegInfinity, SpecialNegZero, SpecialNull, SpecialUndefined)
   , boolArgument
+  , evaluate
   , evaluateBoolWith
   , evaluateNumber
   , evaluateNumberWith
@@ -16,9 +17,11 @@ import Playwright
   , evaluateSpecial
   , evaluateSpecialWith
   , evaluateTextWith
+  , evaluateWith
   , numberArgument
   , numbersArgument
   , objectNumberArgument
+  , objectTextArgument
   , specialArgument
   , textArgument
   )
@@ -27,12 +30,17 @@ import Playwright.Harness
   , withAssetPage
   , withChromiumPage
   )
+import Playwright.SerializedValue
+  ( SerializedPayload (PayloadBigInt, PayloadObject, PayloadString)
+  , SerializedValue (SerializedNode)
+  )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
   ( assertEqual
+  , assertFailure
   , testCase
   )
 
@@ -138,4 +146,36 @@ tests =
     , testCase "should reject promise with exception" $
         withChromiumPage $ \page ->
           assertProtocolContains "not_existing_object" (evaluateNumber page "() => not_existing_object.property")
+    , testCase "should support thrown strings as error messages" $
+        withChromiumPage $ \page ->
+          assertProtocolContains "qwerty" (evaluateNumber page "() => { throw 'qwerty'; }")
+    , testCase "should support thrown numbers as error messages" $
+        withChromiumPage $ \page ->
+          assertProtocolContains "100500" (evaluateNumber page "() => { throw 100500; }")
+    , testCase "should return complex objects" $
+        withChromiumPage $ \page -> do
+          result <- evaluateWith page "a => a" (objectTextArgument [("foo", "bar!")])
+          case result of
+            SerializedNode (PayloadObject fields) _ ->
+              case lookup ("foo" :: Text) fields of
+                Just (SerializedNode (PayloadString text) _) ->
+                  assertEqual "foo" ("bar!" :: Text) text
+                _ ->
+                  assertFailure "missing foo"
+            _ ->
+              assertFailure "expected object"
+    , testCase "should work with large unicode strings" $
+        withChromiumPage $ \page -> do
+          let expected :: Text
+              expected = Text.replicate 10000 "🎭"
+          result <- evaluateTextWith page "data => data" (textArgument expected)
+          assertEqual "unicode" expected result
+    , testCase "should transfer bigint" $
+        withChromiumPage $ \page -> do
+          result <- evaluate page "() => 42n"
+          case result of
+            SerializedNode (PayloadBigInt digits) _ ->
+              assertEqual "bigint" ("42" :: Text) digits
+            _ ->
+              assertFailure "expected bigint"
     ]

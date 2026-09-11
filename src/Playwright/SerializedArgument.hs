@@ -5,6 +5,8 @@ module Playwright.SerializedArgument
   , channelArgument
   , numbersArgument
   , objectNumberArgument
+  , objectSpecialArgument
+  , objectTextArgument
   , specialArgument
   , textArgument
   , undefinedArgument
@@ -104,6 +106,40 @@ objectNumberArgument fields =
               ( fmap
                   ( \(name, number) ->
                       (name, SerializedNode (PayloadNumber number) Nothing)
+                  )
+                  fields
+              )
+          )
+          Nothing
+    , serializedArgumentHandles = []
+    }
+
+objectTextArgument :: [(Text, Text)] -> SerializedArgument
+objectTextArgument fields =
+  SerializedArgument
+    { serializedArgumentValue =
+        SerializedNode
+          ( PayloadObject
+              ( fmap
+                  ( \(name, text) ->
+                      (name, SerializedNode (PayloadString text) Nothing)
+                  )
+                  fields
+              )
+          )
+          Nothing
+    , serializedArgumentHandles = []
+    }
+
+objectSpecialArgument :: [(Text, SpecialJsValue)] -> SerializedArgument
+objectSpecialArgument fields =
+  SerializedArgument
+    { serializedArgumentValue =
+        SerializedNode
+          ( PayloadObject
+              ( fmap
+                  ( \(name, special) ->
+                      (name, SerializedNode (PayloadSpecial special) Nothing)
                   )
                   fields
               )

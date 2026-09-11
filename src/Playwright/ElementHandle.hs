@@ -3,6 +3,8 @@ module Playwright.ElementHandle
   , boundingBox
   , clickHandle
   , elementArgument
+  , contentFrameHandle
+  , ownerFrameHandle
   , elementHandleFromRef
   , getAttributeHandle
   , innerHtmlHandle
@@ -22,7 +24,7 @@ import Playwright.BoundingBox
   ( BoundingBox (BoundingBox, boundingBoxHeight, boundingBoxWidth, boundingBoxX, boundingBoxY)
   )
 import Playwright.Channel
-  ( Channel (Channel, channelGuid)
+  ( Channel (Channel, channelConnection, channelGuid)
   , ElementHandleTag
   , send
   )
@@ -31,6 +33,10 @@ import Playwright.Connection
   )
 import Playwright.CssPixel
   ( CssPixel (CssPixel)
+  )
+import Playwright.Frame
+  ( Frame
+  , frameFromRef
   )
 import Playwright.Json.ChannelRef
   ( ChannelRef (ChannelRef, channelRefGuid)
@@ -41,18 +47,22 @@ import Playwright.MethodName
 import Playwright.Protocol
   ( ElementHandleBoundingBoxResult (elementHandleBoundingBoxResultValue)
   , ElementHandleClickResult
+  , ElementHandleContentFrameResult (elementHandleContentFrameResultFrame)
   , ElementHandleGetAttributeResult (elementHandleGetAttributeResultValue)
   , ElementHandleInnerHTMLResult (elementHandleInnerHTMLResultValue)
   , ElementHandleInnerTextResult (elementHandleInnerTextResultValue)
   , ElementHandleInputValueResult (elementHandleInputValueResultValue)
+  , ElementHandleOwnerFrameResult (elementHandleOwnerFrameResultFrame)
   , ElementHandleTextContentResult (elementHandleTextContentResultValue)
   , Rect (rectHeight, rectWidth, rectX, rectY)
   , mkElementHandleBoundingBoxParams
   , mkElementHandleClickParams
+  , mkElementHandleContentFrameParams
   , mkElementHandleGetAttributeParams
   , mkElementHandleInnerHTMLParams
   , mkElementHandleInnerTextParams
   , mkElementHandleInputValueParams
+  , mkElementHandleOwnerFrameParams
   , mkElementHandleTextContentParams
   )
 import Playwright.SerializedArgument
@@ -123,3 +133,21 @@ inputValueHandle :: ElementHandle -> IO Text
 inputValueHandle handle = do
   result <- handleSend handle "inputValue" mkElementHandleInputValueParams
   pure (elementHandleInputValueResultValue result)
+
+contentFrameHandle :: ElementHandle -> IO (Maybe Frame)
+contentFrameHandle handle = do
+  result <- handleSend handle "contentFrame" mkElementHandleContentFrameParams
+  case elementHandleContentFrameResultFrame result of
+    Nothing ->
+      pure Nothing
+    Just ref ->
+      Just <$> frameFromRef (channelConnection (elementHandleChannel handle)) ref
+
+ownerFrameHandle :: ElementHandle -> IO (Maybe Frame)
+ownerFrameHandle handle = do
+  result <- handleSend handle "ownerFrame" mkElementHandleOwnerFrameParams
+  case elementHandleOwnerFrameResultFrame result of
+    Nothing ->
+      pure Nothing
+    Just ref ->
+      Just <$> frameFromRef (channelConnection (elementHandleChannel handle)) ref

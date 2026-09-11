@@ -6,13 +6,25 @@ module Playwright
   , AriaRole (..)
   , BoundingBox (..)
   , CheckOptions (..)
+  , ColorScheme (..)
   , ConsoleMessage (..)
   , ConsoleType (..)
+  , Cookie (..)
+  , CookieDomain (..)
+  , CookieExpires (..)
+  , CookieHttpOnly (..)
+  , CookieName (..)
+  , CookiePath (..)
+  , CookieSameSite (..)
+  , CookieSecure (..)
+  , CookieToSet (..)
+  , CookieValue (..)
   , CssPixel (..)
   , Dialog (..)
   , DialogType (..)
   , DomEventType (..)
   , ElementHandle (..)
+  , EmulateMedia (..)
   , Exactness (..)
   , Frame (..)
   , GetByRoleOptions (..)
@@ -20,21 +32,30 @@ module Playwright
   , HeaderName (..)
   , HeaderValue (..)
   , HttpHeader (..)
+  , HttpMethod (..)
   , HttpStatus (..)
   , JsHandle (..)
   , Key (..)
   , LaunchOptions (..)
   , LoadState (..)
   , Locator (..)
+  , MediaType (..)
   , Page (..)
+  , PageError (..)
   , Playwright (..)
   , Point (..)
+  , Request (..)
+  , ResourceType (..)
   , Response (..)
   , ScreenshotOptions (..)
   , ScriptTag (..)
   , SelectOption (..)
   , Selector
   , SpecialJsValue (..)
+  , StorageItem (..)
+  , StorageKind (..)
+  , StorageName (..)
+  , StorageValue (..)
   , StyleTag (..)
   , Timeout
   , Url
@@ -43,7 +64,10 @@ module Playwright
   , ViewportSize (..)
   , ViewportWidth (..)
   , WaitForState (..)
+  , WebStorage (..)
   , WheelDelta (..)
+  , Worker (..)
+  , addCookies
   , addInitScript
   , addScriptTag
   , addStyleTag
@@ -53,6 +77,7 @@ module Playwright
   , armConsole
   , armDialog
   , armPopup
+  , asElement
   , boolArgument
   , boundingBox
   , browserFromRef
@@ -64,18 +89,26 @@ module Playwright
   , childFrames
   , chromium
   , clear
+  , clearCookies
+  , clearCookiesNamed
+  , clearPageErrors
   , click
   , clickHandle
   , closeBrowser
   , closeContext
   , closePage
   , content
+  , contentFrameHandle
   , contextFromRef
+  , cookieForUrl
+  , cookies
+  , cookiesFor
   , cssPixelFromInt
   , currentName
   , currentUrl
   , dblclick
   , defaultCheckOptions
+  , defaultEmulateMedia
   , defaultGetByRoleOptions
   , defaultGotoOptions
   , defaultLaunchOptions
@@ -88,9 +121,13 @@ module Playwright
   , elementHandles
   , emptyScriptTag
   , emptyStyleTag
+  , emulateMedia
   , evaluate
   , evaluateBool
   , evaluateBoolWith
+  , evaluateHandle
+  , evaluateHandleOnFrame
+  , evaluateHandleWith
   , evaluateNumber
   , evaluateNumberWith
   , evaluateNumbersWith
@@ -103,6 +140,8 @@ module Playwright
   , evaluateOnLocatorBool
   , evaluateOnLocatorText
   , evaluateOnLocatorWith
+  , evaluateOnWorker
+  , evaluateOnWorkerText
   , evaluateSpecial
   , evaluateSpecialWith
   , evaluateText
@@ -115,6 +154,7 @@ module Playwright
   , focus
   , frameByName
   , frames
+  , framesEqual
   , getAttribute
   , getAttributeHandle
   , getByLabel
@@ -139,6 +179,7 @@ module Playwright
   , isEnabled
   , isHidden
   , isVisible
+  , jsHandleArgument
   , jsonValue
   , jsonValueNumber
   , jsonValueText
@@ -149,6 +190,7 @@ module Playwright
   , keyboardUp
   , lastLocator
   , launch
+  , localStorage
   , locator
   , locatorCount
   , mainFrame
@@ -165,13 +207,26 @@ module Playwright
   , numberArgument
   , numbersArgument
   , objectNumberArgument
+  , objectSpecialArgument
+  , objectTextArgument
   , opener
+  , ownerFrameHandle
+  , pageContext
+  , pageErrors
   , pageFromRef
   , pagesEqual
   , press
   , querySelector
+  , querySelectorStrict
   , reload
+  , requestFrame
+  , requestHeaders
+  , requestIsNavigation
+  , requestMethod
+  , requestResourceType
+  , requestUrl
   , responseOk
+  , responseRequest
   , responseStatus
   , responseText
   , responseUrl
@@ -179,11 +234,18 @@ module Playwright
   , selectOption
   , selectorFromText
   , selectorToText
+  , sessionExpires
+  , sessionStorage
   , setChecked
   , setContent
   , setExtraHTTPHeaders
   , setViewportSize
   , specialArgument
+  , storageClear
+  , storageGetItem
+  , storageItems
+  , storageRemoveItem
+  , storageSetItem
   , textArgument
   , textContent
   , textContentHandle
@@ -200,19 +262,26 @@ module Playwright
   , waitForDialog
   , waitForFunction
   , waitForLoadState
+  , waitForPageError
   , waitForPopup
+  , waitForRequest
+  , waitForRequestWith
   , waitForResponse
   , waitForResponseWith
   , waitForSelector
+  , waitForSelectorStrict
   , waitForTimeout
   , waitForURL
   , waitForURLWith
+  , waitForWorker
   , waitForWith
   , webkit
   , wheelDeltaFromInt
   , withBrowser
   , withPage
   , withPlaywright
+  , workerUrl
+  , workers
   ) where
 
 import Playwright.AriaRole
@@ -230,9 +299,15 @@ import Playwright.Browser
   )
 import Playwright.BrowserContext
   ( BrowserContext (BrowserContext, browserContextChannel)
+  , addCookies
+  , clearCookies
+  , clearCookiesNamed
   , closeContext
   , contextFromRef
+  , cookies
+  , cookiesFor
   , newPage
+  , pageContext
   )
 import Playwright.BrowserName
   ( BrowserName (Chromium, Firefox, WebKit)
@@ -247,11 +322,30 @@ import Playwright.CheckOptions
   ( CheckOptions (CheckOptions, checkOptionsForce, checkOptionsTimeout, checkOptionsTrial)
   , defaultCheckOptions
   )
+import Playwright.ColorScheme
+  ( ColorScheme (ColorSchemeDark, ColorSchemeLight, ColorSchemeNoOverride, ColorSchemeNoPreference)
+  )
 import Playwright.ConsoleMessage
   ( ConsoleMessage (ConsoleMessage, consoleMessageArgs, consoleMessageText, consoleMessageType)
   )
 import Playwright.ConsoleType
   ( ConsoleType (ConsoleAssert, ConsoleClear, ConsoleCount, ConsoleDebug, ConsoleDir, ConsoleDirXml, ConsoleError, ConsoleInfo, ConsoleLog, ConsoleProfile, ConsoleProfileEnd, ConsoleTable, ConsoleTimeEnd, ConsoleTrace, ConsoleVerbose, ConsoleWarning)
+  )
+import Playwright.Cookie
+  ( Cookie (Cookie, cookieDomain, cookieExpires, cookieHttpOnly, cookieName, cookiePath, cookieSameSite, cookieSecure, cookieValue)
+  , CookieDomain (CookieDomain, cookieDomainToText)
+  , CookieExpires (CookieExpires, cookieExpiresToScientific)
+  , CookieHttpOnly (CookieHttpOnly, cookieHttpOnlyToBool)
+  , CookieName (CookieName, cookieNameToText)
+  , CookiePath (CookiePath, cookiePathToText)
+  , CookieSecure (CookieSecure, cookieSecureToBool)
+  , CookieToSet (CookieToSet, cookieToSetDomain, cookieToSetExpires, cookieToSetHttpOnly, cookieToSetName, cookieToSetPath, cookieToSetSameSite, cookieToSetSecure, cookieToSetUrl, cookieToSetValue)
+  , CookieValue (CookieValue, cookieValueToText)
+  , cookieForUrl
+  , sessionExpires
+  )
+import Playwright.CookieSameSite
+  ( CookieSameSite (CookieSameSiteLax, CookieSameSiteNone, CookieSameSiteStrict)
   )
 import Playwright.CssPixel
   ( CssPixel (CssPixel, cssPixelToScientific)
@@ -273,17 +367,27 @@ import Playwright.ElementHandle
   ( ElementHandle (ElementHandle)
   , boundingBox
   , clickHandle
+  , contentFrameHandle
   , elementArgument
   , getAttributeHandle
   , innerHtmlHandle
   , innerTextHandle
   , inputValueHandle
+  , ownerFrameHandle
   , textContentHandle
+  )
+import Playwright.EmulateMedia
+  ( EmulateMedia (EmulateMedia, emulateMediaColorScheme, emulateMediaType)
+  , defaultEmulateMedia
+  , emulateMedia
   )
 import Playwright.Evaluate
   ( evaluate
   , evaluateBool
   , evaluateBoolWith
+  , evaluateHandle
+  , evaluateHandleOnFrame
+  , evaluateHandleWith
   , evaluateNumber
   , evaluateNumberWith
   , evaluateNumbersWith
@@ -311,6 +415,7 @@ import Playwright.Frame
   , childFrames
   , currentName
   , currentUrl
+  , framesEqual
   )
 import Playwright.GetByRoleOptions
   ( GetByRoleOptions (GetByRoleOptions, getByRoleExact, getByRoleName)
@@ -321,9 +426,12 @@ import Playwright.GotoOptions
   , defaultGotoOptions
   )
 import Playwright.HttpHeader
-  ( HeaderName (HeaderName)
-  , HeaderValue (HeaderValue)
-  , HttpHeader (HttpHeader)
+  ( HeaderName (HeaderName, headerNameToText)
+  , HeaderValue (HeaderValue, headerValueToText)
+  , HttpHeader (HttpHeader, httpHeaderName, httpHeaderValue)
+  )
+import Playwright.HttpMethod
+  ( HttpMethod (HttpMethod, httpMethodToText)
   )
 import Playwright.HttpStatus
   ( HttpStatus (HttpStatus, httpStatusToInt)
@@ -339,6 +447,8 @@ import Playwright.Instance
   )
 import Playwright.JsHandle
   ( JsHandle (JsHandle)
+  , asElement
+  , jsHandleArgument
   , jsonValue
   , jsonValueNumber
   , jsonValueText
@@ -406,6 +516,9 @@ import Playwright.Mouse
   , mouseUp
   , mouseWheel
   )
+import Playwright.MediaType
+  ( MediaType (MediaNoOverride, MediaPrint, MediaScreen)
+  )
 import Playwright.Page
   ( Page (Page, pageChannel, pageContextChannel, pageMainFrame)
   , addInitScript
@@ -428,6 +541,7 @@ import Playwright.Page
   , pageFromRef
   , pagesEqual
   , querySelector
+  , querySelectorStrict
   , reload
   , screenshot
   , setContent
@@ -440,9 +554,12 @@ import Playwright.Page
   , waitForFunction
   , waitForLoadState
   , waitForPopup
+  , waitForRequest
+  , waitForRequestWith
   , waitForResponse
   , waitForResponseWith
   , waitForSelector
+  , waitForSelectorStrict
   , waitForTimeout
   , waitForURL
   , waitForURLWith
@@ -450,12 +567,33 @@ import Playwright.Page
   , frames
   , mainFrame
   )
+import Playwright.PageError
+  ( PageError (PageError, pageErrorMessage, pageErrorName, pageErrorStack)
+  , clearPageErrors
+  , pageErrors
+  , waitForPageError
+  )
 import Playwright.Point
   ( Point (Point)
+  )
+import Playwright.Request
+  ( Request (Request, requestChannel)
+  , requestHeaders
+  , requestIsNavigation
+  , requestMethod
+  , requestResourceType
+  , requestUrl
+  )
+import Playwright.RequestFrame
+  ( requestFrame
+  )
+import Playwright.ResourceType
+  ( ResourceType (ResourceType, resourceTypeToText)
   )
 import Playwright.Response
   ( Response (Response, responseChannel)
   , responseOk
+  , responseRequest
   , responseStatus
   , responseText
   , responseUrl
@@ -483,11 +621,21 @@ import Playwright.SerializedArgument
   , numberArgument
   , numbersArgument
   , objectNumberArgument
+  , objectSpecialArgument
+  , objectTextArgument
   , specialArgument
   , textArgument
   )
 import Playwright.SpecialJsValue
   ( SpecialJsValue (SpecialInfinity, SpecialNaN, SpecialNegInfinity, SpecialNegZero, SpecialNull, SpecialUndefined)
+  )
+import Playwright.StorageItem
+  ( StorageItem (StorageItem, storageItemName, storageItemValue)
+  , StorageName (StorageName, storageNameToText)
+  , StorageValue (StorageValue, storageValueToText)
+  )
+import Playwright.StorageKind
+  ( StorageKind (StorageLocal, StorageSession)
   )
 import Playwright.StyleTag
   ( StyleTag (StyleTag, styleTagContent, styleTagUrl)
@@ -515,7 +663,25 @@ import Playwright.ViewportSize
 import Playwright.WaitForState
   ( WaitForState (WaitForAttached, WaitForDetached, WaitForHidden, WaitForVisible)
   )
+import Playwright.WebStorage
+  ( WebStorage (WebStorage, webStorageKind, webStoragePage)
+  , localStorage
+  , sessionStorage
+  , storageClear
+  , storageGetItem
+  , storageItems
+  , storageRemoveItem
+  , storageSetItem
+  )
 import Playwright.WheelDelta
   ( WheelDelta (WheelDelta)
   , wheelDeltaFromInt
+  )
+import Playwright.Worker
+  ( Worker (Worker, workerChannel)
+  , evaluateOnWorker
+  , evaluateOnWorkerText
+  , waitForWorker
+  , workerUrl
+  , workers
   )

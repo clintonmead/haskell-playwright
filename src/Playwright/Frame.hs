@@ -9,6 +9,7 @@ module Playwright.Frame
   , evaluateFrame
   , evaluateFrameWith
   , frameFromRef
+  , framesEqual
   , frameSend
   , frameSend_
   , gotoFrame
@@ -202,6 +203,10 @@ evalOnSelectorFrame frame selector expression arg = do
         , frameEvalOnSelectorParamsStrict = Just True
         }
   pure (frameEvalOnSelectorResultValue result)
+
+framesEqual :: Frame -> Frame -> Bool
+framesEqual left right =
+  channelGuid (frameChannel left) == channelGuid (frameChannel right)
 
 evalOnSelectorAllFrame :: Frame -> Selector -> Text -> SerializedArgument -> IO SerializedValue
 evalOnSelectorAllFrame frame selector expression arg = do
