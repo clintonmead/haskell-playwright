@@ -8,8 +8,10 @@ import Playwright.IntegrationSpec qualified as IntegrationSpec
 import Playwright.LocatorClickSpec qualified as LocatorClickSpec
 import Playwright.LocatorEvaluateSpec qualified as LocatorEvaluateSpec
 import Playwright.LocatorIsVisibleSpec qualified as LocatorIsVisibleSpec
+import Playwright.LocatorMiscSpec qualified as LocatorMiscSpec
 import Playwright.LocatorQuerySpec qualified as LocatorQuerySpec
 import Playwright.LocatorSpec qualified as LocatorSpec
+import Playwright.PageAddInitScriptSpec qualified as PageAddInitScriptSpec
 import Playwright.PageCheckSpec qualified as PageCheckSpec
 import Playwright.PageClickSpec qualified as PageClickSpec
 import Playwright.PageDispatchEventSpec qualified as PageDispatchEventSpec
@@ -27,6 +29,7 @@ import Playwright.PageWaitForLoadStateSpec qualified as PageWaitForLoadStateSpec
 import Playwright.PageWaitForSelectorSpec qualified as PageWaitForSelectorSpec
 import Playwright.SelectorsGetBySpec qualified as SelectorsGetBySpec
 import Playwright.TransportSpec qualified as TransportSpec
+import Playwright.WheelSpec qualified as WheelSpec
 import Test.Tasty
   ( defaultMain
   , localOption
@@ -50,7 +53,9 @@ main =
         , LocatorClickSpec.tests
         , LocatorEvaluateSpec.tests
         , LocatorIsVisibleSpec.tests
+        , LocatorMiscSpec.tests
         , LocatorQuerySpec.tests
+        , PageAddInitScriptSpec.tests
         , PageCheckSpec.tests
         , PageClickSpec.tests
         , PageDispatchEventSpec.tests
@@ -67,4 +72,5 @@ main =
         , PageWaitForLoadStateSpec.tests
         , PageWaitForSelectorSpec.tests
         , SelectorsGetBySpec.tests
+        , WheelSpec.tests
         ]

@@ -10,12 +10,14 @@ import GHC.Clock
   )
 import Playwright
   ( evaluateBool
+  , jsonValueNumber
   , milliseconds
   , waitForFunction
   , waitForTimeout
   )
 import Playwright.Harness
-  ( withChromiumPage
+  ( assertProtocolContains
+  , withChromiumPage
   )
 import Test.Tasty
   ( TestTree
@@ -23,6 +25,7 @@ import Test.Tasty
   )
 import Test.Tasty.HUnit
   ( assertBool
+  , assertEqual
   , assertFailure
   , testCase
   )
@@ -51,4 +54,11 @@ tests =
           concurrently_
             (waitForFunction page "() => window.__FOO === 1")
             (evaluateBool page "() => { window.__FOO = 1; return true; }")
+    , testCase "should return the success value as a JSHandle" $
+        withChromiumPage $ \page -> do
+          handle <- waitForFunction page "() => 5"
+          assertEqual "5" (5 :: Double) =<< jsonValueNumber handle
+    , testCase "should fail with predicate throwing on first call" $
+        withChromiumPage $ \page ->
+          assertProtocolContains "oh my" (waitForFunction page "() => { throw new Error('oh my'); }")
     ]

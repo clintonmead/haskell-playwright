@@ -43,6 +43,7 @@ module Playwright
   , checkWith
   , childLocator
   , chromium
+  , clear
   , click
   , closeBrowser
   , closeContext
@@ -99,6 +100,7 @@ module Playwright
   , isEnabled
   , isHidden
   , isVisible
+  , jsonValueNumber
   , keyboardDown
   , keyboardInsertText
   , keyboardPress
@@ -246,6 +248,7 @@ import Playwright.Instance
   )
 import Playwright.JsHandle
   ( JsHandle (JsHandle)
+  , jsonValueNumber
   )
 import Playwright.Key
   ( Key (Key, keyToText)
@@ -269,6 +272,7 @@ import Playwright.Locator
   , check
   , checkWith
   , childLocator
+  , clear
   , click
   , dblclick
   , dispatchEvent

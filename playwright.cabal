@@ -126,8 +126,10 @@ test-suite playwright-test
       Playwright.LocatorClickSpec
       Playwright.LocatorEvaluateSpec
       Playwright.LocatorIsVisibleSpec
+      Playwright.LocatorMiscSpec
       Playwright.LocatorQuerySpec
       Playwright.LocatorSpec
+      Playwright.PageAddInitScriptSpec
       Playwright.PageCheckSpec
       Playwright.PageClickSpec
       Playwright.PageDispatchEventSpec
@@ -145,6 +147,7 @@ test-suite playwright-test
       Playwright.PageWaitForSelectorSpec
       Playwright.SelectorsGetBySpec
       Playwright.TransportSpec
+      Playwright.WheelSpec
       Paths_playwright
   hs-source-dirs:
       test

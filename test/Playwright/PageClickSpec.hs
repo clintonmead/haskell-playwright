@@ -56,4 +56,14 @@ tests =
           setContent page "<div style=\"width: 1px; height: 1px;\" onclick=\"window.__clicked = true\"></div>"
           click (locate page "div")
           assertEqual "clicked" True =<< evaluateBool page "() => window.__clicked"
+    , testCase "should click the half-aligned 1x1 div" $
+        withChromiumPage $ \page -> do
+          setContent page "<div style=\"margin-left: 20.5px; margin-top: 11.5px; width: 1px; height: 1px;\" onclick=\"window.__clicked = true\"></div>"
+          click (locate page "div")
+          assertEqual "clicked" True =<< evaluateBool page "() => window.__clicked"
+    , testCase "should click the unaligned 1x1 div v1" $
+        withChromiumPage $ \page -> do
+          setContent page "<div style=\"margin-left: 20.23px; margin-top: 11.65px; width: 1px; height: 1px;\" onclick=\"window.__clicked = true\"></div>"
+          click (locate page "div")
+          assertEqual "clicked" True =<< evaluateBool page "() => window.__clicked"
     ]

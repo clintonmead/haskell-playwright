@@ -3,6 +3,7 @@ module Playwright.Locator
   , check
   , checkWith
   , childLocator
+  , clear
   , click
   , dblclick
   , dispatchEvent
@@ -181,6 +182,10 @@ elementHandle loc = do
 fill :: Locator -> Text -> IO ()
 fill loc value =
   fillFrame (locatorFrame loc) (locatorSelector loc) value defaultTimeout
+
+clear :: Locator -> IO ()
+clear loc =
+  fill loc ""
 
 check :: Locator -> IO ()
 check loc =
