@@ -57,7 +57,7 @@ module Playwright
   , Request (..)
   , ResourceType (..)
   , Response (..)
-  , Route (..)
+  , Route
   , ScreenshotOptions (..)
   , ScriptTag (..)
   , SelectOption (..)
@@ -297,6 +297,7 @@ module Playwright
   , typeText
   , uncheck
   , uncheckWith
+  , unroute
   , url
   , urlFromText
   , urlToText
@@ -701,7 +702,7 @@ import Playwright.Response
   , responseUrl
   )
 import Playwright.Route
-  ( Route (Route, routeChannel)
+  ( Route
   , abortRoute
   , continueRoute
   , continueRouteWith
@@ -709,6 +710,7 @@ import Playwright.Route
   , fulfillRoute
   , route
   , routeRequest
+  , unroute
   )
 import Playwright.ScreenshotOptions
   ( ScreenshotOptions (ScreenshotOptions, screenshotOptionsFullPage, screenshotOptionsTimeout)

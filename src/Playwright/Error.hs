@@ -65,6 +65,7 @@ data PlaywrightError
   | BrowserPathMissing
   | EvaluateUnexpected SerializedValue
   | WaitTimeout Timeout
+  | RouteAlreadyHandled
   deriving stock (Eq, Show)
 
 instance Exception PlaywrightError

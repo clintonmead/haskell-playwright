@@ -57,6 +57,7 @@ import Playwright.PageNetworkRequestSpec qualified as PageNetworkRequestSpec
 import Playwright.PageNetworkResponseSpec qualified as PageNetworkResponseSpec
 import Playwright.PageRequestAbortSpec qualified as PageRequestAbortSpec
 import Playwright.PageRequestContinueSpec qualified as PageRequestContinueSpec
+import Playwright.PageRequestFallbackSpec qualified as PageRequestFallbackSpec
 import Playwright.PageRequestFulfillSpec qualified as PageRequestFulfillSpec
 import Playwright.PageRouteSpec qualified as PageRouteSpec
 import Playwright.PageScreenshotSpec qualified as PageScreenshotSpec
@@ -148,6 +149,7 @@ main =
         , PageNetworkResponseSpec.tests
         , PageRequestAbortSpec.tests
         , PageRequestContinueSpec.tests
+        , PageRequestFallbackSpec.tests
         , PageRequestFulfillSpec.tests
         , PageRouteSpec.tests
         , PageSelectOptionSpec.tests

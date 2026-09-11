@@ -1,5 +1,5 @@
 module Playwright.Route
-  ( Route (..)
+  ( Route
   , abortRoute
   , continueRoute
   , continueRouteWith
@@ -7,13 +7,24 @@ module Playwright.Route
   , fulfillRoute
   , route
   , routeRequest
+  , unroute
   ) where
 
+import Control.Concurrent.STM
+  ( TMVar
+  , atomically
+  , isEmptyTMVar
+  , newEmptyTMVarIO
+  , putTMVar
+  , takeTMVar
+  , throwSTM
+  )
 import Control.Exception
   ( throwIO
   )
 import Control.Monad
-  ( when
+  ( unless
+  , when
   )
 import Data.Aeson
   ( Value
@@ -22,9 +33,6 @@ import Data.ByteString.Base64
   ( encode
   )
 import Data.ByteString qualified as ByteString
-import Data.List
-  ( find
-  )
 import Data.Text
   ( Text
   , pack
@@ -43,11 +51,15 @@ import Playwright.Connection
   ( lookupObject
   , pushRouteHandler
   , registerEventHandler
+  , removeRouteHandlers
   , routeHandlersFor
   )
 import Playwright.ContinueOptions
   ( ContinueOptions (continueHeaders)
   , defaultContinueOptions
+  )
+import Playwright.Error
+  ( PlaywrightError (RouteAlreadyHandled)
   )
 import Playwright.FulfillOptions
   ( ContentType (contentTypeToText)
@@ -105,19 +117,20 @@ import Playwright.UrlGlob
   , matchesUrlGlob
   )
 
-newtype Route = Route
+data Route = Route
   { routeChannel :: Channel RouteTag
+  , routeOutcome :: TMVar Bool
   }
 
 routeRequest :: Route -> IO Request
-routeRequest handled = do
-  obj <- lookupObject (channelConnection (routeChannel handled)) (channelGuid (routeChannel handled))
+routeRequest handled =
+  requestFromChannel (routeChannel handled)
+
+requestFromChannel :: Channel RouteTag -> IO Request
+requestFromChannel chan = do
+  obj <- lookupObject (channelConnection chan) (channelGuid chan)
   initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
-  pure
-    ( requestFromRef
-        (channelConnection (routeChannel handled))
-        (routeInitializerRequest initializer)
-    )
+  pure (requestFromRef (channelConnection chan) (routeInitializerRequest initializer))
 
 continueRoute :: Route -> IO ()
 continueRoute handled =
@@ -125,26 +138,18 @@ continueRoute handled =
 
 continueRouteWith :: Route -> ContinueOptions -> IO ()
 continueRouteWith handled opts = do
-  _ :: RouteContinueResult <-
-    send
-      (routeChannel handled)
-      (MethodName "continue")
-      (mkRouteContinueParams False)
-        { routeContinueParamsHeaders = fmap (fmap toNameValue) (continueHeaders opts)
-        }
-  pure ()
+  sendContinue (routeChannel handled) False (continueHeaders opts)
+  settleRoute handled True
 
 fallbackRoute :: Route -> IO ()
-fallbackRoute handled = do
-  _ :: RouteContinueResult <-
-    send (routeChannel handled) (MethodName "continue") (mkRouteContinueParams True)
-  pure ()
+fallbackRoute handled =
+  settleRoute handled False
 
 abortRoute :: Route -> IO ()
 abortRoute handled = do
   _ :: RouteAbortResult <-
     send (routeChannel handled) (MethodName "abort") mkRouteAbortParams
-  pure ()
+  settleRoute handled True
 
 fulfillRoute :: Route -> FulfillOptions -> IO ()
 fulfillRoute handled opts = do
@@ -161,7 +166,7 @@ fulfillRoute handled opts = do
         , routeFulfillParamsIsBase64 = Just isBase64
         , routeFulfillParamsStatus = Just (maybe 200 httpStatusToInt (fulfillStatus opts))
         }
-  pure ()
+  settleRoute handled True
 
 route :: Page -> UrlGlob -> (Route -> IO ()) -> IO ()
 route page glob handler = do
@@ -169,9 +174,19 @@ route page glob handler = do
     conn = channelConnection (pageChannel page)
     guid = channelGuid (pageChannel page)
   first <-
-    pushRouteHandler conn guid glob $ \ref ->
-      handler (Route (Channel conn (channelRefGuid ref)))
+    pushRouteHandler conn guid glob $ \ref -> do
+      box <- newEmptyTMVarIO
+      handler (Route (Channel conn (channelRefGuid ref)) box)
+      atomically (takeTMVar box)
   when first (registerEventHandler conn guid (MethodName "route") (dispatchPageRoute page))
+  updateInterceptionPatterns page
+
+unroute :: Page -> UrlGlob -> IO ()
+unroute page glob = do
+  removeRouteHandlers
+    (channelConnection (pageChannel page))
+    (channelGuid (pageChannel page))
+    glob
   updateInterceptionPatterns page
 
 dispatchPageRoute :: Page -> Value -> IO ()
@@ -179,15 +194,43 @@ dispatchPageRoute page params = do
   event <- either throwIO pure (fromJsonValue params)
   let
     conn = channelConnection (pageChannel page)
-    handled = Route (Channel conn (channelRefGuid (pageRouteEventRoute event)))
-  request <- routeRequest handled
+    chan :: Channel RouteTag
+    chan = Channel conn (channelRefGuid (pageRouteEventRoute event))
+  request <- requestFromChannel chan
   current <- requestUrl request
   handlers <- routeHandlersFor conn (channelGuid (pageChannel page))
-  case find (\(glob, _) -> matchesUrlGlob glob current) handlers of
-    Just (_, run) ->
-      run (pageRouteEventRoute event)
-    Nothing ->
-      fallbackRoute handled
+  let
+    matching =
+      [run | (glob, run) <- handlers, matchesUrlGlob glob current]
+  chainRoutes chan (pageRouteEventRoute event) matching
+
+chainRoutes :: Channel RouteTag -> ChannelRef -> [ChannelRef -> IO Bool] -> IO ()
+chainRoutes chan ref runs =
+  case runs of
+    [] ->
+      sendContinue chan True Nothing
+    run : rest -> do
+      done <- run ref
+      unless done (chainRoutes chan ref rest)
+
+settleRoute :: Route -> Bool -> IO ()
+settleRoute handled settled =
+  atomically $ do
+    empty <- isEmptyTMVar (routeOutcome handled)
+    if empty
+      then putTMVar (routeOutcome handled) settled
+      else throwSTM RouteAlreadyHandled
+
+sendContinue :: Channel RouteTag -> Bool -> Maybe [HttpHeader] -> IO ()
+sendContinue chan isFallback headers = do
+  _ :: RouteContinueResult <-
+    send
+      chan
+      (MethodName "continue")
+      (mkRouteContinueParams isFallback)
+        { routeContinueParamsHeaders = fmap (fmap toNameValue) headers
+        }
+  pure ()
 
 updateInterceptionPatterns :: Page -> IO ()
 updateInterceptionPatterns page = do

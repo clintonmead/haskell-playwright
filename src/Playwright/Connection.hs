@@ -12,6 +12,7 @@ module Playwright.Connection
   , waitUntilUrl
   , closedGuids
   , pushRouteHandler
+  , removeRouteHandlers
   , routeHandlersFor
   ) where
 
@@ -142,7 +143,7 @@ data Connection = Connection
   , connectionEventBuffer :: TVar (Map (Guid, MethodName) (Seq Value))
   , connectionClosedGuids :: TVar (Set Guid)
   , connectionEventHandlers :: TVar [EventHandler]
-  , connectionRouteHandlers :: TVar (Map Guid [(UrlGlob, ChannelRef -> IO ())])
+  , connectionRouteHandlers :: TVar (Map Guid [(UrlGlob, ChannelRef -> IO Bool)])
   , connectionRouteListening :: TVar (Set Guid)
   }
 
@@ -383,7 +384,7 @@ registerEventHandler conn guid method run =
   atomically $
     modifyTVar' (connectionEventHandlers conn) (EventHandler guid method run :)
 
-pushRouteHandler :: Connection -> Guid -> UrlGlob -> (ChannelRef -> IO ()) -> IO Bool
+pushRouteHandler :: Connection -> Guid -> UrlGlob -> (ChannelRef -> IO Bool) -> IO Bool
 pushRouteHandler conn guid glob run =
   atomically $ do
     listening <- readTVar (connectionRouteListening conn)
@@ -395,7 +396,14 @@ pushRouteHandler conn guid glob run =
       (Map.insertWith (++) guid [(glob, run)])
     pure first
 
-routeHandlersFor :: Connection -> Guid -> IO [(UrlGlob, ChannelRef -> IO ())]
+removeRouteHandlers :: Connection -> Guid -> UrlGlob -> IO ()
+removeRouteHandlers conn guid glob =
+  atomically $
+    modifyTVar'
+      (connectionRouteHandlers conn)
+      (Map.adjust (filter (\(existing, _) -> existing /= glob)) guid)
+
+routeHandlersFor :: Connection -> Guid -> IO [(UrlGlob, ChannelRef -> IO Bool)]
 routeHandlersFor conn guid = do
   handlers <- atomically (readTVar (connectionRouteHandlers conn))
   pure (Map.findWithDefault [] guid handlers)

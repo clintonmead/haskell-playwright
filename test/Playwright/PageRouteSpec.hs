@@ -27,6 +27,7 @@ import Playwright
   , continueRoute
   , currentUrl
   , defaultGotoOptions
+  , fallbackRoute
   , framesEqual
   , goto
   , mainFrame
@@ -41,6 +42,7 @@ import Playwright
   , route
   , routeRequest
   , setExtraHTTPHeaders
+  , unroute
   , urlFromText
   , urlToText
   )
@@ -133,6 +135,24 @@ tests =
                   assertBool "html" ("/one-style.html" `isInfixOf` referer)
             _ ->
               assertFailure "expected stylesheet request"
+    , testCase "should unroute" $
+        withAssets $ \prefix page -> do
+          intercepted <- newIORef ([] :: [Int])
+          route page (UrlGlob "**/*") $ \handled -> do
+            modifyIORef' intercepted (1 :)
+            fallbackRoute handled
+          route page (UrlGlob "**/empty.html") $ \handled -> do
+            modifyIORef' intercepted (2 :)
+            fallbackRoute handled
+          route page (UrlGlob "**/empty.html") $ \handled -> do
+            modifyIORef' intercepted (3 :)
+            fallbackRoute handled
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "before" [3, 2, 1] . reverse =<< readIORef intercepted
+          writeIORef intercepted []
+          unroute page (UrlGlob "**/empty.html")
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "after" [1] . reverse =<< readIORef intercepted
     ]
 
 headerValue :: Text -> [HttpHeader] -> Maybe Text

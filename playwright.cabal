@@ -207,6 +207,7 @@ test-suite playwright-test
       Playwright.PageNetworkResponseSpec
       Playwright.PageRequestAbortSpec
       Playwright.PageRequestContinueSpec
+      Playwright.PageRequestFallbackSpec
       Playwright.PageRequestFulfillSpec
       Playwright.PageRouteSpec
       Playwright.PageScreenshotSpec
