@@ -7,6 +7,7 @@ module Playwright.Page.Query
   , pageIsDisabled
   , pageIsEditable
   , pageIsEnabled
+  , pageIsHidden
   , pageIsVisible
   , pageTextContent
   ) where
@@ -23,6 +24,7 @@ import Playwright.Frame.Inspect
   , isDisabledFrame
   , isEditableFrame
   , isEnabledFrame
+  , isHiddenFrame
   , isVisibleFrame
   , textContentFrame
   )
@@ -82,3 +84,7 @@ pageIsEditable page selector = do
 pageIsVisible :: Page -> Selector -> IO Bool
 pageIsVisible page selector =
   isVisibleFrame (pageMainFrame page) selector
+
+pageIsHidden :: Page -> Selector -> IO Bool
+pageIsHidden page selector =
+  isHiddenFrame (pageMainFrame page) selector

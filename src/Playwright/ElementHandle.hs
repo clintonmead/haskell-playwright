@@ -12,6 +12,7 @@ module Playwright.ElementHandle
   , innerHtmlHandle
   , innerTextHandle
   , inputValueHandle
+  , isEditableHandle
   , scrollIntoViewIfNeeded
   , scrollIntoViewIfNeededWith
   , screenshotHandle
@@ -90,6 +91,7 @@ import Playwright.Protocol
   , ElementHandleInnerHTMLResult (elementHandleInnerHTMLResultValue)
   , ElementHandleInnerTextResult (elementHandleInnerTextResultValue)
   , ElementHandleInputValueResult (elementHandleInputValueResultValue)
+  , ElementHandleIsEditableResult (elementHandleIsEditableResultValue)
   , ElementHandleOwnerFrameResult (elementHandleOwnerFrameResultFrame)
   , ElementHandleScreenshotResult (elementHandleScreenshotResultBinary)
   , ElementHandleScrollIntoViewIfNeededResult
@@ -110,6 +112,7 @@ import Playwright.Protocol
   , mkElementHandleInnerHTMLParams
   , mkElementHandleInnerTextParams
   , mkElementHandleInputValueParams
+  , mkElementHandleIsEditableParams
   , mkElementHandleOwnerFrameParams
   , mkElementHandleScreenshotParams
   , mkElementHandleScrollIntoViewIfNeededParams
@@ -226,6 +229,11 @@ inputValueHandle :: ElementHandle -> IO Text
 inputValueHandle handle = do
   result <- handleSend handle "inputValue" mkElementHandleInputValueParams
   pure (elementHandleInputValueResultValue result)
+
+isEditableHandle :: ElementHandle -> IO Bool
+isEditableHandle handle = do
+  result <- handleSend handle "isEditable" mkElementHandleIsEditableParams
+  pure (elementHandleIsEditableResultValue result)
 
 contentFrameHandle :: ElementHandle -> IO (Maybe Frame)
 contentFrameHandle handle = do

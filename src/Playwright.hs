@@ -319,6 +319,7 @@ module Playwright
   , isClosed
   , isDisabled
   , isEditable
+  , isEditableHandle
   , isEnabled
   , isHidden
   , isVisible
@@ -382,6 +383,7 @@ module Playwright
   , pageIsDisabled
   , pageIsEditable
   , pageIsEnabled
+  , pageIsHidden
   , pageIsVisible
   , pagesEqual
   , pageTextContent
@@ -689,6 +691,7 @@ import Playwright.ElementHandle
   , innerHtmlHandle
   , innerTextHandle
   , inputValueHandle
+  , isEditableHandle
   , ownerFrameHandle
   , scrollIntoViewIfNeeded
   , scrollIntoViewIfNeededWith
@@ -1059,6 +1062,7 @@ import Playwright.Page.Query
   , pageIsDisabled
   , pageIsEditable
   , pageIsEnabled
+  , pageIsHidden
   , pageIsVisible
   , pageTextContent
   )
