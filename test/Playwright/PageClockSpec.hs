@@ -2,23 +2,16 @@ module Playwright.PageClockSpec
   ( tests
   ) where
 
-import Control.Concurrent
-  ( threadDelay
-  )
 import Control.Concurrent.Async
-  ( race
-  , wait
+  ( wait
   , withAsync
   )
 import Control.Concurrent.STM
-  ( STM
-  , TVar
+  ( TVar
   , atomically
   , modifyTVar'
   , newTVarIO
-  , readTVar
   , readTVarIO
-  , retry
   )
 import Playwright
   ( BindingName (BindingName)
@@ -81,7 +74,7 @@ tests =
             withPausedClock $ \page calls -> do
               _ <- evaluate page "async () => { setTimeout(window.stub, 100); }"
               clockRunFor page (ClockTicksMillis (clockMillisFromInt 10))
-              assertNoCalls page calls
+              assertNoCalls calls
         , testCase "triggers after sufficient delay" $
             withPausedClock $ \page calls -> do
               _ <- evaluate page "async () => { setTimeout(window.stub, 100); }"
@@ -99,7 +92,7 @@ tests =
             withPausedClock $ \page calls -> do
               _ <- evaluate page "async () => { setTimeout(window.stub, 150); }"
               clockRunFor page (ClockTicksMillis (clockMillisFromInt 50))
-              assertNoCalls page calls
+              assertNoCalls calls
               clockRunFor page (ClockTicksMillis (clockMillisFromInt 100))
               assertCallCount calls 1
         , testCase "triggers event when some throw" $
@@ -120,7 +113,7 @@ tests =
                   page
                   "async () => { setInterval(() => { window.stub(new Date().getTime()); }, 10); }"
               clockRunFor page (ClockTicksMillis (clockMillisFromInt 100))
-              listed <- waitCallCount calls 10
+              listed <- readTVarIO calls
               case traverse callNumber listed of
                 Nothing ->
                   assertFailure "expected numeric stub args"
@@ -155,7 +148,7 @@ tests =
                   page
                   "async () => { setTimeout(() => { window.stub('should not be logged'); }, 1000); }"
               clockFastForward page (ClockTicksMillis (clockMillisFromInt 500))
-              assertNoCalls page calls
+              assertNoCalls calls
         , testCase "pushes back execution time for skipped timers" $
             withPausedClock $ \page calls -> do
               _ <-
@@ -163,7 +156,7 @@ tests =
                   page
                   "async () => { setTimeout(() => { window.stub(Date.now()); }, 1000); }"
               clockFastForward page (ClockTicksMillis (clockMillisFromInt 2000))
-              listed <- waitCallCount calls 1
+              listed <- readTVarIO calls
               case listed of
                 [args] ->
                   assertEqual "now" (Just (3000 :: Double)) (callNumber args)
@@ -176,7 +169,7 @@ tests =
                   page
                   "async () => { setTimeout(() => { window.stub(Date.now()); }, 100000); }"
               clockFastForward page (ClockTicksString "01:50")
-              listed <- waitCallCount calls 1
+              listed <- readTVarIO calls
               case listed of
                 [args] ->
                   assertEqual "now" (Just (111000 :: Double)) (callNumber args)
@@ -198,7 +191,7 @@ tests =
             withPausedClock $ \page calls -> do
               _ <- evaluate page "async () => { const to = setTimeout(window.stub, 1000); clearTimeout(to); }"
               clockRunFor page (ClockTicksMillis (clockMillisFromInt 1000))
-              assertNoCalls page calls
+              assertNoCalls calls
         , testCase "replaces global setInterval" $
             withPausedClock $ \page calls -> do
               _ <- evaluate page "async () => { setInterval(window.stub, 500); }"
@@ -302,32 +295,13 @@ withPausedClock action =
 
 assertCallCount :: TVar [[SerializedValue]] -> Int -> IO ()
 assertCallCount var expected = do
-  listed <- waitCallCount var expected
+  listed <- readTVarIO var
   assertEqual "calls" expected (length listed)
 
-assertNoCalls :: Page -> TVar [[SerializedValue]] -> IO ()
-assertNoCalls page var = do
-  _ <- evaluateNumber page "() => Date.now()"
+assertNoCalls :: TVar [[SerializedValue]] -> IO ()
+assertNoCalls var = do
   listed <- readTVarIO var
   assertEqual "calls" (0 :: Int) (length listed)
-
-waitCallCount :: TVar [[SerializedValue]] -> Int -> IO [[SerializedValue]]
-waitCallCount var expected = do
-  result <- race (threadDelay 5000000) (atomically waitListed)
-  case result of
-    Left () -> do
-      listed <- readTVarIO var
-      assertFailure
-        ("timed out waiting for " ++ show expected ++ " calls, got " ++ show (length listed))
-    Right listed ->
-      pure listed
-  where
-    waitListed :: STM [[SerializedValue]]
-    waitListed = do
-      listed <- readTVar var
-      if length listed >= expected
-        then pure listed
-        else retry
 
 sleepMillis :: Page -> Double -> IO ()
 sleepMillis page n =
