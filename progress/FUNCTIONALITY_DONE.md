@@ -7,7 +7,7 @@ Haskell client for Playwright 1.61.1. Speaks the channel protocol to the officia
 - Dual build: Stack LTS 24.58 (GHC 9.10.3) and Cabal, via Nix flake (`playwright-driver`, protocol YAML, test assets).
 - Protocol types are generated at compile time (`playwright-codegen`); not vendored.
 - Handshake uses `sdkLanguage: javascript` / `PW_LANG_NAME=javascript`. Driver env includes `PWTEST_UNDER_TEST=1` (open highlight shadow root, same as official tests). NixOS Chromium uses `chromiumSandbox = false`.
-- Test runner: `playwright-test` (Nix shell). Tasty `-p` / `--pattern` selects tests. No extra args shards spec groups across processes (`PLAYWRIGHT_TEST_JOBS`, default one process per CPU thread via `nproc`). Each process is `--num-threads=1`.
+- Test runner: `playwright-test` (Nix shell). Tasty `-p` / `--pattern` selects tests. Tests run in parallel (`--num-threads` defaults to RTS capabilities / CPU threads via `-N`).
 
 ## Public API (Chromium)
 

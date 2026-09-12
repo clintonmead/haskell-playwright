@@ -5,6 +5,7 @@ module Playwright.Transport.Stdio
 import Control.Exception
   ( IOException
   , bracket
+  , catch
   , throwIO
   , try
   )
@@ -44,8 +45,12 @@ import System.IO
   , hSetBinaryMode
   , hSetBuffering
   )
+import System.IO.Error
+  ( isDoesNotExistError
+  )
 import System.Process.Typed
-  ( createPipe
+  ( Process
+  , createPipe
   , getStdin
   , getStdout
   , inherit
@@ -82,7 +87,7 @@ withStdioTransport paths action = do
         $ setStdout createPipe
         $ setStderr inherit
         $ proc (driverNode paths) [driverCli paths, "run-driver"]
-  bracket (startProcess config) stopProcess $ \process -> do
+  bracket (startProcess config) stopDriver $ \process -> do
     let
       hin :: Handle
       hin = getStdin process
@@ -94,6 +99,13 @@ withStdioTransport paths action = do
     hSetBuffering hout NoBuffering
     leftover <- newIORef RecvBuffer {recvIncomplete = BS.empty, recvQueued = []}
     action (mkStdioTransport hin hout leftover)
+
+stopDriver :: Process Handle Handle () -> IO ()
+stopDriver process =
+  stopProcess process `catch` \exception ->
+    if isDoesNotExistError exception
+      then pure ()
+      else throwIO exception
 
 mkStdioTransport ::
   Handle ->

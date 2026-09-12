@@ -1,27 +1,18 @@
 #!/usr/bin/env bash
 # Quiet Playwright Haskell tests.
 #
-# Individual tests use Tasty's built-in -p/--pattern (same role as Hspec
-# --match). Extra args skip sharding and are passed to the Tasty binary:
+# Extra args go to Tasty:
 #   playwright-test -p /page-goto/
 #   playwright-test -p '/page-goto/&&/should work/'
 #   playwright-test --list-tests
 # TASTY_PATTERN is also honored (Tasty reads it itself).
 #
-# Full-suite runs (no extra args) shard across processes, each with
-# --num-threads=1, because concurrent waitForProcess in one RTS races on
-# SIGCHLD.
+# Tests run in parallel: Tasty's default --num-threads is the number of
+# RTS capabilities, and the test binary is linked with -N (CPU threads).
+# Override with --num-threads / -j or TASTY_NUM_THREADS.
 set -eu
 
 hpack --force
-
-jobs="${PLAYWRIGHT_TEST_JOBS:-}"
-if [ -z "$jobs" ]; then
-  jobs="$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)"
-  if [ "$jobs" -lt 1 ]; then
-    jobs=1
-  fi
-fi
 
 cabal build playwright-test
 bin="$(cabal list-bin playwright:test:playwright-test)"
@@ -38,16 +29,6 @@ ensure_matches() {
   fi
 }
 
-run_one() {
-  ensure_matches "$@"
-  set +e
-  output="$("$bin" --hide-successes --hide-progress --color=never --num-threads=1 "$@" 2>&1)"
-  status=$?
-  set -e
-  printf '%s\n' "$output" | filter_noise
-  return "$status"
-}
-
 pass_through=0
 for arg in "$@"; do
   case "$arg" in
@@ -58,78 +39,17 @@ for arg in "$@"; do
 done
 
 if [ "$pass_through" -eq 1 ]; then
-  "$bin" --hide-successes --hide-progress --color=never --num-threads=1 "$@"
+  "$bin" --hide-successes --hide-progress --color=never "$@"
   exit $?
 fi
 
-if [ "$#" -gt 0 ] || [ "$jobs" -eq 1 ] || [ -n "${TASTY_PATTERN:-}" ]; then
-  run_one "$@"
-  exit $?
+if [ "$#" -gt 0 ] || [ -n "${TASTY_PATTERN:-}" ]; then
+  ensure_matches "$@"
 fi
 
-list="$("$bin" --list-tests)"
-if [ -z "$list" ]; then
-  echo "playwright-test: no tests listed" >&2
-  exit 1
-fi
-
-tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
-
-groups="$(printf '%s\n' "$list" | awk -F. 'NF >= 2 { print $2 }' | sort -u)"
-group_count="$(printf '%s\n' "$groups" | grep -c . || true)"
-if [ "$group_count" -lt 1 ]; then
-  echo "playwright-test: failed to parse test groups" >&2
-  exit 1
-fi
-if [ "$jobs" -gt "$group_count" ]; then
-  jobs="$group_count"
-fi
-
-index=0
-while IFS= read -r group; do
-  [ -n "$group" ] || continue
-  shard=$((index % jobs))
-  printf '%s\n' "$group" >> "$tmp/groups.$shard"
-  index=$((index + 1))
-done <<< "$groups"
-
-for shard in $(seq 0 $((jobs - 1))); do
-  (
-    pattern=""
-    while IFS= read -r group; do
-      if [ -z "$pattern" ]; then
-        pattern="\$2 == \"$group\""
-      else
-        pattern="$pattern || \$2 == \"$group\""
-      fi
-    done < "$tmp/groups.$shard"
-    set +e
-    output="$("$bin" --hide-successes --hide-progress --color=never --num-threads=1 -p "$pattern" 2>&1)"
-    status=$?
-    set -e
-    filtered="$(printf '%s\n' "$output" | filter_noise)"
-    if [ "$status" != "0" ] || [ -n "$filtered" ]; then
-      {
-        echo "=== shard $((shard + 1))/$jobs ==="
-        printf '%s\n' "$filtered"
-      } > "$tmp/out.$shard"
-    else
-      : > "$tmp/out.$shard"
-    fi
-    echo "$status" > "$tmp/exit.$shard"
-  ) &
-done
-wait
-
-fail=0
-for shard in $(seq 0 $((jobs - 1))); do
-  if [ -s "$tmp/out.$shard" ]; then
-    cat "$tmp/out.$shard"
-  fi
-  if [ "$(cat "$tmp/exit.$shard")" != "0" ]; then
-    fail=1
-  fi
-done
-
-exit "$fail"
+set +e
+output="$("$bin" --hide-successes --hide-progress --color=never "$@" 2>&1)"
+status=$?
+set -e
+printf '%s\n' "$output" | filter_noise
+exit "$status"

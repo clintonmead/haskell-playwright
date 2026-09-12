@@ -150,19 +150,14 @@ import Playwright.WheelSpec qualified as WheelSpec
 import Playwright.WorkersSpec qualified as WorkersSpec
 import Test.Tasty
   ( defaultMain
-  , localOption
   , testGroup
-  )
-import Test.Tasty.Runners
-  ( NumThreads (NumThreads)
   )
 
 main :: IO ()
 main =
   defaultMain $
-    localOption (NumThreads 1) $
-      testGroup
-        "playwright"
+    testGroup
+      "playwright"
         [ TransportSpec.tests
         , BrowserSpec.tests
         , BrowserContextAddCookiesSpec.tests
