@@ -193,6 +193,7 @@ test-suite playwright-test
       Playwright.BrowserContextAddCookiesSpec
       Playwright.BrowserContextAddInitScriptSpec
       Playwright.BrowserContextBaseUrlSpec
+      Playwright.BrowserContextBasicSpec
       Playwright.BrowserContextCookiesSpec
       Playwright.BrowserContextCredentialsSpec
       Playwright.BrowserContextCspSpec

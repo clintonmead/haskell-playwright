@@ -113,6 +113,7 @@ import Playwright.Connection
   ( closedGuids
   , lookupObject
   , lookupTimeoutDefaults
+  , pageOwnsContext
   , registerEventHandler
   , registerEventWaiter
   , registerFutureEventWaiter
@@ -203,7 +204,8 @@ import Playwright.MethodName
   ( MethodName (MethodName)
   )
 import Playwright.Protocol
-  ( BrowserContextConsoleEvent
+  ( BrowserContextCloseResult
+  , BrowserContextConsoleEvent
   , BrowserContextDialogEvent (browserContextDialogEventDialog)
   , BrowserContextPageEvent (browserContextPageEventPage)
   , BrowserContextRequestEvent (browserContextRequestEventRequest)
@@ -235,6 +237,7 @@ import Playwright.Protocol
   , PageScreenshotResult (pageScreenshotResultBinary)
   , PageSetExtraHTTPHeadersResult
   , PageSetViewportSizeResult
+  , mkBrowserContextCloseParams
   , mkBrowserContextUpdateSubscriptionParams
   , mkFrameAddScriptTagParams
   , mkFrameAddStyleTagParams
@@ -370,15 +373,31 @@ setDefaultNavigationTimeout page timeout =
 
 closePage :: Page -> IO ()
 closePage page = do
-  result <- try (send (pageChannel page) (MethodName "close") mkPageCloseParams)
-  case result of
-    Left (ProtocolRpc failure)
-      | protocolFailureName failure == "TargetClosedError" ->
+  let
+    conn = channelConnection (pageChannel page)
+  ownsContext <- pageOwnsContext conn (channelGuid (pageChannel page))
+  if ownsContext
+    then do
+      result <-
+        try (send (pageContextChannel page) (MethodName "close") mkBrowserContextCloseParams)
+      case result of
+        Left (ProtocolRpc failure)
+          | protocolFailureName failure == "TargetClosedError" ->
+              pure ()
+        Left err ->
+          throwIO err
+        Right (_ :: BrowserContextCloseResult) ->
           pure ()
-    Left err ->
-      throwIO err
-    Right (_ :: PageCloseResult) ->
-      pure ()
+    else do
+      result <- try (send (pageChannel page) (MethodName "close") mkPageCloseParams)
+      case result of
+        Left (ProtocolRpc failure)
+          | protocolFailureName failure == "TargetClosedError" ->
+              pure ()
+        Left err ->
+          throwIO err
+        Right (_ :: PageCloseResult) ->
+          pure ()
 
 isClosed :: Page -> IO Bool
 isClosed page = do

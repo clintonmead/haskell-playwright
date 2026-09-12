@@ -5,6 +5,7 @@ module Main
 import Playwright.BrowserContextAddCookiesSpec qualified as BrowserContextAddCookiesSpec
 import Playwright.BrowserContextAddInitScriptSpec qualified as BrowserContextAddInitScriptSpec
 import Playwright.BrowserContextBaseUrlSpec qualified as BrowserContextBaseUrlSpec
+import Playwright.BrowserContextBasicSpec qualified as BrowserContextBasicSpec
 import Playwright.BrowserContextCookiesSpec qualified as BrowserContextCookiesSpec
 import Playwright.BrowserContextCredentialsSpec qualified as BrowserContextCredentialsSpec
 import Playwright.BrowserContextCspSpec qualified as BrowserContextCspSpec
@@ -163,6 +164,7 @@ main =
         , BrowserContextAddCookiesSpec.tests
         , BrowserContextAddInitScriptSpec.tests
         , BrowserContextBaseUrlSpec.tests
+        , BrowserContextBasicSpec.tests
         , BrowserContextCookiesSpec.tests
         , BrowserContextCredentialsSpec.tests
         , BrowserContextCspSpec.tests

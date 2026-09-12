@@ -165,7 +165,9 @@ module Playwright
   , blur
   , boundingBox
   , bringToFront
+  , browserContexts
   , browserFromRef
+  , browsersEqual
   , browserTypeFromRef
   , check
   , checkHandle
@@ -203,6 +205,7 @@ module Playwright
   , contentFrameHandle
   , contextExposeFunction
   , contextFromRef
+  , contextBrowser
   , contextPages
   , contextRequest
   , contextRoute
@@ -288,6 +291,7 @@ module Playwright
   , evaluateOnElementText
   , evaluateOnElementWith
   , evaluateOnFrame
+  , evaluateOnFrameBool
   , evaluateOnFrameText
   , evaluateOnHandle
   , evaluateOnHandleExpression
@@ -370,6 +374,7 @@ module Playwright
   , inputValueHandle
   , isChecked
   , isClosed
+  , isContextClosed
   , isDisabled
   , isEditable
   , isEditableHandle
@@ -409,6 +414,8 @@ module Playwright
   , mouseUp
   , mouseWheel
   , nestedSelector
+  , newBrowserPage
+  , newBrowserPageWith
   , newContext
   , newContextWith
   , newPage
@@ -421,6 +428,7 @@ module Playwright
   , objectSpecialArgument
   , objectTextArgument
   , onLoad
+  , onContextPage
   , onRequest
   , onRequestFailed
   , onRequestFinished
@@ -545,6 +553,7 @@ module Playwright
   , waitFor
   , waitForClose
   , waitForConsole
+  , waitForContextClose
   , waitForContextPage
   , waitForDialog
   , waitForDownload
@@ -646,8 +655,13 @@ import Playwright.BoundingBox
   )
 import Playwright.Browser
   ( Browser (Browser, browserChannel)
+  , browserContexts
   , browserFromRef
+  , browsersEqual
   , closeBrowser
+  , contextBrowser
+  , newBrowserPage
+  , newBrowserPageWith
   , newContext
   , newContextWith
   , withPage
@@ -671,7 +685,9 @@ import Playwright.BrowserContext
   , contextRequest
   , grantPermissions
   , grantPermissionsFor
+  , isContextClosed
   , newPage
+  , onContextPage
   , pageContext
   , setContextDefaultNavigationTimeout
   , setContextDefaultTimeout
@@ -681,6 +697,7 @@ import Playwright.BrowserContext
   , setOffline
   , setStorageState
   , storageState
+  , waitForContextClose
   , waitForContextPage
   )
 import Playwright.BrowserName
@@ -868,6 +885,7 @@ import Playwright.Evaluate
   , evaluateOnElementText
   , evaluateOnElementWith
   , evaluateOnFrame
+  , evaluateOnFrameBool
   , evaluateOnFrameText
   , evaluateOnHandle
   , evaluateOnHandleExpression

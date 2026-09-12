@@ -1,6 +1,7 @@
 module Playwright.Error
   ( PlaywrightError (..)
   , ProtocolFailure (..)
+  , targetClosedError
   ) where
 
 import Autodocodec
@@ -71,3 +72,12 @@ data PlaywrightError
   deriving stock (Eq, Show)
 
 instance Exception PlaywrightError
+
+targetClosedError :: PlaywrightError
+targetClosedError =
+  ProtocolRpc
+    ProtocolFailure
+      { protocolFailureName = "TargetClosedError"
+      , protocolFailureMessage = "Target page, context or browser has been closed"
+      , protocolFailureStack = Nothing
+      }

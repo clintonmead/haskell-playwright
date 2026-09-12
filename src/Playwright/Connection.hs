@@ -8,7 +8,13 @@ module Playwright.Connection
   , registerEventWaiter
   , waitForChannelEvent
   , waitForFutureChannelEvent
+  , waitForFutureChannelEventUnlessClosed
   , registerFutureEventWaiter
+  , rememberBrowserContext
+  , lookupOwnedContextGuids
+  , lookupContextBrowserGuid
+  , markPageOwnsContext
+  , pageOwnsContext
   , waitForLifecycle
   , waitUntilUrl
   , closedGuids
@@ -65,6 +71,7 @@ import Control.Concurrent.STM
   , retry
   , takeTMVar
   , throwSTM
+  , tryReadTMVar
   , writeTVar
   )
 import Control.Concurrent.STM.TQueue
@@ -110,6 +117,7 @@ import Data.Map.Strict
 import Data.Map.Strict qualified as Map
 import Data.Maybe
   ( fromMaybe
+  , isJust
   )
 import Data.Set
   ( Set
@@ -126,6 +134,7 @@ import Data.Text qualified as Text
 import Playwright.Error
   ( PlaywrightError (ConnectionClosed, DecodeFailure, MissingObject, ProtocolRpc, UnexpectedResponse)
   , ProtocolFailure
+  , targetClosedError
   )
 import Playwright.Guid
   ( Guid
@@ -197,6 +206,9 @@ data Connection = Connection
   , connectionRouteListening :: TVar (Set Guid)
   , connectionRequestOverrides :: TVar (Map Guid RequestOverrides)
   , connectionContextBaseUrls :: TVar (Map Guid Url)
+  , connectionBrowserContexts :: TVar (Map Guid [Guid])
+  , connectionContextBrowsers :: TVar (Map Guid Guid)
+  , connectionPagesOwningContext :: TVar (Set Guid)
   , connectionSelectorEngines :: TVar [SelectorEngine]
   , connectionTimeoutDefaults :: TVar (Map Guid TimeoutDefaults)
   , connectionMainFramePages :: TVar (Map Guid Guid)
@@ -262,6 +274,9 @@ withConnection transport action = do
   routeListening <- newTVarIO Set.empty
   requestOverrides <- newTVarIO Map.empty
   contextBaseUrls <- newTVarIO Map.empty
+  browserContexts <- newTVarIO (Map.empty :: Map Guid [Guid])
+  contextBrowsers <- newTVarIO (Map.empty :: Map Guid Guid)
+  pagesOwningContext <- newTVarIO (Set.empty :: Set Guid)
   selectorEngines <- newTVarIO ([] :: [SelectorEngine])
   timeoutDefaults <- newTVarIO Map.empty
   mainFramePages <- newTVarIO Map.empty
@@ -289,6 +304,9 @@ withConnection transport action = do
         , connectionRouteListening = routeListening
         , connectionRequestOverrides = requestOverrides
         , connectionContextBaseUrls = contextBaseUrls
+        , connectionBrowserContexts = browserContexts
+        , connectionContextBrowsers = contextBrowsers
+        , connectionPagesOwningContext = pagesOwningContext
         , connectionSelectorEngines = selectorEngines
         , connectionTimeoutDefaults = timeoutDefaults
         , connectionMainFramePages = mainFramePages
@@ -459,7 +477,9 @@ handleEvent conn guid method params = do
     MethodName "requestFinished" ->
       applyRequestFinished conn params
     MethodName "close" ->
-      atomically (modifyTVar' (connectionClosedGuids conn) (Set.insert guid))
+      atomically $ do
+        modifyTVar' (connectionClosedGuids conn) (Set.insert guid)
+        modifyTVar' (connectionBrowserContexts conn) (Map.map (filter (/= guid)))
     _ ->
       pure ()
   deliverEvent conn guid method params
@@ -533,6 +553,33 @@ writeContextBaseUrl :: Connection -> Guid -> Url -> IO ()
 writeContextBaseUrl conn guid url =
   atomically $
     modifyTVar' (connectionContextBaseUrls conn) (Map.insert guid url)
+
+rememberBrowserContext :: Connection -> Guid -> Guid -> IO ()
+rememberBrowserContext conn browserGuid contextGuid =
+  atomically $ do
+    modifyTVar' (connectionContextBrowsers conn) (Map.insert contextGuid browserGuid)
+    modifyTVar' (connectionBrowserContexts conn) $
+      Map.insertWith (\new old -> old <> new) browserGuid [contextGuid]
+
+lookupOwnedContextGuids :: Connection -> Guid -> IO [Guid]
+lookupOwnedContextGuids conn browserGuid =
+  atomically $
+    Map.findWithDefault [] browserGuid <$> readTVar (connectionBrowserContexts conn)
+
+lookupContextBrowserGuid :: Connection -> Guid -> IO (Maybe Guid)
+lookupContextBrowserGuid conn contextGuid =
+  atomically $
+    Map.lookup contextGuid <$> readTVar (connectionContextBrowsers conn)
+
+markPageOwnsContext :: Connection -> Guid -> IO ()
+markPageOwnsContext conn pageGuid =
+  atomically $
+    modifyTVar' (connectionPagesOwningContext conn) (Set.insert pageGuid)
+
+pageOwnsContext :: Connection -> Guid -> IO Bool
+pageOwnsContext conn pageGuid =
+  atomically $
+    Set.member pageGuid <$> readTVar (connectionPagesOwningContext conn)
 
 lookupSelectorEngines :: Connection -> IO [SelectorEngine]
 lookupSelectorEngines conn =
@@ -727,6 +774,40 @@ waitForFutureChannelEvent :: Connection -> Guid -> MethodName -> IO Value
 waitForFutureChannelEvent conn guid method = do
   box <- registerFutureEventWaiter conn guid method
   atomically (takeTMVar box)
+
+unregisterWaiterSTM :: Connection -> TMVar Value -> STM ()
+unregisterWaiterSTM conn box =
+  modifyTVar' (connectionEventWaiters conn) (filter (\waiter -> eventWaiterBox waiter /= box))
+
+waitForFutureChannelEventUnlessClosed :: Connection -> Guid -> MethodName -> IO Value
+waitForFutureChannelEventUnlessClosed conn guid method = do
+  already <- atomically (Set.member guid <$> readTVar (connectionClosedGuids conn))
+  when already (throwIO targetClosedError)
+  box <- registerFutureEventWaiter conn guid method
+  closeBox <- registerEventWaiter conn guid (MethodName "close")
+  atomically $ do
+    closedConn <- readTVar (connectionClosed conn)
+    case closedConn of
+      Just err -> do
+        unregisterWaiterSTM conn box
+        unregisterWaiterSTM conn closeBox
+        throwSTM err
+      Nothing -> do
+        closedSet <- readTVar (connectionClosedGuids conn)
+        eventParams <- tryReadTMVar box
+        closeFired <- tryReadTMVar closeBox
+        case eventParams of
+          Just params -> do
+            unregisterWaiterSTM conn box
+            unregisterWaiterSTM conn closeBox
+            pure params
+          Nothing
+            | Set.member guid closedSet || isJust closeFired -> do
+                unregisterWaiterSTM conn box
+                unregisterWaiterSTM conn closeBox
+                throwSTM targetClosedError
+            | otherwise ->
+                retry
 
 waitUntilUrl :: Connection -> Guid -> (Url -> Bool) -> IO ()
 waitUntilUrl conn guid predicate =

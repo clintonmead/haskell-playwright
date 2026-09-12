@@ -14,6 +14,8 @@ module Playwright.BrowserContext
   , cookiesFor
   , contextsEqual
   , contextRequest
+  , isContextClosed
+  , onContextPage
   , grantPermissions
   , grantPermissionsFor
   , newPage
@@ -26,11 +28,13 @@ module Playwright.BrowserContext
   , setOffline
   , setStorageState
   , storageState
+  , waitForContextClose
   , waitForContextPage
   ) where
 
 import Control.Exception
   ( throwIO
+  , try
   )
 import Data.Set qualified as Set
 import Data.Text
@@ -50,9 +54,15 @@ import Playwright.Connection
   , closedGuids
   , guidsOfType
   , lookupObject
+  , registerEventHandler
   , setTimeoutDefault
   , setTimeoutNavigation
-  , waitForFutureChannelEvent
+  , waitForChannelEvent
+  , waitForFutureChannelEventUnlessClosed
+  )
+import Playwright.Error
+  ( PlaywrightError (ProtocolRpc)
+  , ProtocolFailure (protocolFailureName)
   )
 import Playwright.Cookie
   ( Cookie
@@ -192,12 +202,21 @@ closeContext ctx =
 
 closeContextWith :: BrowserContext -> Maybe Text -> IO ()
 closeContextWith ctx reason = do
-  _ :: BrowserContextCloseResult <-
-    send
-      (browserContextChannel ctx)
-      (MethodName "close")
-      mkBrowserContextCloseParams {browserContextCloseParamsReason = reason}
-  pure ()
+  result <-
+    try
+      ( send
+          (browserContextChannel ctx)
+          (MethodName "close")
+          mkBrowserContextCloseParams {browserContextCloseParamsReason = reason}
+      )
+  case result of
+    Left (ProtocolRpc failure)
+      | protocolFailureName failure == "TargetClosedError" ->
+          pure ()
+    Left err ->
+      throwIO err
+    Right (_ :: BrowserContextCloseResult) ->
+      pure ()
 
 pageContext :: Page -> BrowserContext
 pageContext page =
@@ -227,6 +246,36 @@ contextsEqual :: BrowserContext -> BrowserContext -> Bool
 contextsEqual left right =
   channelGuid (browserContextChannel left) == channelGuid (browserContextChannel right)
 
+isContextClosed :: BrowserContext -> IO Bool
+isContextClosed ctx = do
+  closed <- closedGuids (channelConnection (browserContextChannel ctx))
+  pure (Set.member (channelGuid (browserContextChannel ctx)) closed)
+
+onContextPage :: BrowserContext -> (Page -> IO ()) -> IO ()
+onContextPage ctx run =
+  registerEventHandler
+    (channelConnection (browserContextChannel ctx))
+    (channelGuid (browserContextChannel ctx))
+    (MethodName "page")
+    ( \params -> do
+        event <- either throwIO pure (fromJsonValue params)
+        page <- pageFromRef (browserContextChannel ctx) (browserContextPageEventPage event)
+        run page
+    )
+
+waitForContextClose :: BrowserContext -> IO BrowserContext
+waitForContextClose ctx = do
+  already <- isContextClosed ctx
+  if already
+    then pure ctx
+    else do
+      _ <-
+        waitForChannelEvent
+          (channelConnection (browserContextChannel ctx))
+          (channelGuid (browserContextChannel ctx))
+          (MethodName "close")
+      pure ctx
+
 contextPages :: BrowserContext -> IO [Page]
 contextPages ctx = do
   let
@@ -248,7 +297,7 @@ contextPages ctx = do
 waitForContextPage :: BrowserContext -> IO Page
 waitForContextPage ctx = do
   params <-
-    waitForFutureChannelEvent
+    waitForFutureChannelEventUnlessClosed
       (channelConnection (browserContextChannel ctx))
       (channelGuid (browserContextChannel ctx))
       (MethodName "page")

@@ -19,6 +19,7 @@ module Playwright.Evaluate
   , evaluateOnElementText
   , evaluateOnElementWith
   , evaluateOnFrame
+  , evaluateOnFrameBool
   , evaluateOnFrameText
   , evaluateOnHandle
   , evaluateOnHandleExpression
@@ -192,6 +193,10 @@ evaluateOnFrame =
 evaluateOnFrameText :: Frame -> Text -> IO Text
 evaluateOnFrameText frame expression =
   requireText =<< evaluateOnFrame frame expression
+
+evaluateOnFrameBool :: Frame -> Text -> IO Bool
+evaluateOnFrameBool frame expression =
+  requireBool =<< evaluateOnFrame frame expression
 
 evaluateOnElement :: ElementHandle -> Text -> IO SerializedValue
 evaluateOnElement handle expression =
