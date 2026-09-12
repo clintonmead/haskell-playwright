@@ -216,6 +216,7 @@ test-suite playwright-test
       Playwright.BrowserContextTimezoneSpec
       Playwright.BrowserContextUserAgentSpec
       Playwright.BrowserContextViewportSpec
+      Playwright.BrowserSpec
       Playwright.ConnectionSpec
       Playwright.DownloadSpec
       Playwright.ElementHandleBoundingBoxSpec

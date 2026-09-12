@@ -3,9 +3,11 @@ module Playwright.Connection.Store
   , beginLocatorHandler
   , clearRouteHandlers
   , closedGuids
+  , contextHasOwnerPage
   , deleteLocatorHandler
   , guidsOfType
   , locatorHandlerUidsMatching
+  , lookupBrowserTypeGuid
   , lookupContextBaseUrl
   , lookupContextBrowserGuid
   , lookupMainFramePage
@@ -15,6 +17,7 @@ module Playwright.Connection.Store
   , lookupRequestOverrides
   , lookupSelectorEngines
   , lookupTimeoutDefaults
+  , markContextHasOwnerPage
   , markLocatorHandlersListening
   , markPageOwnsContext
   , pageOwnsContext
@@ -22,6 +25,7 @@ module Playwright.Connection.Store
   , putLocatorHandler
   , registerMainFramePage
   , rememberBrowserContext
+  , rememberBrowserType
   , removeRouteHandlers
   , routeHandlersFor
   , setTimeoutDefault
@@ -54,7 +58,7 @@ import Data.Text
   ( Text
   )
 import Playwright.Connection.Types
-  ( Connection (connectionBrowserContexts, connectionClosedGuids, connectionContextBaseUrls, connectionContextBrowsers, connectionLocatorHandlers, connectionLocatorListening, connectionMainFramePages, connectionObjects, connectionPagesOwningContext, connectionRequestFailures, connectionRequestOverrides, connectionRouteHandlers, connectionRouteListening, connectionSelectorEngines, connectionTimeoutDefaults)
+  ( Connection (connectionBrowserContexts, connectionBrowserTypes, connectionClosedGuids, connectionContextBaseUrls, connectionContextBrowsers, connectionContextsWithOwnerPage, connectionLocatorHandlers, connectionLocatorListening, connectionMainFramePages, connectionObjects, connectionPagesOwningContext, connectionRequestFailures, connectionRequestOverrides, connectionRouteHandlers, connectionRouteListening, connectionSelectorEngines, connectionTimeoutDefaults)
   , StoredLocatorHandler (storedLocatorHandlerFrame, storedLocatorHandlerSelector, storedLocatorHandlerTimes)
   )
 import Playwright.Error
@@ -188,6 +192,26 @@ pageOwnsContext :: Connection -> Guid -> IO Bool
 pageOwnsContext conn pageGuid =
   atomically $
     Set.member pageGuid <$> readTVar (connectionPagesOwningContext conn)
+
+markContextHasOwnerPage :: Connection -> Guid -> IO ()
+markContextHasOwnerPage conn contextGuid =
+  atomically $
+    modifyTVar' (connectionContextsWithOwnerPage conn) (Set.insert contextGuid)
+
+contextHasOwnerPage :: Connection -> Guid -> IO Bool
+contextHasOwnerPage conn contextGuid =
+  atomically $
+    Set.member contextGuid <$> readTVar (connectionContextsWithOwnerPage conn)
+
+rememberBrowserType :: Connection -> Guid -> Guid -> IO ()
+rememberBrowserType conn browserGuid browserTypeGuid =
+  atomically $
+    modifyTVar' (connectionBrowserTypes conn) (Map.insert browserGuid browserTypeGuid)
+
+lookupBrowserTypeGuid :: Connection -> Guid -> IO (Maybe Guid)
+lookupBrowserTypeGuid conn browserGuid =
+  atomically $
+    Map.lookup browserGuid <$> readTVar (connectionBrowserTypes conn)
 
 lookupSelectorEngines :: Connection -> IO [SelectorEngine]
 lookupSelectorEngines conn =

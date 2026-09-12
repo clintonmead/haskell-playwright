@@ -35,6 +35,9 @@ module Playwright.BrowserContext
 import Control.Exception
   ( throwIO
   )
+import Control.Monad
+  ( when
+  )
 import Data.Set qualified as Set
 import Data.Text
   ( Text
@@ -51,6 +54,7 @@ import Playwright.Channel
 import Playwright.Connection
   ( Connection
   , closedGuids
+  , contextHasOwnerPage
   , guidsOfType
   , lookupObject
   , registerEventHandler
@@ -60,7 +64,8 @@ import Playwright.Connection
   , waitForFutureChannelEventUnlessClosed
   )
 import Playwright.Error
-  ( ignoreTargetClosed
+  ( PlaywrightError (DecodeFailure)
+  , ignoreTargetClosed
   )
 import Playwright.Cookie
   ( Cookie
@@ -172,6 +177,12 @@ contextFromRef conn ref =
 
 newPage :: BrowserContext -> IO Page
 newPage ctx = do
+  owned <-
+    contextHasOwnerPage
+      (channelConnection (browserContextChannel ctx))
+      (channelGuid (browserContextChannel ctx))
+  when owned $
+    throwIO (DecodeFailure "Please use browser.newContext()")
   result <-
     send
       (browserContextChannel ctx)

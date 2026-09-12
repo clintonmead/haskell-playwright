@@ -2,6 +2,7 @@ module Playwright.Browser
   ( Browser (..)
   , browserFromRef
   , browserContexts
+  , browserVersion
   , browsersEqual
   , closeBrowser
   , contextBrowser
@@ -9,6 +10,7 @@ module Playwright.Browser
   , newBrowserPageWith
   , newContext
   , newContextWith
+  , onBrowserContext
   , withPage
   , withPageWith
   ) where
@@ -24,6 +26,9 @@ import Data.Maybe
   ( isJust
   )
 import Data.Set qualified as Set
+import Data.Text
+  ( Text
+  )
 import Playwright.BrowserContext
   ( BrowserContext (browserContextChannel)
   , closeContext
@@ -42,15 +47,21 @@ import Playwright.Connection
   , lookupObject
   , lookupOwnedContextGuids
   , lookupSelectorEngines
+  , markContextHasOwnerPage
   , markPageOwnsContext
+  , registerEventHandler
   , rememberBrowserContext
   , writeContextBaseUrl
   )
 import Playwright.Error
   ( PlaywrightError (DecodeFailure)
+  , ignoreTargetClosed
   )
 import Playwright.Json.ChannelRef
   ( ChannelRef (ChannelRef, channelRefGuid)
+  )
+import Playwright.Json.Decode
+  ( fromJsonValue
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -65,12 +76,14 @@ import Playwright.Page
   )
 import Playwright.Protocol
   ( BrowserCloseResult
+  , BrowserContextEvent (browserContextEventContext)
+  , BrowserInitializer (browserInitializerVersion)
   , BrowserNewContextParams (browserNewContextParamsSelectorEngines)
   , BrowserNewContextResult (browserNewContextResultContext)
   , mkBrowserCloseParams
   )
 import Playwright.RemoteObject
-  ( RemoteObject (remoteParent)
+  ( RemoteObject (remoteInitializer, remoteParent)
   )
 
 newtype Browser = Browser
@@ -84,6 +97,29 @@ browserFromRef conn ref =
 browsersEqual :: Browser -> Browser -> Bool
 browsersEqual left right =
   channelGuid (browserChannel left) == channelGuid (browserChannel right)
+
+browserVersion :: Browser -> IO Text
+browserVersion browser = do
+  let
+    conn = channelConnection (browserChannel browser)
+  obj <- lookupObject conn (channelGuid (browserChannel browser))
+  initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
+  pure (browserInitializerVersion initializer)
+
+onBrowserContext :: Browser -> (BrowserContext -> IO ()) -> IO ()
+onBrowserContext browser run =
+  registerEventHandler
+    (channelConnection (browserChannel browser))
+    (channelGuid (browserChannel browser))
+    (MethodName "context")
+    ( \params -> do
+        event <- either throwIO pure (fromJsonValue params)
+        ctx <-
+          contextFromRef
+            (channelConnection (browserChannel browser))
+            (browserContextEventContext event)
+        run ctx
+    )
 
 browserContexts :: Browser -> IO [BrowserContext]
 browserContexts browser = do
@@ -110,10 +146,11 @@ contextBrowser ctx = do
       browserFromRef conn (ChannelRef (remoteParent obj))
 
 closeBrowser :: Browser -> IO ()
-closeBrowser browser = do
-  _ :: BrowserCloseResult <-
-    send (browserChannel browser) (MethodName "close") mkBrowserCloseParams
-  pure ()
+closeBrowser browser =
+  ignoreTargetClosed $ do
+    _ :: BrowserCloseResult <-
+      send (browserChannel browser) (MethodName "close") mkBrowserCloseParams
+    pure ()
 
 newContext :: Browser -> IO BrowserContext
 newContext browser =
@@ -165,9 +202,10 @@ newBrowserPageWith :: Browser -> NewContextOptions -> IO Page
 newBrowserPageWith browser opts = do
   ctx <- newContextWith browser opts
   page <- newPage ctx
-  markPageOwnsContext
-    (channelConnection (browserChannel browser))
-    (channelGuid (pageChannel page))
+  let
+    conn = channelConnection (browserChannel browser)
+  markPageOwnsContext conn (channelGuid (pageChannel page))
+  markContextHasOwnerPage conn (channelGuid (browserContextChannel ctx))
   pure page
 
 withPage :: Browser -> (Page -> IO a) -> IO a

@@ -165,10 +165,13 @@ module Playwright
   , blur
   , boundingBox
   , bringToFront
+  , browserBrowserType
   , browserContexts
   , browserFromRef
   , browsersEqual
   , browserTypeFromRef
+  , browserTypesEqual
+  , browserVersion
   , check
   , checkHandle
   , checkWith
@@ -428,7 +431,9 @@ module Playwright
   , objectSpecialArgument
   , objectTextArgument
   , onLoad
+  , onBrowserContext
   , onContextPage
+  , onPageClose
   , onRequest
   , onRequestFailed
   , onRequestFinished
@@ -658,12 +663,14 @@ import Playwright.Browser
   , browserContexts
   , browserFromRef
   , browsersEqual
+  , browserVersion
   , closeBrowser
   , contextBrowser
   , newBrowserPage
   , newBrowserPageWith
   , newContext
   , newContextWith
+  , onBrowserContext
   , withPage
   , withPageWith
   )
@@ -705,7 +712,9 @@ import Playwright.BrowserName
   )
 import Playwright.BrowserType
   ( BrowserType (BrowserType, browserTypeChannel, browserTypeName)
+  , browserBrowserType
   , browserTypeFromRef
+  , browserTypesEqual
   , launch
   , withBrowser
   )
@@ -1170,6 +1179,7 @@ import Playwright.Page
   , title
   , url
   , waitForClose
+  , onPageClose
   , frameByName
   , frames
   , mainFrame

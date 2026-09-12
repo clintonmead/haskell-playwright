@@ -36,6 +36,7 @@ module Playwright.Page
   , addStyleTag
   , setExtraHTTPHeaders
   , waitForClose
+  , onPageClose
   , opener
   , pagesEqual
   , subscribeContext
@@ -78,6 +79,7 @@ import Playwright.Connection
   , lookupObject
   , lookupTimeoutDefaults
   , pageOwnsContext
+  , registerEventHandler
   , registerMainFramePage
   , setTimeoutDefault
   , setTimeoutNavigation
@@ -311,6 +313,14 @@ waitForClose page = do
           (channelGuid (pageChannel page))
           (MethodName "close")
       pure ()
+
+onPageClose :: Page -> IO () -> IO ()
+onPageClose page run =
+  registerEventHandler
+    (channelConnection (pageChannel page))
+    (channelGuid (pageChannel page))
+    (MethodName "close")
+    (\_ -> run)
 
 bringToFront :: Page -> IO ()
 bringToFront page = do

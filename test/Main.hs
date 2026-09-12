@@ -2,6 +2,7 @@ module Main
   ( main
   ) where
 
+import Playwright.BrowserSpec qualified as BrowserSpec
 import Playwright.BrowserContextAddCookiesSpec qualified as BrowserContextAddCookiesSpec
 import Playwright.BrowserContextAddInitScriptSpec qualified as BrowserContextAddInitScriptSpec
 import Playwright.BrowserContextBaseUrlSpec qualified as BrowserContextBaseUrlSpec
@@ -161,6 +162,7 @@ main =
       testGroup
         "playwright"
         [ TransportSpec.tests
+        , BrowserSpec.tests
         , BrowserContextAddCookiesSpec.tests
         , BrowserContextAddInitScriptSpec.tests
         , BrowserContextBaseUrlSpec.tests

@@ -94,6 +94,8 @@ data Connection = Connection
   , connectionBrowserContexts :: TVar (Map Guid [Guid])
   , connectionContextBrowsers :: TVar (Map Guid Guid)
   , connectionPagesOwningContext :: TVar (Set Guid)
+  , connectionContextsWithOwnerPage :: TVar (Set Guid)
+  , connectionBrowserTypes :: TVar (Map Guid Guid)
   , connectionSelectorEngines :: TVar [SelectorEngine]
   , connectionTimeoutDefaults :: TVar (Map Guid TimeoutDefaults)
   , connectionMainFramePages :: TVar (Map Guid Guid)

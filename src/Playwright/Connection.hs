@@ -15,6 +15,10 @@ module Playwright.Connection
   , lookupContextBrowserGuid
   , markPageOwnsContext
   , pageOwnsContext
+  , markContextHasOwnerPage
+  , contextHasOwnerPage
+  , rememberBrowserType
+  , lookupBrowserTypeGuid
   , waitForLifecycle
   , waitUntilUrl
   , closedGuids
@@ -108,9 +112,11 @@ import Playwright.Connection.Store
   , beginLocatorHandler
   , clearRouteHandlers
   , closedGuids
+  , contextHasOwnerPage
   , deleteLocatorHandler
   , guidsOfType
   , locatorHandlerUidsMatching
+  , lookupBrowserTypeGuid
   , lookupContextBaseUrl
   , lookupContextBrowserGuid
   , lookupMainFramePage
@@ -121,12 +127,14 @@ import Playwright.Connection.Store
   , lookupSelectorEngines
   , lookupTimeoutDefaults
   , markLocatorHandlersListening
+  , markContextHasOwnerPage
   , markPageOwnsContext
   , pageOwnsContext
   , pushRouteHandler
   , putLocatorHandler
   , registerMainFramePage
   , rememberBrowserContext
+  , rememberBrowserType
   , removeRouteHandlers
   , routeHandlersFor
   , setTimeoutDefault
@@ -135,7 +143,7 @@ import Playwright.Connection.Store
   , writeRequestOverrides
   )
 import Playwright.Connection.Types
-  ( Connection (Connection, connectionBrowserContexts, connectionCallbacks, connectionClosed, connectionClosedGuids, connectionContextBaseUrls, connectionContextBrowsers, connectionEventBuffer, connectionEventHandlers, connectionEventWaiters, connectionFinishedRequests, connectionHandlerQueue, connectionHandlerThreads, connectionLocatorHandlers, connectionLocatorListening, connectionMainFramePages, connectionNextId, connectionObjects, connectionPagesOwningContext, connectionPendingHandlers, connectionRequestFailures, connectionRequestOverrides, connectionRouteHandlers, connectionRouteListening, connectionSelectorEngines, connectionTimeoutDefaults, connectionTransport)
+  ( Connection (Connection, connectionBrowserContexts, connectionBrowserTypes, connectionCallbacks, connectionClosed, connectionClosedGuids, connectionContextBaseUrls, connectionContextBrowsers, connectionContextsWithOwnerPage, connectionEventBuffer, connectionEventHandlers, connectionEventWaiters, connectionFinishedRequests, connectionHandlerQueue, connectionHandlerThreads, connectionLocatorHandlers, connectionLocatorListening, connectionMainFramePages, connectionNextId, connectionObjects, connectionPagesOwningContext, connectionPendingHandlers, connectionRequestFailures, connectionRequestOverrides, connectionRouteHandlers, connectionRouteListening, connectionSelectorEngines, connectionTimeoutDefaults, connectionTransport)
   , OutgoingCall (OutgoingCall, outgoingCallGuid, outgoingCallId, outgoingCallMetadata, outgoingCallMethod, outgoingCallParams)
   , StoredLocatorHandler (StoredLocatorHandler, storedLocatorHandlerFrame, storedLocatorHandlerRun, storedLocatorHandlerSelector, storedLocatorHandlerTimes)
   )
@@ -214,6 +222,8 @@ withConnection transport action = do
   browserContexts <- newTVarIO (Map.empty :: Map Guid [Guid])
   contextBrowsers <- newTVarIO (Map.empty :: Map Guid Guid)
   pagesOwningContext <- newTVarIO (Set.empty :: Set Guid)
+  contextsWithOwnerPage <- newTVarIO (Set.empty :: Set Guid)
+  browserTypes <- newTVarIO (Map.empty :: Map Guid Guid)
   selectorEngines <- newTVarIO ([] :: [SelectorEngine])
   timeoutDefaults <- newTVarIO Map.empty
   mainFramePages <- newTVarIO Map.empty
@@ -244,6 +254,8 @@ withConnection transport action = do
         , connectionBrowserContexts = browserContexts
         , connectionContextBrowsers = contextBrowsers
         , connectionPagesOwningContext = pagesOwningContext
+        , connectionContextsWithOwnerPage = contextsWithOwnerPage
+        , connectionBrowserTypes = browserTypes
         , connectionSelectorEngines = selectorEngines
         , connectionTimeoutDefaults = timeoutDefaults
         , connectionMainFramePages = mainFramePages
