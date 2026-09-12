@@ -43,6 +43,7 @@ import Playwright.FrameGotoSpec qualified as FrameGotoSpec
 import Playwright.FrameHierarchySpec qualified as FrameHierarchySpec
 import Playwright.GeolocationSpec qualified as GeolocationSpec
 import Playwright.IntegrationSpec qualified as IntegrationSpec
+import Playwright.InterceptionSpec qualified as InterceptionSpec
 import Playwright.JsHandleAsElementSpec qualified as JsHandleAsElementSpec
 import Playwright.JsHandleEvaluateSpec qualified as JsHandleEvaluateSpec
 import Playwright.JsHandleJsonValueSpec qualified as JsHandleJsonValueSpec
@@ -192,6 +193,7 @@ main =
         , FrameHierarchySpec.tests
         , GeolocationSpec.tests
         , IntegrationSpec.tests
+        , InterceptionSpec.tests
         , JsHandleAsElementSpec.tests
         , JsHandleEvaluateSpec.tests
         , JsHandleJsonValueSpec.tests

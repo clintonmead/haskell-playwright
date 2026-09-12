@@ -26,7 +26,6 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 - page-leaks (JS `toImpl` / leakedJSHandles)
 - page-listeners (JS `removeAllListeners` wait/ignoreErrors)
 - page-request-intercept
-- interception
 - locator-highlight
 
 ## Ported `tests/page` with remaining cases
@@ -39,6 +38,7 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 - **selectors-text:** skip locator `{ hasText }` / regex hasText (no `filterHasText` yet).
 - **selectors-role:** skip `getByRole` regex `name` (locator `role=…[name=/…/]` is covered). Skip `description`.
 - **retarget:** skip Playwright `expect` matchers (`toBeEnabled`, `toHaveValue`, `toHaveText`, `toHaveClass`, …). Core locator/handle/page checks and `waitForElementState` are ported. Official `giveItAChanceToResolve` is `rafraf(page, 5)` (double `requestAnimationFrame`, not a sleep).
+- **interception:** skip Node `iso.globToRegexPattern` / `urlMatches` unit tests, unbalanced-brace glob validation (Haskell `UrlGlob` does not reject `{`), `page.route` with a `vm` RegExp, and blob-URL intercept (official WebKit-only). The `http://localhos**?*oo` case uses `localhost` like other cross-host ports.
 - **page-history:** bfcache, reload during renderer navigation, goBack/goForward during submit, issue 20791, popup reload isolation.
 - **page-event-request:** service worker / intercept-race / Chromium 204 fixme leftovers.
 - **downloads:** saveAs / cancel.
