@@ -10,9 +10,11 @@ module Playwright.Route
   , routeRequest
   , routeWith
   , unroute
+  , unrouteAll
   , contextRoute
   , contextRouteWith
   , unrouteContext
+  , unrouteContextAll
   ) where
 
 import Control.Concurrent.STM
@@ -67,6 +69,7 @@ import Playwright.Connection
   , pushRouteHandler
   , registerEventHandler
   , removeRouteHandlers
+  , clearRouteHandlers
   , routeHandlersFor
   , writeRequestOverrides
   )
@@ -286,12 +289,26 @@ unroute page glob = do
     glob
   updateInterceptionPatterns page
 
+unrouteAll :: Page -> IO ()
+unrouteAll page = do
+  clearRouteHandlers
+    (channelConnection (pageChannel page))
+    (channelGuid (pageChannel page))
+  updateInterceptionPatterns page
+
 unrouteContext :: BrowserContext -> UrlGlob -> IO ()
 unrouteContext ctx glob = do
   removeRouteHandlers
     (channelConnection (browserContextChannel ctx))
     (channelGuid (browserContextChannel ctx))
     glob
+  updateContextInterceptionPatterns ctx
+
+unrouteContextAll :: BrowserContext -> IO ()
+unrouteContextAll ctx = do
+  clearRouteHandlers
+    (channelConnection (browserContextChannel ctx))
+    (channelGuid (browserContextChannel ctx))
   updateContextInterceptionPatterns ctx
 
 dispatchPageRoute :: Page -> Value -> IO ()

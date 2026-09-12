@@ -13,6 +13,7 @@ module Playwright.Connection
   , closedGuids
   , pushRouteHandler
   , removeRouteHandlers
+  , clearRouteHandlers
   , routeHandlersFor
   , lookupRequestOverrides
   , writeRequestOverrides
@@ -425,6 +426,11 @@ removeRouteHandlers conn guid glob =
     modifyTVar'
       (connectionRouteHandlers conn)
       (Map.adjust (filter (\(existing, _) -> existing /= glob)) guid)
+
+clearRouteHandlers :: Connection -> Guid -> IO ()
+clearRouteHandlers conn guid =
+  atomically $
+    modifyTVar' (connectionRouteHandlers conn) (Map.delete guid)
 
 routeHandlersFor :: Connection -> Guid -> IO [(UrlGlob, ChannelRef -> IO Bool)]
 routeHandlersFor conn guid = do

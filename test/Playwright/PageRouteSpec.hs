@@ -24,6 +24,7 @@ import Playwright
   , HttpMethod (httpMethodToText)
   , ResourceType (resourceTypeToText)
   , UrlGlob (UrlGlob)
+  , abortRoute
   , continueRoute
   , currentUrl
   , defaultGotoOptions
@@ -43,6 +44,7 @@ import Playwright
   , routeRequest
   , setExtraHTTPHeaders
   , unroute
+  , unrouteAll
   , urlFromText
   , urlToText
   )
@@ -153,6 +155,17 @@ tests =
           unroute page (UrlGlob "**/empty.html")
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           assertEqual "after" [1] . reverse =<< readIORef intercepted
+    , testCase "page.unrouteAll removes all routes" $
+        withAssets $ \prefix page -> do
+          route page (UrlGlob "**/*") abortRoute
+          route page (UrlGlob "**/empty.html") abortRoute
+          unrouteAll page
+          response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          case response of
+            Nothing ->
+              assertFailure "missing response"
+            Just value ->
+              assertEqual "ok" True =<< responseOk value
     ]
 
 headerValue :: Text -> [HttpHeader] -> Maybe Text

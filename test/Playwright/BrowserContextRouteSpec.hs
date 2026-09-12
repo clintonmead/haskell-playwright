@@ -30,6 +30,7 @@ import Playwright
   , RouteOptions (routeTimes)
   , RouteTimes (RouteTimes)
   , UrlGlob (UrlGlob)
+  , abortRoute
   , contextRoute
   , contextRouteWith
   , continueRoute
@@ -55,6 +56,7 @@ import Playwright
   , route
   , routeRequest
   , unrouteContext
+  , unrouteContextAll
   , urlFromText
   , urlToText
   )
@@ -177,6 +179,17 @@ tests =
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           assertEqual "once" [1] . reverse =<< readIORef intercepted
+    , testCase "context.unrouteAll removes all handlers" $
+        withAssetsContextWithDefault $ \prefix ctx page -> do
+          contextRoute ctx (UrlGlob "**/*") abortRoute
+          contextRoute ctx (UrlGlob "**/empty.html") abortRoute
+          unrouteContextAll ctx
+          response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          case response of
+            Nothing ->
+              assertFailure "missing response"
+            Just value ->
+              assertEqual "ok" True =<< responseOk value
     ]
 
 withAssetsContextWithDefault :: (Text -> BrowserContext -> Page -> IO a) -> IO a

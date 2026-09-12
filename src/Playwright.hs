@@ -364,7 +364,9 @@ module Playwright
   , uncheck
   , uncheckWith
   , unroute
+  , unrouteAll
   , unrouteContext
+  , unrouteContextAll
   , url
   , urlFromText
   , urlToText
@@ -868,7 +870,9 @@ import Playwright.Route
   , routeRequest
   , routeWith
   , unroute
+  , unrouteAll
   , unrouteContext
+  , unrouteContextAll
   )
 import Playwright.RouteOptions
   ( RouteOptions (RouteOptions, routeTimes)
