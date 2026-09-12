@@ -19,6 +19,11 @@ module Playwright.Connection
   , writeRequestOverrides
   , lookupContextBaseUrl
   , writeContextBaseUrl
+  , lookupTimeoutDefaults
+  , lookupMainFramePage
+  , registerMainFramePage
+  , setTimeoutDefault
+  , setTimeoutNavigation
   , waitUntilRemote
   ) where
 
@@ -92,6 +97,9 @@ import Data.Map.Strict
   ( Map
   )
 import Data.Map.Strict qualified as Map
+import Data.Maybe
+  ( fromMaybe
+  )
 import Data.Set
   ( Set
   )
@@ -141,6 +149,13 @@ import Playwright.RequestOverrides
   ( RequestOverrides
   , emptyRequestOverrides
   )
+import Playwright.Timeout
+  ( Timeout
+  )
+import Playwright.TimeoutDefaults
+  ( TimeoutDefaults (timeoutDefaultsNavigation, timeoutDefaultsTimeout)
+  , emptyTimeoutDefaults
+  )
 import Playwright.Transport
   ( Transport (closeTransport, recvPayload, sendPayload)
   )
@@ -165,6 +180,8 @@ data Connection = Connection
   , connectionRouteListening :: TVar (Set Guid)
   , connectionRequestOverrides :: TVar (Map Guid RequestOverrides)
   , connectionContextBaseUrls :: TVar (Map Guid Url)
+  , connectionTimeoutDefaults :: TVar (Map Guid TimeoutDefaults)
+  , connectionMainFramePages :: TVar (Map Guid Guid)
   , connectionPendingHandlers :: TVar Int
   , connectionHandlerThreads :: TVar (Set ThreadId)
   , connectionHandlerQueue :: TQueue (IO ())
@@ -216,6 +233,8 @@ withConnection transport action = do
   routeListening <- newTVarIO Set.empty
   requestOverrides <- newTVarIO Map.empty
   contextBaseUrls <- newTVarIO Map.empty
+  timeoutDefaults <- newTVarIO Map.empty
+  mainFramePages <- newTVarIO Map.empty
   pendingHandlers <- newTVarIO (0 :: Int)
   handlerThreads <- newTVarIO (Set.empty :: Set ThreadId)
   handlerQueue <- newTQueueIO
@@ -236,6 +255,8 @@ withConnection transport action = do
         , connectionRouteListening = routeListening
         , connectionRequestOverrides = requestOverrides
         , connectionContextBaseUrls = contextBaseUrls
+        , connectionTimeoutDefaults = timeoutDefaults
+        , connectionMainFramePages = mainFramePages
         , connectionPendingHandlers = pendingHandlers
         , connectionHandlerThreads = handlerThreads
         , connectionHandlerQueue = handlerQueue
@@ -469,6 +490,37 @@ writeContextBaseUrl :: Connection -> Guid -> Url -> IO ()
 writeContextBaseUrl conn guid url =
   atomically $
     modifyTVar' (connectionContextBaseUrls conn) (Map.insert guid url)
+
+lookupTimeoutDefaults :: Connection -> Guid -> IO TimeoutDefaults
+lookupTimeoutDefaults conn guid =
+  atomically $
+    Map.findWithDefault emptyTimeoutDefaults guid <$> readTVar (connectionTimeoutDefaults conn)
+
+setTimeoutDefault :: Connection -> Guid -> Maybe Timeout -> IO ()
+setTimeoutDefault conn guid value =
+  atomically $
+    modifyTVar' (connectionTimeoutDefaults conn) (Map.alter (Just . update . fromMaybe emptyTimeoutDefaults) guid)
+  where
+    update defaults =
+      defaults {timeoutDefaultsTimeout = value}
+
+setTimeoutNavigation :: Connection -> Guid -> Maybe Timeout -> IO ()
+setTimeoutNavigation conn guid value =
+  atomically $
+    modifyTVar' (connectionTimeoutDefaults conn) (Map.alter (Just . update . fromMaybe emptyTimeoutDefaults) guid)
+  where
+    update defaults =
+      defaults {timeoutDefaultsNavigation = value}
+
+registerMainFramePage :: Connection -> Guid -> Guid -> IO ()
+registerMainFramePage conn frameGuid pageGuid =
+  atomically $
+    modifyTVar' (connectionMainFramePages conn) (Map.insert frameGuid pageGuid)
+
+lookupMainFramePage :: Connection -> Guid -> IO (Maybe Guid)
+lookupMainFramePage conn frameGuid =
+  atomically $
+    Map.lookup frameGuid <$> readTVar (connectionMainFramePages conn)
 
 runEventHandlers :: Connection -> Guid -> MethodName -> Value -> IO ()
 runEventHandlers conn guid method params = do

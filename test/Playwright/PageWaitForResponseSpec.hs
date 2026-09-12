@@ -11,13 +11,16 @@ import Playwright
   , defaultGotoOptions
   , evaluate
   , goto
+  , milliseconds
+  , setDefaultTimeout
   , urlFromText
   , urlToText
   , waitForResponse
   , responseUrl
   )
 import Playwright.Harness
-  ( withAssets
+  ( assertWaitTimeout
+  , withAssets
   )
 import Test.Tasty
   ( TestTree
@@ -25,6 +28,7 @@ import Test.Tasty
   )
 import Test.Tasty.HUnit
   ( assertEqual
+  , assertFailure
   , testCase
   )
 
@@ -44,4 +48,13 @@ tests =
             response <- wait handle
             url <- responseUrl response
             assertEqual "url" wanted (urlToText url)
+    , testCase "should respect default timeout" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          case milliseconds 1 of
+            Nothing ->
+              assertFailure "timeout"
+            Just timeout -> do
+              setDefaultTimeout page timeout
+              assertWaitTimeout (waitForResponse page (UrlGlob (prefix <> "/does-not-exist.png")))
     ]

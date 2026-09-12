@@ -38,6 +38,7 @@ module Playwright.Page
   , addStyleTag
   , setExtraHTTPHeaders
   , waitForFunction
+  , waitForFunctionWith
   , waitForLoadState
   , waitForNavigation
   , waitForNavigationWith
@@ -59,14 +60,12 @@ module Playwright.Page
   , pagesEqual
   , waitForPopup
   , onLoad
+  , pageActionTimeout
+  , pageNavigationTimeout
+  , setDefaultTimeout
+  , setDefaultNavigationTimeout
   ) where
 
-import Control.Concurrent
-  ( threadDelay
-  )
-import Control.Concurrent.Async
-  ( race
-  )
 import Control.Concurrent.STM
   ( atomically
   , takeTMVar
@@ -97,8 +96,12 @@ import Playwright.Channel
 import Playwright.Connection
   ( closedGuids
   , lookupObject
+  , lookupTimeoutDefaults
   , registerEventHandler
   , registerEventWaiter
+  , registerMainFramePage
+  , setTimeoutDefault
+  , setTimeoutNavigation
   , waitForChannelEvent
   , waitForFutureChannelEvent
   , waitUntilUrl
@@ -138,7 +141,7 @@ import Playwright.ElementHandle
   , elementHandleFromRef
   )
 import Playwright.Error
-  ( PlaywrightError (MissingObject, ProtocolRpc, WaitTimeout)
+  ( PlaywrightError (MissingObject, ProtocolRpc)
   , ProtocolFailure (protocolFailureName)
   )
 import Playwright.Exactness
@@ -264,8 +267,6 @@ import Playwright.SerializedArgument
   )
 import Playwright.Timeout
   ( Timeout
-  , defaultTimeout
-  , timeoutToDouble
   )
 import Playwright.Url
   ( Url
@@ -278,6 +279,13 @@ import Playwright.ViewportSize
   ( ViewportSize (viewportHeight, viewportWidth)
   , viewportHeightToInt
   , viewportWidthToInt
+  )
+import Playwright.RaceTimeout
+  ( waitWithTimeout
+  )
+import Playwright.TimeoutDefaults
+  ( resolveActionTimeout
+  , resolveNavigationTimeout
   )
 import Playwright.WaitForState
   ( WaitForState
@@ -295,12 +303,43 @@ pageFromRef contextChannel ref = do
   obj <- lookupObject conn (channelRefGuid ref)
   initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
   resolvedMainFrame <- frameFromRef conn (pageInitializerMainFrame initializer)
+  let
+    pageGuid = channelRefGuid ref
+  registerMainFramePage conn (channelGuid (frameChannel resolvedMainFrame)) pageGuid
   pure
     Page
-      { pageChannel = Channel conn (channelRefGuid ref)
+      { pageChannel = Channel conn pageGuid
       , pageMainFrame = resolvedMainFrame
       , pageContextChannel = contextChannel
       }
+
+pageActionTimeout :: Page -> IO Timeout
+pageActionTimeout page = do
+  let conn = channelConnection (pageChannel page)
+  pageDefaults <- lookupTimeoutDefaults conn (channelGuid (pageChannel page))
+  contextDefaults <- lookupTimeoutDefaults conn (channelGuid (pageContextChannel page))
+  pure (resolveActionTimeout pageDefaults contextDefaults)
+
+pageNavigationTimeout :: Page -> IO Timeout
+pageNavigationTimeout page = do
+  let conn = channelConnection (pageChannel page)
+  pageDefaults <- lookupTimeoutDefaults conn (channelGuid (pageChannel page))
+  contextDefaults <- lookupTimeoutDefaults conn (channelGuid (pageContextChannel page))
+  pure (resolveNavigationTimeout pageDefaults contextDefaults)
+
+setDefaultTimeout :: Page -> Timeout -> IO ()
+setDefaultTimeout page timeout =
+  setTimeoutDefault
+    (channelConnection (pageChannel page))
+    (channelGuid (pageChannel page))
+    (Just timeout)
+
+setDefaultNavigationTimeout :: Page -> Timeout -> IO ()
+setDefaultNavigationTimeout page timeout =
+  setTimeoutNavigation
+    (channelConnection (pageChannel page))
+    (channelGuid (pageChannel page))
+    (Just timeout)
 
 closePage :: Page -> IO ()
 closePage page = do
@@ -354,12 +393,14 @@ url :: Page -> IO Url
 url page = currentUrl (pageMainFrame page)
 
 waitForSelector :: Page -> Selector -> WaitForState -> IO ()
-waitForSelector page selector state =
-  waitForSelectorFrame (pageMainFrame page) selector state defaultTimeout Nothing
+waitForSelector page selector state = do
+  timeout <- pageActionTimeout page
+  waitForSelectorFrame (pageMainFrame page) selector state timeout Nothing
 
 waitForSelectorHandle :: Page -> Selector -> WaitForState -> IO (Maybe ElementHandle)
-waitForSelectorHandle page selector state =
-  waitForSelectorHandleWith page selector state defaultTimeout
+waitForSelectorHandle page selector state = do
+  timeout <- pageActionTimeout page
+  waitForSelectorHandleWith page selector state timeout
 
 waitForSelectorHandleWith :: Page -> Selector -> WaitForState -> Timeout -> IO (Maybe ElementHandle)
 waitForSelectorHandleWith page selector state timeout =
@@ -369,8 +410,9 @@ content :: Page -> IO Text
 content page = contentFrame (pageMainFrame page)
 
 setContent :: Page -> Text -> IO ()
-setContent page html =
-  setContentFrame (pageMainFrame page) html defaultTimeout
+setContent page html = do
+  timeout <- pageNavigationTimeout page
+  setContentFrame (pageMainFrame page) html timeout
 
 setViewportSize :: Page -> ViewportSize -> IO ()
 setViewportSize page size = do
@@ -463,17 +505,20 @@ getByRole page role opts =
 
 goBack :: Page -> IO (Maybe Response)
 goBack page = do
-  result <- send (pageChannel page) (MethodName "goBack") (mkPageGoBackParams defaultTimeout)
+  timeout <- pageNavigationTimeout page
+  result <- send (pageChannel page) (MethodName "goBack") (mkPageGoBackParams timeout)
   pure (fmap (responseFromRef (channelConnection (pageChannel page))) (pageGoBackResultResponse result))
 
 goForward :: Page -> IO (Maybe Response)
 goForward page = do
-  result <- send (pageChannel page) (MethodName "goForward") (mkPageGoForwardParams defaultTimeout)
+  timeout <- pageNavigationTimeout page
+  result <- send (pageChannel page) (MethodName "goForward") (mkPageGoForwardParams timeout)
   pure (fmap (responseFromRef (channelConnection (pageChannel page))) (pageGoForwardResultResponse result))
 
 reload :: Page -> IO (Maybe Response)
 reload page = do
-  result <- send (pageChannel page) (MethodName "reload") (mkPageReloadParams defaultTimeout)
+  timeout <- pageNavigationTimeout page
+  result <- send (pageChannel page) (MethodName "reload") (mkPageReloadParams timeout)
   pure (fmap (responseFromRef (channelConnection (pageChannel page))) (pageReloadResultResponse result))
 
 querySelector :: Page -> Selector -> IO (Maybe ElementHandle)
@@ -485,8 +530,9 @@ querySelectorStrict page selector =
   querySelectorFrame (pageMainFrame page) selector (Just True)
 
 waitForSelectorStrict :: Page -> Selector -> WaitForState -> IO ()
-waitForSelectorStrict page selector state =
-  waitForSelectorFrame (pageMainFrame page) selector state defaultTimeout (Just True)
+waitForSelectorStrict page selector state = do
+  timeout <- pageActionTimeout page
+  waitForSelectorFrame (pageMainFrame page) selector state timeout (Just True)
 
 addInitScript :: Page -> Text -> IO ()
 addInitScript page source = do
@@ -559,8 +605,13 @@ waitForTimeout page =
   waitForTimeoutFrame (pageMainFrame page)
 
 waitForFunction :: Page -> Text -> IO JsHandle
-waitForFunction page expression =
-  waitForFunctionFrame (pageMainFrame page) expression undefinedArgument defaultTimeout
+waitForFunction page expression = do
+  timeout <- pageActionTimeout page
+  waitForFunctionWith page expression timeout
+
+waitForFunctionWith :: Page -> Text -> Timeout -> IO JsHandle
+waitForFunctionWith page expression timeout =
+  waitForFunctionFrame (pageMainFrame page) expression undefinedArgument timeout
 
 mainFrame :: Page -> Frame
 mainFrame =
@@ -585,18 +636,10 @@ frameByName page name = do
       frameName <- currentName frame
       pure (frame, frameName)
 
-waitWithTimeout :: Timeout -> IO a -> IO a
-waitWithTimeout timeout action = do
-  result <- race (threadDelay (round (timeoutToDouble timeout * 1000))) action
-  case result of
-    Left () ->
-      throwIO (WaitTimeout timeout)
-    Right value ->
-      pure value
-
 waitForURL :: Page -> UrlGlob -> IO ()
-waitForURL page glob =
-  waitForURLWith page glob defaultTimeout
+waitForURL page glob = do
+  timeout <- pageNavigationTimeout page
+  waitForURLWith page glob timeout
 
 waitForURLWith :: Page -> UrlGlob -> Timeout -> IO ()
 waitForURLWith page glob timeout =
@@ -608,8 +651,9 @@ waitForURLWith page glob timeout =
     waitForLoadState page LoadStateLoad
 
 waitForNavigation :: Page -> IO (Maybe Response)
-waitForNavigation page =
-  waitForNavigationWith page defaultTimeout Nothing
+waitForNavigation page = do
+  timeout <- pageNavigationTimeout page
+  waitForNavigationWith page timeout Nothing
 
 waitForNavigationWith :: Page -> Timeout -> Maybe UrlGlob -> IO (Maybe Response)
 waitForNavigationWith page timeout glob =
@@ -683,8 +727,9 @@ waitForConsole page = do
   takeMessage
 
 waitForResponse :: Page -> UrlGlob -> IO Response
-waitForResponse page glob =
-  waitForResponseWith page glob defaultTimeout
+waitForResponse page glob = do
+  timeout <- pageActionTimeout page
+  waitForResponseWith page glob timeout
 
 waitForResponseWith :: Page -> UrlGlob -> Timeout -> IO Response
 waitForResponseWith page glob timeout =
@@ -704,8 +749,9 @@ waitForResponseWith page glob timeout =
         else collectResponse
 
 waitForRequest :: Page -> UrlGlob -> IO Request
-waitForRequest page glob =
-  waitForRequestWith page glob defaultTimeout
+waitForRequest page glob = do
+  timeout <- pageActionTimeout page
+  waitForRequestWith page glob timeout
 
 waitForRequestWith :: Page -> UrlGlob -> Timeout -> IO Request
 waitForRequestWith page glob timeout =

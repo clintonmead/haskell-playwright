@@ -12,7 +12,9 @@ import Playwright
   ( evaluateBool
   , jsonValueNumber
   , milliseconds
+  , setDefaultTimeout
   , waitForFunction
+  , waitForFunctionWith
   , waitForTimeout
   )
 import Playwright.Harness
@@ -61,4 +63,23 @@ tests =
     , testCase "should fail with predicate throwing on first call" $
         withChromiumPage $ \page ->
           assertProtocolContains "oh my" (waitForFunction page "() => { throw new Error('oh my'); }")
+    , testCase "should respect timeout" $
+        withChromiumPage $ \page ->
+          case milliseconds 10 of
+            Nothing ->
+              assertFailure "timeout"
+            Just timeout ->
+              assertProtocolContains
+                "Timeout 10ms exceeded"
+                (waitForFunctionWith page "() => false" timeout)
+    , testCase "should respect default timeout" $
+        withChromiumPage $ \page ->
+          case milliseconds 1 of
+            Nothing ->
+              assertFailure "timeout"
+            Just timeout -> do
+              setDefaultTimeout page timeout
+              assertProtocolContains
+                "Timeout 1ms exceeded"
+                (waitForFunction page "() => false")
     ]

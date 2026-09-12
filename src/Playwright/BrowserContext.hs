@@ -17,6 +17,8 @@ module Playwright.BrowserContext
   , newPage
   , pageContext
   , setContextExtraHTTPHeaders
+  , setContextDefaultTimeout
+  , setContextDefaultNavigationTimeout
   , setGeolocation
   , setHTTPCredentials
   , setOffline
@@ -42,6 +44,8 @@ import Playwright.Connection
   , closedGuids
   , guidsOfType
   , lookupObject
+  , setTimeoutDefault
+  , setTimeoutNavigation
   , waitForFutureChannelEvent
   )
 import Playwright.Cookie
@@ -135,6 +139,9 @@ import Playwright.StorageState
   , fromStorageStateResult
   , toSetStorageState
   )
+import Playwright.Timeout
+  ( Timeout
+  )
 import Playwright.Url
   ( Url
   , urlToText
@@ -181,6 +188,20 @@ closeContext ctx = do
 pageContext :: Page -> BrowserContext
 pageContext page =
   BrowserContext (pageContextChannel page)
+
+setContextDefaultTimeout :: BrowserContext -> Timeout -> IO ()
+setContextDefaultTimeout ctx timeout =
+  setTimeoutDefault
+    (channelConnection (browserContextChannel ctx))
+    (channelGuid (browserContextChannel ctx))
+    (Just timeout)
+
+setContextDefaultNavigationTimeout :: BrowserContext -> Timeout -> IO ()
+setContextDefaultNavigationTimeout ctx timeout =
+  setTimeoutNavigation
+    (channelConnection (browserContextChannel ctx))
+    (channelGuid (browserContextChannel ctx))
+    (Just timeout)
 
 contextsEqual :: BrowserContext -> BrowserContext -> Bool
 contextsEqual left right =

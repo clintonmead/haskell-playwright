@@ -402,7 +402,11 @@ module Playwright
   , setChecked
   , setCheckedHandle
   , setContent
+  , setContextDefaultNavigationTimeout
+  , setContextDefaultTimeout
   , setContextExtraHTTPHeaders
+  , setDefaultNavigationTimeout
+  , setDefaultTimeout
   , setExtraHTTPHeaders
   , setGeolocation
   , setHTTPCredentials
@@ -446,7 +450,9 @@ module Playwright
   , waitForElementState
   , waitForElementStateWith
   , waitForFileChooser
+  , waitForFileChooserWith
   , waitForFunction
+  , waitForFunctionWith
   , waitForLoadState
   , waitForNavigation
   , waitForNavigationWith
@@ -518,6 +524,8 @@ import Playwright.BrowserContext
   , grantPermissionsFor
   , newPage
   , pageContext
+  , setContextDefaultNavigationTimeout
+  , setContextDefaultTimeout
   , setContextExtraHTTPHeaders
   , setGeolocation
   , setHTTPCredentials
@@ -726,6 +734,7 @@ import Playwright.FileChooser
   ( FileChooser (FileChooser, fileChooserElement, fileChooserMultiple)
   , armFileChooser
   , waitForFileChooser
+  , waitForFileChooserWith
   )
 import Playwright.Frame
   ( Frame (Frame, frameChannel, frameParent, frameUrl)
@@ -930,6 +939,8 @@ import Playwright.Page
   , requestGC
   , screenshot
   , setContent
+  , setDefaultNavigationTimeout
+  , setDefaultTimeout
   , setExtraHTTPHeaders
   , setViewportSize
   , title
@@ -938,6 +949,7 @@ import Playwright.Page
   , waitForClose
   , waitForDialog
   , waitForFunction
+  , waitForFunctionWith
   , waitForLoadState
   , waitForNavigation
   , waitForNavigationWith

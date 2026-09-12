@@ -17,6 +17,7 @@ import Playwright
   , urlToText
   , waitForRequest
   , waitForRequestWith
+  , setDefaultTimeout
   )
 import Playwright.Harness
   ( assertWaitTimeout
@@ -56,4 +57,13 @@ tests =
               assertFailure "timeout"
             Just timeout ->
               assertWaitTimeout (waitForRequestWith page (UrlGlob (prefix <> "/does-not-exist.png")) timeout)
+    , testCase "should respect default timeout" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          case milliseconds 1 of
+            Nothing ->
+              assertFailure "timeout"
+            Just timeout -> do
+              setDefaultTimeout page timeout
+              assertWaitTimeout (waitForRequest page (UrlGlob (prefix <> "/does-not-exist.png")))
     ]

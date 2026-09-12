@@ -33,11 +33,16 @@ import Playwright.Channel
   , FrameTag
   , send
   )
+import Playwright.Guid
+  ( Guid
+  )
 import Playwright.Connection
   ( Connection
   , guidsOfType
   , lookupContextBaseUrl
+  , lookupMainFramePage
   , lookupObject
+  , lookupTimeoutDefaults
   )
 import Playwright.GotoOptions
   ( GotoOptions (gotoOptionsReferer, gotoOptionsTimeout, gotoOptionsWaitUntil)
@@ -95,6 +100,10 @@ import Playwright.SerializedValue
   )
 import Playwright.Timeout
   ( Timeout
+  )
+import Playwright.TimeoutDefaults
+  ( emptyTimeoutDefaults
+  , resolveNavigationTimeout
   )
 import Playwright.Url
   ( Url
@@ -163,11 +172,12 @@ frameSend_ frame methodName params = do
 gotoFrame :: Frame -> Url -> GotoOptions -> IO (Maybe Response)
 gotoFrame frame url opts = do
   resolved <- resolveFrameUrl frame url
+  timeout <- resolveFrameNavigationTimeout frame (gotoOptionsTimeout opts)
   result <-
     frameSend
       frame
       "goto"
-      (mkFrameGotoParams (gotoOptionsTimeout opts) resolved)
+      (mkFrameGotoParams timeout resolved)
         { frameGotoParamsWaitUntil = fmap toLifecycle (gotoOptionsWaitUntil opts)
         , frameGotoParamsReferer = gotoOptionsReferer opts
         }
@@ -176,6 +186,39 @@ gotoFrame frame url opts = do
       pure Nothing
     Just responseRef ->
       pure (Just (responseFromRef (channelConnection (frameChannel frame)) responseRef))
+
+resolveFrameNavigationTimeout :: Frame -> Maybe Timeout -> IO Timeout
+resolveFrameNavigationTimeout frame explicit =
+  case explicit of
+    Just timeout ->
+      pure timeout
+    Nothing ->
+      frameNavigationTimeout frame
+
+frameNavigationTimeout :: Frame -> IO Timeout
+frameNavigationTimeout frame = do
+  let conn = channelConnection (frameChannel frame)
+  mainGuid <- mainFrameGuid frame
+  pageGuid <- lookupMainFramePage conn mainGuid
+  case pageGuid of
+    Just page -> do
+      pageObj <- lookupObject conn page
+      pageDefaults <- lookupTimeoutDefaults conn page
+      contextDefaults <- lookupTimeoutDefaults conn (remoteParent pageObj)
+      pure (resolveNavigationTimeout pageDefaults contextDefaults)
+    Nothing -> do
+      frameObj <- lookupObject conn (channelGuid (frameChannel frame))
+      contextDefaults <- lookupTimeoutDefaults conn (remoteParent frameObj)
+      pure (resolveNavigationTimeout emptyTimeoutDefaults contextDefaults)
+
+mainFrameGuid :: Frame -> IO Guid
+mainFrameGuid frame =
+  case frameParent frame of
+    Nothing ->
+      pure (channelGuid (frameChannel frame))
+    Just parent -> do
+      parentFrame <- frameFromRef (channelConnection (frameChannel frame)) parent
+      mainFrameGuid parentFrame
 
 titleFrame :: Frame -> IO Text
 titleFrame frame = do

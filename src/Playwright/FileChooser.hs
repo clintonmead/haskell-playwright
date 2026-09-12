@@ -2,6 +2,7 @@ module Playwright.FileChooser
   ( FileChooser (..)
   , armFileChooser
   , waitForFileChooser
+  , waitForFileChooserWith
   ) where
 
 import Control.Concurrent.STM
@@ -30,6 +31,13 @@ import Playwright.MethodName
   )
 import Playwright.Page
   ( Page (pageChannel)
+  , pageActionTimeout
+  )
+import Playwright.RaceTimeout
+  ( waitWithTimeout
+  )
+import Playwright.Timeout
+  ( Timeout
   )
 import Playwright.Protocol
   ( PageFileChooserEvent (pageFileChooserEventElement, pageFileChooserEventIsMultiple)
@@ -45,8 +53,13 @@ data FileChooser = FileChooser
 
 waitForFileChooser :: Page -> IO FileChooser
 waitForFileChooser page = do
+  timeout <- pageActionTimeout page
+  waitForFileChooserWith page timeout
+
+waitForFileChooserWith :: Page -> Timeout -> IO FileChooser
+waitForFileChooserWith page timeout = do
   takeChooser <- armFileChooser page
-  takeChooser
+  waitWithTimeout timeout takeChooser
 
 armFileChooser :: Page -> IO (IO FileChooser)
 armFileChooser page = do

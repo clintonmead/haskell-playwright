@@ -83,12 +83,12 @@ import Playwright.BoundingBox
   ( BoundingBox
   )
 import Playwright.Channel
-  ( Channel
+  ( Channel (channelConnection, channelGuid)
   , BrowserContextTag
   , PageTag
   )
 import Playwright.CheckOptions
-  ( CheckOptions
+  ( CheckOptions (checkOptionsTimeout)
   , defaultCheckOptions
   )
 import Playwright.DomEventType
@@ -173,9 +173,14 @@ import Playwright.Selector
   , selectorFromText
   , selectorToText
   )
+import Playwright.Connection
+  ( lookupTimeoutDefaults
+  )
 import Playwright.Timeout
   ( Timeout
-  , defaultTimeout
+  )
+import Playwright.TimeoutDefaults
+  ( resolveActionTimeout
   )
 import Playwright.WaitForState
   ( WaitForState (WaitForAttached)
@@ -265,17 +270,33 @@ getByRole :: Locator -> AriaRole -> GetByRoleOptions -> Locator
 getByRole loc role opts =
   childLocator loc (getByRoleSelector role opts)
 
+locatorActionTimeout :: Locator -> IO Timeout
+locatorActionTimeout loc = do
+  let conn = channelConnection (locatorPageChannel loc)
+  pageDefaults <- lookupTimeoutDefaults conn (channelGuid (locatorPageChannel loc))
+  contextDefaults <- lookupTimeoutDefaults conn (channelGuid (locatorContextChannel loc))
+  pure (resolveActionTimeout pageDefaults contextDefaults)
+
+withActionTimeout :: Locator -> (Timeout -> IO a) -> IO a
+withActionTimeout loc action = do
+  timeout <- locatorActionTimeout loc
+  action timeout
+
 click :: Locator -> IO ()
 click loc =
-  clickFrame (locatorFrame loc) (locatorSelector loc) defaultTimeout
+  withActionTimeout loc (clickFrame (locatorFrame loc) (locatorSelector loc))
 
 dblclick :: Locator -> IO ()
 dblclick loc =
-  dblclickFrame (locatorFrame loc) (locatorSelector loc) defaultTimeout
+  withActionTimeout loc (dblclickFrame (locatorFrame loc) (locatorSelector loc))
 
 dispatchEvent :: Locator -> DomEventType -> IO ()
 dispatchEvent loc eventType =
-  dispatchEventFrame (locatorFrame loc) (locatorSelector loc) eventType defaultTimeout
+  withActionTimeout loc (dispatchEventFrame (locatorFrame loc) (locatorSelector loc) eventType)
+
+fill :: Locator -> Text -> IO ()
+fill loc value =
+  withActionTimeout loc (\timeout -> fillFrame (locatorFrame loc) (locatorSelector loc) value timeout)
 
 elementHandle :: Locator -> IO (Maybe ElementHandle)
 elementHandle loc = do
@@ -291,25 +312,23 @@ allLocators loc = do
   n <- locatorCount loc
   pure [nth loc i | i <- [0 .. n - 1]]
 
-fill :: Locator -> Text -> IO ()
-fill loc value =
-  fillFrame (locatorFrame loc) (locatorSelector loc) value defaultTimeout
-
 clear :: Locator -> IO ()
 clear loc =
   fill loc ""
 
 check :: Locator -> IO ()
-check loc =
-  checkWith loc defaultCheckOptions
+check loc = do
+  timeout <- locatorActionTimeout loc
+  checkWith loc defaultCheckOptions {checkOptionsTimeout = timeout}
 
 checkWith :: Locator -> CheckOptions -> IO ()
 checkWith loc =
   checkFrame (locatorFrame loc) (locatorSelector loc)
 
 uncheck :: Locator -> IO ()
-uncheck loc =
-  uncheckWith loc defaultCheckOptions
+uncheck loc = do
+  timeout <- locatorActionTimeout loc
+  uncheckWith loc defaultCheckOptions {checkOptionsTimeout = timeout}
 
 uncheckWith :: Locator -> CheckOptions -> IO ()
 uncheckWith loc =
@@ -323,27 +342,27 @@ setChecked loc wanted =
 
 focus :: Locator -> IO ()
 focus loc =
-  focusFrame (locatorFrame loc) (locatorSelector loc) defaultTimeout
+  withActionTimeout loc (focusFrame (locatorFrame loc) (locatorSelector loc))
 
 blur :: Locator -> IO ()
 blur loc =
-  blurFrame (locatorFrame loc) (locatorSelector loc) defaultTimeout
+  withActionTimeout loc (blurFrame (locatorFrame loc) (locatorSelector loc))
 
 hover :: Locator -> IO ()
 hover loc =
-  hoverFrame (locatorFrame loc) (locatorSelector loc) defaultTimeout
+  withActionTimeout loc (hoverFrame (locatorFrame loc) (locatorSelector loc))
 
 tap :: Locator -> IO ()
 tap loc =
-  tapFrame (locatorFrame loc) (locatorSelector loc) defaultTimeout
+  withActionTimeout loc (tapFrame (locatorFrame loc) (locatorSelector loc))
 
 press :: Locator -> Key -> IO ()
 press loc key =
-  pressFrame (locatorFrame loc) (locatorSelector loc) key defaultTimeout
+  withActionTimeout loc (pressFrame (locatorFrame loc) (locatorSelector loc) key)
 
 typeText :: Locator -> Text -> IO ()
 typeText loc text =
-  typeTextFrame (locatorFrame loc) (locatorSelector loc) text defaultTimeout
+  withActionTimeout loc (typeTextFrame (locatorFrame loc) (locatorSelector loc) text)
 
 pressSequentially :: Locator -> Text -> IO ()
 pressSequentially =
@@ -351,23 +370,25 @@ pressSequentially =
 
 setInputFiles :: Locator -> [InputFile] -> IO ()
 setInputFiles loc files =
-  setInputFilesFrame (locatorFrame loc) (locatorSelector loc) files defaultTimeout
+  withActionTimeout loc (setInputFilesFrame (locatorFrame loc) (locatorSelector loc) files)
 
 dragAndDrop :: Locator -> Locator -> IO ()
 dragAndDrop source target =
-  dragAndDropFrame
-    (locatorFrame source)
-    (locatorSelector source)
-    (locatorSelector target)
-    defaultTimeout
+  withActionTimeout
+    source
+    ( dragAndDropFrame
+        (locatorFrame source)
+        (locatorSelector source)
+        (locatorSelector target)
+    )
 
 selectOption :: Locator -> [SelectOption] -> IO [Text]
 selectOption loc options =
-  selectOptionFrame (locatorFrame loc) (locatorSelector loc) options defaultTimeout
+  withActionTimeout loc (selectOptionFrame (locatorFrame loc) (locatorSelector loc) options)
 
 innerText :: Locator -> IO Text
 innerText loc =
-  innerTextWith loc defaultTimeout
+  withActionTimeout loc (innerTextWith loc)
 
 innerTextWith :: Locator -> Timeout -> IO Text
 innerTextWith loc timeout =
@@ -375,19 +396,19 @@ innerTextWith loc timeout =
 
 innerHtml :: Locator -> IO Text
 innerHtml loc =
-  innerHtmlFrame (locatorFrame loc) (locatorSelector loc) defaultTimeout
+  withActionTimeout loc (innerHtmlFrame (locatorFrame loc) (locatorSelector loc))
 
 textContent :: Locator -> IO (Maybe Text)
 textContent loc =
-  textContentFrame (locatorFrame loc) (locatorSelector loc) defaultTimeout
+  withActionTimeout loc (textContentFrame (locatorFrame loc) (locatorSelector loc))
 
 getAttribute :: Locator -> Text -> IO (Maybe Text)
 getAttribute loc name =
-  getAttributeFrame (locatorFrame loc) (locatorSelector loc) name defaultTimeout
+  withActionTimeout loc (getAttributeFrame (locatorFrame loc) (locatorSelector loc) name)
 
 inputValue :: Locator -> IO Text
 inputValue loc =
-  inputValueFrame (locatorFrame loc) (locatorSelector loc) defaultTimeout
+  withActionTimeout loc (inputValueFrame (locatorFrame loc) (locatorSelector loc))
 
 isVisible :: Locator -> IO Bool
 isVisible loc =
@@ -399,27 +420,28 @@ isHidden loc =
 
 isChecked :: Locator -> IO Bool
 isChecked loc =
-  isCheckedFrame (locatorFrame loc) (locatorSelector loc) defaultTimeout
+  withActionTimeout loc (isCheckedFrame (locatorFrame loc) (locatorSelector loc))
 
 isEnabled :: Locator -> IO Bool
 isEnabled loc =
-  isEnabledFrame (locatorFrame loc) (locatorSelector loc) defaultTimeout
+  withActionTimeout loc (isEnabledFrame (locatorFrame loc) (locatorSelector loc))
 
 isDisabled :: Locator -> IO Bool
 isDisabled loc =
-  isDisabledFrame (locatorFrame loc) (locatorSelector loc) defaultTimeout
+  withActionTimeout loc (isDisabledFrame (locatorFrame loc) (locatorSelector loc))
 
 isEditable :: Locator -> IO Bool
 isEditable loc =
-  isEditableFrame (locatorFrame loc) (locatorSelector loc) defaultTimeout
+  withActionTimeout loc (isEditableFrame (locatorFrame loc) (locatorSelector loc))
 
 locatorCount :: Locator -> IO Int
 locatorCount loc =
   queryCountFrame (locatorFrame loc) (locatorSelector loc)
 
 waitFor :: Locator -> WaitForState -> IO ()
-waitFor loc =
-  waitForWith loc defaultTimeout
+waitFor loc state = do
+  timeout <- locatorActionTimeout loc
+  waitForWith loc timeout state
 
 waitForWith :: Locator -> Timeout -> WaitForState -> IO ()
 waitForWith loc timeout state =

@@ -26,46 +26,53 @@ import Playwright.Frame.Inspect
   )
 import Playwright.Page
   ( Page (pageMainFrame)
+  , pageActionTimeout
   )
 import Playwright.Selector
   ( Selector
   )
-import Playwright.Timeout
-  ( defaultTimeout
-  )
 
 pageInnerText :: Page -> Selector -> IO Text
-pageInnerText page selector =
-  innerTextFrame (pageMainFrame page) selector defaultTimeout
+pageInnerText page selector = do
+  timeout <- pageActionTimeout page
+  innerTextFrame (pageMainFrame page) selector timeout
 
 pageInnerHtml :: Page -> Selector -> IO Text
-pageInnerHtml page selector =
-  innerHtmlFrame (pageMainFrame page) selector defaultTimeout
+pageInnerHtml page selector = do
+  timeout <- pageActionTimeout page
+  innerHtmlFrame (pageMainFrame page) selector timeout
 
 pageTextContent :: Page -> Selector -> IO (Maybe Text)
-pageTextContent page selector =
-  textContentFrame (pageMainFrame page) selector defaultTimeout
+pageTextContent page selector = do
+  timeout <- pageActionTimeout page
+  textContentFrame (pageMainFrame page) selector timeout
 
 pageGetAttribute :: Page -> Selector -> Text -> IO (Maybe Text)
-pageGetAttribute page selector name =
-  getAttributeFrame (pageMainFrame page) selector name defaultTimeout
+pageGetAttribute page selector name = do
+  timeout <- pageActionTimeout page
+  getAttributeFrame (pageMainFrame page) selector name timeout
 
 pageInputValue :: Page -> Selector -> IO Text
-pageInputValue page selector =
-  inputValueFrame (pageMainFrame page) selector defaultTimeout
+pageInputValue page selector = do
+  timeout <- pageActionTimeout page
+  inputValueFrame (pageMainFrame page) selector timeout
 
 pageIsChecked :: Page -> Selector -> IO Bool
-pageIsChecked page selector =
-  isCheckedFrame (pageMainFrame page) selector defaultTimeout
+pageIsChecked page selector = do
+  timeout <- pageActionTimeout page
+  isCheckedFrame (pageMainFrame page) selector timeout
 
 pageIsEnabled :: Page -> Selector -> IO Bool
-pageIsEnabled page selector =
-  isEnabledFrame (pageMainFrame page) selector defaultTimeout
+pageIsEnabled page selector = do
+  timeout <- pageActionTimeout page
+  isEnabledFrame (pageMainFrame page) selector timeout
 
 pageIsDisabled :: Page -> Selector -> IO Bool
-pageIsDisabled page selector =
-  isDisabledFrame (pageMainFrame page) selector defaultTimeout
+pageIsDisabled page selector = do
+  timeout <- pageActionTimeout page
+  isDisabledFrame (pageMainFrame page) selector timeout
 
 pageIsEditable :: Page -> Selector -> IO Bool
-pageIsEditable page selector =
-  isEditableFrame (pageMainFrame page) selector defaultTimeout
+pageIsEditable page selector = do
+  timeout <- pageActionTimeout page
+  isEditableFrame (pageMainFrame page) selector timeout

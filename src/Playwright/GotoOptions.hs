@@ -8,7 +8,6 @@ import Autodocodec
   , HasCodec (codec)
   , object
   , optionalField'
-  , requiredField'
   , (.=)
   )
 import Data.Aeson
@@ -20,14 +19,13 @@ import Playwright.LoadState
   )
 import Playwright.Timeout
   ( Timeout
-  , defaultTimeout
   )
 import Playwright.Url
   ( Url
   )
 
 data GotoOptions = GotoOptions
-  { gotoOptionsTimeout :: Timeout
+  { gotoOptionsTimeout :: Maybe Timeout
   , gotoOptionsWaitUntil :: Maybe LoadState
   , gotoOptionsReferer :: Maybe Url
   }
@@ -37,7 +35,7 @@ data GotoOptions = GotoOptions
 defaultGotoOptions :: GotoOptions
 defaultGotoOptions =
   GotoOptions
-    { gotoOptionsTimeout = defaultTimeout
+    { gotoOptionsTimeout = Nothing
     , gotoOptionsWaitUntil = Nothing
     , gotoOptionsReferer = Nothing
     }
@@ -46,6 +44,6 @@ instance HasCodec GotoOptions where
   codec =
     object "GotoOptions" $
       GotoOptions
-        <$> requiredField' "timeout" .= gotoOptionsTimeout
+        <$> optionalField' "timeout" .= gotoOptionsTimeout
         <*> optionalField' "waitUntil" .= gotoOptionsWaitUntil
         <*> optionalField' "referer" .= gotoOptionsReferer

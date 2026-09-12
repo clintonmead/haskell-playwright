@@ -99,6 +99,7 @@ library
       Playwright.Point
       Playwright.PropertyName
       Playwright.Protocol
+      Playwright.RaceTimeout
       Playwright.RemoteObject
       Playwright.Request
       Playwright.RequestFrame
@@ -122,6 +123,7 @@ library
       Playwright.StorageState
       Playwright.StyleTag
       Playwright.Timeout
+      Playwright.TimeoutDefaults
       Playwright.TimezoneId
       Playwright.Transport
       Playwright.Transport.Frame
