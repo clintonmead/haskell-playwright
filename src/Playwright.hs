@@ -458,6 +458,11 @@ module Playwright
   , waitForResponse
   , waitForResponseWith
   , waitForSelector
+  , waitForSelectorHandle
+  , waitForSelectorHandleOnFrame
+  , waitForSelectorHandleWith
+  , waitForSelectorOnHandle
+  , waitForSelectorOnHandleWith
   , waitForSelectorStrict
   , waitForTimeout
   , waitForURL
@@ -647,6 +652,8 @@ import Playwright.ElementHandle.Action
 import Playwright.ElementHandle.Query
   ( querySelectorAllHandle
   , querySelectorHandle
+  , waitForSelectorOnHandle
+  , waitForSelectorOnHandleWith
   )
 import Playwright.ElementState
   ( ElementState (ElementDisabled, ElementEditable, ElementEnabled, ElementHidden, ElementStable, ElementVisible)
@@ -730,6 +737,9 @@ import Playwright.Frame
   )
 import Playwright.Frame.Inspect
   ( frameElement
+  )
+import Playwright.Frame.Wait
+  ( waitForSelectorHandleOnFrame
   )
 import Playwright.FulfillOptions
   ( ContentType (ContentType, contentTypeToText)
@@ -937,6 +947,8 @@ import Playwright.Page
   , waitForResponse
   , waitForResponseWith
   , waitForSelector
+  , waitForSelectorHandle
+  , waitForSelectorHandleWith
   , waitForSelectorStrict
   , waitForTimeout
   , waitForURL

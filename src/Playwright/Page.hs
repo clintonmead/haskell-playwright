@@ -15,6 +15,8 @@ module Playwright.Page
   , title
   , url
   , waitForSelector
+  , waitForSelectorHandle
+  , waitForSelectorHandleWith
   , getByLabel
   , getByRole
   , getByTestId
@@ -128,6 +130,7 @@ import Playwright.Frame.Wait
   ( waitForFunctionFrame
   , waitForLoadStateFrame
   , waitForSelectorFrame
+  , waitForSelectorHandleFrame
   , waitForTimeoutFrame
   )
 import Playwright.ElementHandle
@@ -353,6 +356,14 @@ url page = currentUrl (pageMainFrame page)
 waitForSelector :: Page -> Selector -> WaitForState -> IO ()
 waitForSelector page selector state =
   waitForSelectorFrame (pageMainFrame page) selector state defaultTimeout Nothing
+
+waitForSelectorHandle :: Page -> Selector -> WaitForState -> IO (Maybe ElementHandle)
+waitForSelectorHandle page selector state =
+  waitForSelectorHandleWith page selector state defaultTimeout
+
+waitForSelectorHandleWith :: Page -> Selector -> WaitForState -> Timeout -> IO (Maybe ElementHandle)
+waitForSelectorHandleWith page selector state timeout =
+  waitForSelectorHandleFrame (pageMainFrame page) selector state timeout Nothing
 
 content :: Page -> IO Text
 content page = contentFrame (pageMainFrame page)

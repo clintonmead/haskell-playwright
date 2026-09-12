@@ -107,6 +107,7 @@ import Playwright.PageWaitForLoadStateSpec qualified as PageWaitForLoadStateSpec
 import Playwright.PageWaitForNavigationSpec qualified as PageWaitForNavigationSpec
 import Playwright.PageWaitForResponseSpec qualified as PageWaitForResponseSpec
 import Playwright.PageWaitForRequestSpec qualified as PageWaitForRequestSpec
+import Playwright.PageWaitForSelector2Spec qualified as PageWaitForSelector2Spec
 import Playwright.PageWaitForSelectorSpec qualified as PageWaitForSelectorSpec
 import Playwright.PageWaitForUrlSpec qualified as PageWaitForUrlSpec
 import Playwright.PermissionsSpec qualified as PermissionsSpec
@@ -237,6 +238,7 @@ main =
         , PageWaitForNavigationSpec.tests
         , PageWaitForRequestSpec.tests
         , PageWaitForResponseSpec.tests
+        , PageWaitForSelector2Spec.tests
         , PageWaitForSelectorSpec.tests
         , PageWaitForUrlSpec.tests
         , PermissionsSpec.tests

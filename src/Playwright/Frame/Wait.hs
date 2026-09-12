@@ -2,6 +2,8 @@ module Playwright.Frame.Wait
   ( waitForFunctionFrame
   , waitForLoadStateFrame
   , waitForSelectorFrame
+  , waitForSelectorHandleFrame
+  , waitForSelectorHandleOnFrame
   , waitForTimeoutFrame
   ) where
 
@@ -13,6 +15,10 @@ import Playwright.Channel
   )
 import Playwright.Connection
   ( waitForLifecycle
+  )
+import Playwright.ElementHandle
+  ( ElementHandle
+  , elementHandleFromRef
   )
 import Playwright.Frame
   ( Frame (frameChannel)
@@ -32,7 +38,7 @@ import Playwright.Protocol
   , FrameWaitForFunctionResult (frameWaitForFunctionResultHandle)
   , FrameWaitForSelectorParams (frameWaitForSelectorParamsOmitReturnValue, frameWaitForSelectorParamsState, frameWaitForSelectorParamsStrict)
   , FrameWaitForSelectorParamsState (FrameWaitForSelectorParamsStateAttached, FrameWaitForSelectorParamsStateDetached, FrameWaitForSelectorParamsStateHidden, FrameWaitForSelectorParamsStateVisible)
-  , FrameWaitForSelectorResult
+  , FrameWaitForSelectorResult (frameWaitForSelectorResultElement)
   , FrameWaitForTimeoutResult
   , mkFrameWaitForFunctionParams
   , mkFrameWaitForSelectorParams
@@ -46,6 +52,7 @@ import Playwright.SerializedArgument
   )
 import Playwright.Timeout
   ( Timeout
+  , defaultTimeout
   )
 import Playwright.WaitForState
   ( WaitForState (WaitForAttached, WaitForDetached, WaitForHidden, WaitForVisible)
@@ -63,6 +70,27 @@ waitForSelectorFrame frame selector state timeout strict = do
         , frameWaitForSelectorParamsState = Just (toProtocolState state)
         }
   pure ()
+
+waitForSelectorHandleFrame :: Frame -> Selector -> WaitForState -> Timeout -> Maybe Bool -> IO (Maybe ElementHandle)
+waitForSelectorHandleFrame frame selector state timeout strict = do
+  result <-
+    frameSend
+      frame
+      "waitForSelector"
+      (mkFrameWaitForSelectorParams selector timeout)
+        { frameWaitForSelectorParamsStrict = strict
+        , frameWaitForSelectorParamsOmitReturnValue = Nothing
+        , frameWaitForSelectorParamsState = Just (toProtocolState state)
+        }
+  pure
+    ( fmap
+        (elementHandleFromRef (channelConnection (frameChannel frame)))
+        (frameWaitForSelectorResultElement result)
+    )
+
+waitForSelectorHandleOnFrame :: Frame -> Selector -> WaitForState -> IO (Maybe ElementHandle)
+waitForSelectorHandleOnFrame frame selector state =
+  waitForSelectorHandleFrame frame selector state defaultTimeout Nothing
 
 waitForTimeoutFrame :: Frame -> Timeout -> IO ()
 waitForTimeoutFrame frame timeout =
