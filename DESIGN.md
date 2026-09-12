@@ -81,6 +81,10 @@ Ideally, we want all the tests the official Playwright tests have. We'll natural
 
 Do not put artificial delays in tests, particularly when those artificial delays are not in the official Playwright tests. That could result in flaky tests and unexpected runtime failures.
 
+### Run individual tests most of the time to test new functionality
+
+Most of the time, run individual tests to test new functionality. Occasionally run the full test suite, in particular before a commit. By default, tests should run in parallel. 
+
 ## Implementation process
 
 ### Go for it
@@ -90,6 +94,14 @@ You've already a good amount of progress now. Continue to completely implement t
 ### You can make commits
 
 Make commits to git at appropriate milestones.
+
+### Script things you run regularly
+
+If you have non-trivial commands you run regularly, ensure they are scripted, either in `/scripts` in in `flake.nix`. This is so humans can easily reproduce your build and test runs. 
+
+### Update your progress regularly
+
+There are the files `progress/FUNCTIONALITY_DONE.md` and `progress/FUNCTIONALITY_TODO.md`. Update these files as you go, and also ensure they're up to date before commits.
 
 ## Reread this document and modify it
 
