@@ -231,6 +231,7 @@ test-suite playwright-test
       Playwright.FrameGotoSpec
       Playwright.FrameHierarchySpec
       Playwright.GeolocationSpec
+      Playwright.GlobalFetchCookieSpec
       Playwright.GlobalFetchSpec
       Playwright.Harness
       Playwright.IntegrationSpec

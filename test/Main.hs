@@ -43,6 +43,7 @@ import Playwright.FrameFrameElementSpec qualified as FrameFrameElementSpec
 import Playwright.FrameGotoSpec qualified as FrameGotoSpec
 import Playwright.FrameHierarchySpec qualified as FrameHierarchySpec
 import Playwright.GeolocationSpec qualified as GeolocationSpec
+import Playwright.GlobalFetchCookieSpec qualified as GlobalFetchCookieSpec
 import Playwright.GlobalFetchSpec qualified as GlobalFetchSpec
 import Playwright.IntegrationSpec qualified as IntegrationSpec
 import Playwright.InterceptionSpec qualified as InterceptionSpec
@@ -198,6 +199,7 @@ main =
         , FrameGotoSpec.tests
         , FrameHierarchySpec.tests
         , GeolocationSpec.tests
+        , GlobalFetchCookieSpec.tests
         , GlobalFetchSpec.tests
         , IntegrationSpec.tests
         , InterceptionSpec.tests

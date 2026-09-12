@@ -31,7 +31,7 @@ elementhandle-bounding-box, elementhandle-click, elementhandle-content-frame, el
 
 ### `tests/library` (partial ports)
 
-browsercontext-add-cookies, browsercontext-add-init-script, browsercontext-base-url, browsercontext-cookies, browsercontext-credentials, browsercontext-csp, browsercontext-expose-function, browsercontext-fetch, browsercontext-locale, browsercontext-page-event, browsercontext-pages, browsercontext-route, browsercontext-set-extra-http-headers, browsercontext-storage-state, browsercontext-timezone-id, browsercontext-viewport, download, geolocation, global-fetch, page-clock, page-close, pdf, permissions, selectors-register, tap (hasTouch).
+browsercontext-add-cookies, browsercontext-add-init-script, browsercontext-base-url, browsercontext-cookies, browsercontext-credentials, browsercontext-csp, browsercontext-expose-function, browsercontext-fetch, browsercontext-locale, browsercontext-page-event, browsercontext-pages, browsercontext-route, browsercontext-set-extra-http-headers, browsercontext-storage-state, browsercontext-timezone-id, browsercontext-viewport, download, geolocation, global-fetch, global-fetch-cookie, page-clock, page-close, pdf, permissions, selectors-register, tap (hasTouch).
 
 Plus connection/transport unit tests and a small integration spec.
 
