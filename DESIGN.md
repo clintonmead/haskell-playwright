@@ -154,7 +154,7 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - `deriving via Autodocodec` needs the `Autodocodec` constructor in scope (`import Autodocodec (Autodocodec (Autodocodec), ...)`).
 - Transparent newtypes that appear in Autodocodec fields also `deriving newtype HasCodec`.
 - Protocol floats that are not timeouts are `Scientific` (Autodocodec has no `HasCodec Double`).
-- Each Tasty process uses `--num-threads=1`: concurrent `waitForProcess` in one RTS races on SIGCHLD. Full-suite `playwright-test` shards spec groups across processes (default `nproc/2`, cap 8, override `PLAYWRIGHT_TEST_JOBS`). Individual runs use Tasty `-p` (see Testing).
+- Each Tasty process uses `--num-threads=1`: concurrent `waitForProcess` in one RTS races on SIGCHLD. Full-suite `playwright-test` shards spec groups across processes (default one process per CPU thread via `nproc`, override `PLAYWRIGHT_TEST_JOBS`). Individual runs use Tasty `-p` (see Testing).
 - Local packages are built with `-O0` (`optimization: False` in `cabal.project`, `$locals` / local `ghc-options` in Stack). Snapshot/Hackage dependencies stay optimized.
 - Cabal `verbose: 0` plus the flake `cabal` wrapper (`-v0`) and Stack `cabal-verbosity: 0` keep successful builds quiet; GHC errors and test output still show. In the Nix shell, `playwright-test` (see `scripts/playwright-test`) builds once, runs the Tasty binary with `--hide-successes --hide-progress`, strips the driver's host-requirements skip line, and only prints shard output when something failed. Extra args go to Tasty (`playwright-test -p/page-goto/`).
 - Locator `evaluate` is `Frame.evalOnSelector` with `strict: true`. Page `evaluate` is `Frame.evaluateExpression` with `isFunction: true`.
