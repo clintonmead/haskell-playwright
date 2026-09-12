@@ -1,5 +1,6 @@
 module Playwright.Frame.Action
-  ( checkFrame
+  ( blurFrame
+  , checkFrame
   , clickFrame
   , dblclickFrame
   , dispatchEventFrame
@@ -42,7 +43,9 @@ import Playwright.Key
   ( Key (keyToText)
   )
 import Playwright.Protocol
-  ( FrameCheckParams (frameCheckParamsForce, frameCheckParamsStrict, frameCheckParamsTrial)
+  ( FrameBlurParams (frameBlurParamsStrict)
+  , FrameBlurResult
+  , FrameCheckParams (frameCheckParamsForce, frameCheckParamsStrict, frameCheckParamsTrial)
   , FrameCheckResult
   , FrameClickParams (frameClickParamsStrict)
   , FrameClickResult
@@ -72,6 +75,7 @@ import Playwright.Protocol
   , FrameTypeResult
   , FrameUncheckParams (frameUncheckParamsForce, frameUncheckParamsStrict, frameUncheckParamsTrial)
   , FrameUncheckResult
+  , mkFrameBlurParams
   , mkFrameCheckParams
   , mkFrameClickParams
   , mkFrameDblclickParams
@@ -167,6 +171,15 @@ focusFrame frame selector timeout =
     "focus"
     (mkFrameFocusParams selector timeout)
       { frameFocusParamsStrict = Just True
+      }
+
+blurFrame :: Frame -> Selector -> Timeout -> IO ()
+blurFrame frame selector timeout =
+  frameSend_ @FrameBlurResult
+    frame
+    "blur"
+    (mkFrameBlurParams selector timeout)
+      { frameBlurParamsStrict = Just True
       }
 
 hoverFrame :: Frame -> Selector -> Timeout -> IO ()

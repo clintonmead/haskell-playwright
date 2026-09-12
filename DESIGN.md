@@ -154,4 +154,6 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - Page `onLoad` listens for the main frame `loadstate` add=`load` event. Official page-event-load uses a 1000ms `waitForTimeout` after goto to check the handler did not double-fire.
 - ElementHandle `$eval` / `$$eval` are `evalOnSelector` / `evalOnSelectorAll` with `isFunction: true`. Page `$eval` and ElementHandle `$eval` omit `strict` (first match), matching the JS client; locator `evaluate` still sends `strict: true`.
 - ElementHandle `$` / `$$` are `querySelector` / `querySelectorAll` on the handle. Hover/fill/check/focus/selectOption/dispose are ElementHandle mixin methods. A second `dispose` is a no-op: the driver reports `TargetClosedError` after the handle is gone.
-- Page `$$eval` is Frame `evalOnSelectorAll`.
+- Page `getAttribute`/`innerText`/`innerHTML`/`inputValue`/`textContent`/`isEnabled`/`isChecked` and friends take a selector and call the same Frame methods locators use (`strict: true`).
+- Locator `describe` appends `internal:describe=` plus JSON; `description` reads that suffix only when it is last. `locator.page()` is reconstructed from channels stored on the Locator. `filter({ visible })` appends `visible=true|false`. Chaining a locator uses `internal:chain=`.
+- Locator `blur` is Frame.blur. `allTextContents` / `allInnerTexts` are `evalOnSelectorAll`. Bounding box / scrollIntoView / selectText resolve an element handle, run the mixin, then dispose it.

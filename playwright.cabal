@@ -92,6 +92,7 @@ library
       Playwright.Mouse
       Playwright.NewContextOptions
       Playwright.Page
+      Playwright.Page.Query
       Playwright.PageError
       Playwright.PdfOptions
       Playwright.PermissionName
@@ -217,11 +218,13 @@ test-suite playwright-test
       Playwright.JsHandlePropertiesSpec
       Playwright.JsHandleToStringSpec
       Playwright.LocatorClickSpec
+      Playwright.LocatorConvenienceSpec
       Playwright.LocatorElementHandleSpec
       Playwright.LocatorEvaluateSpec
       Playwright.LocatorFrameSpec
       Playwright.LocatorIsVisibleSpec
       Playwright.LocatorListSpec
+      Playwright.LocatorMisc2Spec
       Playwright.LocatorMiscSpec
       Playwright.LocatorQuerySpec
       Playwright.LocatorSpec

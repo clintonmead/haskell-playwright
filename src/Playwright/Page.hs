@@ -6,6 +6,8 @@ module Playwright.Page
   , content
   , goto
   , locator
+  , locatorOnFrame
+  , locatorPage
   , pdf
   , pdfWith
   , screenshot
@@ -171,7 +173,7 @@ import Playwright.LoadState
   ( LoadState (LoadStateLoad)
   )
 import Playwright.Locator
-  ( Locator (Locator, locatorFrame, locatorSelector)
+  ( Locator (Locator, locatorContextChannel, locatorFrame, locatorMainFrame, locatorPageChannel, locatorSelector)
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -405,6 +407,27 @@ locator page selector =
   Locator
     { locatorFrame = pageMainFrame page
     , locatorSelector = selector
+    , locatorPageChannel = pageChannel page
+    , locatorContextChannel = pageContextChannel page
+    , locatorMainFrame = pageMainFrame page
+    }
+
+locatorOnFrame :: Page -> Frame -> Selector -> Locator
+locatorOnFrame page frame selector =
+  Locator
+    { locatorFrame = frame
+    , locatorSelector = selector
+    , locatorPageChannel = pageChannel page
+    , locatorContextChannel = pageContextChannel page
+    , locatorMainFrame = pageMainFrame page
+    }
+
+locatorPage :: Locator -> Page
+locatorPage loc =
+  Page
+    { pageChannel = locatorPageChannel loc
+    , pageMainFrame = locatorMainFrame loc
+    , pageContextChannel = locatorContextChannel loc
     }
 
 frameLocator :: Page -> Selector -> Locator

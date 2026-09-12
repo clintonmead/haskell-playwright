@@ -49,12 +49,14 @@ import Playwright.JsHandleJsonValueSpec qualified as JsHandleJsonValueSpec
 import Playwright.JsHandlePropertiesSpec qualified as JsHandlePropertiesSpec
 import Playwright.JsHandleToStringSpec qualified as JsHandleToStringSpec
 import Playwright.LocatorClickSpec qualified as LocatorClickSpec
+import Playwright.LocatorConvenienceSpec qualified as LocatorConvenienceSpec
 import Playwright.LocatorElementHandleSpec qualified as LocatorElementHandleSpec
 import Playwright.LocatorEvaluateSpec qualified as LocatorEvaluateSpec
 import Playwright.LocatorFrameSpec qualified as LocatorFrameSpec
 import Playwright.LocatorIsVisibleSpec qualified as LocatorIsVisibleSpec
 import Playwright.LocatorListSpec qualified as LocatorListSpec
 import Playwright.LocatorMiscSpec qualified as LocatorMiscSpec
+import Playwright.LocatorMisc2Spec qualified as LocatorMisc2Spec
 import Playwright.LocatorQuerySpec qualified as LocatorQuerySpec
 import Playwright.LocatorSpec qualified as LocatorSpec
 import Playwright.PageAddInitScriptSpec qualified as PageAddInitScriptSpec
@@ -178,12 +180,14 @@ main =
         , JsHandleToStringSpec.tests
         , LocatorSpec.tests
         , LocatorClickSpec.tests
+        , LocatorConvenienceSpec.tests
         , LocatorElementHandleSpec.tests
         , LocatorEvaluateSpec.tests
         , LocatorFrameSpec.tests
         , LocatorIsVisibleSpec.tests
         , LocatorListSpec.tests
         , LocatorMiscSpec.tests
+        , LocatorMisc2Spec.tests
         , LocatorQuerySpec.tests
         , PageAddInitScriptSpec.tests
         , PageAddScriptTagSpec.tests

@@ -111,7 +111,9 @@ module Playwright
   , addInitScript
   , addScriptTag
   , addStyleTag
+  , allInnerTexts
   , allLocators
+  , allTextContents
   , armConsole
   , armDialog
   , armDownload
@@ -119,6 +121,7 @@ module Playwright
   , armPopup
   , asElement
   , boolArgument
+  , blur
   , boundingBox
   , bringToFront
   , browserFromRef
@@ -127,6 +130,7 @@ module Playwright
   , checkHandle
   , checkWith
   , channelArgument
+  , chainLocator
   , childLocator
   , childFrameLocator
   , childFrames
@@ -180,6 +184,7 @@ module Playwright
   , defaultRouteOptions
   , defaultScreenshotOptions
   , defaultTimeout
+  , describeLocator
   , deviceScaleFactorFromInt
   , dispatchEvent
   , dispose
@@ -218,6 +223,7 @@ module Playwright
   , evaluateHandleExpression
   , evaluateHandleOnElement
   , evaluateHandleOnFrame
+  , evaluateHandleOnLocator
   , evaluateHandleWith
   , evaluateNumber
   , evaluateNumberWith
@@ -236,6 +242,7 @@ module Playwright
   , evaluateOnLocator
   , evaluateOnLocatorAllTexts
   , evaluateOnLocatorBool
+  , evaluateOnLocatorNumber
   , evaluateOnLocatorText
   , evaluateOnLocatorWith
   , evaluateOnWorker
@@ -251,6 +258,7 @@ module Playwright
   , fallbackRouteWith
   , fill
   , fillHandle
+  , filterVisible
   , firefox
   , first
   , focus
@@ -283,6 +291,7 @@ module Playwright
   , innerHtmlHandle
   , innerText
   , innerTextHandle
+  , innerTextWith
   , inputValue
   , inputValueHandle
   , isChecked
@@ -309,7 +318,13 @@ module Playwright
   , launch
   , localStorage
   , locator
+  , locatorBoundingBox
   , locatorCount
+  , locatorDescription
+  , locatorOnFrame
+  , locatorPage
+  , locatorScrollIntoView
+  , locatorSelectText
   , longitudeFromInt
   , mainFrame
   , milliseconds
@@ -334,10 +349,20 @@ module Playwright
   , pageContext
   , pageErrors
   , pageFromRef
+  , pageGetAttribute
+  , pageInnerHtml
+  , pageInnerText
+  , pageInputValue
+  , pageIsChecked
+  , pageIsDisabled
+  , pageIsEditable
+  , pageIsEnabled
   , pagesEqual
+  , pageTextContent
   , pdf
   , pdfWith
   , press
+  , pressSequentially
   , querySelector
   , querySelectorAllHandle
   , querySelectorHandle
@@ -632,7 +657,9 @@ import Playwright.EmulateMedia
   , emulateMedia
   )
 import Playwright.Evaluate
-  ( evalOnSelectorAll
+  ( allInnerTexts
+  , allTextContents
+  , evalOnSelectorAll
   , evalOnSelectorAllHandle
   , evalOnSelectorAllHandleNumber
   , evalOnSelectorAllHandleTexts
@@ -652,6 +679,7 @@ import Playwright.Evaluate
   , evaluateHandleExpression
   , evaluateHandleOnElement
   , evaluateHandleOnFrame
+  , evaluateHandleOnLocator
   , evaluateHandleWith
   , evaluateNumber
   , evaluateNumberWith
@@ -670,6 +698,7 @@ import Playwright.Evaluate
   , evaluateOnLocator
   , evaluateOnLocatorAllTexts
   , evaluateOnLocatorBool
+  , evaluateOnLocatorNumber
   , evaluateOnLocatorText
   , evaluateOnLocatorWith
   , evaluateSpecial
@@ -790,26 +819,31 @@ import Playwright.Locale
   ( Locale (Locale, localeToText)
   )
 import Playwright.Locator
-  ( Locator (Locator, locatorFrame, locatorSelector)
+  ( Locator (Locator, locatorContextChannel, locatorFrame, locatorMainFrame, locatorPageChannel, locatorSelector)
   , allLocators
+  , blur
+  , chainLocator
   , check
   , checkWith
   , childFrameLocator
   , childLocator
   , clear
   , click
+  , describeLocator
   , dblclick
   , dispatchEvent
   , dragAndDrop
   , elementHandle
   , elementHandles
   , fill
+  , filterVisible
   , first
   , focus
   , getAttribute
   , hover
   , innerHtml
   , innerText
+  , innerTextWith
   , inputValue
   , isChecked
   , isDisabled
@@ -818,9 +852,14 @@ import Playwright.Locator
   , isHidden
   , isVisible
   , lastLocator
+  , locatorBoundingBox
   , locatorCount
+  , locatorDescription
+  , locatorScrollIntoView
+  , locatorSelectText
   , nth
   , press
+  , pressSequentially
   , selectOption
   , setChecked
   , setInputFiles
@@ -866,6 +905,8 @@ import Playwright.Page
   , goto
   , isClosed
   , locator
+  , locatorOnFrame
+  , locatorPage
   , frameLocator
   , onLoad
   , opener
@@ -903,6 +944,17 @@ import Playwright.Page
   , frameByName
   , frames
   , mainFrame
+  )
+import Playwright.Page.Query
+  ( pageGetAttribute
+  , pageInnerHtml
+  , pageInnerText
+  , pageInputValue
+  , pageIsChecked
+  , pageIsDisabled
+  , pageIsEditable
+  , pageIsEnabled
+  , pageTextContent
   )
 import Playwright.PageError
   ( PageError (PageError, pageErrorMessage, pageErrorName, pageErrorStack)

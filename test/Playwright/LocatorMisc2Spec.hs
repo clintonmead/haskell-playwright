@@ -1,0 +1,190 @@
+module Playwright.LocatorMisc2Spec
+  ( tests
+  ) where
+
+import Control.Concurrent.Async
+  ( wait
+  , withAsync
+  )
+import Data.Text
+  ( pack
+  )
+import Playwright
+  ( Page
+  , BoundingBox (boundingBoxHeight, boundingBoxWidth, boundingBoxX, boundingBoxY)
+  , Exactness (Inexact)
+  , Key (Key)
+  , Locator (locatorSelector)
+  , ViewportHeight (ViewportHeight)
+  , ViewportSize (ViewportSize)
+  , ViewportWidth (ViewportWidth)
+  , WaitForState (WaitForHidden, WaitForVisible)
+  , chainLocator
+  , childLocator
+  , click
+  , cssPixelFromInt
+  , defaultGotoOptions
+  , evalOnSelector
+  , evalOnSelectorText
+  , evaluate
+  , evaluateOnLocator
+  , evaluateOnLocatorNumber
+  , evaluateText
+  , fill
+  , filterVisible
+  , frameLocator
+  , goto
+  , innerText
+  , inputValue
+  , locatorBoundingBox
+  , locatorCount
+  , locatorScrollIntoView
+  , locatorSelectText
+  , nth
+  , press
+  , pressSequentially
+  , selectorFromText
+  , setContent
+  , setViewportSize
+  , typeText
+  , urlFromText
+  , waitFor
+  )
+import Playwright.Harness
+  ( assertProtocolContains
+  , locate
+  , withAssetPage
+  , withAssets
+  , withChromiumPage
+  )
+import Playwright.Locator qualified as Locator
+import Test.Tasty
+  ( TestTree
+  , testGroup
+  )
+import Test.Tasty.HUnit
+  ( assertEqual
+  , assertFailure
+  , testCase
+  )
+
+tests :: TestTree
+tests =
+  testGroup
+    "locator-misc-2"
+    [ testCase "should press" $
+        withChromiumPage $ \page -> do
+          setContent page "<input type='text' />"
+          press (locate page "input") (Key "h")
+          assertEqual "value" "h" =<< evalOnSelectorText page (selectorFromText "input") "input => input.value"
+    , testCase "should scroll into view" $
+        withAssetPage "offscreenbuttons.html" $ \page ->
+          mapM_ (assertScrollsIntoView page) ([0 .. 10] :: [Int])
+    , testCase "should select textarea" $
+        withAssetPage "input/textarea.html" $ \page -> do
+          _ <- evaluateOnLocator (locate page "textarea") "textarea => { textarea.value = 'some value'; }"
+          locatorSelectText (locate page "textarea")
+          assertEqual "selected" "some value" =<< evaluateText page "() => window.getSelection().toString()"
+    , testCase "should type" $
+        withChromiumPage $ \page -> do
+          setContent page "<input type='text' />"
+          typeText (locate page "input") "hello"
+          assertEqual "value" "hello" =<< evalOnSelectorText page (selectorFromText "input") "input => input.value"
+    , testCase "should pressSequentially" $
+        withChromiumPage $ \page -> do
+          setContent page "<input type='text' />"
+          pressSequentially (locate page "input") "hello"
+          assertEqual "value" "hello" =<< evalOnSelectorText page (selectorFromText "input") "input => input.value"
+    , testCase "should return bounding box" $
+        withAssets $ \prefix page -> do
+          setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 500))
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          box <- locatorBoundingBox (locate page ".box:nth-of-type(13)")
+          case box of
+            Nothing ->
+              assertFailure "expected bounding box"
+            Just found -> do
+              assertEqual "x" (cssPixelFromInt 100) (boundingBoxX found)
+              assertEqual "y" (cssPixelFromInt 50) (boundingBoxY found)
+              assertEqual "width" (cssPixelFromInt 50) (boundingBoxWidth found)
+              assertEqual "height" (cssPixelFromInt 50) (boundingBoxHeight found)
+    , testCase "should waitFor" $
+        withChromiumPage $ \page -> do
+          setContent page "<div></div>"
+          let
+            loc = locate page "span"
+          withAsync (waitFor loc WaitForVisible) $ \pending -> do
+            _ <- evalOnSelector page (selectorFromText "div") "div => { div.innerHTML = '<span>target</span>'; }"
+            wait pending
+          assertEqual "text" "target" =<< evalOnSelectorText page (selectorFromText "span") "e => e.textContent"
+    , testCase "should waitFor hidden" $
+        withChromiumPage $ \page -> do
+          setContent page "<div><span>target</span></div>"
+          let
+            loc = locate page "span"
+          withAsync (waitFor loc WaitForHidden) $ \pending -> do
+            _ <- evalOnSelector page (selectorFromText "div") "div => { div.innerHTML = ''; }"
+            wait pending
+    , testCase "should combine visible with other selectors" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<div><div class=\"item\" style=\"display: none\">Hidden data0</div><div class=\"item\">visible data1</div><div class=\"item\" style=\"display: none\">Hidden data1</div><div class=\"item\">visible data2</div><div class=\"item\" style=\"display: none\">Hidden data1</div><div class=\"item\">visible data3</div></div>"
+          assertEqual "nth visible" "visible data2"
+            =<< evalOnSelectorText page (selectorFromText ".item >> visible=true >> nth=1") "e => e.textContent"
+          assertEqual "data3" "visible data3"
+            =<< evalOnSelectorText page (selectorFromText ".item >> visible=true >> text=data3") "e => e.textContent"
+    , testCase "should support filter(visible)" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<div><div class=\"item\" style=\"display: none\">Hidden data0</div><div class=\"item\">visible data1</div><div class=\"item\" style=\"display: none\">Hidden data1</div><div class=\"item\">visible data2</div><div class=\"item\" style=\"display: none\">Hidden data2</div><div class=\"item\">visible data3</div></div>"
+          assertEqual "nth" "visible data2" =<< innerText (nth (filterVisible (locate page ".item") True) 1)
+          assertEqual "data3" "visible data3" =<< innerText (Locator.getByText (filterVisible (locate page ".item") True) "data3" Inexact)
+          assertEqual "hidden" "Hidden data1" =<< innerText (Locator.getByText (filterVisible (locate page ".item") False) "data1" Inexact)
+    , testCase "locator.count should work with deleted Map in main world" $
+        withChromiumPage $ \page -> do
+          _ <- evaluate page "() => { Map = 1; }"
+          assertEqual "count" 0 =<< locatorCount (locate page "#searchResultTableDiv .x-grid3-row")
+    , testCase "Locator.locator() and FrameLocator.locator() should accept locator" $
+        withChromiumPage $ \page -> do
+          setContent page "<div><input value=outer></div><iframe srcdoc=\"<div><input value=inner></div>\"></iframe>"
+          let
+            inputLocator = locate page "input"
+            iframe = frameLocator page (selectorFromText "iframe")
+            divLocator = locate page "div"
+          assertEqual "page input" "outer" =<< inputValue inputLocator
+          assertEqual "div chained" "outer" =<< inputValue (chainLocator (locate page "div") inputLocator)
+          assertEqual "frame locator" "inner" =<< inputValue (childLocator iframe (locatorSelector inputLocator))
+          assertEqual "frame nested" "inner" =<< inputValue (childLocator (childLocator iframe (selectorFromText "div")) (locatorSelector inputLocator))
+          assertEqual "div input" "outer" =<< inputValue (childLocator divLocator (selectorFromText "input"))
+          assertEqual "frame div" "inner" =<< inputValue (childLocator (childLocator iframe (locatorSelector divLocator)) (selectorFromText "input"))
+    , testCase "should fill programmatically enabled textarea" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<button>Enable</button><form><textarea id=\"text\" disabled></textarea></form><script>document.querySelector('button').addEventListener('click', () => { document.querySelector('#text').disabled = false; });</script>"
+          click (locate page "button")
+          fill (locate page "#text") "Hello"
+          assertEqual "filled" "Hello" =<< inputValue (locate page "#text")
+    , testCase "press should throw on unknown keys" $
+        withChromiumPage $ \page -> do
+          setContent page "<input type='text' value='hello' />"
+          let
+            loc = locate page "input"
+          assertProtocolContains "Unknown key: \"NotARealKey\"" (press loc (Key "NotARealKey"))
+          assertProtocolContains "Unknown key: \"ё\"" (press loc (Key "ё"))
+          assertProtocolContains "Unknown key: \"😊\"" (press loc (Key "😊"))
+    ]
+
+assertScrollsIntoView :: Page -> Int -> IO ()
+assertScrollsIntoView page i = do
+  let
+    button = locate page ("#btn" <> pack (show i))
+  before <- evaluateOnLocatorNumber button "button => button.getBoundingClientRect().right - window.innerWidth"
+  assertEqual "before" (fromIntegral i * (10 :: Double)) before
+  locatorScrollIntoView button
+  after <- evaluateOnLocatorNumber button "button => button.getBoundingClientRect().right - window.innerWidth"
+  assertEqual "after" True (after <= 0)
+  _ <- evaluate page "() => window.scrollTo(0, 0)"
+  pure ()

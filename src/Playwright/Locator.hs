@@ -1,18 +1,22 @@
 module Playwright.Locator
   ( Locator (..)
   , allLocators
+  , blur
+  , chainLocator
   , check
   , checkWith
   , childLocator
   , childFrameLocator
   , clear
   , click
+  , describeLocator
   , dblclick
   , dispatchEvent
   , dragAndDrop
   , elementHandle
   , elementHandles
   , fill
+  , filterVisible
   , first
   , focus
   , getAttribute
@@ -23,6 +27,7 @@ module Playwright.Locator
   , hover
   , innerHtml
   , innerText
+  , innerTextWith
   , inputValue
   , isChecked
   , isDisabled
@@ -31,9 +36,14 @@ module Playwright.Locator
   , isHidden
   , isVisible
   , lastLocator
+  , locatorBoundingBox
   , locatorCount
+  , locatorDescription
+  , locatorScrollIntoView
+  , locatorSelectText
   , nth
   , press
+  , pressSequentially
   , selectOption
   , setChecked
   , setInputFiles
@@ -46,12 +56,36 @@ module Playwright.Locator
   , waitForWith
   ) where
 
+import Control.Exception
+  ( finally
+  , throwIO
+  )
+import Data.Aeson
+  ( eitherDecodeStrict'
+  , encode
+  )
+import Data.ByteString.Lazy
+  ( toStrict
+  )
 import Data.Text
   ( Text
   , pack
   )
+import Data.Text qualified as Text
+import Data.Text.Encoding
+  ( decodeUtf8
+  , encodeUtf8
+  )
 import Playwright.AriaRole
   ( AriaRole
+  )
+import Playwright.BoundingBox
+  ( BoundingBox
+  )
+import Playwright.Channel
+  ( Channel
+  , BrowserContextTag
+  , PageTag
   )
 import Playwright.CheckOptions
   ( CheckOptions
@@ -62,6 +96,15 @@ import Playwright.DomEventType
   )
 import Playwright.ElementHandle
   ( ElementHandle
+  , boundingBox
+  , scrollIntoViewIfNeeded
+  , selectText
+  )
+import Playwright.ElementHandle.Action
+  ( disposeHandle
+  )
+import Playwright.Error
+  ( PlaywrightError (DecodeFailure)
   )
 import Playwright.Exactness
   ( Exactness
@@ -70,7 +113,8 @@ import Playwright.Frame
   ( Frame
   )
 import Playwright.Frame.Action
-  ( checkFrame
+  ( blurFrame
+  , checkFrame
   , clickFrame
   , dblclickFrame
   , dispatchEventFrame
@@ -127,6 +171,7 @@ import Playwright.Selector
   , enterFrameSelector
   , nestedSelector
   , selectorFromText
+  , selectorToText
   )
 import Playwright.Timeout
   ( Timeout
@@ -139,6 +184,9 @@ import Playwright.WaitForState
 data Locator = Locator
   { locatorFrame :: Frame
   , locatorSelector :: Selector
+  , locatorPageChannel :: Channel PageTag
+  , locatorContextChannel :: Channel BrowserContextTag
+  , locatorMainFrame :: Frame
   }
 
 childLocator :: Locator -> Selector -> Locator
@@ -146,7 +194,39 @@ childLocator parent child =
   Locator
     { locatorFrame = locatorFrame parent
     , locatorSelector = nestedSelector (locatorSelector parent) child
+    , locatorPageChannel = locatorPageChannel parent
+    , locatorContextChannel = locatorContextChannel parent
+    , locatorMainFrame = locatorMainFrame parent
     }
+
+chainLocator :: Locator -> Locator -> Locator
+chainLocator parent inner =
+  childLocator parent (selectorFromText ("internal:chain=" <> jsonEncodeText (selectorToText (locatorSelector inner))))
+
+filterVisible :: Locator -> Bool -> Locator
+filterVisible loc visible =
+  childLocator loc (selectorFromText ("visible=" <> if visible then "true" else "false"))
+
+describeLocator :: Locator -> Text -> Locator
+describeLocator loc description =
+  childLocator loc (selectorFromText ("internal:describe=" <> jsonEncodeText description))
+
+locatorDescription :: Locator -> Maybe Text
+locatorDescription loc =
+  case Text.breakOnEnd "internal:describe=" (selectorToText (locatorSelector loc)) of
+    (_, payload)
+      | Text.null payload ->
+          Nothing
+      | otherwise ->
+          case eitherDecodeStrict' (encodeUtf8 payload) of
+            Right text ->
+              Just text
+            Left _ ->
+              Nothing
+
+jsonEncodeText :: Text -> Text
+jsonEncodeText =
+  decodeUtf8 . toStrict . encode
 
 childFrameLocator :: Locator -> Selector -> Locator
 childFrameLocator loc iframeSelector =
@@ -245,6 +325,10 @@ focus :: Locator -> IO ()
 focus loc =
   focusFrame (locatorFrame loc) (locatorSelector loc) defaultTimeout
 
+blur :: Locator -> IO ()
+blur loc =
+  blurFrame (locatorFrame loc) (locatorSelector loc) defaultTimeout
+
 hover :: Locator -> IO ()
 hover loc =
   hoverFrame (locatorFrame loc) (locatorSelector loc) defaultTimeout
@@ -260,6 +344,10 @@ press loc key =
 typeText :: Locator -> Text -> IO ()
 typeText loc text =
   typeTextFrame (locatorFrame loc) (locatorSelector loc) text defaultTimeout
+
+pressSequentially :: Locator -> Text -> IO ()
+pressSequentially =
+  typeText
 
 setInputFiles :: Locator -> [InputFile] -> IO ()
 setInputFiles loc files =
@@ -279,7 +367,11 @@ selectOption loc options =
 
 innerText :: Locator -> IO Text
 innerText loc =
-  innerTextFrame (locatorFrame loc) (locatorSelector loc) defaultTimeout
+  innerTextWith loc defaultTimeout
+
+innerTextWith :: Locator -> Timeout -> IO Text
+innerTextWith loc timeout =
+  innerTextFrame (locatorFrame loc) (locatorSelector loc) timeout
 
 innerHtml :: Locator -> IO Text
 innerHtml loc =
@@ -332,3 +424,29 @@ waitFor loc =
 waitForWith :: Locator -> Timeout -> WaitForState -> IO ()
 waitForWith loc timeout state =
   waitForSelectorFrame (locatorFrame loc) (locatorSelector loc) state timeout (Just True)
+
+withLocatorElement :: Locator -> (ElementHandle -> IO a) -> IO a
+withLocatorElement loc action = do
+  handle <- requireLocatorHandle loc
+  action handle `finally` disposeHandle handle
+
+requireLocatorHandle :: Locator -> IO ElementHandle
+requireLocatorHandle loc = do
+  found <- elementHandle loc
+  case found of
+    Just handle ->
+      pure handle
+    Nothing ->
+      throwIO (DecodeFailure "Could not resolve locator to DOM Element")
+
+locatorBoundingBox :: Locator -> IO (Maybe BoundingBox)
+locatorBoundingBox loc =
+  withLocatorElement loc boundingBox
+
+locatorScrollIntoView :: Locator -> IO ()
+locatorScrollIntoView loc =
+  withLocatorElement loc scrollIntoViewIfNeeded
+
+locatorSelectText :: Locator -> IO ()
+locatorSelectText loc =
+  withLocatorElement loc selectText

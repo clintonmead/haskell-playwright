@@ -1,5 +1,7 @@
 module Playwright.Evaluate
-  ( evaluate
+  ( allInnerTexts
+  , allTextContents
+  , evaluate
   , evaluateBool
   , evaluateBoolWith
   , evaluateNumber
@@ -9,6 +11,7 @@ module Playwright.Evaluate
   , evaluateHandleExpression
   , evaluateHandleOnElement
   , evaluateHandleOnFrame
+  , evaluateHandleOnLocator
   , evaluateHandleWith
   , evaluateOnElement
   , evaluateOnElementBoolWith
@@ -24,6 +27,7 @@ module Playwright.Evaluate
   , evaluateOnLocator
   , evaluateOnLocatorAllTexts
   , evaluateOnLocatorBool
+  , evaluateOnLocatorNumber
   , evaluateOnLocatorText
   , evaluateOnLocatorWith
   , evaluateSpecial
@@ -48,7 +52,8 @@ module Playwright.Evaluate
   ) where
 
 import Control.Exception
-  ( throwIO
+  ( finally
+  , throwIO
   )
 import Data.Text
   ( Text
@@ -60,8 +65,11 @@ import Playwright.Channel
 import Playwright.ElementHandle
   ( ElementHandle (elementHandleChannel)
   )
+import Playwright.ElementHandle.Action
+  ( disposeHandle
+  )
 import Playwright.Error
-  ( PlaywrightError (EvaluateUnexpected)
+  ( PlaywrightError (DecodeFailure, EvaluateUnexpected)
   )
 import Playwright.Frame
   ( Frame (frameChannel)
@@ -78,6 +86,7 @@ import Playwright.JsHandle
   )
 import Playwright.Locator
   ( Locator (locatorFrame, locatorSelector)
+  , elementHandle
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -244,6 +253,23 @@ evaluateOnLocatorWith :: Locator -> Text -> SerializedArgument -> IO SerializedV
 evaluateOnLocatorWith loc expression arg =
   evalOnSelectorFrameStrict (locatorFrame loc) (locatorSelector loc) expression arg
 
+evaluateHandleOnLocator :: Locator -> Text -> IO JsHandle
+evaluateHandleOnLocator loc expression = do
+  found <- elementHandle loc
+  case found of
+    Nothing ->
+      throwIO (DecodeFailure "Could not resolve locator to DOM Element")
+    Just handle ->
+      evaluateHandleOnElement handle expression `finally` disposeHandle handle
+
+allInnerTexts :: Locator -> IO [Text]
+allInnerTexts loc =
+  evaluateOnLocatorAllTexts loc "ee => ee.map(e => e.innerText)"
+
+allTextContents :: Locator -> IO [Text]
+allTextContents loc =
+  evaluateOnLocatorAllTexts loc "ee => ee.map(e => e.textContent || '')"
+
 evalOnSelectorHandle :: ElementHandle -> Selector -> Text -> IO SerializedValue
 evalOnSelectorHandle handle selector expression = do
   result <-
@@ -338,6 +364,10 @@ evaluateOnLocatorText loc expression =
 evaluateOnLocatorBool :: Locator -> Text -> IO Bool
 evaluateOnLocatorBool loc expression =
   requireBool =<< evaluateOnLocator loc expression
+
+evaluateOnLocatorNumber :: Locator -> Text -> IO Double
+evaluateOnLocatorNumber loc expression =
+  requireNumber =<< evaluateOnLocator loc expression
 
 evaluateNumber :: Page -> Text -> IO Double
 evaluateNumber page expression =
