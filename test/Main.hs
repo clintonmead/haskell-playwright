@@ -25,6 +25,7 @@ import Playwright.ElementHandleBoundingBoxSpec qualified as ElementHandleBoundin
 import Playwright.ElementHandleClickSpec qualified as ElementHandleClickSpec
 import Playwright.ElementHandleContentFrameSpec qualified as ElementHandleContentFrameSpec
 import Playwright.ElementHandleConvenienceSpec qualified as ElementHandleConvenienceSpec
+import Playwright.ElementHandleEvalOnSelectorSpec qualified as ElementHandleEvalOnSelectorSpec
 import Playwright.ElementHandleOwnerFrameSpec qualified as ElementHandleOwnerFrameSpec
 import Playwright.ElementHandlePressSpec qualified as ElementHandlePressSpec
 import Playwright.ElementHandleScrollIntoViewSpec qualified as ElementHandleScrollIntoViewSpec
@@ -46,6 +47,7 @@ import Playwright.JsHandleToStringSpec qualified as JsHandleToStringSpec
 import Playwright.LocatorClickSpec qualified as LocatorClickSpec
 import Playwright.LocatorElementHandleSpec qualified as LocatorElementHandleSpec
 import Playwright.LocatorEvaluateSpec qualified as LocatorEvaluateSpec
+import Playwright.LocatorFrameSpec qualified as LocatorFrameSpec
 import Playwright.LocatorIsVisibleSpec qualified as LocatorIsVisibleSpec
 import Playwright.LocatorListSpec qualified as LocatorListSpec
 import Playwright.LocatorMiscSpec qualified as LocatorMiscSpec
@@ -147,6 +149,7 @@ main =
         , ElementHandleClickSpec.tests
         , ElementHandleContentFrameSpec.tests
         , ElementHandleConvenienceSpec.tests
+        , ElementHandleEvalOnSelectorSpec.tests
         , ElementHandleOwnerFrameSpec.tests
         , ElementHandlePressSpec.tests
         , ElementHandleScrollIntoViewSpec.tests
@@ -169,6 +172,7 @@ main =
         , LocatorClickSpec.tests
         , LocatorElementHandleSpec.tests
         , LocatorEvaluateSpec.tests
+        , LocatorFrameSpec.tests
         , LocatorIsVisibleSpec.tests
         , LocatorListSpec.tests
         , LocatorMiscSpec.tests

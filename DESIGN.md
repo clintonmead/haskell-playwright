@@ -152,4 +152,5 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - `gotoOptionsWaitUntil` is `LoadState`, mapped onto protocol `LifecycleEvent` in `Frame.goto`.
 - `responseFrame` is `request.frame` of the response's request.
 - Page `onLoad` listens for the main frame `loadstate` add=`load` event. Official page-event-load uses a 1000ms `waitForTimeout` after goto to check the handler did not double-fire.
-- ElementHandle `screenshot` is `ElementHandle.screenshot` with the default timeout.
+- ElementHandle `$eval` / `$$eval` are `evalOnSelector` / `evalOnSelectorAll` with `isFunction: true` (`$eval` is `strict: true`).
+- `frameLocator` is a client-side selector that appends `internal:control=enter-frame`. Nested iframe locators use `childFrameLocator`.

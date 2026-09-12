@@ -3,6 +3,7 @@ module Playwright.Selector
   , selectorFromText
   , selectorToText
   , nestedSelector
+  , enterFrameSelector
   ) where
 
 import Autodocodec
@@ -29,3 +30,7 @@ selectorToText (Selector text) = text
 nestedSelector :: Selector -> Selector -> Selector
 nestedSelector (Selector parent) (Selector child) =
   Selector (parent <> " >> " <> child)
+
+enterFrameSelector :: Selector
+enterFrameSelector =
+  Selector "internal:control=enter-frame"

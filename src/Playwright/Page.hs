@@ -26,6 +26,7 @@ module Playwright.Page
   , querySelectorStrict
   , setViewportSize
   , frameByName
+  , frameLocator
   , frames
   , mainFrame
   , addInitScript
@@ -250,6 +251,8 @@ import Playwright.ScreenshotOptions
   )
 import Playwright.Selector
   ( Selector
+  , enterFrameSelector
+  , nestedSelector
   )
 import Playwright.SerializedArgument
   ( undefinedArgument
@@ -403,6 +406,10 @@ locator page selector =
     { locatorFrame = pageMainFrame page
     , locatorSelector = selector
     }
+
+frameLocator :: Page -> Selector -> Locator
+frameLocator page iframeSelector =
+  locator page (nestedSelector iframeSelector enterFrameSelector)
 
 getByTestId :: Page -> Text -> Locator
 getByTestId page testId =

@@ -32,6 +32,11 @@ module Playwright.Evaluate
   , evaluateTextWith
   , evaluateTexts
   , evaluateWith
+  , evalOnSelectorAllHandle
+  , evalOnSelectorAllHandleNumber
+  , evalOnSelectorAllHandleTexts
+  , evalOnSelectorHandle
+  , evalOnSelectorHandleText
   ) where
 
 import Control.Exception
@@ -78,9 +83,18 @@ import Playwright.Protocol
   , JSHandleEvaluateExpressionHandleResult (jSHandleEvaluateExpressionHandleResultHandle)
   , JSHandleEvaluateExpressionParams (jSHandleEvaluateExpressionParamsIsFunction)
   , JSHandleEvaluateExpressionResult (jSHandleEvaluateExpressionResultValue)
+  , ElementHandleEvalOnSelectorAllParams (elementHandleEvalOnSelectorAllParamsIsFunction)
+  , ElementHandleEvalOnSelectorAllResult (elementHandleEvalOnSelectorAllResultValue)
+  , ElementHandleEvalOnSelectorParams (elementHandleEvalOnSelectorParamsIsFunction, elementHandleEvalOnSelectorParamsStrict)
+  , ElementHandleEvalOnSelectorResult (elementHandleEvalOnSelectorResultValue)
+  , mkElementHandleEvalOnSelectorAllParams
+  , mkElementHandleEvalOnSelectorParams
   , mkFrameEvaluateExpressionHandleParams
   , mkJSHandleEvaluateExpressionHandleParams
   , mkJSHandleEvaluateExpressionParams
+  )
+import Playwright.Selector
+  ( Selector
   )
 import Playwright.SerializedArgument
   ( SerializedArgument
@@ -220,6 +234,41 @@ evaluateOnLocator loc expression =
 evaluateOnLocatorWith :: Locator -> Text -> SerializedArgument -> IO SerializedValue
 evaluateOnLocatorWith loc expression arg =
   evalOnSelectorFrame (locatorFrame loc) (locatorSelector loc) expression arg
+
+evalOnSelectorHandle :: ElementHandle -> Selector -> Text -> IO SerializedValue
+evalOnSelectorHandle handle selector expression = do
+  result <-
+    send
+      (elementHandleChannel handle)
+      (MethodName "evalOnSelector")
+      (mkElementHandleEvalOnSelectorParams undefinedArgument expression selector)
+        { elementHandleEvalOnSelectorParamsIsFunction = Just True
+        , elementHandleEvalOnSelectorParamsStrict = Just True
+        }
+  pure (elementHandleEvalOnSelectorResultValue result)
+
+evalOnSelectorHandleText :: ElementHandle -> Selector -> Text -> IO Text
+evalOnSelectorHandleText handle selector expression =
+  requireText =<< evalOnSelectorHandle handle selector expression
+
+evalOnSelectorAllHandle :: ElementHandle -> Selector -> Text -> IO SerializedValue
+evalOnSelectorAllHandle handle selector expression = do
+  result <-
+    send
+      (elementHandleChannel handle)
+      (MethodName "evalOnSelectorAll")
+      (mkElementHandleEvalOnSelectorAllParams undefinedArgument expression selector)
+        { elementHandleEvalOnSelectorAllParamsIsFunction = Just True
+        }
+  pure (elementHandleEvalOnSelectorAllResultValue result)
+
+evalOnSelectorAllHandleTexts :: ElementHandle -> Selector -> Text -> IO [Text]
+evalOnSelectorAllHandleTexts handle selector expression =
+  requireTexts =<< evalOnSelectorAllHandle handle selector expression
+
+evalOnSelectorAllHandleNumber :: ElementHandle -> Selector -> Text -> IO Double
+evalOnSelectorAllHandleNumber handle selector expression =
+  requireNumber =<< evalOnSelectorAllHandle handle selector expression
 
 evaluateOnLocatorAllTexts :: Locator -> Text -> IO [Text]
 evaluateOnLocatorAllTexts loc expression =

@@ -4,6 +4,7 @@ module Playwright.Locator
   , check
   , checkWith
   , childLocator
+  , childFrameLocator
   , clear
   , click
   , dblclick
@@ -123,6 +124,7 @@ import Playwright.SelectOption
   )
 import Playwright.Selector
   ( Selector
+  , enterFrameSelector
   , nestedSelector
   , selectorFromText
   )
@@ -144,6 +146,15 @@ childLocator parent child =
   Locator
     { locatorFrame = locatorFrame parent
     , locatorSelector = nestedSelector (locatorSelector parent) child
+    }
+
+childFrameLocator :: Locator -> Selector -> Locator
+childFrameLocator loc iframeSelector =
+  loc
+    { locatorSelector =
+        nestedSelector
+          (nestedSelector (locatorSelector loc) iframeSelector)
+          enterFrameSelector
     }
 
 nth :: Locator -> Int -> Locator

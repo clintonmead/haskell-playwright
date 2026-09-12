@@ -127,6 +127,7 @@ module Playwright
   , checkWith
   , channelArgument
   , childLocator
+  , childFrameLocator
   , childFrames
   , chromium
   , clear
@@ -194,6 +195,12 @@ module Playwright
   , emptyStyleTag
   , emulateMedia
   , emptyStorageState
+  , enterFrameSelector
+  , evalOnSelectorAllHandle
+  , evalOnSelectorAllHandleNumber
+  , evalOnSelectorAllHandleTexts
+  , evalOnSelectorHandle
+  , evalOnSelectorHandleText
   , evaluate
   , evaluateBool
   , evaluateBoolWith
@@ -238,6 +245,7 @@ module Playwright
   , focus
   , frameByName
   , frameElement
+  , frameLocator
   , frames
   , framesEqual
   , fulfillRoute
@@ -592,7 +600,12 @@ import Playwright.EmulateMedia
   , emulateMedia
   )
 import Playwright.Evaluate
-  ( evaluate
+  ( evalOnSelectorAllHandle
+  , evalOnSelectorAllHandleNumber
+  , evalOnSelectorAllHandleTexts
+  , evalOnSelectorHandle
+  , evalOnSelectorHandleText
+  , evaluate
   , evaluateBool
   , evaluateBoolWith
   , evaluateHandle
@@ -741,6 +754,7 @@ import Playwright.Locator
   , allLocators
   , check
   , checkWith
+  , childFrameLocator
   , childLocator
   , clear
   , click
@@ -812,6 +826,7 @@ import Playwright.Page
   , goto
   , isClosed
   , locator
+  , frameLocator
   , onLoad
   , opener
   , pageFromRef
@@ -930,6 +945,7 @@ import Playwright.SelectOption
   )
 import Playwright.Selector
   ( Selector
+  , enterFrameSelector
   , nestedSelector
   , selectorFromText
   , selectorToText

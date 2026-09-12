@@ -190,6 +190,7 @@ test-suite playwright-test
       Playwright.ElementHandleClickSpec
       Playwright.ElementHandleContentFrameSpec
       Playwright.ElementHandleConvenienceSpec
+      Playwright.ElementHandleEvalOnSelectorSpec
       Playwright.ElementHandleOwnerFrameSpec
       Playwright.ElementHandlePressSpec
       Playwright.ElementHandleScreenshotSpec
@@ -212,6 +213,7 @@ test-suite playwright-test
       Playwright.LocatorClickSpec
       Playwright.LocatorElementHandleSpec
       Playwright.LocatorEvaluateSpec
+      Playwright.LocatorFrameSpec
       Playwright.LocatorIsVisibleSpec
       Playwright.LocatorListSpec
       Playwright.LocatorMiscSpec
