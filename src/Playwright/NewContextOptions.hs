@@ -32,7 +32,7 @@ import Playwright.PermissionName
   ( PermissionName (permissionNameToText)
   )
 import Playwright.Protocol
-  ( BrowserNewContextParams (browserNewContextParamsBaseURL, browserNewContextParamsBypassCSP, browserNewContextParamsColorScheme, browserNewContextParamsDeviceScaleFactor, browserNewContextParamsExtraHTTPHeaders, browserNewContextParamsGeolocation, browserNewContextParamsHttpCredentials, browserNewContextParamsIgnoreHTTPSErrors, browserNewContextParamsJavaScriptEnabled, browserNewContextParamsLocale, browserNewContextParamsOffline, browserNewContextParamsPermissions, browserNewContextParamsStorageState, browserNewContextParamsTimezoneId, browserNewContextParamsUserAgent, browserNewContextParamsViewport)
+  ( BrowserNewContextParams (browserNewContextParamsBaseURL, browserNewContextParamsBypassCSP, browserNewContextParamsColorScheme, browserNewContextParamsDeviceScaleFactor, browserNewContextParamsExtraHTTPHeaders, browserNewContextParamsGeolocation, browserNewContextParamsHasTouch, browserNewContextParamsHttpCredentials, browserNewContextParamsIgnoreHTTPSErrors, browserNewContextParamsIsMobile, browserNewContextParamsJavaScriptEnabled, browserNewContextParamsLocale, browserNewContextParamsNoDefaultViewport, browserNewContextParamsOffline, browserNewContextParamsPermissions, browserNewContextParamsStorageState, browserNewContextParamsTimezoneId, browserNewContextParamsUserAgent, browserNewContextParamsViewport)
   , BrowserNewContextParamsColorScheme (BrowserNewContextParamsColorSchemeDark, BrowserNewContextParamsColorSchemeLight, BrowserNewContextParamsColorSchemeNoOverride, BrowserNewContextParamsColorSchemeNoPreference)
   , BrowserNewContextParamsGeolocation (browserNewContextParamsGeolocationAccuracy)
   , BrowserNewContextParamsHttpCredentials (browserNewContextParamsHttpCredentialsOrigin)
@@ -69,10 +69,13 @@ data NewContextOptions = NewContextOptions
   , newContextDeviceScaleFactor :: Maybe DeviceScaleFactor
   , newContextExtraHTTPHeaders :: Maybe [HttpHeader]
   , newContextGeolocation :: Maybe Geolocation
+  , newContextHasTouch :: Maybe Bool
   , newContextHttpCredentials :: Maybe HttpCredentials
   , newContextIgnoreHTTPSErrors :: Maybe Bool
+  , newContextIsMobile :: Maybe Bool
   , newContextJavaScriptEnabled :: Maybe Bool
   , newContextLocale :: Maybe Locale
+  , newContextNoDefaultViewport :: Maybe Bool
   , newContextOffline :: Maybe Bool
   , newContextPermissions :: Maybe [PermissionName]
   , newContextStorageState :: Maybe StorageState
@@ -91,10 +94,13 @@ defaultNewContextOptions =
     , newContextDeviceScaleFactor = Nothing
     , newContextExtraHTTPHeaders = Nothing
     , newContextGeolocation = Nothing
+    , newContextHasTouch = Nothing
     , newContextHttpCredentials = Nothing
     , newContextIgnoreHTTPSErrors = Nothing
+    , newContextIsMobile = Nothing
     , newContextJavaScriptEnabled = Nothing
     , newContextLocale = Nothing
+    , newContextNoDefaultViewport = Nothing
     , newContextOffline = Nothing
     , newContextPermissions = Nothing
     , newContextStorageState = Nothing
@@ -113,10 +119,13 @@ toBrowserNewContextParams opts =
         fmap deviceScaleFactorToScientific (newContextDeviceScaleFactor opts)
     , browserNewContextParamsExtraHTTPHeaders = fmap (fmap toNameValue) (newContextExtraHTTPHeaders opts)
     , browserNewContextParamsGeolocation = fmap toProtocolGeolocation (newContextGeolocation opts)
+    , browserNewContextParamsHasTouch = newContextHasTouch opts
     , browserNewContextParamsHttpCredentials = fmap toProtocolCredentials (newContextHttpCredentials opts)
     , browserNewContextParamsIgnoreHTTPSErrors = newContextIgnoreHTTPSErrors opts
+    , browserNewContextParamsIsMobile = newContextIsMobile opts
     , browserNewContextParamsJavaScriptEnabled = newContextJavaScriptEnabled opts
     , browserNewContextParamsLocale = fmap localeToText (newContextLocale opts)
+    , browserNewContextParamsNoDefaultViewport = newContextNoDefaultViewport opts
     , browserNewContextParamsOffline = newContextOffline opts
     , browserNewContextParamsPermissions = fmap (fmap permissionNameToText) (newContextPermissions opts)
     , browserNewContextParamsStorageState = fmap toNewContextStorageState (newContextStorageState opts)

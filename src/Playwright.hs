@@ -723,7 +723,7 @@ import Playwright.MediaType
   ( MediaType (MediaNoOverride, MediaPrint, MediaScreen)
   )
 import Playwright.NewContextOptions
-  ( NewContextOptions (NewContextOptions, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextGeolocation, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextJavaScriptEnabled, newContextLocale, newContextOffline, newContextPermissions, newContextStorageState, newContextTimezoneId, newContextUserAgent, newContextViewport)
+  ( NewContextOptions (NewContextOptions, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextGeolocation, newContextHasTouch, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextIsMobile, newContextJavaScriptEnabled, newContextLocale, newContextNoDefaultViewport, newContextOffline, newContextPermissions, newContextStorageState, newContextTimezoneId, newContextUserAgent, newContextViewport)
   , defaultNewContextOptions
   )
 import Playwright.Page
