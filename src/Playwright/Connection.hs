@@ -44,52 +44,29 @@ module Playwright.Connection
   , locatorHandlerUidsMatching
   ) where
 
-import Autodocodec
-  ( Autodocodec (Autodocodec)
-  , HasCodec (codec)
-  , object
-  , requiredField'
-  , (.=)
-  )
 import Control.Concurrent
   ( ThreadId
-  , myThreadId
   )
 import Control.Concurrent.Async
   ( withAsync
   )
 import Control.Concurrent.STM
-  ( STM
-  , TMVar
-  , TVar
-  , atomically
+  ( atomically
   , modifyTVar'
   , newEmptyTMVarIO
   , newTVarIO
   , putTMVar
   , readTVar
-  , retry
   , takeTMVar
   , throwSTM
-  , tryReadTMVar
   , writeTVar
   )
 import Control.Concurrent.STM.TQueue
-  ( TQueue
-  , newTQueueIO
-  , readTQueue
-  , writeTQueue
+  ( newTQueueIO
   )
 import Control.Exception
-  ( SomeException
-  , catch
-  , finally
+  ( finally
   , throwIO
-  )
-import Control.Monad
-  ( forever
-  , unless
-  , when
   )
 import Data.Aeson
   ( FromJSON
@@ -108,45 +85,87 @@ import Data.Aeson qualified as Aeson
 import Data.ByteString.Lazy
   ( toStrict
   )
-import Data.Foldable
-  ( traverse_
-  )
 import Data.Map.Strict
   ( Map
   )
 import Data.Map.Strict qualified as Map
-import Data.Maybe
-  ( fromMaybe
-  , isJust
-  )
 import Data.Set
   ( Set
   )
 import Data.Set qualified as Set
-import Data.Sequence
-  ( Seq
-  )
-import Data.Sequence qualified as Seq
 import Data.Text
   ( Text
   )
 import Data.Text qualified as Text
+import Playwright.Connection.Handlers
+  ( handlerLoop
+  , registerEventHandler
+  , runEventHandlers
+  , waitForDispatchedHandlers
+  )
+import Playwright.Connection.Store
+  ( addSelectorEngine
+  , beginLocatorHandler
+  , clearRouteHandlers
+  , closedGuids
+  , deleteLocatorHandler
+  , guidsOfType
+  , locatorHandlerUidsMatching
+  , lookupContextBaseUrl
+  , lookupContextBrowserGuid
+  , lookupMainFramePage
+  , lookupObject
+  , lookupOwnedContextGuids
+  , lookupRequestFailure
+  , lookupRequestOverrides
+  , lookupSelectorEngines
+  , lookupTimeoutDefaults
+  , markLocatorHandlersListening
+  , markPageOwnsContext
+  , pageOwnsContext
+  , pushRouteHandler
+  , putLocatorHandler
+  , registerMainFramePage
+  , rememberBrowserContext
+  , removeRouteHandlers
+  , routeHandlersFor
+  , setTimeoutDefault
+  , setTimeoutNavigation
+  , writeContextBaseUrl
+  , writeRequestOverrides
+  )
+import Playwright.Connection.Types
+  ( Connection (Connection, connectionBrowserContexts, connectionCallbacks, connectionClosed, connectionClosedGuids, connectionContextBaseUrls, connectionContextBrowsers, connectionEventBuffer, connectionEventHandlers, connectionEventWaiters, connectionFinishedRequests, connectionHandlerQueue, connectionHandlerThreads, connectionLocatorHandlers, connectionLocatorListening, connectionMainFramePages, connectionNextId, connectionObjects, connectionPagesOwningContext, connectionPendingHandlers, connectionRequestFailures, connectionRequestOverrides, connectionRouteHandlers, connectionRouteListening, connectionSelectorEngines, connectionTimeoutDefaults, connectionTransport)
+  , OutgoingCall (OutgoingCall, outgoingCallGuid, outgoingCallId, outgoingCallMetadata, outgoingCallMethod, outgoingCallParams)
+  , StoredLocatorHandler (StoredLocatorHandler, storedLocatorHandlerFrame, storedLocatorHandlerRun, storedLocatorHandlerSelector, storedLocatorHandlerTimes)
+  )
+import Playwright.Connection.Wait
+  ( deliverEvent
+  , registerEventWaiter
+  , registerFutureEventWaiter
+  , waitForChannelEvent
+  , waitForFutureChannelEvent
+  , waitForFutureChannelEventUnlessClosed
+  , waitForLifecycle
+  , waitUntilRemote
+  , waitUntilRequestSettled
+  , waitUntilUrl
+  )
 import Playwright.Error
-  ( PlaywrightError (ConnectionClosed, DecodeFailure, MissingObject, ProtocolRpc, UnexpectedResponse)
+  ( PlaywrightError (ConnectionClosed, DecodeFailure, ProtocolRpc, UnexpectedResponse)
   , ProtocolFailure
-  , targetClosedError
   )
 import Playwright.Guid
   ( Guid
   , rootGuid
   )
-import Playwright.Json.ChannelRef
-  ( ChannelRef (channelRefGuid)
-  )
 import Playwright.Incoming
   ( CreateParams (createGuid, createInitializer, createType)
   , Incoming (IncomingAdopt, IncomingCreate, IncomingDispose, IncomingEvent, IncomingResponse)
   , parseIncoming
+  )
+import Playwright.Json.ChannelRef
+  ( ChannelRef (channelRefGuid)
   )
 import Playwright.Json.Decode
   ( fromJsonValue
@@ -158,7 +177,7 @@ import Playwright.Protocol
   ( BrowserContextRequestFailedEvent (browserContextRequestFailedEventFailureText, browserContextRequestFailedEventRequest)
   , BrowserContextRequestFinishedEvent (browserContextRequestFinishedEventRequest)
   , ChannelType (ChannelTypeRoot)
-  , FrameInitializer (frameInitializerLoadStates, frameInitializerUrl)
+  , FrameInitializer (frameInitializerLoadStates)
   , FrameLoadstateEvent (frameLoadstateEventAdd, frameLoadstateEventRemove)
   , FrameNavigatedEvent (frameNavigatedEventName, frameNavigatedEventUrl)
   , JSHandlePreviewUpdatedEvent (jSHandlePreviewUpdatedEventPreview)
@@ -171,94 +190,12 @@ import Playwright.RemoteObject
 import Playwright.RequestId
   ( RequestId (RequestId)
   )
-import Playwright.RequestOverrides
-  ( RequestOverrides
-  , emptyRequestOverrides
-  )
-import Playwright.Timeout
-  ( Timeout
-  )
-import Playwright.TimeoutDefaults
-  ( TimeoutDefaults (timeoutDefaultsNavigation, timeoutDefaultsTimeout)
-  , emptyTimeoutDefaults
-  )
 import Playwright.Transport
   ( Transport (closeTransport, recvPayload, sendPayload)
   )
 import Playwright.Url
   ( Url
   )
-import Playwright.UrlGlob
-  ( UrlGlob
-  )
-
-data Connection = Connection
-  { connectionTransport :: Transport
-  , connectionObjects :: TVar (Map Guid RemoteObject)
-  , connectionCallbacks :: TVar (Map RequestId (TMVar (Either PlaywrightError Value)))
-  , connectionNextId :: TVar RequestId
-  , connectionClosed :: TVar (Maybe PlaywrightError)
-  , connectionEventWaiters :: TVar [EventWaiter]
-  , connectionEventBuffer :: TVar (Map (Guid, MethodName) (Seq Value))
-  , connectionClosedGuids :: TVar (Set Guid)
-  , connectionEventHandlers :: TVar [EventHandler]
-  , connectionRouteHandlers :: TVar (Map Guid [(UrlGlob, ChannelRef -> IO Bool)])
-  , connectionRouteListening :: TVar (Set Guid)
-  , connectionRequestOverrides :: TVar (Map Guid RequestOverrides)
-  , connectionContextBaseUrls :: TVar (Map Guid Url)
-  , connectionBrowserContexts :: TVar (Map Guid [Guid])
-  , connectionContextBrowsers :: TVar (Map Guid Guid)
-  , connectionPagesOwningContext :: TVar (Set Guid)
-  , connectionSelectorEngines :: TVar [SelectorEngine]
-  , connectionTimeoutDefaults :: TVar (Map Guid TimeoutDefaults)
-  , connectionMainFramePages :: TVar (Map Guid Guid)
-  , connectionFinishedRequests :: TVar (Set Guid)
-  , connectionRequestFailures :: TVar (Map Guid Text.Text)
-  , connectionPendingHandlers :: TVar Int
-  , connectionHandlerThreads :: TVar (Set ThreadId)
-  , connectionHandlerQueue :: TQueue (IO ())
-  , connectionLocatorHandlers :: TVar (Map Guid (Map Int StoredLocatorHandler))
-  , connectionLocatorListening :: TVar (Set Guid)
-  }
-
-data StoredLocatorHandler = StoredLocatorHandler
-  { storedLocatorHandlerTimes :: Maybe Int
-  , storedLocatorHandlerSelector :: Text
-  , storedLocatorHandlerFrame :: Guid
-  , storedLocatorHandlerRun :: IO ()
-  }
-
-data EventWaiter = EventWaiter
-  { eventWaiterGuid :: Guid
-  , eventWaiterMethod :: MethodName
-  , eventWaiterBox :: TMVar Value
-  }
-
-data EventHandler = EventHandler
-  { eventHandlerGuid :: Guid
-  , eventHandlerMethod :: MethodName
-  , eventHandlerRun :: Value -> IO ()
-  }
-
-data OutgoingCall = OutgoingCall
-  { outgoingCallId :: RequestId
-  , outgoingCallGuid :: Guid
-  , outgoingCallMethod :: MethodName
-  , outgoingCallParams :: Value
-  , outgoingCallMetadata :: Value
-  }
-  deriving stock (Eq, Show)
-  deriving (FromJSON, ToJSON) via (Autodocodec OutgoingCall)
-
-instance HasCodec OutgoingCall where
-  codec =
-    object "OutgoingCall" $
-      OutgoingCall
-        <$> requiredField' "id" .= outgoingCallId
-        <*> requiredField' "guid" .= outgoingCallGuid
-        <*> requiredField' "method" .= outgoingCallMethod
-        <*> requiredField' "params" .= outgoingCallParams
-        <*> requiredField' "metadata" .= outgoingCallMetadata
 
 withConnection :: Transport -> (Connection -> IO a) -> IO a
 withConnection transport action = do
@@ -281,7 +218,7 @@ withConnection transport action = do
   timeoutDefaults <- newTVarIO Map.empty
   mainFramePages <- newTVarIO Map.empty
   finishedRequests <- newTVarIO (Set.empty :: Set Guid)
-  requestFailures <- newTVarIO (Map.empty :: Map Guid Text.Text)
+  requestFailures <- newTVarIO (Map.empty :: Map Guid Text)
   pendingHandlers <- newTVarIO (0 :: Int)
   handlerThreads <- newTVarIO (Set.empty :: Set ThreadId)
   handlerQueue <- newTQueueIO
@@ -371,50 +308,6 @@ sendCommand conn guid method params = do
             Success decoded ->
               pure decoded
 
-lookupObject :: Connection -> Guid -> IO RemoteObject
-lookupObject conn guid = do
-  objects <- atomically (readTVar (connectionObjects conn))
-  case Map.lookup guid objects of
-    Nothing ->
-      throwIO (MissingObject guid)
-    Just obj ->
-      pure obj
-
-guidsOfType :: Connection -> ChannelType -> IO [Guid]
-guidsOfType conn ty = do
-  objects <- atomically (readTVar (connectionObjects conn))
-  pure
-    [ remoteGuid obj
-    | obj <- Map.elems objects
-    , remoteType obj == ty
-    ]
-
-closedGuids :: Connection -> IO (Set Guid)
-closedGuids conn =
-  atomically (readTVar (connectionClosedGuids conn))
-
-waitForLifecycle :: Connection -> Guid -> LifecycleEvent -> IO ()
-waitForLifecycle conn guid wanted =
-  atomically (waitForLifecycleSTM conn guid wanted)
-
-waitForLifecycleSTM :: Connection -> Guid -> LifecycleEvent -> STM ()
-waitForLifecycleSTM conn guid wanted = do
-  closed <- readTVar (connectionClosed conn)
-  case closed of
-    Just err ->
-      throwSTM err
-    Nothing -> do
-      objects <- readTVar (connectionObjects conn)
-      case Map.lookup guid objects of
-        Nothing ->
-          retry
-        Just obj ->
-          case fromJsonValue (remoteInitializer obj) of
-            Left err ->
-              throwSTM err
-            Right initializer ->
-              unless (wanted `elem` frameInitializerLoadStates initializer) retry
-
 nextRequestId :: Connection -> IO RequestId
 nextRequestId conn =
   atomically $ do
@@ -484,367 +377,6 @@ handleEvent conn guid method params = do
       pure ()
   deliverEvent conn guid method params
   runEventHandlers conn guid method params
-
-deliverEvent :: Connection -> Guid -> MethodName -> Value -> IO ()
-deliverEvent conn guid method params =
-  atomically $ do
-    waiters <- readTVar (connectionEventWaiters conn)
-    case break matches waiters of
-      (before, waiter : after) -> do
-        writeTVar (connectionEventWaiters conn) (before <> after)
-        putTMVar (eventWaiterBox waiter) params
-      (_, []) ->
-        modifyTVar' (connectionEventBuffer conn) $
-          Map.insertWith (flip (<>)) (guid, method) (Seq.singleton params)
-  where
-    matches waiter =
-      eventWaiterGuid waiter == guid && eventWaiterMethod waiter == method
-
-registerEventHandler :: Connection -> Guid -> MethodName -> (Value -> IO ()) -> IO ()
-registerEventHandler conn guid method run =
-  atomically $
-    modifyTVar' (connectionEventHandlers conn) (EventHandler guid method run :)
-
-pushRouteHandler :: Connection -> Guid -> UrlGlob -> (ChannelRef -> IO Bool) -> IO Bool
-pushRouteHandler conn guid glob run =
-  atomically $ do
-    listening <- readTVar (connectionRouteListening conn)
-    let
-      first = Set.notMember guid listening
-    when first (modifyTVar' (connectionRouteListening conn) (Set.insert guid))
-    modifyTVar'
-      (connectionRouteHandlers conn)
-      (Map.insertWith (++) guid [(glob, run)])
-    pure first
-
-removeRouteHandlers :: Connection -> Guid -> UrlGlob -> IO ()
-removeRouteHandlers conn guid glob =
-  atomically $
-    modifyTVar'
-      (connectionRouteHandlers conn)
-      (Map.adjust (filter (\(existing, _) -> existing /= glob)) guid)
-
-clearRouteHandlers :: Connection -> Guid -> IO ()
-clearRouteHandlers conn guid =
-  atomically $
-    modifyTVar' (connectionRouteHandlers conn) (Map.delete guid)
-
-routeHandlersFor :: Connection -> Guid -> IO [(UrlGlob, ChannelRef -> IO Bool)]
-routeHandlersFor conn guid = do
-  handlers <- atomically (readTVar (connectionRouteHandlers conn))
-  pure (Map.findWithDefault [] guid handlers)
-
-lookupRequestOverrides :: Connection -> Guid -> IO RequestOverrides
-lookupRequestOverrides conn guid = do
-  overrides <- atomically (readTVar (connectionRequestOverrides conn))
-  pure (Map.findWithDefault emptyRequestOverrides guid overrides)
-
-writeRequestOverrides :: Connection -> Guid -> RequestOverrides -> IO ()
-writeRequestOverrides conn guid overrides =
-  atomically $
-    modifyTVar' (connectionRequestOverrides conn) (Map.insert guid overrides)
-
-lookupContextBaseUrl :: Connection -> Guid -> IO (Maybe Url)
-lookupContextBaseUrl conn guid =
-  atomically $
-    Map.lookup guid <$> readTVar (connectionContextBaseUrls conn)
-
-writeContextBaseUrl :: Connection -> Guid -> Url -> IO ()
-writeContextBaseUrl conn guid url =
-  atomically $
-    modifyTVar' (connectionContextBaseUrls conn) (Map.insert guid url)
-
-rememberBrowserContext :: Connection -> Guid -> Guid -> IO ()
-rememberBrowserContext conn browserGuid contextGuid =
-  atomically $ do
-    modifyTVar' (connectionContextBrowsers conn) (Map.insert contextGuid browserGuid)
-    modifyTVar' (connectionBrowserContexts conn) $
-      Map.insertWith (\new old -> old <> new) browserGuid [contextGuid]
-
-lookupOwnedContextGuids :: Connection -> Guid -> IO [Guid]
-lookupOwnedContextGuids conn browserGuid =
-  atomically $
-    Map.findWithDefault [] browserGuid <$> readTVar (connectionBrowserContexts conn)
-
-lookupContextBrowserGuid :: Connection -> Guid -> IO (Maybe Guid)
-lookupContextBrowserGuid conn contextGuid =
-  atomically $
-    Map.lookup contextGuid <$> readTVar (connectionContextBrowsers conn)
-
-markPageOwnsContext :: Connection -> Guid -> IO ()
-markPageOwnsContext conn pageGuid =
-  atomically $
-    modifyTVar' (connectionPagesOwningContext conn) (Set.insert pageGuid)
-
-pageOwnsContext :: Connection -> Guid -> IO Bool
-pageOwnsContext conn pageGuid =
-  atomically $
-    Set.member pageGuid <$> readTVar (connectionPagesOwningContext conn)
-
-lookupSelectorEngines :: Connection -> IO [SelectorEngine]
-lookupSelectorEngines conn =
-  atomically (readTVar (connectionSelectorEngines conn))
-
-addSelectorEngine :: Connection -> SelectorEngine -> IO ()
-addSelectorEngine conn engine =
-  atomically $
-    modifyTVar' (connectionSelectorEngines conn) (++ [engine])
-
-markLocatorHandlersListening :: Connection -> Guid -> IO Bool
-markLocatorHandlersListening conn guid =
-  atomically $ do
-    listening <- readTVar (connectionLocatorListening conn)
-    let
-      first = Set.notMember guid listening
-    when first (modifyTVar' (connectionLocatorListening conn) (Set.insert guid))
-    pure first
-
-putLocatorHandler :: Connection -> Guid -> Int -> StoredLocatorHandler -> IO ()
-putLocatorHandler conn pageGuid uid stored =
-  atomically $
-    modifyTVar' (connectionLocatorHandlers conn) (Map.insertWith Map.union pageGuid (Map.singleton uid stored))
-
-beginLocatorHandler :: Connection -> Guid -> Int -> IO (Maybe StoredLocatorHandler, Bool)
-beginLocatorHandler conn pageGuid uid =
-  atomically $ do
-    pages <- readTVar (connectionLocatorHandlers conn)
-    let
-      handlers = Map.findWithDefault Map.empty pageGuid pages
-    case Map.lookup uid handlers of
-      Nothing ->
-        pure (Nothing, False)
-      Just stored ->
-        case storedLocatorHandlerTimes stored of
-          Just 0 ->
-            pure (Nothing, True)
-          Just remaining -> do
-            let
-              next = remaining - 1
-              updated = stored {storedLocatorHandlerTimes = Just next}
-            writeTVar
-              (connectionLocatorHandlers conn)
-              (Map.insert pageGuid (Map.insert uid updated handlers) pages)
-            pure (Just stored, next == 0)
-          Nothing ->
-            pure (Just stored, False)
-
-deleteLocatorHandler :: Connection -> Guid -> Int -> IO ()
-deleteLocatorHandler conn pageGuid uid =
-  atomically $
-    modifyTVar' (connectionLocatorHandlers conn) (Map.adjust (Map.delete uid) pageGuid)
-
-locatorHandlerUidsMatching :: Connection -> Guid -> Text -> Guid -> IO [Int]
-locatorHandlerUidsMatching conn pageGuid selector frameGuid =
-  atomically $ do
-    pages <- readTVar (connectionLocatorHandlers conn)
-    let
-      handlers = Map.findWithDefault Map.empty pageGuid pages
-    pure
-      [ uid
-      | (uid, stored) <- Map.toList handlers
-      , storedLocatorHandlerSelector stored == selector
-      , storedLocatorHandlerFrame stored == frameGuid
-      ]
-
-lookupTimeoutDefaults :: Connection -> Guid -> IO TimeoutDefaults
-lookupTimeoutDefaults conn guid =
-  atomically $
-    Map.findWithDefault emptyTimeoutDefaults guid <$> readTVar (connectionTimeoutDefaults conn)
-
-setTimeoutDefault :: Connection -> Guid -> Maybe Timeout -> IO ()
-setTimeoutDefault conn guid value =
-  atomically $
-    modifyTVar' (connectionTimeoutDefaults conn) (Map.alter (Just . update . fromMaybe emptyTimeoutDefaults) guid)
-  where
-    update defaults =
-      defaults {timeoutDefaultsTimeout = value}
-
-setTimeoutNavigation :: Connection -> Guid -> Maybe Timeout -> IO ()
-setTimeoutNavigation conn guid value =
-  atomically $
-    modifyTVar' (connectionTimeoutDefaults conn) (Map.alter (Just . update . fromMaybe emptyTimeoutDefaults) guid)
-  where
-    update defaults =
-      defaults {timeoutDefaultsNavigation = value}
-
-registerMainFramePage :: Connection -> Guid -> Guid -> IO ()
-registerMainFramePage conn frameGuid pageGuid =
-  atomically $
-    modifyTVar' (connectionMainFramePages conn) (Map.insert frameGuid pageGuid)
-
-lookupMainFramePage :: Connection -> Guid -> IO (Maybe Guid)
-lookupMainFramePage conn frameGuid =
-  atomically $
-    Map.lookup frameGuid <$> readTVar (connectionMainFramePages conn)
-
-lookupRequestFailure :: Connection -> Guid -> IO (Maybe Text.Text)
-lookupRequestFailure conn guid =
-  atomically $
-    Map.lookup guid <$> readTVar (connectionRequestFailures conn)
-
-waitUntilRequestSettled :: Connection -> Guid -> IO ()
-waitUntilRequestSettled conn guid =
-  atomically $ do
-    closed <- readTVar (connectionClosed conn)
-    case closed of
-      Just err ->
-        throwSTM err
-      Nothing -> do
-        finished <- readTVar (connectionFinishedRequests conn)
-        unless (Set.member guid finished) retry
-
-runEventHandlers :: Connection -> Guid -> MethodName -> Value -> IO ()
-runEventHandlers conn guid method params = do
-  handlers <- atomically (readTVar (connectionEventHandlers conn))
-  let
-    matching =
-      filter
-        ( \handler ->
-            eventHandlerGuid handler == guid && eventHandlerMethod handler == method
-        )
-        handlers
-  traverse_ (enqueueHandler conn params) matching
-
-enqueueHandler :: Connection -> Value -> EventHandler -> IO ()
-enqueueHandler conn params handler =
-  atomically $ do
-    modifyTVar' (connectionPendingHandlers conn) (+ 1)
-    writeTQueue (connectionHandlerQueue conn) (runQueuedHandler conn params handler)
-
-handlerLoop :: Connection -> IO ()
-handlerLoop conn =
-  forever $ do
-    job <- atomically (readTQueue (connectionHandlerQueue conn))
-    job
-
-runQueuedHandler :: Connection -> Value -> EventHandler -> IO ()
-runQueuedHandler conn params handler = do
-  tid <- myThreadId
-  atomically (modifyTVar' (connectionHandlerThreads conn) (Set.insert tid))
-  let
-    cleanup :: IO ()
-    cleanup =
-      atomically $ do
-        modifyTVar' (connectionHandlerThreads conn) (Set.delete tid)
-        modifyTVar' (connectionPendingHandlers conn) (subtract 1)
-  eventHandlerRun handler params
-    `catch` (\(_ :: SomeException) -> pure ())
-    `finally` cleanup
-
-waitForDispatchedHandlers :: Connection -> IO ()
-waitForDispatchedHandlers conn = do
-  tid <- myThreadId
-  atomically $ do
-    closed <- readTVar (connectionClosed conn)
-    case closed of
-      Just err ->
-        throwSTM err
-      Nothing -> do
-        handlerThreads <- readTVar (connectionHandlerThreads conn)
-        unless (Set.member tid handlerThreads) $ do
-          pending <- readTVar (connectionPendingHandlers conn)
-          when (pending > 0) retry
-
-registerEventWaiter :: Connection -> Guid -> MethodName -> IO (TMVar Value)
-registerEventWaiter conn guid method = do
-  box <- newEmptyTMVarIO
-  atomically $ do
-    buffer <- readTVar (connectionEventBuffer conn)
-    case Seq.viewl (Map.findWithDefault Seq.empty (guid, method) buffer) of
-      params Seq.:< rest -> do
-        writeTVar (connectionEventBuffer conn) (Map.insert (guid, method) rest buffer)
-        putTMVar box params
-      Seq.EmptyL ->
-        modifyTVar' (connectionEventWaiters conn) (EventWaiter guid method box :)
-  pure box
-
-waitForChannelEvent :: Connection -> Guid -> MethodName -> IO Value
-waitForChannelEvent conn guid method = do
-  box <- registerEventWaiter conn guid method
-  atomically (takeTMVar box)
-
-registerFutureEventWaiter :: Connection -> Guid -> MethodName -> IO (TMVar Value)
-registerFutureEventWaiter conn guid method = do
-  box <- newEmptyTMVarIO
-  atomically $
-    modifyTVar' (connectionEventWaiters conn) (EventWaiter guid method box :)
-  pure box
-
-waitForFutureChannelEvent :: Connection -> Guid -> MethodName -> IO Value
-waitForFutureChannelEvent conn guid method = do
-  box <- registerFutureEventWaiter conn guid method
-  atomically (takeTMVar box)
-
-unregisterWaiterSTM :: Connection -> TMVar Value -> STM ()
-unregisterWaiterSTM conn box =
-  modifyTVar' (connectionEventWaiters conn) (filter (\waiter -> eventWaiterBox waiter /= box))
-
-waitForFutureChannelEventUnlessClosed :: Connection -> Guid -> MethodName -> IO Value
-waitForFutureChannelEventUnlessClosed conn guid method = do
-  already <- atomically (Set.member guid <$> readTVar (connectionClosedGuids conn))
-  when already (throwIO targetClosedError)
-  box <- registerFutureEventWaiter conn guid method
-  closeBox <- registerEventWaiter conn guid (MethodName "close")
-  atomically $ do
-    closedConn <- readTVar (connectionClosed conn)
-    case closedConn of
-      Just err -> do
-        unregisterWaiterSTM conn box
-        unregisterWaiterSTM conn closeBox
-        throwSTM err
-      Nothing -> do
-        closedSet <- readTVar (connectionClosedGuids conn)
-        eventParams <- tryReadTMVar box
-        closeFired <- tryReadTMVar closeBox
-        case eventParams of
-          Just params -> do
-            unregisterWaiterSTM conn box
-            unregisterWaiterSTM conn closeBox
-            pure params
-          Nothing
-            | Set.member guid closedSet || isJust closeFired -> do
-                unregisterWaiterSTM conn box
-                unregisterWaiterSTM conn closeBox
-                throwSTM targetClosedError
-            | otherwise ->
-                retry
-
-waitUntilUrl :: Connection -> Guid -> (Url -> Bool) -> IO ()
-waitUntilUrl conn guid predicate =
-  atomically (waitUntilUrlSTM conn guid predicate)
-
-waitUntilRemote :: Connection -> Guid -> (RemoteObject -> STM a) -> IO a
-waitUntilRemote conn guid useObject =
-  atomically $ do
-    closed <- readTVar (connectionClosed conn)
-    case closed of
-      Just err ->
-        throwSTM err
-      Nothing -> do
-        objects <- readTVar (connectionObjects conn)
-        case Map.lookup guid objects of
-          Nothing ->
-            retry
-          Just obj ->
-            useObject obj
-
-waitUntilUrlSTM :: Connection -> Guid -> (Url -> Bool) -> STM ()
-waitUntilUrlSTM conn guid predicate = do
-  closed <- readTVar (connectionClosed conn)
-  case closed of
-    Just err ->
-      throwSTM err
-    Nothing -> do
-      objects <- readTVar (connectionObjects conn)
-      case Map.lookup guid objects of
-        Nothing ->
-          retry
-        Just obj ->
-          case fromJsonValue (remoteInitializer obj) of
-            Left err ->
-              throwSTM err
-            Right initializer ->
-              unless (predicate (frameInitializerUrl initializer)) retry
 
 applyLoadstate :: Connection -> Guid -> Value -> IO ()
 applyLoadstate conn guid params = do
@@ -927,11 +459,11 @@ applyRequestFinished conn params = do
   atomically $
     modifyTVar' (connectionFinishedRequests conn) (Set.insert (channelRefGuid (browserContextRequestFinishedEventRequest event)))
 
-setInitializerPreview :: Text.Text -> RemoteObject -> RemoteObject
+setInitializerPreview :: Text -> RemoteObject -> RemoteObject
 setInitializerPreview preview obj =
   obj {remoteInitializer = patchPreview preview (remoteInitializer obj)}
 
-patchPreview :: Text.Text -> Value -> Value
+patchPreview :: Text -> Value -> Value
 patchPreview preview value =
   case value of
     Object keys ->
@@ -939,11 +471,11 @@ patchPreview preview value =
     _ ->
       value
 
-setInitializerNavigation :: Text.Text -> Url -> RemoteObject -> RemoteObject
+setInitializerNavigation :: Text -> Url -> RemoteObject -> RemoteObject
 setInitializerNavigation name url obj =
   obj {remoteInitializer = patchNavigation name url (remoteInitializer obj)}
 
-patchNavigation :: Text.Text -> Url -> Value -> Value
+patchNavigation :: Text -> Url -> Value -> Value
 patchNavigation name url value =
   case value of
     Object keys ->

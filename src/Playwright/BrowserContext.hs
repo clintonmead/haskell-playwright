@@ -34,7 +34,6 @@ module Playwright.BrowserContext
 
 import Control.Exception
   ( throwIO
-  , try
   )
 import Data.Set qualified as Set
 import Data.Text
@@ -61,8 +60,7 @@ import Playwright.Connection
   , waitForFutureChannelEventUnlessClosed
   )
 import Playwright.Error
-  ( PlaywrightError (ProtocolRpc)
-  , ProtocolFailure (protocolFailureName)
+  ( ignoreTargetClosed
   )
 import Playwright.Cookie
   ( Cookie
@@ -201,22 +199,14 @@ closeContext ctx =
   closeContextWith ctx Nothing
 
 closeContextWith :: BrowserContext -> Maybe Text -> IO ()
-closeContextWith ctx reason = do
-  result <-
-    try
-      ( send
-          (browserContextChannel ctx)
-          (MethodName "close")
-          mkBrowserContextCloseParams {browserContextCloseParamsReason = reason}
-      )
-  case result of
-    Left (ProtocolRpc failure)
-      | protocolFailureName failure == "TargetClosedError" ->
-          pure ()
-    Left err ->
-      throwIO err
-    Right (_ :: BrowserContextCloseResult) ->
-      pure ()
+closeContextWith ctx reason =
+  ignoreTargetClosed $ do
+    _ :: BrowserContextCloseResult <-
+      send
+        (browserContextChannel ctx)
+        (MethodName "close")
+        mkBrowserContextCloseParams {browserContextCloseParamsReason = reason}
+    pure ()
 
 pageContext :: Page -> BrowserContext
 pageContext page =

@@ -1,6 +1,7 @@
 module Playwright.Error
   ( PlaywrightError (..)
   , ProtocolFailure (..)
+  , ignoreTargetClosed
   , targetClosedError
   ) where
 
@@ -14,6 +15,8 @@ import Autodocodec
   )
 import Control.Exception
   ( Exception
+  , throwIO
+  , try
   )
 import Data.Aeson
   ( FromJSON
@@ -81,3 +84,15 @@ targetClosedError =
       , protocolFailureMessage = "Target page, context or browser has been closed"
       , protocolFailureStack = Nothing
       }
+
+ignoreTargetClosed :: IO a -> IO ()
+ignoreTargetClosed action = do
+  result <- try action
+  case result of
+    Left (ProtocolRpc failure)
+      | protocolFailureName failure == "TargetClosedError" ->
+          pure ()
+    Left err ->
+      throwIO err
+    Right _ ->
+      pure ()

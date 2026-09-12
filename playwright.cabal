@@ -39,6 +39,10 @@ library
       Playwright.Clock
       Playwright.ColorScheme
       Playwright.Connection
+      Playwright.Connection.Handlers
+      Playwright.Connection.Store
+      Playwright.Connection.Types
+      Playwright.Connection.Wait
       Playwright.ConsoleMessage
       Playwright.ConsoleType
       Playwright.ContinueOptions
@@ -106,6 +110,7 @@ library
       Playwright.Page
       Playwright.Page.Network
       Playwright.Page.Query
+      Playwright.Page.Wait
       Playwright.PageError
       Playwright.PdfOptions
       Playwright.PermissionName

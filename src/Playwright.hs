@@ -1135,12 +1135,6 @@ import Playwright.Page
   , addInitScript
   , addScriptTag
   , addStyleTag
-  , armConsole
-  , armDialog
-  , armFrameDetached
-  , armFrameNavigated
-  , armLoadEvent
-  , armPopup
   , bringToFront
   , closePage
   , content
@@ -1156,7 +1150,6 @@ import Playwright.Page
   , locatorOnFrame
   , locatorPage
   , frameLocator
-  , onLoad
   , opener
   , pageFromRef
   , pageRequest
@@ -1176,8 +1169,20 @@ import Playwright.Page
   , setViewportSize
   , title
   , url
-  , waitForConsole
   , waitForClose
+  , frameByName
+  , frames
+  , mainFrame
+  )
+import Playwright.Page.Wait
+  ( armConsole
+  , armDialog
+  , armFrameDetached
+  , armFrameNavigated
+  , armLoadEvent
+  , armPopup
+  , onLoad
+  , waitForConsole
   , waitForDialog
   , waitForFunction
   , waitForFunctionWith
@@ -1202,9 +1207,6 @@ import Playwright.Page
   , waitForTimeout
   , waitForURL
   , waitForURLWith
-  , frameByName
-  , frames
-  , mainFrame
   )
 import Playwright.Page.Query
   ( pageGetAttribute
