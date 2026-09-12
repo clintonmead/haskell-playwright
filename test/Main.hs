@@ -124,6 +124,7 @@ import Playwright.PageWaitForUrlSpec qualified as PageWaitForUrlSpec
 import Playwright.PermissionsSpec qualified as PermissionsSpec
 import Playwright.QuerySelectorSpec qualified as QuerySelectorSpec
 import Playwright.SelectorsCssSpec qualified as SelectorsCssSpec
+import Playwright.SelectorsFrameSpec qualified as SelectorsFrameSpec
 import Playwright.SelectorsGetBySpec qualified as SelectorsGetBySpec
 import Playwright.SelectorsMiscSpec qualified as SelectorsMiscSpec
 import Playwright.SelectorsRoleSpec qualified as SelectorsRoleSpec
@@ -273,6 +274,7 @@ main =
         , PermissionsSpec.tests
         , QuerySelectorSpec.tests
         , SelectorsCssSpec.tests
+        , SelectorsFrameSpec.tests
         , SelectorsGetBySpec.tests
         , SelectorsMiscSpec.tests
         , SelectorsRoleSpec.tests
