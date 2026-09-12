@@ -32,11 +32,19 @@ module Playwright.Evaluate
   , evaluateTextWith
   , evaluateTexts
   , evaluateWith
+  , evalOnSelector
+  , evalOnSelectorAll
   , evalOnSelectorAllHandle
   , evalOnSelectorAllHandleNumber
   , evalOnSelectorAllHandleTexts
+  , evalOnSelectorAllNumber
+  , evalOnSelectorAllTexts
+  , evalOnSelectorAllWith
   , evalOnSelectorHandle
   , evalOnSelectorHandleText
+  , evalOnSelectorText
+  , evalOnSelectorTextWith
+  , evalOnSelectorWith
   ) where
 
 import Control.Exception
@@ -59,6 +67,7 @@ import Playwright.Frame
   ( Frame (frameChannel)
   , evalOnSelectorAllFrame
   , evalOnSelectorFrame
+  , evalOnSelectorFrameStrict
   , evaluateFrame
   , evaluateFrameWith
   , frameSend
@@ -85,7 +94,7 @@ import Playwright.Protocol
   , JSHandleEvaluateExpressionResult (jSHandleEvaluateExpressionResultValue)
   , ElementHandleEvalOnSelectorAllParams (elementHandleEvalOnSelectorAllParamsIsFunction)
   , ElementHandleEvalOnSelectorAllResult (elementHandleEvalOnSelectorAllResultValue)
-  , ElementHandleEvalOnSelectorParams (elementHandleEvalOnSelectorParamsIsFunction, elementHandleEvalOnSelectorParamsStrict)
+  , ElementHandleEvalOnSelectorParams (elementHandleEvalOnSelectorParamsIsFunction)
   , ElementHandleEvalOnSelectorResult (elementHandleEvalOnSelectorResultValue)
   , mkElementHandleEvalOnSelectorAllParams
   , mkElementHandleEvalOnSelectorParams
@@ -233,7 +242,7 @@ evaluateOnLocator loc expression =
 
 evaluateOnLocatorWith :: Locator -> Text -> SerializedArgument -> IO SerializedValue
 evaluateOnLocatorWith loc expression arg =
-  evalOnSelectorFrame (locatorFrame loc) (locatorSelector loc) expression arg
+  evalOnSelectorFrameStrict (locatorFrame loc) (locatorSelector loc) expression arg
 
 evalOnSelectorHandle :: ElementHandle -> Selector -> Text -> IO SerializedValue
 evalOnSelectorHandle handle selector expression = do
@@ -243,7 +252,6 @@ evalOnSelectorHandle handle selector expression = do
       (MethodName "evalOnSelector")
       (mkElementHandleEvalOnSelectorParams undefinedArgument expression selector)
         { elementHandleEvalOnSelectorParamsIsFunction = Just True
-        , elementHandleEvalOnSelectorParamsStrict = Just True
         }
   pure (elementHandleEvalOnSelectorResultValue result)
 
@@ -269,6 +277,38 @@ evalOnSelectorAllHandleTexts handle selector expression =
 evalOnSelectorAllHandleNumber :: ElementHandle -> Selector -> Text -> IO Double
 evalOnSelectorAllHandleNumber handle selector expression =
   requireNumber =<< evalOnSelectorAllHandle handle selector expression
+
+evalOnSelector :: Page -> Selector -> Text -> IO SerializedValue
+evalOnSelector page selector expression =
+  evalOnSelectorWith page selector expression undefinedArgument
+
+evalOnSelectorWith :: Page -> Selector -> Text -> SerializedArgument -> IO SerializedValue
+evalOnSelectorWith page selector expression arg =
+  evalOnSelectorFrame (pageMainFrame page) selector expression arg
+
+evalOnSelectorText :: Page -> Selector -> Text -> IO Text
+evalOnSelectorText page selector expression =
+  requireText =<< evalOnSelector page selector expression
+
+evalOnSelectorTextWith :: Page -> Selector -> Text -> SerializedArgument -> IO Text
+evalOnSelectorTextWith page selector expression arg =
+  requireText =<< evalOnSelectorWith page selector expression arg
+
+evalOnSelectorAll :: Page -> Selector -> Text -> IO SerializedValue
+evalOnSelectorAll page selector expression =
+  evalOnSelectorAllWith page selector expression undefinedArgument
+
+evalOnSelectorAllWith :: Page -> Selector -> Text -> SerializedArgument -> IO SerializedValue
+evalOnSelectorAllWith page selector expression arg =
+  evalOnSelectorAllFrame (pageMainFrame page) selector expression arg
+
+evalOnSelectorAllNumber :: Page -> Selector -> Text -> IO Double
+evalOnSelectorAllNumber page selector expression =
+  requireNumber =<< evalOnSelectorAll page selector expression
+
+evalOnSelectorAllTexts :: Page -> Selector -> Text -> IO [Text]
+evalOnSelectorAllTexts page selector expression =
+  requireTexts =<< evalOnSelectorAll page selector expression
 
 evaluateOnLocatorAllTexts :: Locator -> Text -> IO [Text]
 evaluateOnLocatorAllTexts loc expression =

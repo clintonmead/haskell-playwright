@@ -124,6 +124,7 @@ module Playwright
   , browserFromRef
   , browserTypeFromRef
   , check
+  , checkHandle
   , checkWith
   , channelArgument
   , childLocator
@@ -182,6 +183,7 @@ module Playwright
   , deviceScaleFactorFromInt
   , dispatchEvent
   , dispose
+  , disposeHandle
   , downloadPath
   , downloadPage
   , downloadSuggestedFilename
@@ -196,11 +198,19 @@ module Playwright
   , emulateMedia
   , emptyStorageState
   , enterFrameSelector
+  , evalOnSelectorAll
   , evalOnSelectorAllHandle
   , evalOnSelectorAllHandleNumber
   , evalOnSelectorAllHandleTexts
+  , evalOnSelectorAllNumber
+  , evalOnSelectorAllTexts
+  , evalOnSelectorAllWith
   , evalOnSelectorHandle
   , evalOnSelectorHandleText
+  , evalOnSelector
+  , evalOnSelectorText
+  , evalOnSelectorTextWith
+  , evalOnSelectorWith
   , evaluate
   , evaluateBool
   , evaluateBoolWith
@@ -240,9 +250,11 @@ module Playwright
   , fallbackRoute
   , fallbackRouteWith
   , fill
+  , fillHandle
   , firefox
   , first
   , focus
+  , focusHandle
   , frameByName
   , frameElement
   , frameLocator
@@ -264,6 +276,7 @@ module Playwright
   , grantPermissions
   , grantPermissionsFor
   , hover
+  , hoverHandle
   , httpStatusOk
   , initializePlaywright
   , innerHtml
@@ -326,6 +339,8 @@ module Playwright
   , pdfWith
   , press
   , querySelector
+  , querySelectorAllHandle
+  , querySelectorHandle
   , querySelectorStrict
   , reload
   , requestFrame
@@ -352,6 +367,7 @@ module Playwright
   , scrollIntoViewIfNeeded
   , scrollIntoViewIfNeededWith
   , selectOption
+  , selectOptionHandle
   , selectText
   , selectTextWith
   , selectorFromText
@@ -359,6 +375,7 @@ module Playwright
   , sessionExpires
   , sessionStorage
   , setChecked
+  , setCheckedHandle
   , setContent
   , setContextExtraHTTPHeaders
   , setExtraHTTPHeaders
@@ -386,6 +403,7 @@ module Playwright
   , typeHandle
   , typeText
   , uncheck
+  , uncheckHandle
   , uncheckWith
   , unroute
   , unrouteAll
@@ -591,6 +609,20 @@ import Playwright.ElementHandle
   , waitForElementState
   , waitForElementStateWith
   )
+import Playwright.ElementHandle.Action
+  ( checkHandle
+  , disposeHandle
+  , fillHandle
+  , focusHandle
+  , hoverHandle
+  , selectOptionHandle
+  , setCheckedHandle
+  , uncheckHandle
+  )
+import Playwright.ElementHandle.Query
+  ( querySelectorAllHandle
+  , querySelectorHandle
+  )
 import Playwright.ElementState
   ( ElementState (ElementDisabled, ElementEditable, ElementEnabled, ElementHidden, ElementStable, ElementVisible)
   )
@@ -600,11 +632,19 @@ import Playwright.EmulateMedia
   , emulateMedia
   )
 import Playwright.Evaluate
-  ( evalOnSelectorAllHandle
+  ( evalOnSelectorAll
+  , evalOnSelectorAllHandle
   , evalOnSelectorAllHandleNumber
   , evalOnSelectorAllHandleTexts
+  , evalOnSelectorAllNumber
+  , evalOnSelectorAllTexts
+  , evalOnSelectorAllWith
   , evalOnSelectorHandle
   , evalOnSelectorHandleText
+  , evalOnSelector
+  , evalOnSelectorText
+  , evalOnSelectorTextWith
+  , evalOnSelectorWith
   , evaluate
   , evaluateBool
   , evaluateBoolWith

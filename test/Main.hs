@@ -26,13 +26,17 @@ import Playwright.ElementHandleClickSpec qualified as ElementHandleClickSpec
 import Playwright.ElementHandleContentFrameSpec qualified as ElementHandleContentFrameSpec
 import Playwright.ElementHandleConvenienceSpec qualified as ElementHandleConvenienceSpec
 import Playwright.ElementHandleEvalOnSelectorSpec qualified as ElementHandleEvalOnSelectorSpec
+import Playwright.ElementHandleMiscSpec qualified as ElementHandleMiscSpec
 import Playwright.ElementHandleOwnerFrameSpec qualified as ElementHandleOwnerFrameSpec
 import Playwright.ElementHandlePressSpec qualified as ElementHandlePressSpec
+import Playwright.ElementHandleQuerySelectorSpec qualified as ElementHandleQuerySelectorSpec
 import Playwright.ElementHandleScrollIntoViewSpec qualified as ElementHandleScrollIntoViewSpec
 import Playwright.ElementHandleScreenshotSpec qualified as ElementHandleScreenshotSpec
 import Playwright.ElementHandleSelectTextSpec qualified as ElementHandleSelectTextSpec
 import Playwright.ElementHandleTypeSpec qualified as ElementHandleTypeSpec
 import Playwright.ElementHandleWaitForElementStateSpec qualified as ElementHandleWaitForElementStateSpec
+import Playwright.EvalOnSelectorAllSpec qualified as EvalOnSelectorAllSpec
+import Playwright.EvalOnSelectorSpec qualified as EvalOnSelectorSpec
 import Playwright.FrameEvaluateSpec qualified as FrameEvaluateSpec
 import Playwright.FrameFrameElementSpec qualified as FrameFrameElementSpec
 import Playwright.FrameGotoSpec qualified as FrameGotoSpec
@@ -150,13 +154,17 @@ main =
         , ElementHandleContentFrameSpec.tests
         , ElementHandleConvenienceSpec.tests
         , ElementHandleEvalOnSelectorSpec.tests
+        , ElementHandleMiscSpec.tests
         , ElementHandleOwnerFrameSpec.tests
         , ElementHandlePressSpec.tests
+        , ElementHandleQuerySelectorSpec.tests
         , ElementHandleScrollIntoViewSpec.tests
         , ElementHandleScreenshotSpec.tests
         , ElementHandleSelectTextSpec.tests
         , ElementHandleTypeSpec.tests
         , ElementHandleWaitForElementStateSpec.tests
+        , EvalOnSelectorAllSpec.tests
+        , EvalOnSelectorSpec.tests
         , FrameEvaluateSpec.tests
         , FrameFrameElementSpec.tests
         , FrameGotoSpec.tests

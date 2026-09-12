@@ -6,6 +6,7 @@ module Playwright.Frame
   , currentUrl
   , evalOnSelectorAllFrame
   , evalOnSelectorFrame
+  , evalOnSelectorFrameStrict
   , evaluateFrame
   , evaluateFrameWith
   , frameFromRef
@@ -206,14 +207,22 @@ evaluateFrameWith frame expression arg = do
   pure (frameEvaluateExpressionResultValue result)
 
 evalOnSelectorFrame :: Frame -> Selector -> Text -> SerializedArgument -> IO SerializedValue
-evalOnSelectorFrame frame selector expression arg = do
+evalOnSelectorFrame frame selector expression arg =
+  evalOnSelectorFrameMaybeStrict frame selector expression arg Nothing
+
+evalOnSelectorFrameStrict :: Frame -> Selector -> Text -> SerializedArgument -> IO SerializedValue
+evalOnSelectorFrameStrict frame selector expression arg =
+  evalOnSelectorFrameMaybeStrict frame selector expression arg (Just True)
+
+evalOnSelectorFrameMaybeStrict :: Frame -> Selector -> Text -> SerializedArgument -> Maybe Bool -> IO SerializedValue
+evalOnSelectorFrameMaybeStrict frame selector expression arg strict = do
   result <-
     frameSend
       frame
       "evalOnSelector"
       (mkFrameEvalOnSelectorParams arg expression selector)
         { frameEvalOnSelectorParamsIsFunction = Just True
-        , frameEvalOnSelectorParamsStrict = Just True
+        , frameEvalOnSelectorParamsStrict = strict
         }
   pure (frameEvalOnSelectorResultValue result)
 

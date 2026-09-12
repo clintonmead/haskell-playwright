@@ -48,6 +48,8 @@ library
       Playwright.Download
       Playwright.Driver
       Playwright.ElementHandle
+      Playwright.ElementHandle.Action
+      Playwright.ElementHandle.Query
       Playwright.ElementState
       Playwright.EmulateMedia
       Playwright.Error
@@ -191,13 +193,17 @@ test-suite playwright-test
       Playwright.ElementHandleContentFrameSpec
       Playwright.ElementHandleConvenienceSpec
       Playwright.ElementHandleEvalOnSelectorSpec
+      Playwright.ElementHandleMiscSpec
       Playwright.ElementHandleOwnerFrameSpec
       Playwright.ElementHandlePressSpec
+      Playwright.ElementHandleQuerySelectorSpec
       Playwright.ElementHandleScreenshotSpec
       Playwright.ElementHandleScrollIntoViewSpec
       Playwright.ElementHandleSelectTextSpec
       Playwright.ElementHandleTypeSpec
       Playwright.ElementHandleWaitForElementStateSpec
+      Playwright.EvalOnSelectorAllSpec
+      Playwright.EvalOnSelectorSpec
       Playwright.FrameEvaluateSpec
       Playwright.FrameFrameElementSpec
       Playwright.FrameGotoSpec

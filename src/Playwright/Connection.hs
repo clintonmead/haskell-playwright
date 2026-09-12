@@ -31,7 +31,6 @@ import Autodocodec
   )
 import Control.Concurrent
   ( ThreadId
-  , forkIO
   , myThreadId
   )
 import Control.Concurrent.Async
@@ -52,6 +51,12 @@ import Control.Concurrent.STM
   , throwSTM
   , writeTVar
   )
+import Control.Concurrent.STM.TQueue
+  ( TQueue
+  , newTQueueIO
+  , readTQueue
+  , writeTQueue
+  )
 import Control.Exception
   ( SomeException
   , catch
@@ -59,8 +64,8 @@ import Control.Exception
   , throwIO
   )
 import Control.Monad
-  ( unless
-  , void
+  ( forever
+  , unless
   , when
   )
 import Data.Aeson
@@ -162,6 +167,7 @@ data Connection = Connection
   , connectionContextBaseUrls :: TVar (Map Guid Url)
   , connectionPendingHandlers :: TVar Int
   , connectionHandlerThreads :: TVar (Set ThreadId)
+  , connectionHandlerQueue :: TQueue (IO ())
   }
 
 data EventWaiter = EventWaiter
@@ -212,6 +218,7 @@ withConnection transport action = do
   contextBaseUrls <- newTVarIO Map.empty
   pendingHandlers <- newTVarIO (0 :: Int)
   handlerThreads <- newTVarIO (Set.empty :: Set ThreadId)
+  handlerQueue <- newTQueueIO
   let
     conn :: Connection
     conn =
@@ -231,9 +238,11 @@ withConnection transport action = do
         , connectionContextBaseUrls = contextBaseUrls
         , connectionPendingHandlers = pendingHandlers
         , connectionHandlerThreads = handlerThreads
+        , connectionHandlerQueue = handlerQueue
         }
   withAsync (readerLoop conn) $ \_ ->
-    action conn `finally` closeTransport transport
+    withAsync (handlerLoop conn) $ \_ ->
+      action conn `finally` closeTransport transport
 
 rootObject :: RemoteObject
 rootObject =
@@ -471,24 +480,33 @@ runEventHandlers conn guid method params = do
             eventHandlerGuid handler == guid && eventHandlerMethod handler == method
         )
         handlers
-  traverse_ (forkHandler conn params) matching
+  traverse_ (enqueueHandler conn params) matching
 
-forkHandler :: Connection -> Value -> EventHandler -> IO ()
-forkHandler conn params handler = do
-  atomically (modifyTVar' (connectionPendingHandlers conn) (+ 1))
-  void $
-    forkIO $ do
-      tid <- myThreadId
-      atomically (modifyTVar' (connectionHandlerThreads conn) (Set.insert tid))
-      let
-        cleanup :: IO ()
-        cleanup =
-          atomically $ do
-            modifyTVar' (connectionHandlerThreads conn) (Set.delete tid)
-            modifyTVar' (connectionPendingHandlers conn) (subtract 1)
-      eventHandlerRun handler params
-        `catch` (\(_ :: SomeException) -> pure ())
-        `finally` cleanup
+enqueueHandler :: Connection -> Value -> EventHandler -> IO ()
+enqueueHandler conn params handler =
+  atomically $ do
+    modifyTVar' (connectionPendingHandlers conn) (+ 1)
+    writeTQueue (connectionHandlerQueue conn) (runQueuedHandler conn params handler)
+
+handlerLoop :: Connection -> IO ()
+handlerLoop conn =
+  forever $ do
+    job <- atomically (readTQueue (connectionHandlerQueue conn))
+    job
+
+runQueuedHandler :: Connection -> Value -> EventHandler -> IO ()
+runQueuedHandler conn params handler = do
+  tid <- myThreadId
+  atomically (modifyTVar' (connectionHandlerThreads conn) (Set.insert tid))
+  let
+    cleanup :: IO ()
+    cleanup =
+      atomically $ do
+        modifyTVar' (connectionHandlerThreads conn) (Set.delete tid)
+        modifyTVar' (connectionPendingHandlers conn) (subtract 1)
+  eventHandlerRun handler params
+    `catch` (\(_ :: SomeException) -> pure ())
+    `finally` cleanup
 
 waitForDispatchedHandlers :: Connection -> IO ()
 waitForDispatchedHandlers conn = do
