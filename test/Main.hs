@@ -68,6 +68,7 @@ import Playwright.PageBasicSpec qualified as PageBasicSpec
 import Playwright.PageCheckSpec qualified as PageCheckSpec
 import Playwright.PageClockSpec qualified as PageClockSpec
 import Playwright.PageClickSpec qualified as PageClickSpec
+import Playwright.PageClickScrollSpec qualified as PageClickScrollSpec
 import Playwright.PageCloseSpec qualified as PageCloseSpec
 import Playwright.PageDispatchEventSpec qualified as PageDispatchEventSpec
 import Playwright.PageDialogSpec qualified as PageDialogSpec
@@ -206,6 +207,7 @@ main =
         , PageCheckSpec.tests
         , PageClockSpec.tests
         , PageClickSpec.tests
+        , PageClickScrollSpec.tests
         , PageCloseSpec.tests
         , PageDispatchEventSpec.tests
         , PageDialogSpec.tests

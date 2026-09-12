@@ -27,6 +27,13 @@ import Data.Text
 import Playwright.CheckOptions
   ( CheckOptions (checkOptionsForce, checkOptionsTimeout, checkOptionsTrial)
   )
+import Playwright.ClickOptions
+  ( ClickOptions (clickOptionsForce, clickOptionsNoWaitAfter, clickOptionsPosition)
+  , defaultClickOptions
+  )
+import Playwright.CssPixel
+  ( cssPixelToScientific
+  )
 import Playwright.DomEventType
   ( DomEventType (domEventTypeToText)
   )
@@ -58,12 +65,17 @@ import Playwright.Key
 import Playwright.MimeType
   ( mimeTypeToText
   )
+import Playwright.Point
+  ( Point
+  , pointX
+  , pointY
+  )
 import Playwright.Protocol
   ( FrameBlurParams (frameBlurParamsStrict)
   , FrameBlurResult
   , FrameCheckParams (frameCheckParamsForce, frameCheckParamsStrict, frameCheckParamsTrial)
   , FrameCheckResult
-  , FrameClickParams (frameClickParamsNoWaitAfter, frameClickParamsStrict)
+  , FrameClickParams (frameClickParamsForce, frameClickParamsNoWaitAfter, frameClickParamsPosition, frameClickParamsStrict)
   , FrameClickResult
   , FrameDblclickParams (frameDblclickParamsStrict)
   , FrameDblclickResult
@@ -116,6 +128,10 @@ import Playwright.Protocol
   , mkFrameTypeParams
   , mkFrameUncheckParams
   )
+import Playwright.Protocol qualified as Protocol
+  ( Point
+  , mkPoint
+  )
 import Playwright.SerializedArgument
   ( undefinedArgument
   )
@@ -131,17 +147,23 @@ import Playwright.Timeout
 
 clickFrame :: Frame -> Selector -> Timeout -> IO ()
 clickFrame frame selector timeout =
-  clickFrameWith frame selector timeout Nothing
+  clickFrameWith frame selector timeout defaultClickOptions
 
-clickFrameWith :: Frame -> Selector -> Timeout -> Maybe Bool -> IO ()
-clickFrameWith frame selector timeout noWaitAfter =
+clickFrameWith :: Frame -> Selector -> Timeout -> ClickOptions -> IO ()
+clickFrameWith frame selector timeout opts =
   frameSend_ @FrameClickResult
     frame
     "click"
     (mkFrameClickParams selector timeout)
       { frameClickParamsStrict = Just True
-      , frameClickParamsNoWaitAfter = noWaitAfter
+      , frameClickParamsForce = clickOptionsForce opts
+      , frameClickParamsNoWaitAfter = clickOptionsNoWaitAfter opts
+      , frameClickParamsPosition = fmap toProtocolPoint (clickOptionsPosition opts)
       }
+
+toProtocolPoint :: Point -> Protocol.Point
+toProtocolPoint point =
+  Protocol.mkPoint (cssPixelToScientific (pointX point)) (cssPixelToScientific (pointY point))
 
 dblclickFrame :: Frame -> Selector -> Timeout -> IO ()
 dblclickFrame frame selector timeout =

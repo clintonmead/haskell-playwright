@@ -21,7 +21,7 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 ## `tests/page` with no Haskell spec yet
 
 - page-add-locator-handler
-- page-click-during-navigation, page-click-react, page-click-scroll, page-click-timeout-1..4
+- page-click-during-navigation, page-click-react, page-click-timeout-1..4
 - page-evaluate-no-stall (JS `toImpl` / nonStallingRawEvaluate — not a public API)
 - page-leaks, page-listeners
 - page-navigation
@@ -36,7 +36,7 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 - **page-goto:** bad SSL (and after redirects / cross-origin); `networkidle2` invalid option (typed `LoadState` has no such constructor); Node `process` leak-listener tests; raw main-resource buffer (official Chromium fail); error message that includes HTTPS URL.
 - **page-autowaiting-no-hang:** first official case needs `httpsServer`. In-flight abort uses Warp throwing `ResourceVanished` (Node `socket.destroy()`).
 - **page-autowaiting-basic:** skip official internal hooks / expect call-log tests.
-- **page-drop:** host `localPaths` (in-memory payloads and clipboard `data` are done).
+- **page-click-scroll:** skip official Chromium fixme `display:contents` + `position` (`DOM.getBoxModel`).
 - **page-history:** bfcache, reload during renderer navigation, goBack/goForward during submit, issue 20791, popup reload isolation.
 - **page-event-request:** service worker / intercept-race / Chromium 204 fixme leftovers.
 - **downloads:** saveAs / cancel.

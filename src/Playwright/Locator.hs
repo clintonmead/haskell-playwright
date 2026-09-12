@@ -94,7 +94,7 @@ import Playwright.CheckOptions
   , defaultCheckOptions
   )
 import Playwright.ClickOptions
-  ( ClickOptions (clickOptionsNoWaitAfter, clickOptionsTimeout)
+  ( ClickOptions (clickOptionsTimeout)
   )
 import Playwright.DomEventType
   ( DomEventType
@@ -308,7 +308,7 @@ clickWith loc opts = do
     (locatorFrame loc)
     (locatorSelector loc)
     timeout
-    (clickOptionsNoWaitAfter opts)
+    opts
 
 dblclick :: Locator -> IO ()
 dblclick loc =

@@ -3,12 +3,17 @@ module Playwright.ClickOptions
   , defaultClickOptions
   ) where
 
+import Playwright.Point
+  ( Point
+  )
 import Playwright.Timeout
   ( Timeout
   )
 
 data ClickOptions = ClickOptions
-  { clickOptionsNoWaitAfter :: Maybe Bool
+  { clickOptionsForce :: Maybe Bool
+  , clickOptionsNoWaitAfter :: Maybe Bool
+  , clickOptionsPosition :: Maybe Point
   , clickOptionsTimeout :: Maybe Timeout
   }
   deriving stock (Eq, Show)
@@ -16,6 +21,8 @@ data ClickOptions = ClickOptions
 defaultClickOptions :: ClickOptions
 defaultClickOptions =
   ClickOptions
-    { clickOptionsNoWaitAfter = Nothing
+    { clickOptionsForce = Nothing
+    , clickOptionsNoWaitAfter = Nothing
+    , clickOptionsPosition = Nothing
     , clickOptionsTimeout = Nothing
     }

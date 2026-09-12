@@ -583,7 +583,7 @@ import Playwright.CheckOptions
   , defaultCheckOptions
   )
 import Playwright.ClickOptions
-  ( ClickOptions (ClickOptions, clickOptionsNoWaitAfter, clickOptionsTimeout)
+  ( ClickOptions (ClickOptions, clickOptionsForce, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsTimeout)
   , defaultClickOptions
   )
 import Playwright.Clock
