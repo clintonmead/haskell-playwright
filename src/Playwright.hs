@@ -36,6 +36,9 @@ module Playwright
   , Disposable (..)
   , Download
   , DomEventType (..)
+  , DropData (..)
+  , DropFile (..)
+  , DropPayload (..)
   , ElementHandle (..)
   , ElementState (..)
   , EmulateMedia (..)
@@ -67,6 +70,7 @@ module Playwright
   , Locator (..)
   , Longitude (..)
   , MediaType (..)
+  , MimeType (..)
   , NewContextOptions (..)
   , NetworkSizes (..)
   , OriginStorageState (..)
@@ -204,12 +208,14 @@ module Playwright
   , downloadSuggestedFilename
   , downloadUrl
   , dragAndDrop
+  , dropOnto
   , dismissDialog
   , elementArgument
   , elementHandle
   , elementHandles
   , emptyScriptTag
   , emptyStyleTag
+  , emptyDropPayload
   , emulateMedia
   , emptyStorageState
   , enterFrameSelector
@@ -650,6 +656,12 @@ import Playwright.Download
   , downloadUrl
   , waitForDownload
   )
+import Playwright.DropPayload
+  ( DropData (DropData, dropDataMimeType, dropDataValue)
+  , DropFile (DropFile, dropFileBytes, dropFileMimeType, dropFileName)
+  , DropPayload (DropPayload, dropPayloadData, dropPayloadFiles)
+  , emptyDropPayload
+  )
 import Playwright.Disposable
   ( Disposable (Disposable)
   , dispose
@@ -886,6 +898,7 @@ import Playwright.Locator
   , dblclick
   , dispatchEvent
   , dragAndDrop
+  , dropOnto
   , elementHandle
   , elementHandles
   , fill
@@ -933,6 +946,9 @@ import Playwright.Mouse
   )
 import Playwright.MediaType
   ( MediaType (MediaNoOverride, MediaPrint, MediaScreen)
+  )
+import Playwright.MimeType
+  ( MimeType (MimeType, mimeTypeToText)
   )
 import Playwright.NewContextOptions
   ( NewContextOptions (NewContextOptions, newContextAcceptDownloads, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextGeolocation, newContextHasTouch, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextIsMobile, newContextJavaScriptEnabled, newContextLocale, newContextNoDefaultViewport, newContextOffline, newContextPermissions, newContextStorageState, newContextTimezoneId, newContextUserAgent, newContextViewport)

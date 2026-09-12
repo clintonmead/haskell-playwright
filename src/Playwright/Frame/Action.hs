@@ -14,9 +14,13 @@ module Playwright.Frame.Action
   , typeTextFrame
   , uncheckFrame
   , dragAndDropFrame
+  , dropFrame
   , setInputFilesFrame
   ) where
 
+import Control.Exception
+  ( throwIO
+  )
 import Data.Text
   ( Text
   )
@@ -25,6 +29,14 @@ import Playwright.CheckOptions
   )
 import Playwright.DomEventType
   ( DomEventType (domEventTypeToText)
+  )
+import Playwright.DropPayload
+  ( DropData (dropDataMimeType, dropDataValue)
+  , DropFile (dropFileBytes, dropFileMimeType, dropFileName)
+  , DropPayload (dropPayloadData, dropPayloadFiles)
+  )
+import Playwright.Error
+  ( PlaywrightError (DecodeFailure)
   )
 import Playwright.Frame
   ( Frame
@@ -43,6 +55,9 @@ import Playwright.Json.ProtocolBinary
 import Playwright.Key
   ( Key (keyToText)
   )
+import Playwright.MimeType
+  ( mimeTypeToText
+  )
 import Playwright.Protocol
   ( FrameBlurParams (frameBlurParamsStrict)
   , FrameBlurResult
@@ -56,6 +71,10 @@ import Playwright.Protocol
   , FrameDispatchEventResult
   , FrameDragAndDropParams (frameDragAndDropParamsStrict)
   , FrameDragAndDropResult
+  , FrameDropParams (frameDropParamsData, frameDropParamsPayloads, frameDropParamsStrict)
+  , FrameDropParamsData
+  , FrameDropParamsPayloads (frameDropParamsPayloadsMimeType)
+  , FrameDropResult
   , FrameFillParams (frameFillParamsStrict)
   , FrameFillResult
   , FrameFocusParams (frameFocusParamsStrict)
@@ -82,6 +101,9 @@ import Playwright.Protocol
   , mkFrameDblclickParams
   , mkFrameDispatchEventParams
   , mkFrameDragAndDropParams
+  , mkFrameDropParams
+  , mkFrameDropParamsData
+  , mkFrameDropParamsPayloads
   , mkFrameFillParams
   , mkFrameFocusParams
   , mkFrameHoverParams
@@ -232,6 +254,40 @@ dragAndDropFrame frame source target timeout =
     (mkFrameDragAndDropParams source target timeout)
       { frameDragAndDropParamsStrict = Just True
       }
+
+dropFrame :: Frame -> Selector -> DropPayload -> Timeout -> IO ()
+dropFrame frame selector payload timeout =
+  if null (dropPayloadFiles payload) && null (dropPayloadData payload)
+    then
+      throwIO (DecodeFailure "At least one of \"files\" or \"data\" must be provided")
+    else
+      frameSend_ @FrameDropResult
+        frame
+        "drop"
+        (mkFrameDropParams selector timeout)
+          { frameDropParamsStrict = Just True
+          , frameDropParamsPayloads =
+              if null (dropPayloadFiles payload)
+                then Nothing
+                else Just (fmap toDropFilePayload (dropPayloadFiles payload))
+          , frameDropParamsData =
+              if null (dropPayloadData payload)
+                then Nothing
+                else Just (fmap toDropDataPayload (dropPayloadData payload))
+          }
+
+toDropFilePayload :: DropFile -> FrameDropParamsPayloads
+toDropFilePayload file =
+  ( mkFrameDropParamsPayloads
+      (protocolBinaryFromByteString (dropFileBytes file))
+      (inputFileNameToText (dropFileName file))
+  )
+    { frameDropParamsPayloadsMimeType = fmap mimeTypeToText (dropFileMimeType file)
+    }
+
+toDropDataPayload :: DropData -> FrameDropParamsData
+toDropDataPayload item =
+  mkFrameDropParamsData (mimeTypeToText (dropDataMimeType item)) (dropDataValue item)
 
 setInputFilesFrame :: Frame -> Selector -> [InputFile] -> Timeout -> IO ()
 setInputFilesFrame frame selector files timeout =

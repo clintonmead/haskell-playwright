@@ -14,6 +14,7 @@ module Playwright.Locator
   , dblclick
   , dispatchEvent
   , dragAndDrop
+  , dropOnto
   , elementHandle
   , elementHandles
   , fill
@@ -98,6 +99,9 @@ import Playwright.ClickOptions
 import Playwright.DomEventType
   ( DomEventType
   )
+import Playwright.DropPayload
+  ( DropPayload
+  )
 import Playwright.ElementHandle
   ( ElementHandle
   , boundingBox
@@ -124,6 +128,7 @@ import Playwright.Frame.Action
   , dblclickFrame
   , dispatchEventFrame
   , dragAndDropFrame
+  , dropFrame
   , fillFrame
   , setInputFilesFrame
   , focusFrame
@@ -400,6 +405,10 @@ dragAndDrop source target =
         (locatorSelector source)
         (locatorSelector target)
     )
+
+dropOnto :: Locator -> DropPayload -> IO ()
+dropOnto loc payload =
+  withActionTimeout loc (dropFrame (locatorFrame loc) (locatorSelector loc) payload)
 
 selectOption :: Locator -> [SelectOption] -> IO [Text]
 selectOption loc options =

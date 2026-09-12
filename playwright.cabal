@@ -48,6 +48,7 @@ library
       Playwright.DomEventType
       Playwright.Download
       Playwright.Driver
+      Playwright.DropPayload
       Playwright.ElementHandle
       Playwright.ElementHandle.Action
       Playwright.ElementHandle.Query
@@ -90,6 +91,7 @@ library
       Playwright.Locator
       Playwright.MediaType
       Playwright.MethodName
+      Playwright.MimeType
       Playwright.Mouse
       Playwright.NetworkSizes
       Playwright.NewContextOptions
@@ -247,6 +249,7 @@ test-suite playwright-test
       Playwright.PageDialogSpec
       Playwright.PageDispatchEventSpec
       Playwright.PageDragSpec
+      Playwright.PageDropSpec
       Playwright.PageEmulateMediaSpec
       Playwright.PageEvaluateHandleSpec
       Playwright.PageEvaluateSpec
