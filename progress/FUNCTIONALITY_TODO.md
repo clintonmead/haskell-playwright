@@ -21,7 +21,7 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 ## `tests/page` with no Haskell spec yet
 
 - page-add-locator-handler
-- page-click-during-navigation, page-click-react, page-click-timeout-1..4
+- page-click-during-navigation (JS `__testHookAfterStable` only)
 - page-evaluate-no-stall (JS `toImpl` / nonStallingRawEvaluate — not a public API)
 - page-leaks, page-listeners
 - page-navigation
@@ -37,6 +37,7 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 - **page-autowaiting-no-hang:** first official case needs `httpsServer`. In-flight abort uses Warp throwing `ResourceVanished` (Node `socket.destroy()`).
 - **page-autowaiting-basic:** skip official internal hooks / expect call-log tests.
 - **page-click-scroll:** skip official Chromium fixme `display:contents` + `position` (`DOM.getBoxModel`).
+- **page-click-timeout-1 / 3 / 4:** skip `__testHookBeforePointerAction` / `__testHookBeforeHitTarget` cases (Node-only internals). Protocol timeout errors are `Timeout <n>ms exceeded` (the JS client wraps call-log text such as “element is not enabled”).
 - **page-history:** bfcache, reload during renderer navigation, goBack/goForward during submit, issue 20791, popup reload isolation.
 - **page-event-request:** service worker / intercept-race / Chromium 204 fixme leftovers.
 - **downloads:** saveAs / cancel.

@@ -155,6 +155,7 @@ module Playwright
   , clearPermissions
   , click
   , clickHandle
+  , clickHandleWith
   , clickWith
   , clockFastForward
   , clockInstall
@@ -673,6 +674,7 @@ import Playwright.ElementHandle
   ( ElementHandle (ElementHandle)
   , boundingBox
   , clickHandle
+  , clickHandleWith
   , contentFrameHandle
   , elementArgument
   , getAttributeHandle

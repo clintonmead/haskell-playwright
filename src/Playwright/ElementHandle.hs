@@ -2,6 +2,7 @@ module Playwright.ElementHandle
   ( ElementHandle (..)
   , boundingBox
   , clickHandle
+  , clickHandleWith
   , tapHandle
   , elementArgument
   , contentFrameHandle
@@ -41,11 +42,16 @@ import Playwright.Channel
   , ElementHandleTag
   , send
   )
+import Playwright.ClickOptions
+  ( ClickOptions (clickOptionsForce, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsTimeout)
+  , defaultClickOptions
+  )
 import Playwright.Connection
   ( Connection
   )
 import Playwright.CssPixel
   ( CssPixel (CssPixel)
+  , cssPixelToScientific
   )
 import Playwright.ElementState
   ( ElementState (ElementDisabled, ElementEditable, ElementEnabled, ElementHidden, ElementStable, ElementVisible)
@@ -70,8 +76,14 @@ import Playwright.Json.ProtocolBinary
 import Playwright.MethodName
   ( MethodName (MethodName)
   )
+import Playwright.Point
+  ( Point
+  , pointX
+  , pointY
+  )
 import Playwright.Protocol
   ( ElementHandleBoundingBoxResult (elementHandleBoundingBoxResultValue)
+  , ElementHandleClickParams (elementHandleClickParamsForce, elementHandleClickParamsNoWaitAfter, elementHandleClickParamsPosition)
   , ElementHandleClickResult
   , ElementHandleContentFrameResult (elementHandleContentFrameResultFrame)
   , ElementHandleGetAttributeResult (elementHandleGetAttributeResultValue)
@@ -109,6 +121,10 @@ import Playwright.Protocol
   , mkElementHandleTypeParams
   , mkElementHandleWaitForElementStateParams
   )
+import Playwright.Protocol qualified as Protocol
+  ( Point
+  , mkPoint
+  )
 import Playwright.SerializedArgument
   ( SerializedArgument
   , channelArgument
@@ -135,10 +151,31 @@ handleSend handle method =
   send (elementHandleChannel handle) (MethodName method)
 
 clickHandle :: ElementHandle -> IO ()
-clickHandle handle = do
+clickHandle handle =
+  clickHandleWith handle defaultClickOptions
+
+clickHandleWith :: ElementHandle -> ClickOptions -> IO ()
+clickHandleWith handle opts = do
+  timeout <-
+    case clickOptionsTimeout opts of
+      Just value ->
+        pure value
+      Nothing ->
+        pure defaultTimeout
   _ :: ElementHandleClickResult <-
-    handleSend handle "click" (mkElementHandleClickParams defaultTimeout)
+    handleSend
+      handle
+      "click"
+      (mkElementHandleClickParams timeout)
+        { elementHandleClickParamsForce = clickOptionsForce opts
+        , elementHandleClickParamsNoWaitAfter = clickOptionsNoWaitAfter opts
+        , elementHandleClickParamsPosition = fmap toProtocolPoint (clickOptionsPosition opts)
+        }
   pure ()
+
+toProtocolPoint :: Point -> Protocol.Point
+toProtocolPoint point =
+  Protocol.mkPoint (cssPixelToScientific (pointX point)) (cssPixelToScientific (pointY point))
 
 tapHandle :: ElementHandle -> IO ()
 tapHandle handle = do

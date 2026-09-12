@@ -243,8 +243,10 @@ test-suite playwright-test
       Playwright.PageAutowaitingNoHangSpec
       Playwright.PageBasicSpec
       Playwright.PageCheckSpec
+      Playwright.PageClickReactSpec
       Playwright.PageClickScrollSpec
       Playwright.PageClickSpec
+      Playwright.PageClickTimeoutSpec
       Playwright.PageClockSpec
       Playwright.PageCloseSpec
       Playwright.PageDialogSpec
