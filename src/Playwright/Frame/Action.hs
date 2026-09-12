@@ -2,6 +2,7 @@ module Playwright.Frame.Action
   ( blurFrame
   , checkFrame
   , clickFrame
+  , clickFrameStrict
   , clickFrameWith
   , dblclickFrame
   , dispatchEventFrame
@@ -154,6 +155,15 @@ import Playwright.Timeout
 clickFrame :: Frame -> Selector -> Timeout -> IO ()
 clickFrame frame selector timeout =
   clickFrameWith frame selector timeout defaultClickOptions
+
+clickFrameStrict :: Frame -> Selector -> Timeout -> Maybe Bool -> IO ()
+clickFrameStrict frame selector timeout strict =
+  frameSend_ @FrameClickResult
+    frame
+    "click"
+    (mkFrameClickParams selector timeout)
+      { frameClickParamsStrict = strict
+      }
 
 clickFrameWith :: Frame -> Selector -> Timeout -> ClickOptions -> IO ()
 clickFrameWith frame selector timeout opts =

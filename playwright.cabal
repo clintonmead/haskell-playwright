@@ -206,6 +206,7 @@ test-suite playwright-test
       Playwright.BrowserContextRouteSpec
       Playwright.BrowserContextSetExtraHTTPHeadersSpec
       Playwright.BrowserContextStorageStateSpec
+      Playwright.BrowserContextStrictSpec
       Playwright.BrowserContextTimezoneSpec
       Playwright.BrowserContextUserAgentSpec
       Playwright.BrowserContextViewportSpec

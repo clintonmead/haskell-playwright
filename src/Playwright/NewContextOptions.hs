@@ -38,7 +38,7 @@ import Playwright.PermissionName
   ( PermissionName (permissionNameToText)
   )
 import Playwright.Protocol
-  ( BrowserNewContextParams (browserNewContextParamsAcceptDownloads, browserNewContextParamsBaseURL, browserNewContextParamsBypassCSP, browserNewContextParamsColorScheme, browserNewContextParamsDeviceScaleFactor, browserNewContextParamsExtraHTTPHeaders, browserNewContextParamsGeolocation, browserNewContextParamsHasTouch, browserNewContextParamsHttpCredentials, browserNewContextParamsIgnoreHTTPSErrors, browserNewContextParamsIsMobile, browserNewContextParamsJavaScriptEnabled, browserNewContextParamsLocale, browserNewContextParamsNoDefaultViewport, browserNewContextParamsOffline, browserNewContextParamsPermissions, browserNewContextParamsStorageState, browserNewContextParamsTimezoneId, browserNewContextParamsUserAgent, browserNewContextParamsViewport)
+  ( BrowserNewContextParams (browserNewContextParamsAcceptDownloads, browserNewContextParamsBaseURL, browserNewContextParamsBypassCSP, browserNewContextParamsColorScheme, browserNewContextParamsDeviceScaleFactor, browserNewContextParamsExtraHTTPHeaders, browserNewContextParamsGeolocation, browserNewContextParamsHasTouch, browserNewContextParamsHttpCredentials, browserNewContextParamsIgnoreHTTPSErrors, browserNewContextParamsIsMobile, browserNewContextParamsJavaScriptEnabled, browserNewContextParamsLocale, browserNewContextParamsNoDefaultViewport, browserNewContextParamsOffline, browserNewContextParamsPermissions, browserNewContextParamsStorageState, browserNewContextParamsStrictSelectors, browserNewContextParamsTimezoneId, browserNewContextParamsUserAgent, browserNewContextParamsViewport)
   , BrowserNewContextParamsAcceptDownloads (BrowserNewContextParamsAcceptDownloadsAccept, BrowserNewContextParamsAcceptDownloadsDeny)
   , BrowserNewContextParamsColorScheme (BrowserNewContextParamsColorSchemeDark, BrowserNewContextParamsColorSchemeLight, BrowserNewContextParamsColorSchemeNoOverride, BrowserNewContextParamsColorSchemeNoPreference)
   , BrowserNewContextParamsGeolocation (browserNewContextParamsGeolocationAccuracy)
@@ -88,6 +88,7 @@ data NewContextOptions = NewContextOptions
   , newContextOffline :: Maybe Bool
   , newContextPermissions :: Maybe [PermissionName]
   , newContextStorageState :: Maybe StorageState
+  , newContextStrictSelectors :: Maybe Bool
   , newContextTimezoneId :: Maybe TimezoneId
   , newContextUserAgent :: Maybe UserAgent
   , newContextViewport :: Maybe ViewportSize
@@ -114,6 +115,7 @@ defaultNewContextOptions =
     , newContextOffline = Nothing
     , newContextPermissions = Nothing
     , newContextStorageState = Nothing
+    , newContextStrictSelectors = Nothing
     , newContextTimezoneId = Nothing
     , newContextUserAgent = Nothing
     , newContextViewport = Nothing
@@ -140,6 +142,7 @@ toBrowserNewContextParams opts =
     , browserNewContextParamsOffline = newContextOffline opts
     , browserNewContextParamsPermissions = fmap (fmap permissionNameToText) (newContextPermissions opts)
     , browserNewContextParamsStorageState = fmap toNewContextStorageState (newContextStorageState opts)
+    , browserNewContextParamsStrictSelectors = newContextStrictSelectors opts
     , browserNewContextParamsTimezoneId = fmap timezoneIdToText (newContextTimezoneId opts)
     , browserNewContextParamsUserAgent = fmap userAgentToText (newContextUserAgent opts)
     , browserNewContextParamsViewport = fmap toProtocolViewport (newContextViewport opts)

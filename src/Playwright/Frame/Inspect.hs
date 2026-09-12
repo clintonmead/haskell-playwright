@@ -14,6 +14,7 @@ module Playwright.Frame.Inspect
   , querySelectorAllFrame
   , querySelectorFrame
   , textContentFrame
+  , textContentFrameStrict
   ) where
 
 import Data.Aeson
@@ -124,12 +125,19 @@ innerHtmlFrame =
     frameInnerHTMLResultValue
 
 textContentFrame :: Frame -> Selector -> Timeout -> IO (Maybe Text)
-textContentFrame =
+textContentFrame frame selector timeout =
+  textContentFrameStrict frame selector timeout (Just True)
+
+textContentFrameStrict :: Frame -> Selector -> Timeout -> Maybe Bool -> IO (Maybe Text)
+textContentFrameStrict frame selector timeout strict =
   queryWithTimeout
     "textContent"
     mkFrameTextContentParams
-    (\params -> params {frameTextContentParamsStrict = Just True})
+    (\params -> params {frameTextContentParamsStrict = strict})
     frameTextContentResultValue
+    frame
+    selector
+    timeout
 
 inputValueFrame :: Frame -> Selector -> Timeout -> IO Text
 inputValueFrame =

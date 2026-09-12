@@ -10,10 +10,15 @@ module Playwright.Page.Query
   , pageIsHidden
   , pageIsVisible
   , pageTextContent
+  , pageTextContentWith
+  , pageClickSelector
   ) where
 
 import Data.Text
   ( Text
+  )
+import Playwright.Frame.Action
+  ( clickFrameStrict
   )
 import Playwright.Frame.Inspect
   ( getAttributeFrame
@@ -26,7 +31,7 @@ import Playwright.Frame.Inspect
   , isEnabledFrame
   , isHiddenFrame
   , isVisibleFrame
-  , textContentFrame
+  , textContentFrameStrict
   )
 import Playwright.Page
   ( Page (pageMainFrame)
@@ -47,9 +52,18 @@ pageInnerHtml page selector = do
   innerHtmlFrame (pageMainFrame page) selector timeout
 
 pageTextContent :: Page -> Selector -> IO (Maybe Text)
-pageTextContent page selector = do
+pageTextContent page selector =
+  pageTextContentWith page selector Nothing
+
+pageTextContentWith :: Page -> Selector -> Maybe Bool -> IO (Maybe Text)
+pageTextContentWith page selector strict = do
   timeout <- pageActionTimeout page
-  textContentFrame (pageMainFrame page) selector timeout
+  textContentFrameStrict (pageMainFrame page) selector timeout strict
+
+pageClickSelector :: Page -> Selector -> IO ()
+pageClickSelector page selector = do
+  timeout <- pageActionTimeout page
+  clickFrameStrict (pageMainFrame page) selector timeout Nothing
 
 pageGetAttribute :: Page -> Selector -> Text -> IO (Maybe Text)
 pageGetAttribute page selector name = do
