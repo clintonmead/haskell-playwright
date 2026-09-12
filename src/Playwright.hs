@@ -49,6 +49,8 @@ module Playwright
   , FileChooser (..)
   , FetchOptions (..)
   , FetchPostData (..)
+  , FetchFormField (..)
+  , FetchQueryParam (..)
   , Frame (..)
   , FulfillBody (..)
   , FulfillOptions (..)
@@ -187,6 +189,7 @@ module Playwright
   , clockSetSystemTime
   , closeBrowser
   , closeContext
+  , closeContextWith
   , closePage
   , content
   , contentFrameHandle
@@ -314,6 +317,8 @@ module Playwright
   , fetchPutWith
   , fetchRequest
   , fetchRequestWith
+  , apiRequestStorageState
+  , disposeAPIRequestContext
   , fill
   , fillHandle
   , filterVisible
@@ -579,6 +584,8 @@ import Playwright.AcceptDownloads
   )
 import Playwright.APIRequestContext
   ( APIRequestContext
+  , apiRequestStorageState
+  , disposeAPIRequestContext
   , fetchDelete
   , fetchDeleteWith
   , fetchFromUrl
@@ -636,6 +643,7 @@ import Playwright.BrowserContext
   , clearGeolocation
   , clearPermissions
   , closeContext
+  , closeContextWith
   , contextFromRef
   , contextPages
   , cookies
@@ -867,8 +875,10 @@ import Playwright.Expose
   , exposeFunction
   )
 import Playwright.FetchOptions
-  ( FetchOptions (FetchOptions, fetchFailOnStatusCode, fetchHeaders, fetchMaxRedirects, fetchMethod, fetchPostData, fetchTimeout, fetchUrl)
+  ( FetchFormField (FetchFormField, fetchFormFieldName, fetchFormFieldValue)
+  , FetchOptions (FetchOptions, fetchEncodedParams, fetchFailOnStatusCode, fetchFormData, fetchHeaders, fetchIgnoreHTTPSErrors, fetchMaxRedirects, fetchMaxRetries, fetchMethod, fetchPostData, fetchQueryParams, fetchTimeout, fetchUrl)
   , FetchPostData (FetchPostBytes, FetchPostJson, FetchPostText)
+  , FetchQueryParam (FetchQueryParam, fetchQueryParamName, fetchQueryParamValue)
   , defaultFetchOptions
   )
 import Playwright.FileChooser

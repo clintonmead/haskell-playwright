@@ -7,6 +7,7 @@ module Playwright.BrowserContext
   , clearGeolocation
   , clearPermissions
   , closeContext
+  , closeContextWith
   , contextFromRef
   , contextPages
   , cookies
@@ -101,6 +102,7 @@ import Playwright.Protocol
   , BrowserContextClearCookiesParams (browserContextClearCookiesParamsName)
   , BrowserContextClearCookiesResult
   , BrowserContextClearPermissionsResult
+  , BrowserContextCloseParams (browserContextCloseParamsReason)
   , BrowserContextCloseResult
   , BrowserContextCookiesResult (browserContextCookiesResultCookies)
   , BrowserContextGrantPermissionsParams (browserContextGrantPermissionsParamsOrigin)
@@ -185,9 +187,16 @@ addContextInitScript ctx source = do
     )
 
 closeContext :: BrowserContext -> IO ()
-closeContext ctx = do
+closeContext ctx =
+  closeContextWith ctx Nothing
+
+closeContextWith :: BrowserContext -> Maybe Text -> IO ()
+closeContextWith ctx reason = do
   _ :: BrowserContextCloseResult <-
-    send (browserContextChannel ctx) (MethodName "close") mkBrowserContextCloseParams
+    send
+      (browserContextChannel ctx)
+      (MethodName "close")
+      mkBrowserContextCloseParams {browserContextCloseParamsReason = reason}
   pure ()
 
 pageContext :: Page -> BrowserContext

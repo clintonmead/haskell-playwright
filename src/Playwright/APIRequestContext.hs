@@ -1,6 +1,8 @@
 module Playwright.APIRequestContext
   ( APIRequestContext (..)
   , apiRequestContextFor
+  , apiRequestStorageState
+  , disposeAPIRequestContext
   , fetchDelete
   , fetchDeleteWith
   , fetchFromUrl
@@ -58,8 +60,10 @@ import Playwright.Error
   ( PlaywrightError (DecodeFailure)
   )
 import Playwright.FetchOptions
-  ( FetchOptions (fetchFailOnStatusCode, fetchHeaders, fetchMaxRedirects, fetchMethod, fetchPostData, fetchTimeout, fetchUrl)
+  ( FetchFormField (fetchFormFieldName, fetchFormFieldValue)
+  , FetchOptions (fetchEncodedParams, fetchFailOnStatusCode, fetchFormData, fetchHeaders, fetchIgnoreHTTPSErrors, fetchMaxRedirects, fetchMaxRetries, fetchMethod, fetchPostData, fetchQueryParams, fetchTimeout, fetchUrl)
   , FetchPostData (FetchPostBytes, FetchPostJson, FetchPostText)
+  , FetchQueryParam (fetchQueryParamName, fetchQueryParamValue)
   , defaultFetchOptions
   )
 import Playwright.Guid
@@ -85,11 +89,17 @@ import Playwright.MethodName
   ( MethodName (MethodName)
   )
 import Playwright.Protocol
-  ( APIRequestContextFetchParams (aPIRequestContextFetchParamsFailOnStatusCode, aPIRequestContextFetchParamsHeaders, aPIRequestContextFetchParamsJsonData, aPIRequestContextFetchParamsMaxRedirects, aPIRequestContextFetchParamsMethod, aPIRequestContextFetchParamsPostData)
+  ( APIRequestContextDisposeResult
+  , APIRequestContextFetchParams (aPIRequestContextFetchParamsEncodedParams, aPIRequestContextFetchParamsFailOnStatusCode, aPIRequestContextFetchParamsFormData, aPIRequestContextFetchParamsHeaders, aPIRequestContextFetchParamsIgnoreHTTPSErrors, aPIRequestContextFetchParamsJsonData, aPIRequestContextFetchParamsMaxRedirects, aPIRequestContextFetchParamsMaxRetries, aPIRequestContextFetchParamsMethod, aPIRequestContextFetchParamsParams, aPIRequestContextFetchParamsPostData)
   , APIRequestContextFetchResult (aPIRequestContextFetchResultResponse)
+  , APIRequestContextStorageStateResult
   , BrowserContextInitializer (browserContextInitializerRequestContext)
   , ChannelType (ChannelTypeBrowserContext)
+  , NameValue
+  , mkAPIRequestContextDisposeParams
   , mkAPIRequestContextFetchParams
+  , mkAPIRequestContextStorageStateParams
+  , mkNameValue
   )
 import Playwright.RemoteObject
   ( RemoteObject (remoteInitializer, remoteParent, remoteType)
@@ -103,6 +113,10 @@ import Playwright.Request
   )
 import Playwright.Timeout
   ( Timeout
+  )
+import Playwright.StorageState
+  ( StorageState
+  , fromRequestStorageState
   )
 import Playwright.TimeoutDefaults
   ( emptyTimeoutDefaults
@@ -227,11 +241,16 @@ sendFetch ctx url method headers post opts = do
       (apiRequestContextChannel ctx)
       (MethodName "fetch")
       (mkAPIRequestContextFetchParams timeout url)
-        { aPIRequestContextFetchParamsFailOnStatusCode = fetchFailOnStatusCode opts
+        { aPIRequestContextFetchParamsEncodedParams = fetchEncodedParams opts
+        , aPIRequestContextFetchParamsFailOnStatusCode = fetchFailOnStatusCode opts
+        , aPIRequestContextFetchParamsFormData = fmap (fmap formNameValue) (fetchFormData opts)
         , aPIRequestContextFetchParamsHeaders = fmap (fmap toNameValue) headers
+        , aPIRequestContextFetchParamsIgnoreHTTPSErrors = fetchIgnoreHTTPSErrors opts
         , aPIRequestContextFetchParamsJsonData = postBodyJson post
         , aPIRequestContextFetchParamsMaxRedirects = fetchMaxRedirects opts
+        , aPIRequestContextFetchParamsMaxRetries = fetchMaxRetries opts
         , aPIRequestContextFetchParamsMethod = fmap httpMethodToText method
+        , aPIRequestContextFetchParamsParams = fmap (fmap queryNameValue) (fetchQueryParams opts)
         , aPIRequestContextFetchParamsPostData = fmap protocolBinaryFromByteString (postBodyBytes post)
         }
   pure
@@ -285,3 +304,29 @@ postFromOverlay overlay =
         { postBodyBytes = Nothing
         , postBodyJson = Just (decodeUtf8 (toStrict (encode value)))
         }
+
+queryNameValue :: FetchQueryParam -> NameValue
+queryNameValue param =
+  mkNameValue (fetchQueryParamName param) (fetchQueryParamValue param)
+
+formNameValue :: FetchFormField -> NameValue
+formNameValue field =
+  mkNameValue (fetchFormFieldName field) (fetchFormFieldValue field)
+
+apiRequestStorageState :: APIRequestContext -> IO StorageState
+apiRequestStorageState ctx = do
+  result :: APIRequestContextStorageStateResult <-
+    send
+      (apiRequestContextChannel ctx)
+      (MethodName "storageState")
+      mkAPIRequestContextStorageStateParams
+  pure (fromRequestStorageState result)
+
+disposeAPIRequestContext :: APIRequestContext -> IO ()
+disposeAPIRequestContext ctx = do
+  _ :: APIRequestContextDisposeResult <-
+    send
+      (apiRequestContextChannel ctx)
+      (MethodName "dispose")
+      mkAPIRequestContextDisposeParams
+  pure ()

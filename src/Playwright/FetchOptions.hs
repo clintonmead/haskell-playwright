@@ -1,6 +1,8 @@
 module Playwright.FetchOptions
   ( FetchOptions (..)
+  , FetchFormField (..)
   , FetchPostData (..)
+  , FetchQueryParam (..)
   , defaultFetchOptions
   ) where
 
@@ -32,12 +34,29 @@ data FetchPostData
   | FetchPostText Text
   deriving stock (Eq, Show)
 
+data FetchQueryParam = FetchQueryParam
+  { fetchQueryParamName :: Text
+  , fetchQueryParamValue :: Text
+  }
+  deriving stock (Eq, Show)
+
+data FetchFormField = FetchFormField
+  { fetchFormFieldName :: Text
+  , fetchFormFieldValue :: Text
+  }
+  deriving stock (Eq, Show)
+
 data FetchOptions = FetchOptions
-  { fetchFailOnStatusCode :: Maybe Bool
+  { fetchEncodedParams :: Maybe Text
+  , fetchFailOnStatusCode :: Maybe Bool
+  , fetchFormData :: Maybe [FetchFormField]
   , fetchHeaders :: Maybe [HttpHeader]
+  , fetchIgnoreHTTPSErrors :: Maybe Bool
   , fetchMaxRedirects :: Maybe Int
+  , fetchMaxRetries :: Maybe Int
   , fetchMethod :: Maybe HttpMethod
   , fetchPostData :: Maybe FetchPostData
+  , fetchQueryParams :: Maybe [FetchQueryParam]
   , fetchTimeout :: Maybe Timeout
   , fetchUrl :: Maybe Url
   }
@@ -46,11 +65,16 @@ data FetchOptions = FetchOptions
 defaultFetchOptions :: FetchOptions
 defaultFetchOptions =
   FetchOptions
-    { fetchFailOnStatusCode = Nothing
+    { fetchEncodedParams = Nothing
+    , fetchFailOnStatusCode = Nothing
+    , fetchFormData = Nothing
     , fetchHeaders = Nothing
+    , fetchIgnoreHTTPSErrors = Nothing
     , fetchMaxRedirects = Nothing
+    , fetchMaxRetries = Nothing
     , fetchMethod = Nothing
     , fetchPostData = Nothing
+    , fetchQueryParams = Nothing
     , fetchTimeout = Nothing
     , fetchUrl = Nothing
     }

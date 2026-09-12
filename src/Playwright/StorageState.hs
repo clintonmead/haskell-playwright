@@ -2,6 +2,8 @@ module Playwright.StorageState
   ( OriginStorageState (..)
   , StorageState (..)
   , emptyStorageState
+  , fromNetworkStorage
+  , fromRequestStorageState
   , fromStorageStateResult
   , toNewContextStorageState
   , toSetStorageState
@@ -13,10 +15,12 @@ import Playwright.Cookie
   , toSetNetworkFromCookie
   )
 import Playwright.Protocol
-  ( BrowserContextSetStorageStateParamsStorageState (browserContextSetStorageStateParamsStorageStateCookies, browserContextSetStorageStateParamsStorageStateOrigins)
+  ( APIRequestContextStorageStateResult (aPIRequestContextStorageStateResultCookies, aPIRequestContextStorageStateResultOrigins)
+  , BrowserContextSetStorageStateParamsStorageState (browserContextSetStorageStateParamsStorageStateCookies, browserContextSetStorageStateParamsStorageStateOrigins)
   , BrowserContextStorageStateResult (browserContextStorageStateResultCookies, browserContextStorageStateResultOrigins)
   , BrowserNewContextParamsStorageState (browserNewContextParamsStorageStateCookies, browserNewContextParamsStorageStateOrigins)
   , NameValue (nameValueName, nameValueValue)
+  , NetworkCookie
   , OriginStorage (originStorageLocalStorage, originStorageOrigin)
   , SetOriginStorage
   , mkBrowserContextSetStorageStateParamsStorageState
@@ -56,9 +60,21 @@ emptyStorageState =
 
 fromStorageStateResult :: BrowserContextStorageStateResult -> StorageState
 fromStorageStateResult result =
+  fromNetworkStorage
+    (browserContextStorageStateResultCookies result)
+    (browserContextStorageStateResultOrigins result)
+
+fromRequestStorageState :: APIRequestContextStorageStateResult -> StorageState
+fromRequestStorageState result =
+  fromNetworkStorage
+    (aPIRequestContextStorageStateResultCookies result)
+    (aPIRequestContextStorageStateResultOrigins result)
+
+fromNetworkStorage :: [NetworkCookie] -> [OriginStorage] -> StorageState
+fromNetworkStorage cookies origins =
   StorageState
-    { storageStateCookies = fmap fromNetworkCookie (browserContextStorageStateResultCookies result)
-    , storageStateOrigins = fmap fromOrigin (browserContextStorageStateResultOrigins result)
+    { storageStateCookies = fmap fromNetworkCookie cookies
+    , storageStateOrigins = fmap fromOrigin origins
     }
 
 toSetStorageState :: StorageState -> BrowserContextSetStorageStateParamsStorageState

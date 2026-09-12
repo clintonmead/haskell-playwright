@@ -23,8 +23,12 @@ import Data.Aeson
 import Data.ByteString
   ( ByteString
   )
+import Data.List
+  ( partition
+  )
 import Data.Text
   ( Text
+  , intercalate
   , pack
   , toLower
   )
@@ -41,7 +45,7 @@ import Playwright.Error
   )
 import Playwright.HttpHeader
   ( HeaderName (HeaderName, headerNameToText)
-  , HeaderValue (HeaderValue)
+  , HeaderValue (HeaderValue, headerValueToText)
   , HttpHeader (HttpHeader, httpHeaderName, httpHeaderValue)
   )
 import Playwright.HttpStatus
@@ -97,7 +101,7 @@ apiResponseHeadersArray response =
 
 apiResponseHeaders :: APIResponse -> [HttpHeader]
 apiResponseHeaders response =
-  fmap lowercaseName (apiResponseHeadersArray response)
+  collapseHeaders (fmap lowercaseName (apiResponseHeadersArray response))
 
 apiResponseBody :: APIResponse -> IO ByteString
 apiResponseBody response = do
@@ -145,3 +149,17 @@ lowercaseName header =
   HttpHeader
     (HeaderName (toLower (headerNameToText (httpHeaderName header))))
     (httpHeaderValue header)
+
+collapseHeaders :: [HttpHeader] -> [HttpHeader]
+collapseHeaders [] =
+  []
+collapseHeaders (header : rest) =
+  let
+    name = headerNameToText (httpHeaderName header)
+    (same, others) = partition (\other -> headerNameToText (httpHeaderName other) == name) rest
+    mergedValue =
+      intercalate
+        ", "
+        (fmap (headerValueToText . httpHeaderValue) (header : same))
+  in
+    HttpHeader (httpHeaderName header) (HeaderValue mergedValue) : collapseHeaders others
