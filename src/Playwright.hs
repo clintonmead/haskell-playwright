@@ -83,6 +83,7 @@ module Playwright
   , MediaType (..)
   , MimeType (..)
   , NewContextOptions (..)
+  , NewRequestOptions (..)
   , NetworkSizes (..)
   , OriginStorageState (..)
   , Page (..)
@@ -95,6 +96,7 @@ module Playwright
   , RegisterSelectorOptions (..)
   , Request (..)
   , RequestFailure (..)
+  , RemoteAddr (..)
   , ResourceType (..)
   , Response (..)
   , Route
@@ -102,6 +104,7 @@ module Playwright
   , RouteTimes (..)
   , ScreenshotOptions (..)
   , ScriptTag (..)
+  , SecurityDetails (..)
   , SelectOption (..)
   , Selector
   , SpecialJsValue (..)
@@ -143,6 +146,8 @@ module Playwright
   , apiResponseHeadersArray
   , apiResponseJson
   , apiResponseOk
+  , apiResponseSecurityDetails
+  , apiResponseServerAddr
   , apiResponseStatus
   , apiResponseStatusText
   , apiResponseText
@@ -223,6 +228,7 @@ module Playwright
   , defaultGotoOptions
   , defaultLaunchOptions
   , defaultNewContextOptions
+  , defaultNewRequestOptions
   , defaultPdfOptions
   , defaultRegisterSelectorOptions
   , defaultRouteOptions
@@ -406,6 +412,8 @@ module Playwright
   , newContext
   , newContextWith
   , newPage
+  , newRequestContext
+  , newRequestContextWith
   , nth
   , numberArgument
   , numbersArgument
@@ -585,6 +593,10 @@ module Playwright
 import Playwright.AcceptDownloads
   ( AcceptDownloads (AcceptDownloadsAccept, AcceptDownloadsDeny)
   )
+import Playwright.APIRequest
+  ( newRequestContext
+  , newRequestContextWith
+  )
 import Playwright.APIRequestContext
   ( APIRequestContext
   , apiRequestStorageState
@@ -614,6 +626,8 @@ import Playwright.APIResponse
   , apiResponseHeadersArray
   , apiResponseJson
   , apiResponseOk
+  , apiResponseSecurityDetails
+  , apiResponseServerAddr
   , apiResponseStatus
   , apiResponseStatusText
   , apiResponseText
@@ -933,6 +947,9 @@ import Playwright.RegisterSelectorOptions
   ( RegisterSelectorOptions (RegisterSelectorOptions, registerSelectorContentScript)
   , defaultRegisterSelectorOptions
   )
+import Playwright.RemoteAddr
+  ( RemoteAddr (RemoteAddr, remoteAddrIpAddress, remoteAddrPort)
+  )
 import Playwright.GotoOptions
   ( GotoOptions (GotoOptions, gotoOptionsReferer, gotoOptionsTimeout, gotoOptionsWaitUntil)
   , defaultGotoOptions
@@ -1083,6 +1100,10 @@ import Playwright.MimeType
 import Playwright.NewContextOptions
   ( NewContextOptions (NewContextOptions, newContextAcceptDownloads, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextGeolocation, newContextHasTouch, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextIsMobile, newContextJavaScriptEnabled, newContextLocale, newContextNoDefaultViewport, newContextOffline, newContextPermissions, newContextStorageState, newContextTimezoneId, newContextUserAgent, newContextViewport)
   , defaultNewContextOptions
+  )
+import Playwright.NewRequestOptions
+  ( NewRequestOptions (NewRequestOptions, newRequestBaseURL, newRequestExtraHTTPHeaders, newRequestFailOnStatusCode, newRequestHttpCredentials, newRequestIgnoreHTTPSErrors, newRequestMaxRedirects, newRequestStorageState, newRequestTimeout, newRequestUserAgent)
+  , defaultNewRequestOptions
   )
 import Playwright.NetworkSizes
   ( BodySize (BodySize, bodySizeToInt)
@@ -1273,6 +1294,9 @@ import Playwright.ScreenshotOptions
 import Playwright.ScriptTag
   ( ScriptTag (ScriptTag, scriptTagContent, scriptTagType, scriptTagUrl)
   , emptyScriptTag
+  )
+import Playwright.SecurityDetails
+  ( SecurityDetails (SecurityDetails, securityDetailsIssuer, securityDetailsProtocol, securityDetailsSubjectName, securityDetailsValidFrom, securityDetailsValidTo)
   )
 import Playwright.SelectOption
   ( SelectOption (SelectIndex, SelectLabel, SelectValue, SelectValueOrLabel)

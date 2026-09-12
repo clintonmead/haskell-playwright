@@ -66,6 +66,7 @@ tests:
       - async
       - base
       - bytestring
+      - case-insensitive
       - directory
       - hedgehog
       - http-types

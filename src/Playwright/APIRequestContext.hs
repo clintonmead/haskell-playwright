@@ -23,6 +23,7 @@ module Playwright.APIRequestContext
 
 import Control.Exception
   ( throwIO
+  , try
   )
 import Data.Aeson
   ( encode
@@ -57,7 +58,7 @@ import Playwright.Connection
   , lookupTimeoutDefaults
   )
 import Playwright.Error
-  ( PlaywrightError (DecodeFailure)
+  ( PlaywrightError (DecodeFailure, ProtocolRpc)
   )
 import Playwright.FetchOptions
   ( FetchFormField (fetchFormFieldName, fetchFormFieldValue)
@@ -241,6 +242,8 @@ sendFetch ::
   FetchOptions ->
   IO APIResponse
 sendFetch ctx url method headers post opts = do
+  validateFetchBound "maxRedirects" (fetchMaxRedirects opts)
+  validateFetchBound "maxRetries" (fetchMaxRetries opts)
   timeout <- resolveFetchTimeout ctx (fetchTimeout opts)
   result <-
     send
@@ -265,6 +268,14 @@ sendFetch ctx url method headers post opts = do
       { apiResponseChannel = apiRequestContextChannel ctx
       , apiResponsePayload = aPIRequestContextFetchResultResponse result
       }
+
+validateFetchBound :: Text -> Maybe Int -> IO ()
+validateFetchBound name value =
+  case value of
+    Just n | n < 0 ->
+      throwIO (DecodeFailure ("'" <> name <> "' must be greater than or equal to '0'"))
+    _ ->
+      pure ()
 
 resolveFetchTimeout :: APIRequestContext -> Maybe Timeout -> IO Timeout
 resolveFetchTimeout ctx timeoutOverride =
@@ -349,9 +360,16 @@ apiRequestStorageState ctx = do
 
 disposeAPIRequestContext :: APIRequestContext -> IO ()
 disposeAPIRequestContext ctx = do
-  _ :: APIRequestContextDisposeResult <-
-    send
-      (apiRequestContextChannel ctx)
-      (MethodName "dispose")
-      mkAPIRequestContextDisposeParams
-  pure ()
+  result <-
+    try $
+      send
+        (apiRequestContextChannel ctx)
+        (MethodName "dispose")
+        mkAPIRequestContextDisposeParams
+  case result of
+    Left (ProtocolRpc _) ->
+      pure ()
+    Left err ->
+      throwIO err
+    Right (_ :: APIRequestContextDisposeResult) ->
+      pure ()

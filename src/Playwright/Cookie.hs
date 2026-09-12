@@ -11,6 +11,7 @@ module Playwright.Cookie
   , cookieForUrl
   , fromNetworkCookie
   , sessionExpires
+  , toNetworkCookie
   , toSetNetworkCookie
   , toSetNetworkFromCookie
   ) where
@@ -29,6 +30,7 @@ import Playwright.Protocol
   , NetworkCookieSameSite (NetworkCookieSameSiteLax, NetworkCookieSameSiteNone, NetworkCookieSameSiteStrict)
   , SetNetworkCookie (setNetworkCookieDomain, setNetworkCookieExpires, setNetworkCookieHttpOnly, setNetworkCookiePath, setNetworkCookieSameSite, setNetworkCookieSecure, setNetworkCookieUrl)
   , SetNetworkCookieSameSite (SetNetworkCookieSameSiteLax, SetNetworkCookieSameSiteNone, SetNetworkCookieSameSiteStrict)
+  , mkNetworkCookie
   , mkSetNetworkCookie
   )
 import Playwright.Url
@@ -174,3 +176,25 @@ toSetNetworkFromCookie cookie =
     , setNetworkCookieSecure = Just (cookieSecureToBool (cookieSecure cookie))
     , setNetworkCookieSameSite = Just (toSetSameSite (cookieSameSite cookie))
     }
+
+toNetworkCookie :: Cookie -> NetworkCookie
+toNetworkCookie cookie =
+  mkNetworkCookie
+    (cookieDomainToText (cookieDomain cookie))
+    (cookieExpiresToScientific (cookieExpires cookie))
+    (cookieHttpOnlyToBool (cookieHttpOnly cookie))
+    (cookieNameToText (cookieName cookie))
+    (cookiePathToText (cookiePath cookie))
+    (toNetworkSameSite (cookieSameSite cookie))
+    (cookieSecureToBool (cookieSecure cookie))
+    (cookieValueToText (cookieValue cookie))
+
+toNetworkSameSite :: CookieSameSite -> NetworkCookieSameSite
+toNetworkSameSite sameSite =
+  case sameSite of
+    CookieSameSiteStrict ->
+      NetworkCookieSameSiteStrict
+    CookieSameSiteLax ->
+      NetworkCookieSameSiteLax
+    CookieSameSiteNone ->
+      NetworkCookieSameSiteNone

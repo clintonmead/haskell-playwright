@@ -15,7 +15,7 @@ Core objects and the usual Page / Frame / Locator / ElementHandle / JSHandle / R
 
 - Launch, new context/page, close, cookies, storage state (cookies + local/session storage; not IndexedDB/WebAuthn), permissions, geolocation, locale, timezone, extra headers, CSP, credentials, offline, viewport, init scripts, expose function/binding, clock.
 - Navigation: `goto` (always sends `waitUntil`, default `load`), `reload`, `goBack`/`goForward`, `waitForNavigation` / `waitForURL` / `waitForLoadState` / `waitForFrameNavigated` / `waitForFrameDetached` / `waitForLoadEvent` (`armLoadEvent` does not consume buffered `loadstate`).
-- Routing: page and context `route` / `fallback` / `continue` / `fulfill` / `abort` / `unrouteAll` (default behavior; wait/ignoreErrors not implemented). `APIRequestContext` (`page.request` / `context.request`) can `fetch` a `Request` or URL (get/delete/head/patch/post/put), send query params / form-urlencoded / JSON / multipart, retry on connection reset, and `fulfill` can reuse a fetched response (`fetchResponseUid`). `apiResponseHeaders` joins duplicate names like the JS `headers()` map. `HttpCredentials` can `send` always.
+- Routing: page and context `route` / `fallback` / `continue` / `fulfill` / `abort` / `unrouteAll` (default behavior; wait/ignoreErrors not implemented). `APIRequestContext` (`page.request` / `context.request` / `newRequestContext`) can `fetch` a `Request` or URL (get/delete/head/patch/post/put), send query params / form-urlencoded / JSON / multipart, retry on connection reset, and `fulfill` can reuse a fetched response (`fetchResponseUid`). `apiResponseHeaders` joins duplicate names like the JS `headers()` map. `HttpCredentials` can `send` always. `APIResponse` exposes `serverAddr` and HTTP `securityDetails` (null).
 - Network events: `onRequest` / `onResponse` / `onRequestFailed` / `onRequestFinished`, `waitForRequest` / `waitForResponse`, `page.requests`, sizes, postData JSON, redirects.
 - Query: `querySelector` / `querySelectorAll` (`page.$` / `page.$$`), `evalOnSelectorBool`.
 - Downloads (`waitForDownload` / `downloadPath`), file chooser + `setInputFiles` payloads, PDF (`tagged`/`outline`), screenshot, workers, dialogs, console, pageerror, popups.
@@ -31,7 +31,7 @@ elementhandle-bounding-box, elementhandle-click, elementhandle-content-frame, el
 
 ### `tests/library` (partial ports)
 
-browsercontext-add-cookies, browsercontext-add-init-script, browsercontext-base-url, browsercontext-cookies, browsercontext-credentials, browsercontext-csp, browsercontext-expose-function, browsercontext-fetch, browsercontext-locale, browsercontext-page-event, browsercontext-pages, browsercontext-route, browsercontext-set-extra-http-headers, browsercontext-storage-state, browsercontext-timezone-id, browsercontext-viewport, download, geolocation, page-clock, page-close, pdf, permissions, selectors-register, tap (hasTouch).
+browsercontext-add-cookies, browsercontext-add-init-script, browsercontext-base-url, browsercontext-cookies, browsercontext-credentials, browsercontext-csp, browsercontext-expose-function, browsercontext-fetch, browsercontext-locale, browsercontext-page-event, browsercontext-pages, browsercontext-route, browsercontext-set-extra-http-headers, browsercontext-storage-state, browsercontext-timezone-id, browsercontext-viewport, download, geolocation, global-fetch, page-clock, page-close, pdf, permissions, selectors-register, tap (hasTouch).
 
 Plus connection/transport unit tests and a small integration spec.
 

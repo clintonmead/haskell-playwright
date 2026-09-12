@@ -12,7 +12,7 @@ Next work: remaining `tests/page` specs that do not need `expect` matchers, then
 - Regex URL matches for routes.
 - IndexedDB and WebAuthn credentials on `StorageState`.
 - `unrouteAll` `wait` / `ignoreErrors`.
-- Tracing, HAR, video, screencast, WebSocket routing, global `APIRequest.newContext` fetch. Context `request` covers most of `browsercontext-fetch` (methods, params, cookies, headers, gzip/deflate, form-urlencoded, JSON, multipart, `HTTPCredentials.send`, retries, dispose). Still open there: HTTPS/`ignoreHTTPSErrors`, DNS `__testHookLookup`, brotli, Range+brotli, connectOverCDP, bool/numeric params, and propagating `close` reason onto fetch errors.
+- Tracing, HAR, video, screencast, WebSocket routing. Global `APIRequest.newContext` / `global-fetch` covers the HTTP cases (methods, dispose, userAgent, timeout, extra headers, credentials, empty body, abort, redirects, JSON bodies, maxRedirects, failOnStatusCode). Still open: HTTPS/`ignoreHTTPSErrors`/`securityDetails`, DNS `__testHookLookup`, brotli Range, connectOverCDP, bool/numeric params, `close` reason on fetch errors, JS `inspect`/`toJSON()` client serialization. `response.serverAddr` is wrapped but Playwright 1.61.1 omits it when Node happy-eyeballs has not set `remoteAddress` yet.
 
 ## Assertions
 

@@ -6,12 +6,14 @@ module Playwright.StorageState
   , fromRequestStorageState
   , fromStorageStateResult
   , toNewContextStorageState
+  , toRequestStorageState
   , toSetStorageState
   ) where
 
 import Playwright.Cookie
   ( Cookie
   , fromNetworkCookie
+  , toNetworkCookie
   , toSetNetworkFromCookie
   )
 import Playwright.Protocol
@@ -22,10 +24,12 @@ import Playwright.Protocol
   , NameValue (nameValueName, nameValueValue)
   , NetworkCookie
   , OriginStorage (originStorageLocalStorage, originStorageOrigin)
+  , PlaywrightNewRequestParamsStorageState (playwrightNewRequestParamsStorageStateCookies, playwrightNewRequestParamsStorageStateOrigins)
   , SetOriginStorage
   , mkBrowserContextSetStorageStateParamsStorageState
   , mkBrowserNewContextParamsStorageState
   , mkNameValue
+  , mkPlaywrightNewRequestParamsStorageState
   , mkSetOriginStorage
   )
 import Playwright.StorageItem
@@ -92,6 +96,15 @@ toNewContextStorageState state =
     { browserNewContextParamsStorageStateCookies =
         Just (fmap toSetNetworkFromCookie (storageStateCookies state))
     , browserNewContextParamsStorageStateOrigins =
+        Just (fmap toSetOrigin (storageStateOrigins state))
+    }
+
+toRequestStorageState :: StorageState -> PlaywrightNewRequestParamsStorageState
+toRequestStorageState state =
+  mkPlaywrightNewRequestParamsStorageState
+    { playwrightNewRequestParamsStorageStateCookies =
+        Just (fmap toNetworkCookie (storageStateCookies state))
+    , playwrightNewRequestParamsStorageStateOrigins =
         Just (fmap toSetOrigin (storageStateOrigins state))
     }
 

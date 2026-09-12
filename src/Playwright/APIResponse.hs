@@ -7,6 +7,8 @@ module Playwright.APIResponse
   , apiResponseHeadersArray
   , apiResponseJson
   , apiResponseOk
+  , apiResponseSecurityDetails
+  , apiResponseServerAddr
   , apiResponseStatus
   , apiResponseStatusText
   , apiResponseText
@@ -61,10 +63,18 @@ import Playwright.MethodName
 import Playwright.Protocol qualified as Protocol
   ( APIRequestContextDisposeAPIResponseResult
   , APIRequestContextFetchResponseBodyResult (aPIRequestContextFetchResponseBodyResultBinary)
-  , APIResponse (aPIResponseFetchUid, aPIResponseHeaders, aPIResponseStatus, aPIResponseStatusText, aPIResponseUrl)
+  , APIResponse (aPIResponseFetchUid, aPIResponseHeaders, aPIResponseSecurityDetails, aPIResponseServerAddr, aPIResponseStatus, aPIResponseStatusText, aPIResponseUrl)
   , NameValue (nameValueName, nameValueValue)
   , mkAPIRequestContextDisposeAPIResponseParams
   , mkAPIRequestContextFetchResponseBodyParams
+  )
+import Playwright.RemoteAddr
+  ( RemoteAddr
+  , fromProtocolRemoteAddr
+  )
+import Playwright.SecurityDetails
+  ( SecurityDetails
+  , fromProtocolSecurityDetails
   )
 import Playwright.Url
   ( Url
@@ -94,6 +104,14 @@ apiResponseStatusText =
 apiResponseOk :: APIResponse -> Bool
 apiResponseOk =
   httpStatusOk . apiResponseStatus
+
+apiResponseServerAddr :: APIResponse -> Maybe RemoteAddr
+apiResponseServerAddr =
+  fmap fromProtocolRemoteAddr . Protocol.aPIResponseServerAddr . apiResponsePayload
+
+apiResponseSecurityDetails :: APIResponse -> Maybe SecurityDetails
+apiResponseSecurityDetails =
+  fmap fromProtocolSecurityDetails . Protocol.aPIResponseSecurityDetails . apiResponsePayload
 
 apiResponseHeadersArray :: APIResponse -> [HttpHeader]
 apiResponseHeadersArray response =

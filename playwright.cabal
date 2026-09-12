@@ -23,6 +23,7 @@ library
       Playwright
       Playwright.AcceptDownloads
       Playwright.AddLocatorHandlerOptions
+      Playwright.APIRequest
       Playwright.APIRequestContext
       Playwright.APIResponse
       Playwright.AriaRole
@@ -101,6 +102,7 @@ library
       Playwright.Mouse
       Playwright.NetworkSizes
       Playwright.NewContextOptions
+      Playwright.NewRequestOptions
       Playwright.Page
       Playwright.Page.Network
       Playwright.Page.Query
@@ -112,6 +114,7 @@ library
       Playwright.Protocol
       Playwright.RaceTimeout
       Playwright.RegisterSelectorOptions
+      Playwright.RemoteAddr
       Playwright.RemoteObject
       Playwright.Request
       Playwright.RequestFailure
@@ -124,6 +127,7 @@ library
       Playwright.RouteOptions
       Playwright.ScreenshotOptions
       Playwright.ScriptTag
+      Playwright.SecurityDetails
       Playwright.SelectOption
       Playwright.Selector
       Playwright.Selectors
@@ -227,6 +231,7 @@ test-suite playwright-test
       Playwright.FrameGotoSpec
       Playwright.FrameHierarchySpec
       Playwright.GeolocationSpec
+      Playwright.GlobalFetchSpec
       Playwright.Harness
       Playwright.IntegrationSpec
       Playwright.InterceptionSpec
@@ -340,6 +345,7 @@ test-suite playwright-test
     , async
     , base
     , bytestring
+    , case-insensitive
     , directory
     , hedgehog
     , http-types
