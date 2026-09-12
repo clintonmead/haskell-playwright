@@ -125,6 +125,7 @@ import Playwright.PermissionsSpec qualified as PermissionsSpec
 import Playwright.QuerySelectorSpec qualified as QuerySelectorSpec
 import Playwright.SelectorsCssSpec qualified as SelectorsCssSpec
 import Playwright.SelectorsGetBySpec qualified as SelectorsGetBySpec
+import Playwright.SelectorsTextSpec qualified as SelectorsTextSpec
 import Playwright.TapSpec qualified as TapSpec
 import Playwright.TransportSpec qualified as TransportSpec
 import Playwright.WheelSpec qualified as WheelSpec
@@ -271,6 +272,7 @@ main =
         , QuerySelectorSpec.tests
         , SelectorsCssSpec.tests
         , SelectorsGetBySpec.tests
+        , SelectorsTextSpec.tests
         , TapSpec.tests
         , WheelSpec.tests
         , WorkersSpec.tests

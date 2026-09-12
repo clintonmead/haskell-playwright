@@ -28,7 +28,7 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 - page-request-intercept
 - interception
 - retarget
-- selectors-text, selectors-role, selectors-register, selectors-misc, selectors-frame
+- selectors-role, selectors-register, selectors-misc, selectors-frame
 - locator-highlight
 
 ## Ported `tests/page` with remaining cases
@@ -38,6 +38,7 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 - **page-autowaiting-basic:** skip official internal hooks / expect call-log tests.
 - **page-click-scroll:** skip official Chromium fixme `display:contents` + `position` (`DOM.getBoxModel`).
 - **page-click-timeout-1 / 3 / 4:** skip `__testHookBeforePointerAction` / `__testHookBeforeHitTarget` cases (Node-only internals). Protocol timeout errors are `Timeout <n>ms exceeded` (the JS client wraps call-log text such as “element is not enabled”).
+- **selectors-text:** skip locator `{ hasText }` / regex hasText (no `filterHasText` yet).
 - **page-history:** bfcache, reload during renderer navigation, goBack/goForward during submit, issue 20791, popup reload isolation.
 - **page-event-request:** service worker / intercept-race / Chromium 204 fixme leftovers.
 - **downloads:** saveAs / cancel.

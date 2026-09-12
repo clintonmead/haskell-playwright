@@ -302,6 +302,7 @@ test-suite playwright-test
       Playwright.QuerySelectorSpec
       Playwright.SelectorsCssSpec
       Playwright.SelectorsGetBySpec
+      Playwright.SelectorsTextSpec
       Playwright.TapSpec
       Playwright.TransportSpec
       Playwright.WheelSpec
