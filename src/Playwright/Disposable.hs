@@ -4,13 +4,13 @@ module Playwright.Disposable
   , dispose
   ) where
 
+import Playwright.Monad
+  ( Playwright
+  )
 import Playwright.Channel
   ( Channel (Channel)
   , DisposableTag
   , send
-  )
-import Playwright.Connection
-  ( Connection
   )
 import Playwright.Json.ChannelRef
   ( ChannelRef (channelRefGuid)
@@ -27,12 +27,12 @@ newtype Disposable = Disposable
   { disposableChannel :: Channel DisposableTag
   }
 
-dispose :: Disposable -> IO ()
+dispose :: Disposable -> Playwright ()
 dispose handle = do
   _ :: DisposableDisposeResult <-
     send (disposableChannel handle) (MethodName "dispose") mkDisposableDisposeParams
   pure ()
 
-disposableFromRef :: Connection -> ChannelRef -> Disposable
-disposableFromRef conn ref =
-  Disposable (Channel conn (channelRefGuid ref))
+disposableFromRef :: ChannelRef -> Disposable
+disposableFromRef ref =
+  Disposable (Channel (channelRefGuid ref))

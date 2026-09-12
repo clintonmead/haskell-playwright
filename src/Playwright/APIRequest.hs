@@ -7,20 +7,21 @@ import Playwright.APIRequestContext
   ( APIRequestContext (APIRequestContext, apiRequestContextChannel, apiRequestContextTimeoutOwner)
   )
 import Playwright.Channel
-  ( Channel (Channel, channelConnection)
-  , send
+  ( Channel (Channel)
   )
 import Playwright.Connection
-  ( setTimeoutDefault
-  )
-import Playwright.Instance
-  ( Playwright (playwrightChannel)
+  ( lookupPlaywrightGuid
+  , sendCommand
+  , setTimeoutDefault
   )
 import Playwright.Json.ChannelRef
   ( ChannelRef (channelRefGuid)
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
+  )
+import Playwright.Monad
+  ( Playwright
   )
 import Playwright.NewRequestOptions
   ( NewRequestOptions (newRequestTimeout)
@@ -31,22 +32,23 @@ import Playwright.Protocol
   ( PlaywrightNewRequestResult (playwrightNewRequestResultRequest)
   )
 
-newRequestContext :: Playwright -> IO APIRequestContext
-newRequestContext pw =
-  newRequestContextWith pw defaultNewRequestOptions
+newRequestContext :: Playwright APIRequestContext
+newRequestContext =
+  newRequestContextWith defaultNewRequestOptions
 
-newRequestContextWith :: Playwright -> NewRequestOptions -> IO APIRequestContext
-newRequestContextWith pw opts = do
-  let channel = playwrightChannel pw
+newRequestContextWith :: NewRequestOptions -> Playwright APIRequestContext
+newRequestContextWith opts = do
+  guid <- lookupPlaywrightGuid
   result <-
-    send
-      channel
+    sendCommand
+      guid
       (MethodName "newRequest")
       (toPlaywrightNewRequestParams opts)
-  let guid = channelRefGuid (playwrightNewRequestResultRequest result)
-  setTimeoutDefault (channelConnection channel) guid (newRequestTimeout opts)
+  let
+    requestGuid = channelRefGuid (playwrightNewRequestResultRequest result)
+  setTimeoutDefault requestGuid (newRequestTimeout opts)
   pure
     APIRequestContext
-      { apiRequestContextChannel = Channel (channelConnection channel) guid
-      , apiRequestContextTimeoutOwner = guid
+      { apiRequestContextChannel = Channel requestGuid
+      , apiRequestContextTimeoutOwner = requestGuid
       }

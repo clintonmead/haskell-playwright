@@ -4,6 +4,9 @@ module Playwright.EmulateMedia
   , emulateMedia
   ) where
 
+import Playwright.Monad
+  ( Playwright
+  )
 import Playwright.Channel
   ( send
   )
@@ -40,7 +43,7 @@ defaultEmulateMedia =
     , emulateMediaColorScheme = Nothing
     }
 
-emulateMedia :: Page -> EmulateMedia -> IO ()
+emulateMedia :: Page -> EmulateMedia -> Playwright ()
 emulateMedia page opts = do
   _ :: PageEmulateMediaResult <-
     send

@@ -17,7 +17,10 @@ module Playwright.Request
   , requestsEqual
   ) where
 
-import Control.Exception
+import Playwright.Monad
+  ( Playwright
+  )
+import UnliftIO.Exception
   ( throwIO
   )
 import Data.Aeson
@@ -35,14 +38,13 @@ import Data.Text.Encoding
   ( decodeUtf8
   )
 import Playwright.Channel
-  ( Channel (Channel, channelConnection, channelGuid)
+  ( Channel (Channel, channelGuid)
   , RequestTag
   , ResponseTag
   , send
   )
 import Playwright.Connection
-  ( Connection
-  , guidsOfType
+  ( guidsOfType
   , lookupObject
   , lookupRequestFailure
   , lookupRequestOverrides
@@ -105,26 +107,25 @@ newtype Request = Request
   { requestChannel :: Channel RequestTag
   }
 
-requestFromRef :: Connection -> ChannelRef -> Request
-requestFromRef conn ref =
-  Request (Channel conn (channelRefGuid ref))
+requestFromRef :: ChannelRef -> Request
+requestFromRef ref =
+  Request (Channel (channelRefGuid ref))
 
 requestsEqual :: Request -> Request -> Bool
 requestsEqual left right =
   channelGuid (requestChannel left) == channelGuid (requestChannel right)
 
-requestInitializer :: Request -> IO RequestInitializer
+requestInitializer :: Request -> Playwright RequestInitializer
 requestInitializer request = do
-  obj <- lookupObject (channelConnection (requestChannel request)) (channelGuid (requestChannel request))
+  obj <- lookupObject (channelGuid (requestChannel request))
   either throwIO pure (fromJsonValue (remoteInitializer obj))
 
-requestOverrides :: Request -> IO RequestOverrides
+requestOverrides :: Request -> Playwright RequestOverrides
 requestOverrides request =
   lookupRequestOverrides
-    (channelConnection (requestChannel request))
     (channelGuid (requestChannel request))
 
-requestUrl :: Request -> IO Url
+requestUrl :: Request -> Playwright Url
 requestUrl request = do
   overrides <- requestOverrides request
   case requestOverrideUrl overrides of
@@ -133,7 +134,7 @@ requestUrl request = do
     Nothing ->
       requestInitializerUrl <$> requestInitializer request
 
-requestMethod :: Request -> IO HttpMethod
+requestMethod :: Request -> Playwright HttpMethod
 requestMethod request = do
   overrides <- requestOverrides request
   case requestOverrideMethod overrides of
@@ -142,15 +143,14 @@ requestMethod request = do
     Nothing ->
       HttpMethod . requestInitializerMethod <$> requestInitializer request
 
-requestResourceType :: Request -> IO ResourceType
+requestResourceType :: Request -> Playwright ResourceType
 requestResourceType request =
   ResourceType . requestInitializerResourceType <$> requestInitializer request
 
-requestFailure :: Request -> IO (Maybe RequestFailure)
+requestFailure :: Request -> Playwright (Maybe RequestFailure)
 requestFailure request = do
   text <-
     lookupRequestFailure
-      (channelConnection (requestChannel request))
       (channelGuid (requestChannel request))
   case text of
     Just value | value /= mempty ->
@@ -158,11 +158,11 @@ requestFailure request = do
     _ ->
       pure Nothing
 
-requestIsNavigation :: Request -> IO Bool
+requestIsNavigation :: Request -> Playwright Bool
 requestIsNavigation request =
   requestInitializerIsNavigationRequest <$> requestInitializer request
 
-requestPostData :: Request -> IO (Maybe ByteString)
+requestPostData :: Request -> Playwright (Maybe ByteString)
 requestPostData request = do
   overrides <- requestOverrides request
   case requestOverridePostData overrides of
@@ -171,7 +171,7 @@ requestPostData request = do
     Nothing ->
       fmap (fmap protocolBinaryToByteString . requestInitializerPostData) (requestInitializer request)
 
-requestPostDataJSON :: Request -> IO (Maybe Value)
+requestPostDataJSON :: Request -> Playwright (Maybe Value)
 requestPostDataJSON request = do
   payload <- requestPostData request
   case payload of
@@ -187,7 +187,7 @@ requestPostDataJSON request = do
                 ("POST data is not a valid JSON object: " <> decodeUtf8 bytes)
             )
 
-requestHeaders :: Request -> IO [HttpHeader]
+requestHeaders :: Request -> Playwright [HttpHeader]
 requestHeaders request = do
   overrides <- requestOverrides request
   case requestOverrideHeaders overrides of
@@ -196,25 +196,24 @@ requestHeaders request = do
     Nothing ->
       fmap (fmap fromNameValue . requestInitializerHeaders) (requestInitializer request)
 
-requestFrameRef :: Request -> IO (Maybe ChannelRef)
+requestFrameRef :: Request -> Playwright (Maybe ChannelRef)
 requestFrameRef request =
   requestInitializerFrame <$> requestInitializer request
 
-requestRedirectedFrom :: Request -> IO (Maybe Request)
+requestRedirectedFrom :: Request -> Playwright (Maybe Request)
 requestRedirectedFrom request = do
   initializer <- requestInitializer request
   pure
     ( fmap
-        (requestFromRef (channelConnection (requestChannel request)))
+        (requestFromRef)
         (requestInitializerRedirectedFrom initializer)
     )
 
-requestRedirectedTo :: Request -> IO (Maybe Request)
+requestRedirectedTo :: Request -> Playwright (Maybe Request)
 requestRedirectedTo request = do
   let
-    conn = channelConnection (requestChannel request)
     fromGuid = channelGuid (requestChannel request)
-  objects <- traverse (lookupObject conn) =<< guidsOfType conn ChannelTypeRequest
+  objects <- traverse (lookupObject) =<< guidsOfType ChannelTypeRequest
   pure
     ( listToMaybe
         ( mapMaybe
@@ -223,7 +222,7 @@ requestRedirectedTo request = do
                   Right initializer
                     | Just ref <- requestInitializerRedirectedFrom initializer
                     , channelRefGuid ref == fromGuid ->
-                        Just (requestFromRef conn (ChannelRef (remoteGuid obj)))
+                        Just (requestFromRef (ChannelRef (remoteGuid obj)))
                   _ ->
                     Nothing
             )
@@ -231,7 +230,7 @@ requestRedirectedTo request = do
         )
     )
 
-requestResponseRef :: Request -> IO (Maybe ChannelRef)
+requestResponseRef :: Request -> Playwright (Maybe ChannelRef)
 requestResponseRef request = do
   result <-
     send
@@ -240,17 +239,16 @@ requestResponseRef request = do
       mkRequestResponseParams
   pure (requestResponseResultResponse result)
 
-requestSizes :: Request -> IO NetworkSizes
+requestSizes :: Request -> Playwright NetworkSizes
 requestSizes request = do
   responseRef <- requestResponseRef request
   case responseRef of
     Nothing ->
       throwIO (DecodeFailure "Unable to fetch sizes for failed request")
     Just ref -> do
-      let conn = channelConnection (requestChannel request)
       result <-
         send
-          (Channel conn (channelRefGuid ref) :: Channel ResponseTag)
+          (Channel (channelRefGuid ref) :: Channel ResponseTag)
           (MethodName "sizes")
           mkResponseSizesParams
       let

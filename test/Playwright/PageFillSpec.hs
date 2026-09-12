@@ -22,14 +22,14 @@ import Playwright.Harness
   , locate
   , withAssetPage
   , withChromiumPage
+  , assertEqual
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree

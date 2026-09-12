@@ -2,19 +2,22 @@ module Playwright.PageAutowaitingNoHangSpec
   ( tests
   ) where
 
-import Control.Concurrent
+import Control.Monad.IO.Class
+  ( MonadIO
+  )
+import UnliftIO.Concurrent
   ( threadDelay
   )
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( wait
   , withAsync
   )
-import Control.Concurrent.MVar
+import UnliftIO.MVar
   ( newEmptyMVar
   , putMVar
   , takeMVar
   )
-import Control.Exception
+import UnliftIO.Exception
   ( SomeException
   , throwIO
   , try
@@ -27,7 +30,6 @@ import Data.ByteString.Lazy qualified as LBS
 import Data.Text
   ( Text
   , isInfixOf
-  , pack
   )
 import Network.HTTP.Types
   ( hContentType
@@ -42,9 +44,6 @@ import Network.Wai
 import Network.Wai.Application.Static
   ( defaultFileServerSettings
   , staticApp
-  )
-import Network.Wai.Handler.Warp
-  ( withApplication
   )
 import Playwright
   ( Page
@@ -64,11 +63,15 @@ import Playwright
   , urlToText
   , waitForPopup
   , waitForTimeout
+  , Playwright
   )
 import Playwright.Harness
   ( locate
   , testAssetsDir
   , withChromiumPage
+  , withLocalApp
+  , assertEqual
+  , assertFailure
   )
 import System.IO.Error
   ( mkIOError
@@ -81,9 +84,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -243,25 +244,25 @@ interceptHtml :: LBS.ByteString
 interceptHtml =
   "<a id=\"go\" href=\"/other\">go</a><p id=\"status\">initial</p><script>navigation.addEventListener('navigate', event => { if (!event.canIntercept) return; event.intercept({ handler: async () => { const dest = new URL(event.destination.url).pathname; document.getElementById('status').textContent = 'intercepted:' + dest; } }); });</script>"
 
-tryGoto :: Page -> Text -> IO ()
+tryGoto :: Page -> Text -> Playwright ()
 tryGoto page target = do
-  result <- try (goto page (urlFromText target) defaultGotoOptions) :: IO (Either SomeException (Maybe Response))
+  result <- try (goto page (urlFromText target) defaultGotoOptions) :: Playwright (Either SomeException (Maybe Response))
   case result of
     Left _ ->
       pure ()
     Right _ ->
       pure ()
 
-tryGoBack :: Page -> IO ()
+tryGoBack :: Page -> Playwright ()
 tryGoBack page = do
-  result <- try (goBack page) :: IO (Either SomeException (Maybe Response))
+  result <- try (goBack page) :: Playwright (Either SomeException (Maybe Response))
   case result of
     Left _ ->
       pure ()
     Right _ ->
       pure ()
 
-withHangEmpty :: (Text -> Page -> IO a) -> IO a
+withHangEmpty :: (Text -> Page -> Playwright a) -> IO a
 withHangEmpty action =
   withPageApp hangEmptyApp action
 
@@ -273,7 +274,7 @@ hangEmptyApp request respond =
     _ ->
       respond (responseLBS status404 [] "")
 
-withEmptyPage :: (Page -> IO a) -> IO a
+withEmptyPage :: (Page -> Playwright a) -> IO a
 withEmptyPage action =
   withPageApp emptyOkApp $ \prefix page -> do
     _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
@@ -283,13 +284,13 @@ emptyOkApp :: Application
 emptyOkApp _request respond =
   respond (responseLBS status200 [(hContentType, "text/html")] "")
 
-withPageApp :: Application -> (Text -> Page -> IO a) -> IO a
+withPageApp :: Application -> (Text -> Page -> Playwright a) -> IO a
 withPageApp app action =
   withChromiumPage $ \page ->
-    withApplication (pure app) $ \port ->
-      action ("http://127.0.0.1:" <> pack (show port)) page
+    withLocalApp app $ \prefix ->
+      action prefix page
 
-requireMs :: Double -> IO Timeout
+requireMs :: (MonadIO m) => Double -> m Timeout
 requireMs n =
   case milliseconds n of
     Nothing ->

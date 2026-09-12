@@ -2,7 +2,7 @@ module Playwright.SelectorsRegisterSpec
   ( tests
   ) where
 
-import Control.Exception
+import UnliftIO.Exception
   ( bracket
   , try
   )
@@ -47,7 +47,7 @@ import Playwright
   , urlFromText
   , withBrowser
   , withPage
-  , withPlaywright
+  , runPlaywright
   )
 import Playwright.Error
   ( PlaywrightError (SelectorsRegister)
@@ -55,15 +55,15 @@ import Playwright.Error
 import Playwright.Harness
   ( assertProtocolContains
   , readTestAsset
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -71,8 +71,8 @@ tests =
   testGroup
     "selectors-register"
     [ testCase "textContent should be atomic" $
-        withPwPage $ \pw page -> do
-          registerSelector pw "textContent" mutatingTextEngine
+        withPwPage $ \page -> do
+          registerSelector "textContent" mutatingTextEngine
           _ <-
             goto
               page
@@ -83,8 +83,8 @@ tests =
           assertEqual "modified" "modified"
             =<< evaluateText page "() => document.querySelector('div').textContent"
     , testCase "innerText should be atomic" $
-        withPwPage $ \pw page -> do
-          registerSelector pw "innerText" mutatingTextEngine
+        withPwPage $ \page -> do
+          registerSelector "innerText" mutatingTextEngine
           _ <-
             goto
               page
@@ -95,8 +95,8 @@ tests =
           assertEqual "modified" "modified"
             =<< evaluateText page "() => document.querySelector('div').innerText"
     , testCase "innerHTML should be atomic" $
-        withPwPage $ \pw page -> do
-          registerSelector pw "innerHTML" mutatingTextEngine
+        withPwPage $ \page -> do
+          registerSelector "innerHTML" mutatingTextEngine
           _ <-
             goto
               page
@@ -107,8 +107,8 @@ tests =
           assertEqual "modified" "modified"
             =<< evaluateText page "() => document.querySelector('div').innerHTML"
     , testCase "getAttribute should be atomic" $
-        withPwPage $ \pw page -> do
-          registerSelector pw "getAttribute" mutatingAttrEngine
+        withPwPage $ \page -> do
+          registerSelector "getAttribute" mutatingAttrEngine
           _ <-
             goto
               page
@@ -119,8 +119,8 @@ tests =
           assertEqual "modified" "modified"
             =<< evaluateText page "() => document.querySelector('div').getAttribute('foo')"
     , testCase "isVisible should be atomic" $
-        withPwPage $ \pw page -> do
-          registerSelector pw "isVisible" mutatingVisibleEngine
+        withPwPage $ \page -> do
+          registerSelector "isVisible" mutatingVisibleEngine
           _ <-
             goto
               page
@@ -131,8 +131,8 @@ tests =
           assertEqual "display" "none"
             =<< evaluateText page "() => document.querySelector('div').style.display"
     , testCase "should take java-style string" $
-        withPwPage $ \pw page -> do
-          registerSelector pw "objectLiteral" objectLiteralEngine
+        withPwPage $ \page -> do
+          registerSelector "objectLiteral" objectLiteralEngine
           _ <-
             goto
               page
@@ -141,10 +141,10 @@ tests =
           _ <- pageTextContent page (selectorFromText "objectLiteral=div")
           pure ()
     , testCase "should work" $
-        withPwBrowser $ \pw browser -> do
-          registerSelector pw "tag" tagSelectorEngine
+        withPwBrowser $ \browser -> do
+          registerSelector "tag" tagSelectorEngine
           bracket (newContext browser) closeContext $ \ctx -> do
-            registerSelector pw "tag2" tagSelectorEngine
+            registerSelector "tag2" tagSelectorEngine
             page <- newPage ctx
             setContent page "<div><span></span></div><div></div>"
             assertEqual "tag DIV" "DIV"
@@ -162,18 +162,17 @@ tests =
             assertProtocolContains "Unknown engine \"tAG\" while parsing selector tAG=DIV" $
               querySelector page (selectorFromText "tAG=DIV")
     , testCase "should work with path" $
-        withPwBrowser $ \pw browser -> do
+        withPwBrowser $ \browser -> do
           source <- fmap decodeUtf8 (readTestAsset "sectionselectorengine.js")
-          registerSelector pw "foo" source
+          registerSelector "foo" source
           withPage browser $ \page -> do
             setContent page "<section></section>"
             assertEqual "section" "SECTION"
               =<< evalOnSelectorText page (selectorFromText "foo=whatever") "e => e.nodeName"
     , testCase "should work in main and isolated world" $
-        withPwBrowser $ \pw browser -> do
-          registerSelector pw "main" dummyWorldEngine
+        withPwBrowser $ \browser -> do
+          registerSelector "main" dummyWorldEngine
           registerSelectorWith
-            pw
             "isolated"
             dummyWorldEngine
             defaultRegisterSelectorOptions
@@ -205,53 +204,54 @@ tests =
             assertEqual "main css" "SECTION"
               =<< evalOnSelectorText page (selectorFromText "main=ignored >> css=section") "e => e.nodeName"
     , testCase "should handle errors" $
-        withPwPage $ \pw page -> do
+        withPwPage $ \page -> do
           assertProtocolContains
             "Unknown engine \"neverregister\" while parsing selector neverregister=ignored"
             (querySelector page (selectorFromText "neverregister=ignored"))
           assertSelectorsRegister
             "selectors.register: Selector engine name may only contain [a-zA-Z0-9_] characters"
-            (registerSelector pw "$" tagSelectorEngine)
-          registerSelector pw "dummy" tagSelectorEngine
-          registerSelector pw "duMMy" tagSelectorEngine
+            (registerSelector "$" tagSelectorEngine)
+          registerSelector "dummy" tagSelectorEngine
+          registerSelector "duMMy" tagSelectorEngine
           assertSelectorsRegister
             "selectors.register: \"dummy\" selector engine has been already registered"
-            (registerSelector pw "dummy" tagSelectorEngine)
+            (registerSelector "dummy" tagSelectorEngine)
           assertSelectorsRegister
             "selectors.register: \"css\" is a predefined selector engine"
-            (registerSelector pw "css" tagSelectorEngine)
+            (registerSelector "css" tagSelectorEngine)
     , testCase "should throw already registered error when registering" $
-        withPlaywright $ \pw -> do
-          registerSelector pw "alreadyRegistered" tagSelectorEngine
+        runPlaywright $ do
+          registerSelector "alreadyRegistered" tagSelectorEngine
           assertSelectorsRegister
             "selectors.register: \"alreadyRegistered\" selector engine has been already registered"
-            (registerSelector pw "alreadyRegistered" tagSelectorEngine)
+            (registerSelector "alreadyRegistered" tagSelectorEngine)
     , testCase "should not rely on engines working from the root" $
-        withPwBrowser $ \pw browser -> do
-          registerSelector pw "__value" valueEngine
+        withPwBrowser $ \browser -> do
+          registerSelector "__value" valueEngine
           withPage browser $ \page -> do
             setContent page "<input id=input1 value=value1><input id=input2 value=value2>"
             assertEqual "id" "input2"
               =<< evalOnSelectorText page (selectorFromText "input >> __value=value2") "e => e.id"
     , testCase "should throw a nice error if the selector returns a bad value" $
-        withPwBrowser $ \pw browser -> do
-          registerSelector pw "__fake" fakeEngine
+        withPwBrowser $ \browser -> do
+          registerSelector "__fake" fakeEngine
           withPage browser $ \page ->
             assertProtocolContains "Expected a Node but got [object Array]" $
               querySelector page (selectorFromText "__fake=value2")
     ]
 
-withPwBrowser :: (Playwright -> Browser -> IO a) -> IO a
+withPwBrowser :: (Browser -> Playwright a) -> IO a
 withPwBrowser action =
-  withPlaywright $ \pw ->
-    withBrowser (chromium pw) defaultLaunchOptions (action pw)
+  runPlaywright $ do
+    browserType <- chromium
+    withBrowser browserType defaultLaunchOptions action
 
-withPwPage :: (Playwright -> Page -> IO a) -> IO a
+withPwPage :: (Page -> Playwright a) -> IO a
 withPwPage action =
-  withPwBrowser $ \pw browser ->
-    withPage browser (action pw)
+  withPwBrowser $ \browser ->
+    withPage browser action
 
-assertSelectorsRegister :: Text -> IO a -> IO ()
+assertSelectorsRegister :: Text -> Playwright a -> Playwright ()
 assertSelectorsRegister expected action = do
   result <- try action
   case result of

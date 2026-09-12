@@ -2,7 +2,7 @@ module Playwright.BrowserContextPageEventSpec
   ( tests
   ) where
 
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( wait
   , withAsync
   )
@@ -31,15 +31,15 @@ import Playwright
 import Playwright.Harness
   ( withAssetsContextWith
   , withChromiumContext
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree

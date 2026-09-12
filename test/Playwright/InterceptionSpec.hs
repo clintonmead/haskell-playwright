@@ -2,14 +2,14 @@ module Playwright.InterceptionSpec
   ( tests
   ) where
 
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( wait
   , withAsync
   )
-import Control.Exception
+import UnliftIO.Exception
   ( try
   )
-import Data.IORef
+import UnliftIO.IORef
   ( IORef
   , modifyIORef'
   , newIORef
@@ -73,6 +73,7 @@ import Playwright
   , waitFor
   , waitForConsole
   , waitForWorker
+  , Playwright
   )
 import Playwright.Error
   ( PlaywrightError
@@ -82,6 +83,8 @@ import Playwright.Harness
   , testAssetsDir
   , withAssets
   , withChromiumPage
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
@@ -90,9 +93,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -288,7 +289,7 @@ safeLast items =
     (x : _) ->
       Just x
 
-assertNav :: [(Text, Request)] -> Text -> Bool -> IO ()
+assertNav :: [(Text, Request)] -> Text -> Bool -> Playwright ()
 assertNav requests name expected =
   case lookup name requests of
     Nothing ->
@@ -297,7 +298,7 @@ assertNav requests name expected =
       actual <- requestIsNavigation request
       assertEqual (show name) expected actual
 
-ignoreFulfill :: IO () -> IO ()
+ignoreFulfill :: Playwright () -> Playwright ()
 ignoreFulfill action = do
   result <- try action
   case result of
@@ -306,14 +307,14 @@ ignoreFulfill action = do
     Right () ->
       pure ()
 
-withRedirectAssets :: (Text -> Page -> IO a) -> IO a
+withRedirectAssets :: (Text -> Page -> Playwright a) -> IO a
 withRedirectAssets action = do
   assets <- testAssetsDir
   withApplication (pure (redirectThenStatic assets False)) $ \port ->
     withChromiumPage $ \page ->
       action ("http://127.0.0.1:" <> pack (show port)) page
 
-withSwAssets :: (Text -> Page -> IO () -> IO a) -> IO a
+withSwAssets :: (Text -> Page -> Playwright () -> Playwright a) -> IO a
 withSwAssets action = do
   assets <- testAssetsDir
   passthroughRedirect <- newIORef False

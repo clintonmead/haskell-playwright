@@ -18,7 +18,10 @@ module Playwright.Frame
   , titleFrame
   ) where
 
-import Control.Exception
+import Playwright.Monad
+  ( Playwright
+  )
+import UnliftIO.Exception
   ( throwIO
   )
 import Data.Aeson
@@ -32,7 +35,7 @@ import Data.Text
   ( Text
   )
 import Playwright.Channel
-  ( Channel (Channel, channelConnection, channelGuid)
+  ( Channel (Channel, channelGuid)
   , FrameTag
   , send
   )
@@ -40,8 +43,7 @@ import Playwright.Guid
   ( Guid
   )
 import Playwright.Connection
-  ( Connection
-  , guidsOfType
+  ( guidsOfType
   , lookupContextBaseUrl
   , lookupMainFramePage
   , lookupObject
@@ -120,60 +122,58 @@ data Frame = Frame
   , frameParent :: Maybe ChannelRef
   }
 
-frameFromRef :: Connection -> ChannelRef -> IO Frame
-frameFromRef conn ref = do
-  obj <- lookupObject conn (channelRefGuid ref)
+frameFromRef :: ChannelRef -> Playwright Frame
+frameFromRef ref = do
+  obj <- lookupObject (channelRefGuid ref)
   initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
   pure
     Frame
-      { frameChannel = Channel conn (channelRefGuid ref)
+      { frameChannel = Channel (channelRefGuid ref)
       , frameUrl = frameInitializerUrl initializer
       , frameParent = frameInitializerParentFrame initializer
       }
 
-currentUrl :: Frame -> IO Url
+currentUrl :: Frame -> Playwright Url
 currentUrl frame = do
   initializer <- frameInitializer frame
   pure (frameInitializerUrl initializer)
 
-currentName :: Frame -> IO Text
+currentName :: Frame -> Playwright Text
 currentName frame = do
   initializer <- frameInitializer frame
   pure (frameInitializerName initializer)
 
-frameInitializer :: Frame -> IO FrameInitializer
+frameInitializer :: Frame -> Playwright FrameInitializer
 frameInitializer frame = do
-  obj <- lookupObject (channelConnection (frameChannel frame)) (channelGuid (frameChannel frame))
+  obj <- lookupObject (channelGuid (frameChannel frame))
   either throwIO pure (fromJsonValue (remoteInitializer obj))
 
-childFrames :: Frame -> IO [Frame]
+childFrames :: Frame -> Playwright [Frame]
 childFrames frame = do
-  let conn = channelConnection (frameChannel frame)
-  guids <- guidsOfType conn ChannelTypeFrame
-  candidates <- traverse (\guid -> frameFromRef conn (ChannelRef guid)) guids
+  guids <- guidsOfType ChannelTypeFrame
+  candidates <- traverse (\guid -> frameFromRef (ChannelRef guid)) guids
   pure (filter (isChildOf frame) candidates)
 
 isChildOf :: Frame -> Frame -> Bool
 isChildOf parent child =
   frameParent child == Just (ChannelRef (channelGuid (frameChannel parent)))
 
-resolveFrameUrl :: Frame -> Url -> IO Url
+resolveFrameUrl :: Frame -> Url -> Playwright Url
 resolveFrameUrl frame url = do
-  let conn = channelConnection (frameChannel frame)
-  frameObj <- lookupObject conn (channelGuid (frameChannel frame))
-  base <- lookupContextBaseUrl conn (remoteParent frameObj)
+  frameObj <- lookupObject (channelGuid (frameChannel frame))
+  base <- lookupContextBaseUrl (remoteParent frameObj)
   pure (resolveAgainstBase base url)
 
-frameSend :: forall result params. (ToJSON params, FromJSON result) => Frame -> Text -> params -> IO result
+frameSend :: forall result params. (ToJSON params, FromJSON result) => Frame -> Text -> params -> Playwright result
 frameSend frame methodName params =
   send (frameChannel frame) (MethodName methodName) params
 
-frameSend_ :: forall result params. (ToJSON params, FromJSON result) => Frame -> Text -> params -> IO ()
+frameSend_ :: forall result params. (ToJSON params, FromJSON result) => Frame -> Text -> params -> Playwright ()
 frameSend_ frame methodName params = do
   _ <- frameSend @result frame methodName params
   pure ()
 
-gotoFrame :: Frame -> Url -> GotoOptions -> IO (Maybe Response)
+gotoFrame :: Frame -> Url -> GotoOptions -> Playwright (Maybe Response)
 gotoFrame frame url opts = do
   resolved <- resolveFrameUrl frame url
   timeout <- resolveFrameNavigationTimeout frame (gotoOptionsTimeout opts)
@@ -189,9 +189,9 @@ gotoFrame frame url opts = do
     Nothing ->
       pure Nothing
     Just responseRef ->
-      pure (Just (responseFromRef (channelConnection (frameChannel frame)) responseRef))
+      pure (Just (responseFromRef responseRef))
 
-resolveFrameNavigationTimeout :: Frame -> Maybe Timeout -> IO Timeout
+resolveFrameNavigationTimeout :: Frame -> Maybe Timeout -> Playwright Timeout
 resolveFrameNavigationTimeout frame explicit =
   case explicit of
     Just timeout ->
@@ -199,50 +199,49 @@ resolveFrameNavigationTimeout frame explicit =
     Nothing ->
       frameNavigationTimeout frame
 
-frameNavigationTimeout :: Frame -> IO Timeout
+frameNavigationTimeout :: Frame -> Playwright Timeout
 frameNavigationTimeout frame = do
-  let conn = channelConnection (frameChannel frame)
   mainGuid <- mainFrameGuid frame
-  pageGuid <- lookupMainFramePage conn mainGuid
+  pageGuid <- lookupMainFramePage mainGuid
   case pageGuid of
     Just page -> do
-      pageObj <- lookupObject conn page
-      pageDefaults <- lookupTimeoutDefaults conn page
-      contextDefaults <- lookupTimeoutDefaults conn (remoteParent pageObj)
+      pageObj <- lookupObject page
+      pageDefaults <- lookupTimeoutDefaults page
+      contextDefaults <- lookupTimeoutDefaults (remoteParent pageObj)
       pure (resolveNavigationTimeout pageDefaults contextDefaults)
     Nothing -> do
-      frameObj <- lookupObject conn (channelGuid (frameChannel frame))
-      contextDefaults <- lookupTimeoutDefaults conn (remoteParent frameObj)
+      frameObj <- lookupObject (channelGuid (frameChannel frame))
+      contextDefaults <- lookupTimeoutDefaults (remoteParent frameObj)
       pure (resolveNavigationTimeout emptyTimeoutDefaults contextDefaults)
 
-mainFrameGuid :: Frame -> IO Guid
+mainFrameGuid :: Frame -> Playwright Guid
 mainFrameGuid frame =
   case frameParent frame of
     Nothing ->
       pure (channelGuid (frameChannel frame))
     Just parent -> do
-      parentFrame <- frameFromRef (channelConnection (frameChannel frame)) parent
+      parentFrame <- frameFromRef parent
       mainFrameGuid parentFrame
 
-titleFrame :: Frame -> IO Text
+titleFrame :: Frame -> Playwright Text
 titleFrame frame = do
   result <- frameSend frame "title" mkFrameTitleParams
   pure (frameTitleResultValue result)
 
-contentFrame :: Frame -> IO Text
+contentFrame :: Frame -> Playwright Text
 contentFrame frame = do
   result <- frameSend frame "content" mkFrameContentParams
   pure (frameContentResultValue result)
 
-setContentFrame :: Frame -> Text -> Timeout -> IO ()
+setContentFrame :: Frame -> Text -> Timeout -> Playwright ()
 setContentFrame frame html timeout =
   frameSend_ @FrameSetContentResult frame "setContent" (mkFrameSetContentParams html timeout)
 
-evaluateFrame :: Frame -> Text -> IO SerializedValue
+evaluateFrame :: Frame -> Text -> Playwright SerializedValue
 evaluateFrame frame expression =
   evaluateFrameWith frame expression undefinedArgument
 
-evaluateFrameWith :: Frame -> Text -> SerializedArgument -> IO SerializedValue
+evaluateFrameWith :: Frame -> Text -> SerializedArgument -> Playwright SerializedValue
 evaluateFrameWith frame expression arg = do
   result <-
     frameSend
@@ -253,15 +252,15 @@ evaluateFrameWith frame expression arg = do
         }
   pure (frameEvaluateExpressionResultValue result)
 
-evalOnSelectorFrame :: Frame -> Selector -> Text -> SerializedArgument -> IO SerializedValue
+evalOnSelectorFrame :: Frame -> Selector -> Text -> SerializedArgument -> Playwright SerializedValue
 evalOnSelectorFrame frame selector expression arg =
   evalOnSelectorFrameMaybeStrict frame selector expression arg Nothing
 
-evalOnSelectorFrameStrict :: Frame -> Selector -> Text -> SerializedArgument -> IO SerializedValue
+evalOnSelectorFrameStrict :: Frame -> Selector -> Text -> SerializedArgument -> Playwright SerializedValue
 evalOnSelectorFrameStrict frame selector expression arg =
   evalOnSelectorFrameMaybeStrict frame selector expression arg (Just True)
 
-evalOnSelectorFrameMaybeStrict :: Frame -> Selector -> Text -> SerializedArgument -> Maybe Bool -> IO SerializedValue
+evalOnSelectorFrameMaybeStrict :: Frame -> Selector -> Text -> SerializedArgument -> Maybe Bool -> Playwright SerializedValue
 evalOnSelectorFrameMaybeStrict frame selector expression arg strict = do
   result <-
     frameSend
@@ -277,7 +276,7 @@ framesEqual :: Frame -> Frame -> Bool
 framesEqual left right =
   channelGuid (frameChannel left) == channelGuid (frameChannel right)
 
-evalOnSelectorAllFrame :: Frame -> Selector -> Text -> SerializedArgument -> IO SerializedValue
+evalOnSelectorAllFrame :: Frame -> Selector -> Text -> SerializedArgument -> Playwright SerializedValue
 evalOnSelectorAllFrame frame selector expression arg = do
   result <-
     frameSend

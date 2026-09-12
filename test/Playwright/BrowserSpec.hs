@@ -2,19 +2,21 @@ module Playwright.BrowserSpec
   ( tests
   ) where
 
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( wait
   , withAsync
   )
-import Control.Concurrent.STM
+import UnliftIO.STM
   ( atomically
   , newTVarIO
   , readTVar
   , readTVarIO
-  , retry
   , writeTVar
   )
-import Control.Exception
+import Control.Concurrent.STM
+  ( retry
+  )
+import UnliftIO.Exception
   ( try
   )
 import Control.Monad
@@ -49,7 +51,7 @@ import Playwright
   , onPageClose
   , pageContext
   , withBrowser
-  , withPlaywright
+  , runPlaywright
   )
 import Playwright.Error
   ( PlaywrightError (DecodeFailure, ProtocolRpc)
@@ -57,16 +59,16 @@ import Playwright.Error
   )
 import Playwright.Harness
   ( withChromiumBrowser
+  , assertBool
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertBool
-  , assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -74,10 +76,11 @@ tests =
   testGroup
     "browser"
     [ testCase "should return browserType" $
-        withPlaywright $ \pw ->
-          withBrowser (chromium pw) defaultLaunchOptions $ \browser -> do
+        runPlaywright $ do
+          browserType <- chromium
+          withBrowser browserType defaultLaunchOptions $ \browser -> do
             got <- browserBrowserType browser
-            assertEqual "same" True (browserTypesEqual got (chromium pw))
+            assertEqual "same" True (browserTypesEqual got (browserType))
     , testCase "should create new page @smoke" $
         withChromiumBrowser $ \browser -> do
           page1 <- newBrowserPage browser

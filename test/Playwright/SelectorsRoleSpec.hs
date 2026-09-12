@@ -25,11 +25,13 @@ import Playwright
   , querySelector
   , selectorFromText
   , setContent
+  , Playwright
   )
 import Playwright.Harness
   ( assertProtocolContains
   , locate
   , withChromiumPage
+  , assertEqual
   )
 import Playwright.Locator qualified as Locator
   ( getByRole
@@ -39,8 +41,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -447,12 +448,12 @@ tests =
           assertEqual "text" ["child 1", "child 2"] =<< allInnerTexts children
     ]
 
-assertRoleHtmls :: Page -> Text -> [Text] -> IO ()
+assertRoleHtmls :: Page -> Text -> [Text] -> Playwright ()
 assertRoleHtmls page sel expected =
   assertEqual (unpack sel) expected
     =<< evaluateOnLocatorAllTexts (locator page (selectorFromText sel)) "els => els.map(e => e.outerHTML)"
 
-assertGetByHtmls :: Page -> AriaRole -> GetByRoleOptions -> [Text] -> IO ()
+assertGetByHtmls :: Page -> AriaRole -> GetByRoleOptions -> [Text] -> Playwright ()
 assertGetByHtmls page role opts expected =
   assertEqual "getByRole" expected
     =<< evaluateOnLocatorAllTexts (getByRole page role opts) "els => els.map(e => e.outerHTML)"

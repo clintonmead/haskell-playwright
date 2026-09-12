@@ -9,7 +9,10 @@ module Playwright.ElementHandle.Action
   , uncheckHandle
   ) where
 
-import Control.Exception
+import Playwright.Monad
+  ( Playwright
+  )
+import UnliftIO.Exception
   ( throwIO
   , try
   )
@@ -56,43 +59,43 @@ import Playwright.Timeout
   ( defaultTimeout
   )
 
-hoverHandle :: ElementHandle -> IO ()
+hoverHandle :: ElementHandle -> Playwright ()
 hoverHandle handle = do
   _ :: ElementHandleHoverResult <-
     send (elementHandleChannel handle) (MethodName "hover") (mkElementHandleHoverParams defaultTimeout)
   pure ()
 
-fillHandle :: ElementHandle -> Text -> IO ()
+fillHandle :: ElementHandle -> Text -> Playwright ()
 fillHandle handle value = do
   _ :: ElementHandleFillResult <-
     send (elementHandleChannel handle) (MethodName "fill") (mkElementHandleFillParams defaultTimeout value)
   pure ()
 
-checkHandle :: ElementHandle -> IO ()
+checkHandle :: ElementHandle -> Playwright ()
 checkHandle handle = do
   _ :: ElementHandleCheckResult <-
     send (elementHandleChannel handle) (MethodName "check") (mkElementHandleCheckParams defaultTimeout)
   pure ()
 
-uncheckHandle :: ElementHandle -> IO ()
+uncheckHandle :: ElementHandle -> Playwright ()
 uncheckHandle handle = do
   _ :: ElementHandleUncheckResult <-
     send (elementHandleChannel handle) (MethodName "uncheck") (mkElementHandleUncheckParams defaultTimeout)
   pure ()
 
-setCheckedHandle :: ElementHandle -> Bool -> IO ()
+setCheckedHandle :: ElementHandle -> Bool -> Playwright ()
 setCheckedHandle handle wanted =
   if wanted
     then checkHandle handle
     else uncheckHandle handle
 
-focusHandle :: ElementHandle -> IO ()
+focusHandle :: ElementHandle -> Playwright ()
 focusHandle handle = do
   _ :: ElementHandleFocusResult <-
     send (elementHandleChannel handle) (MethodName "focus") mkElementHandleFocusParams
   pure ()
 
-selectOptionHandle :: ElementHandle -> [SelectOption] -> IO [Text]
+selectOptionHandle :: ElementHandle -> [SelectOption] -> Playwright [Text]
 selectOptionHandle handle options = do
   result <-
     send
@@ -115,7 +118,7 @@ toProtocolOption option =
     SelectIndex index ->
       mkElementHandleSelectOptionParamsOptions {elementHandleSelectOptionParamsOptionsIndex = Just index}
 
-disposeHandle :: ElementHandle -> IO ()
+disposeHandle :: ElementHandle -> Playwright ()
 disposeHandle handle = do
   result <-
     try

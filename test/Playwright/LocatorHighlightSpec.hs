@@ -5,6 +5,7 @@ module Playwright.LocatorHighlightSpec
 import Playwright
   ( BoundingBox (BoundingBox, boundingBoxHeight, boundingBoxWidth, boundingBoxX, boundingBoxY)
   , CssPixel (CssPixel, cssPixelToScientific)
+  , Playwright
   , WaitForState (WaitForVisible)
   , highlight
   , isVisible
@@ -16,15 +17,15 @@ import Playwright
 import Playwright.Harness
   ( locate
   , withChromiumPage
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -45,7 +46,7 @@ tests =
           assertEqual "box" (roundBox box1) (roundBox box2)
     ]
 
-requireBox :: Maybe BoundingBox -> IO BoundingBox
+requireBox :: Maybe BoundingBox -> Playwright BoundingBox
 requireBox found =
   case found of
     Just box ->

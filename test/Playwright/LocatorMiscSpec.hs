@@ -2,7 +2,7 @@ module Playwright.LocatorMiscSpec
   ( tests
   ) where
 
-import Data.IORef
+import UnliftIO.IORef
   ( newIORef
   , readIORef
   , writeIORef
@@ -35,6 +35,7 @@ import Playwright.Harness
   , locate
   , withAssetPage
   , withChromiumPage
+  , assertEqual
   )
 import Playwright.SerializedArgument
   ( undefinedArgument
@@ -44,8 +45,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree

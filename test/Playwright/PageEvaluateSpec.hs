@@ -29,6 +29,8 @@ import Playwright.Harness
   ( assertProtocolContains
   , withAssetPage
   , withChromiumPage
+  , assertEqual
+  , assertFailure
   )
 import Playwright.SerializedValue
   ( SerializedPayload (PayloadBigInt, PayloadObject, PayloadString)
@@ -39,9 +41,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree

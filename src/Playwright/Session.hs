@@ -100,6 +100,10 @@ data Session = Session
   , sessionHandlerThreads :: Set ThreadId
   , sessionLocatorHandlers :: Map Guid (Map Int StoredLocatorHandler)
   , sessionLocatorListening :: Set Guid
+  , sessionPlaywrightGuid :: Maybe Guid
+  , sessionChromiumGuid :: Maybe Guid
+  , sessionFirefoxGuid :: Maybe Guid
+  , sessionWebkitGuid :: Maybe Guid
   }
 
 emptySession :: Session
@@ -134,6 +138,10 @@ emptySession =
     , sessionHandlerThreads = Set.empty
     , sessionLocatorHandlers = Map.empty
     , sessionLocatorListening = Set.empty
+    , sessionPlaywrightGuid = Nothing
+    , sessionChromiumGuid = Nothing
+    , sessionFirefoxGuid = Nothing
+    , sessionWebkitGuid = Nothing
     }
 
 rootObject :: RemoteObject

@@ -19,12 +19,12 @@ import Control.Concurrent.STM
   , tryReadTMVar
   , writeTVar
   )
-import Control.Exception
-  ( throwIO
-  )
 import Control.Monad
   ( unless
   , when
+  )
+import Control.Monad.IO.Class
+  ( liftIO
   )
 import Data.Aeson
   ( Value
@@ -33,13 +33,12 @@ import Playwright.BrowserContext
   ( BrowserContext (browserContextChannel)
   )
 import Playwright.Channel
-  ( Channel (Channel, channelConnection, channelGuid)
+  ( Channel (Channel, channelGuid)
   , RouteTag
   , send
   )
 import Playwright.Connection
-  ( Connection
-  , clearRouteHandlers
+  ( clearRouteHandlers
   , lookupRequestOverrides
   , pushRouteHandler
   , registerEventHandler
@@ -57,6 +56,11 @@ import Playwright.Json.Decode
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
+  )
+import Playwright.Monad
+  ( Playwright
+  , askConnection
+  , runPlaywrightWith
   )
 import Playwright.Page
   ( Page (pageChannel, pageContextChannel)
@@ -91,50 +95,53 @@ import Playwright.UrlGlob
   ( UrlGlob (urlGlobToText)
   , matchesUrlGlob
   )
+import UnliftIO.Exception
+  ( throwIO
+  )
 
-route :: Page -> UrlGlob -> (Route -> IO ()) -> IO ()
+route :: Page -> UrlGlob -> (Route -> Playwright ()) -> Playwright ()
 route page glob =
   routeWith page glob defaultRouteOptions
 
-routeWith :: Page -> UrlGlob -> RouteOptions -> (Route -> IO ()) -> IO ()
+routeWith :: Page -> UrlGlob -> RouteOptions -> (Route -> Playwright ()) -> Playwright ()
 routeWith page glob opts handler = do
   let
-    conn = channelConnection (pageChannel page)
     guid = channelGuid (pageChannel page)
-  first <- installRouteHandler conn guid glob opts handler
-  when first (registerEventHandler conn guid (MethodName "route") (dispatchPageRoute page))
+  first <- installRouteHandler guid glob opts handler
+  when first (registerEventHandler guid (MethodName "route") (dispatchPageRoute page))
   updateInterceptionPatterns page
 
-contextRoute :: BrowserContext -> UrlGlob -> (Route -> IO ()) -> IO ()
+contextRoute :: BrowserContext -> UrlGlob -> (Route -> Playwright ()) -> Playwright ()
 contextRoute ctx glob =
   contextRouteWith ctx glob defaultRouteOptions
 
-contextRouteWith :: BrowserContext -> UrlGlob -> RouteOptions -> (Route -> IO ()) -> IO ()
+contextRouteWith :: BrowserContext -> UrlGlob -> RouteOptions -> (Route -> Playwright ()) -> Playwright ()
 contextRouteWith ctx glob opts handler = do
   let
-    conn = channelConnection (browserContextChannel ctx)
     guid = channelGuid (browserContextChannel ctx)
-  first <- installRouteHandler conn guid glob opts handler
-  when first (registerEventHandler conn guid (MethodName "route") (dispatchContextRoute ctx))
+  first <- installRouteHandler guid glob opts handler
+  when first (registerEventHandler guid (MethodName "route") (dispatchContextRoute ctx))
   updateContextInterceptionPatterns ctx
 
-installRouteHandler :: Connection -> Guid -> UrlGlob -> RouteOptions -> (Route -> IO ()) -> IO Bool
-installRouteHandler conn guid glob opts handler = do
-  remaining <- newTVarIO (fmap routeTimesToInt (routeTimes opts))
-  pushRouteHandler conn guid glob $ \ref -> do
-    live <- atomically (consumeRouteTime remaining)
-    if live
-      then do
-        box <- newEmptyTMVarIO
-        handler (Route (Channel conn (channelRefGuid ref)) box)
-        outcome <- atomically (tryReadTMVar box)
-        case outcome of
-          Nothing ->
-            pure True
-          Just settled ->
-            pure settled
-      else
-        pure False
+installRouteHandler :: Guid -> UrlGlob -> RouteOptions -> (Route -> Playwright ()) -> Playwright Bool
+installRouteHandler guid glob opts handler = do
+  conn <- askConnection
+  remaining <- liftIO (newTVarIO (fmap routeTimesToInt (routeTimes opts)))
+  pushRouteHandler guid glob $ \ref ->
+    runPlaywrightWith conn $ do
+      live <- liftIO (atomically (consumeRouteTime remaining))
+      if live
+        then do
+          box <- liftIO newEmptyTMVarIO
+          handler (Route (Channel (channelRefGuid ref)) box)
+          outcome <- liftIO (atomically (tryReadTMVar box))
+          case outcome of
+            Nothing ->
+              pure True
+            Just settled ->
+              pure settled
+        else
+          pure False
 
 consumeRouteTime :: TVar (Maybe Int) -> STM Bool
 consumeRouteTime remaining = do
@@ -149,80 +156,65 @@ consumeRouteTime remaining = do
           writeTVar remaining (Just (count - 1))
           pure True
 
-unroute :: Page -> UrlGlob -> IO ()
+unroute :: Page -> UrlGlob -> Playwright ()
 unroute page glob = do
-  removeRouteHandlers
-    (channelConnection (pageChannel page))
-    (channelGuid (pageChannel page))
-    glob
+  removeRouteHandlers (channelGuid (pageChannel page)) glob
   updateInterceptionPatterns page
 
-unrouteAll :: Page -> IO ()
+unrouteAll :: Page -> Playwright ()
 unrouteAll page = do
-  clearRouteHandlers
-    (channelConnection (pageChannel page))
-    (channelGuid (pageChannel page))
+  clearRouteHandlers (channelGuid (pageChannel page))
   updateInterceptionPatterns page
 
-unrouteContext :: BrowserContext -> UrlGlob -> IO ()
+unrouteContext :: BrowserContext -> UrlGlob -> Playwright ()
 unrouteContext ctx glob = do
-  removeRouteHandlers
-    (channelConnection (browserContextChannel ctx))
-    (channelGuid (browserContextChannel ctx))
-    glob
+  removeRouteHandlers (channelGuid (browserContextChannel ctx)) glob
   updateContextInterceptionPatterns ctx
 
-unrouteContextAll :: BrowserContext -> IO ()
+unrouteContextAll :: BrowserContext -> Playwright ()
 unrouteContextAll ctx = do
-  clearRouteHandlers
-    (channelConnection (browserContextChannel ctx))
-    (channelGuid (browserContextChannel ctx))
+  clearRouteHandlers (channelGuid (browserContextChannel ctx))
   updateContextInterceptionPatterns ctx
 
-dispatchPageRoute :: Page -> Value -> IO ()
+dispatchPageRoute :: Page -> Value -> Playwright ()
 dispatchPageRoute page params = do
   event <- either throwIO pure (fromJsonValue params)
   let
-    conn = channelConnection (pageChannel page)
     chan :: Channel RouteTag
-    chan = Channel conn (channelRefGuid (pageRouteEventRoute event))
+    chan = Channel (channelRefGuid (pageRouteEventRoute event))
   request <- requestFromChannel chan
-  pageHandlers <- routeHandlersFor conn (channelGuid (pageChannel page))
-  contextHandlers <- routeHandlersFor conn (channelGuid (pageContextChannel page))
+  pageHandlers <- routeHandlersFor (channelGuid (pageChannel page))
+  contextHandlers <- routeHandlersFor (channelGuid (pageContextChannel page))
   chainRoutes chan request (pageHandlers <> contextHandlers)
 
-dispatchContextRoute :: BrowserContext -> Value -> IO ()
+dispatchContextRoute :: BrowserContext -> Value -> Playwright ()
 dispatchContextRoute ctx params = do
   event <- either throwIO pure (fromJsonValue params)
   let
-    conn = channelConnection (browserContextChannel ctx)
     chan :: Channel RouteTag
-    chan = Channel conn (channelRefGuid (browserContextRouteEventRoute event))
+    chan = Channel (channelRefGuid (browserContextRouteEventRoute event))
   request <- requestFromChannel chan
-  handlers <- routeHandlersFor conn (channelGuid (browserContextChannel ctx))
+  handlers <- routeHandlersFor (channelGuid (browserContextChannel ctx))
   chainRoutes chan request handlers
 
-chainRoutes :: Channel RouteTag -> Request -> [(UrlGlob, ChannelRef -> IO Bool)] -> IO ()
+chainRoutes :: Channel RouteTag -> Request -> [(UrlGlob, ChannelRef -> IO Bool)] -> Playwright ()
 chainRoutes chan request handlers =
   case handlers of
     [] -> do
-      overrides <-
-        lookupRequestOverrides
-          (channelConnection (requestChannel request))
-          (channelGuid (requestChannel request))
+      overrides <- lookupRequestOverrides (channelGuid (requestChannel request))
       sendContinue chan True overrides
     (glob, run) : rest -> do
       current <- requestUrl request
       if matchesUrlGlob glob current
         then do
-          done <- run (ChannelRef (channelGuid chan))
+          done <- liftIO (run (ChannelRef (channelGuid chan)))
           unless done (chainRoutes chan request rest)
         else
           chainRoutes chan request rest
 
-updateInterceptionPatterns :: Page -> IO ()
+updateInterceptionPatterns :: Page -> Playwright ()
 updateInterceptionPatterns page = do
-  handlers <- routeHandlersFor (channelConnection (pageChannel page)) (channelGuid (pageChannel page))
+  handlers <- routeHandlersFor (channelGuid (pageChannel page))
   _ :: PageSetNetworkInterceptionPatternsResult <-
     send
       (pageChannel page)
@@ -230,12 +222,9 @@ updateInterceptionPatterns page = do
       (mkPageSetNetworkInterceptionPatternsParams (fmap (globPattern . fst) handlers))
   pure ()
 
-updateContextInterceptionPatterns :: BrowserContext -> IO ()
+updateContextInterceptionPatterns :: BrowserContext -> Playwright ()
 updateContextInterceptionPatterns ctx = do
-  handlers <-
-    routeHandlersFor
-      (channelConnection (browserContextChannel ctx))
-      (channelGuid (browserContextChannel ctx))
+  handlers <- routeHandlersFor (channelGuid (browserContextChannel ctx))
   _ :: BrowserContextSetNetworkInterceptionPatternsResult <-
     send
       (browserContextChannel ctx)

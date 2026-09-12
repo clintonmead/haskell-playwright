@@ -2,7 +2,7 @@ module Playwright.PageEventNetworkSpec
   ( tests
   ) where
 
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( wait
   , withAsync
   )
@@ -10,7 +10,7 @@ import Data.ByteString
   ( ByteString
   )
 import Data.ByteString.Lazy qualified as LBS
-import Data.IORef
+import UnliftIO.IORef
   ( IORef
   , modifyIORef'
   , newIORef
@@ -35,12 +35,10 @@ import Network.Wai
   , responseLBS
   , responseRaw
   )
-import Network.Wai.Handler.Warp
-  ( withApplication
-  )
 import Playwright
   ( HttpMethod (httpMethodToText)
   , HttpStatus (httpStatusToInt)
+  , Playwright
   , Request
   , RequestFailure (requestFailureText)
   , ResourceType (resourceTypeToText)
@@ -75,16 +73,17 @@ import Playwright.Harness
   ( readTestAsset
   , withAssets
   , withChromiumPage
+  , withLocalApp
+  , assertBool
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertBool
-  , assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -137,8 +136,7 @@ tests =
     , testCase "Page.Events.RequestFailed" $
         withChromiumPage $ \page -> do
           html <- readTestAsset "one-style.html"
-          withApplication (pure (failedCssApp html)) $ \port -> do
-            let prefix = "http://127.0.0.1:" <> pack (show port)
+          withLocalApp (failedCssApp html) $ \prefix -> do
             failed <- newIORef ([] :: [Request])
             onRequestFailed page $ \request -> modifyIORef' failed (<> [request])
             _ <- goto page (urlFromText (prefix <> "/one-style.html")) defaultGotoOptions
@@ -215,9 +213,8 @@ tests =
           assertEqual "order" ["request", "response", "requestfinished"] =<< readIORef events
     , testCase "should support redirects" $
         withChromiumPage $ \page -> do
-          withApplication (pure redirectApp) $ \port -> do
+          withLocalApp redirectApp $ \prefix -> do
             let
-              prefix = "http://127.0.0.1:" <> pack (show port)
               empty = prefix <> "/empty.html"
               foo = prefix <> "/foo.html"
             events <- newIORef ([] :: [(Text, Text)])
@@ -265,7 +262,7 @@ tests =
                         assertEqual "to" True (requestsEqual next request)
     ]
 
-appendEvent :: IORef [(Text, Text)] -> Text -> Text -> IO ()
+appendEvent :: IORef [(Text, Text)] -> Text -> Text -> Playwright ()
 appendEvent ref url value =
   modifyIORef' ref (<> [(url, value)])
 

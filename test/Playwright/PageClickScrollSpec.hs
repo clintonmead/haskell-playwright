@@ -2,6 +2,9 @@ module Playwright.PageClickScrollSpec
   ( tests
   ) where
 
+import Control.Monad.IO.Class
+  ( MonadIO
+  )
 import Data.Text
   ( Text
   , replace
@@ -29,6 +32,9 @@ import Playwright.Harness
   , locate
   , withAssets
   , withChromiumPage
+  , assertBool
+  , assertEqual
+  , assertFailure
   )
 import Playwright.Locator
   ( getByRole
@@ -38,10 +44,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertBool
-  , assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -113,7 +116,7 @@ clickDisplayContents html =
       defaultClickOptions {clickOptionsTimeout = Just timeout}
     assertEqual "clicked" True =<< evaluateBool page "() => window._clicked"
 
-requireTimeout :: Double -> IO Timeout
+requireTimeout :: (MonadIO m) => Double -> m Timeout
 requireTimeout n =
   case milliseconds n of
     Nothing ->

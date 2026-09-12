@@ -2,11 +2,11 @@ module Playwright.PageNetworkPostDataSpec
   ( tests
   ) where
 
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( wait
   , withAsync
   )
-import Control.Exception
+import UnliftIO.Exception
   ( try
   )
 import Data.Aeson
@@ -33,22 +33,23 @@ import Playwright
   , requestPostDataJSON
   , urlFromText
   , waitForRequest
+  , Playwright
   )
 import Playwright.Error
   ( PlaywrightError (DecodeFailure)
   )
 import Playwright.Harness
   ( withAssets
+  , assertBool
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertBool
-  , assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -113,7 +114,7 @@ tests =
           assertEqual "json" (Just (object ["value" .= (42 :: Int)])) json
     ]
 
-postTitle :: Page -> Text -> Text -> IO Request
+postTitle :: Page -> Text -> Text -> Playwright Request
 postTitle page prefix script = do
   _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
   withAsync (waitForRequest page (UrlGlob (prefix <> "/title.html"))) $ \pending -> do

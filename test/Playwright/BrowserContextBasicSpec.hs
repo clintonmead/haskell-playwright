@@ -2,20 +2,20 @@ module Playwright.BrowserContextBasicSpec
   ( tests
   ) where
 
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( concurrently_
   , mapConcurrently
   , mapConcurrently_
   , wait
   , withAsync
   )
-import Control.Concurrent.STM
+import UnliftIO.STM
   ( atomically
   , newTVarIO
   , readTVarIO
   , writeTVar
   )
-import Control.Exception
+import UnliftIO.Exception
   ( try
   )
 import Control.Monad
@@ -98,6 +98,7 @@ import Playwright
   , waitForContextPage
   , waitForFunction
   , waitForPopup
+  , Playwright
   )
 import Playwright.Error
   ( PlaywrightError (DecodeFailure)
@@ -108,6 +109,9 @@ import Playwright.Harness
   , withAssetsPrefix
   , withChromiumBrowser
   , withChromiumContextWith
+  , assertBool
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
@@ -116,10 +120,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertBool
-  , assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -525,7 +526,7 @@ listedContexts actual expected =
   length actual == length expected
     && and (zipWith contextsEqual actual expected)
 
-createClickPage :: Browser -> IO Page
+createClickPage :: Browser -> Playwright Page
 createClickPage browser = do
   page <- newBrowserPage browser
   setContent page "<button>Click me</button>"
@@ -535,7 +536,7 @@ createClickPage browser = do
       "button => { window.clicks = 0; button.addEventListener('click', () => ++window.clicks, false); }"
   pure page
 
-clickInPage :: Page -> Int -> IO ()
+clickInPage :: Page -> Int -> Playwright ()
 clickInPage page count =
   forM_ [1 .. count] $ \_ ->
     click (locate page "button")
@@ -544,7 +545,7 @@ hoverHtml :: Text
 hoverHtml =
   "<style>[role=\"tooltip\"] { display: none; } [role=\"tooltip\"].visible { display: block; }</style><button>Hover me</button><div role=\"tooltip\">Tooltip content</div><script>const button = document.querySelector('button'); const tooltip = document.querySelector('[role=\"tooltip\"]'); button.addEventListener('pointerenter', () => tooltip.classList.add('visible')); button.addEventListener('pointerleave', () => tooltip.classList.remove('visible'));</script>"
 
-hoverAndAssert :: Page -> IO ()
+hoverAndAssert :: Page -> Playwright ()
 hoverAndAssert page = do
   hover
     ( getByRole

@@ -13,6 +13,9 @@ module Playwright.Route
   , sendContinue
   ) where
 
+import Playwright.Monad
+  ( Playwright
+  )
 import Control.Concurrent.STM
   ( TMVar
   , atomically
@@ -20,7 +23,10 @@ import Control.Concurrent.STM
   , putTMVar
   , throwSTM
   )
-import Control.Exception
+import Control.Monad.IO.Class
+  ( liftIO
+  )
+import UnliftIO.Exception
   ( throwIO
   )
 import Data.ByteString.Base64
@@ -47,7 +53,7 @@ import Playwright.APIResponse
   , apiResponseStatus
   )
 import Playwright.Channel
-  ( Channel (channelConnection, channelGuid)
+  ( Channel (channelGuid)
   , RouteTag
   , send
   )
@@ -122,55 +128,54 @@ data Route = Route
   , routeOutcome :: TMVar Bool
   }
 
-routeRequest :: Route -> IO Request
+routeRequest :: Route -> Playwright Request
 routeRequest handled =
   requestFromChannel (routeChannel handled)
 
-requestFromChannel :: Channel RouteTag -> IO Request
+requestFromChannel :: Channel RouteTag -> Playwright Request
 requestFromChannel chan = do
-  obj <- lookupObject (channelConnection chan) (channelGuid chan)
+  obj <- lookupObject (channelGuid chan)
   initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
-  pure (requestFromRef (channelConnection chan) (routeInitializerRequest initializer))
+  pure (requestFromRef (routeInitializerRequest initializer))
 
-continueRoute :: Route -> IO ()
+continueRoute :: Route -> Playwright ()
 continueRoute handled =
   continueRouteWith handled defaultContinueOptions
 
-continueRouteWith :: Route -> ContinueOptions -> IO ()
+continueRouteWith :: Route -> ContinueOptions -> Playwright ()
 continueRouteWith handled opts = do
   request <- routeRequest handled
   overrides <- applyContinueOverrides request opts
   sendContinue (routeChannel handled) False overrides
   settleRoute handled True
 
-fallbackRoute :: Route -> IO ()
+fallbackRoute :: Route -> Playwright ()
 fallbackRoute handled =
   fallbackRouteWith handled defaultContinueOptions
 
-fallbackRouteWith :: Route -> ContinueOptions -> IO ()
+fallbackRouteWith :: Route -> ContinueOptions -> Playwright ()
 fallbackRouteWith handled opts = do
   request <- routeRequest handled
   _ <- applyContinueOverrides request opts
   settleRoute handled False
 
-applyContinueOverrides :: Request -> ContinueOptions -> IO RequestOverrides
+applyContinueOverrides :: Request -> ContinueOptions -> Playwright RequestOverrides
 applyContinueOverrides request opts = do
   let
-    conn = channelConnection (requestChannel request)
     guid = channelGuid (requestChannel request)
-  current <- lookupRequestOverrides conn guid
+  current <- lookupRequestOverrides guid
   let
     next = overlayContinueOptions current opts
-  writeRequestOverrides conn guid next
+  writeRequestOverrides guid next
   pure next
 
-abortRoute :: Route -> IO ()
+abortRoute :: Route -> Playwright ()
 abortRoute handled = do
   _ :: RouteAbortResult <-
     send (routeChannel handled) (MethodName "abort") mkRouteAbortParams
   settleRoute handled True
 
-fulfillRoute :: Route -> FulfillOptions -> IO ()
+fulfillRoute :: Route -> FulfillOptions -> Playwright ()
 fulfillRoute handled opts = do
   let
     (bodyText, isBase64, byteLength) = encodeFulfillBody (fulfillBody opts)
@@ -190,28 +195,28 @@ fulfillRoute handled opts = do
         }
   settleRoute handled True
 
-routeFetch :: Route -> IO APIResponse
+routeFetch :: Route -> Playwright APIResponse
 routeFetch handled =
   routeFetchWith handled defaultFetchOptions
 
-routeFetchWith :: Route -> FetchOptions -> IO APIResponse
+routeFetchWith :: Route -> FetchOptions -> Playwright APIResponse
 routeFetchWith handled opts = do
   ctx <-
     apiRequestContextFor
-      (channelConnection (routeChannel handled))
       (channelGuid (routeChannel handled))
   request <- routeRequest handled
   fetchRequestWith ctx request opts
 
-settleRoute :: Route -> Bool -> IO ()
+settleRoute :: Route -> Bool -> Playwright ()
 settleRoute handled settled =
-  atomically $ do
+  liftIO $
+    atomically $ do
     empty <- isEmptyTMVar (routeOutcome handled)
     if empty
       then putTMVar (routeOutcome handled) settled
       else throwSTM RouteAlreadyHandled
 
-sendContinue :: Channel RouteTag -> Bool -> RequestOverrides -> IO ()
+sendContinue :: Channel RouteTag -> Bool -> RequestOverrides -> Playwright ()
 sendContinue chan isFallback overrides = do
   _ :: RouteContinueResult <-
     send

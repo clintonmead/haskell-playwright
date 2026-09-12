@@ -7,15 +7,13 @@ module Playwright.LocatorHandler
 import Control.Concurrent
   ( forkIO
   )
-import Control.Exception
-  ( SomeException
-  , catch
-  , throwIO
-  )
 import Control.Monad
   ( unless
   , void
   , when
+  )
+import Control.Monad.IO.Class
+  ( liftIO
   )
 import Data.Aeson
   ( Value
@@ -26,7 +24,7 @@ import Playwright.AddLocatorHandlerOptions
   , defaultAddLocatorHandlerOptions
   )
 import Playwright.Channel
-  ( Channel (channelConnection, channelGuid)
+  ( Channel (channelGuid)
   , send
   )
 import Playwright.Connection
@@ -54,6 +52,11 @@ import Playwright.Locator
 import Playwright.MethodName
   ( MethodName (MethodName)
   )
+import Playwright.Monad
+  ( Playwright
+  , askConnection
+  , runPlaywrightWith
+  )
 import Playwright.Page
   ( Page (pageChannel, pageMainFrame)
   )
@@ -71,12 +74,17 @@ import Playwright.Protocol
 import Playwright.Selector
   ( selectorToText
   )
+import UnliftIO.Exception
+  ( SomeException
+  , catch
+  , throwIO
+  )
 
-addLocatorHandler :: Page -> Locator -> (Locator -> IO ()) -> IO ()
+addLocatorHandler :: Page -> Locator -> (Locator -> Playwright ()) -> Playwright ()
 addLocatorHandler page loc handler =
   addLocatorHandlerWith page loc handler defaultAddLocatorHandlerOptions
 
-addLocatorHandlerWith :: Page -> Locator -> (Locator -> IO ()) -> AddLocatorHandlerOptions -> IO ()
+addLocatorHandlerWith :: Page -> Locator -> (Locator -> Playwright ()) -> AddLocatorHandlerOptions -> Playwright ()
 addLocatorHandlerWith page loc handler opts = do
   unless (framesEqual (locatorFrame loc) (pageMainFrame page)) $
     throwIO LocatorNotMainFrame
@@ -84,13 +92,12 @@ addLocatorHandlerWith page loc handler opts = do
     Just 0 ->
       pure ()
     times -> do
+      conn <- askConnection
       let
-        conn = channelConnection (pageChannel page)
         pageGuid = channelGuid (pageChannel page)
-      first <- markLocatorHandlersListening conn pageGuid
+      first <- markLocatorHandlersListening pageGuid
       when first $
         registerEventHandler
-          conn
           pageGuid
           (MethodName "locatorHandlerTriggered")
           (dispatchLocatorHandler page)
@@ -102,35 +109,29 @@ addLocatorHandlerWith page loc handler opts = do
             { pageRegisterLocatorHandlerParamsNoWaitAfter = addLocatorHandlerNoWaitAfter opts
             }
       putLocatorHandler
-        conn
         pageGuid
         (pageRegisterLocatorHandlerResultUid result)
         StoredLocatorHandler
           { storedLocatorHandlerTimes = times
           , storedLocatorHandlerSelector = selectorToText (locatorSelector loc)
           , storedLocatorHandlerFrame = channelGuid (frameChannel (locatorFrame loc))
-          , storedLocatorHandlerRun = handler loc
+          , storedLocatorHandlerRun = runPlaywrightWith conn (handler loc)
           }
 
-removeLocatorHandler :: Page -> Locator -> IO ()
+removeLocatorHandler :: Page -> Locator -> Playwright ()
 removeLocatorHandler page loc = do
   let
-    conn = channelConnection (pageChannel page)
     pageGuid = channelGuid (pageChannel page)
   uids <-
     locatorHandlerUidsMatching
-      conn
       pageGuid
       (selectorToText (locatorSelector loc))
       (channelGuid (frameChannel (locatorFrame loc)))
   mapM_ (unregisterOne page) uids
 
-unregisterOne :: Page -> Int -> IO ()
+unregisterOne :: Page -> Int -> Playwright ()
 unregisterOne page uid = do
-  deleteLocatorHandler
-    (channelConnection (pageChannel page))
-    (channelGuid (pageChannel page))
-    uid
+  deleteLocatorHandler (channelGuid (pageChannel page)) uid
   _ :: PageUnregisterLocatorHandlerResult <-
     send
       (pageChannel page)
@@ -138,25 +139,27 @@ unregisterOne page uid = do
       (mkPageUnregisterLocatorHandlerParams uid)
   pure ()
 
-dispatchLocatorHandler :: Page -> Value -> IO ()
-dispatchLocatorHandler page params =
-  void $
-    forkIO $ do
-      event <- either throwIO pure (fromJsonValue params :: Either PlaywrightError PageLocatorHandlerTriggeredEvent)
-      let
-        uid = pageLocatorHandlerTriggeredEventUid event
-        conn = channelConnection (pageChannel page)
-        pageGuid = channelGuid (pageChannel page)
-      (mhandler, remove) <- beginLocatorHandler conn pageGuid uid
-      case mhandler of
-        Nothing ->
-          pure ()
-        Just stored ->
-          storedLocatorHandlerRun stored `catch` (\(_ :: SomeException) -> pure ())
-      when remove (deleteLocatorHandler conn pageGuid uid)
-      resolveLocatorHandler page uid remove
+dispatchLocatorHandler :: Page -> Value -> Playwright ()
+dispatchLocatorHandler page params = do
+  conn <- askConnection
+  liftIO $
+    void $
+      forkIO $
+        runPlaywrightWith conn $ do
+          event <- either throwIO pure (fromJsonValue params :: Either PlaywrightError PageLocatorHandlerTriggeredEvent)
+          let
+            uid = pageLocatorHandlerTriggeredEventUid event
+            pageGuid = channelGuid (pageChannel page)
+          (mhandler, remove) <- beginLocatorHandler pageGuid uid
+          case mhandler of
+            Nothing ->
+              pure ()
+            Just stored ->
+              liftIO (storedLocatorHandlerRun stored) `catch` (\(_ :: SomeException) -> pure ())
+          when remove (deleteLocatorHandler pageGuid uid)
+          resolveLocatorHandler page uid remove
 
-resolveLocatorHandler :: Page -> Int -> Bool -> IO ()
+resolveLocatorHandler :: Page -> Int -> Bool -> Playwright ()
 resolveLocatorHandler page uid remove =
   ( do
       _ :: PageResolveLocatorHandlerNoReplyResult <-

@@ -20,14 +20,14 @@ import Playwright.Harness
   , locate
   , withAssetPage
   , withAssets
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree

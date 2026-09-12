@@ -2,6 +2,9 @@ module Playwright.GlobalFetchCookieSpec
   ( tests
   ) where
 
+import Control.Monad.IO.Class
+  ( liftIO
+  )
 import Control.Concurrent
   ( Chan
   , newChan
@@ -58,7 +61,11 @@ import Playwright
   , newRequestContextWith
   , sessionExpires
   , urlFromText
-  , withPlaywright
+  , runPlaywright
+  , Playwright
+  )
+import Playwright.Harness
+  ( assertEqual
   )
 import Test.Tasty
   ( TestTree
@@ -67,8 +74,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -103,7 +109,7 @@ pathFilterTest =
   withCookieServer pathFilterApp $ \request prefix captured -> do
     _ <- fetchGet request (urlFromText (prefix <> "/setcookie.html"))
     _ <- fetchGet request (urlFromText (prefix <> "/input/button.html"))
-    cookie <- readChan captured
+    cookie <- liftIO (readChan captured)
     assertEqual "cookie" (Just "b=v; c=v") cookie
 
 pathFilterApp :: Chan (Maybe ByteString) -> Application
@@ -129,7 +135,7 @@ localhostSecureCookieTest =
   withCookieServerOn "localhost" secureCookieApp $ \request prefix captured -> do
     _ <- fetchGet request (urlFromText (prefix <> "/setcookie.html"))
     _ <- fetchGet request (urlFromText (prefix <> "/empty.html"))
-    cookie <- readChan captured
+    cookie <- liftIO (readChan captured)
     assertEqual "cookie" (Just "a=v; b=v") cookie
 
 secureCookieApp :: Chan (Maybe ByteString) -> Application
@@ -153,7 +159,7 @@ notExpiredCookieTest =
     \request prefix captured -> do
       _ <- fetchGet request (urlFromText (prefix <> "/setcookie.html"))
       _ <- fetchGet request (urlFromText (prefix <> "/empty.html"))
-      cookie <- readChan captured
+      cookie <- liftIO (readChan captured)
       assertEqual "cookie" (Just "a=v; b=v") cookie
 
 removeExpiredCookieTest :: IO ()
@@ -162,7 +168,7 @@ removeExpiredCookieTest =
     \request prefix captured -> do
       _ <- fetchGet request (urlFromText (prefix <> "/setcookie.html"))
       _ <- fetchGet request (urlFromText (prefix <> "/empty.html"))
-      cookie <- readChan captured
+      cookie <- liftIO (readChan captured)
       assertEqual "cookie" (Just "a=v") cookie
 
 negativeMaxAgeTest :: IO ()
@@ -171,7 +177,7 @@ negativeMaxAgeTest =
     _ <- fetchGet request (urlFromText (prefix <> "/setcookie.html"))
     _ <- fetchGet request (urlFromText (prefix <> "/removecookie.html"))
     _ <- fetchGet request (urlFromText (prefix <> "/empty.html"))
-    cookie <- readChan captured
+    cookie <- liftIO (readChan captured)
     assertEqual "cookie" (Just "c=v") cookie
 
 negativeMaxAgeApp :: Chan (Maybe ByteString) -> Application
@@ -205,7 +211,7 @@ pastExpiresTest =
     _ <- fetchGet request (urlFromText (prefix <> "/setcookie.html"))
     _ <- fetchGet request (urlFromText (prefix <> "/removecookie.html"))
     _ <- fetchGet request (urlFromText (prefix <> "/empty.html"))
-    cookie <- readChan captured
+    cookie <- liftIO (readChan captured)
     assertEqual "cookie" Nothing cookie
 
 pastExpiresApp :: Chan (Maybe ByteString) -> Application
@@ -265,7 +271,7 @@ overrideExpiredCookieTest =
     _ <- fetchGet request (urlFromText (prefix <> "/setcookie.html"))
     _ <- fetchGet request (urlFromText (prefix <> "/unsetsetcookie.html"))
     _ <- fetchGet request (urlFromText (prefix <> "/empty.html"))
-    cookie <- readChan captured
+    cookie <- liftIO (readChan captured)
     assertEqual "cookie" Nothing cookie
 
 unsetCookieApp :: Chan (Maybe ByteString) -> Application
@@ -295,10 +301,9 @@ unsetCookieApp captured request respond =
 storageStateRoundTripTest :: IO ()
 storageStateRoundTripTest =
   withApplication (pure emptyHtmlApp) $ \port ->
-    withPlaywright $ \pw -> do
+    runPlaywright $ do
       request <-
         newRequestContextWith
-          pw
           defaultNewRequestOptions {newRequestStorageState = Just seededState}
       _ <- fetchGet request (urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/empty.html"))
       exported <- apiRequestStorageState request
@@ -309,10 +314,9 @@ storageStateRoundTripTest =
 emptyStorageStateTest :: IO ()
 emptyStorageStateTest =
   withApplication (pure emptyHtmlApp) $ \port ->
-    withPlaywright $ \pw -> do
+    runPlaywright $ do
       request <-
         newRequestContextWith
-          pw
           defaultNewRequestOptions {newRequestStorageState = Just emptyStorageState}
       state <- apiRequestStorageState request
       assertEqual "empty" emptyStorageState state
@@ -367,20 +371,20 @@ captureCookie captured request respond = do
   writeChan captured (lookupHeader "cookie" (requestHeaders request))
   respond (responseLBS status200 [(hContentType, "text/html")] "<html></html>")
 
-withCookieServer :: (Chan (Maybe ByteString) -> Application) -> (APIRequestContext -> Text -> Chan (Maybe ByteString) -> IO ()) -> IO ()
+withCookieServer :: (Chan (Maybe ByteString) -> Application) -> (APIRequestContext -> Text -> Chan (Maybe ByteString) -> Playwright ()) -> IO ()
 withCookieServer =
   withCookieServerOn "127.0.0.1"
 
 withCookieServerOn ::
   Text ->
   (Chan (Maybe ByteString) -> Application) ->
-  (APIRequestContext -> Text -> Chan (Maybe ByteString) -> IO ()) ->
+  (APIRequestContext -> Text -> Chan (Maybe ByteString) -> Playwright ()) ->
   IO ()
 withCookieServerOn host app action = do
   captured <- newChan
   withApplication (pure (app captured)) $ \port ->
-    withPlaywright $ \pw -> do
-      request <- newRequestContext pw
+    runPlaywright $ do
+      request <- newRequestContext
       action request ("http://" <> host <> ":" <> pack (show port)) captured
       disposeAPIRequestContext request
 

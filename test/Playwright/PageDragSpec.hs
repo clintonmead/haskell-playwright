@@ -12,14 +12,14 @@ import Playwright
 import Playwright.Harness
   ( locate
   , withAssetPage
+  , assertEqual
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree

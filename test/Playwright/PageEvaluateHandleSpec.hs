@@ -13,15 +13,15 @@ import Playwright
   )
 import Playwright.Harness
   ( withChromiumPage
+  , assertBool
+  , assertEqual
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertBool
-  , assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree

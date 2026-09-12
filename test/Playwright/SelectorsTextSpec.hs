@@ -2,7 +2,7 @@ module Playwright.SelectorsTextSpec
   ( tests
   ) where
 
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( wait
   , withAsync
   )
@@ -46,12 +46,15 @@ import Playwright
   , textContent
   , textContentHandle
   , waitForSelectorHandle
+  , Playwright
   )
 import Playwright.Harness
   ( assertProtocolContains
   , requireHandle
   , withAssetPage
   , withChromiumPage
+  , assertBool
+  , assertEqual
   )
 import Test.Tasty
   ( TestTree
@@ -60,9 +63,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertBool
-  , assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -447,32 +448,32 @@ tests =
           assertEqual "spans" ["span1", "span2"] ids
     ]
 
-assertHtml :: Page -> Text -> Text -> IO ()
+assertHtml :: Page -> Text -> Text -> Playwright ()
 assertHtml page sel expected =
   assertEqual (unpack sel) expected
     =<< evalOnSelectorText page (selectorFromText sel) "e => e.outerHTML"
 
-assertText :: Page -> Text -> Text -> IO ()
+assertText :: Page -> Text -> Text -> Playwright ()
 assertText page sel expected =
   assertEqual (unpack sel) expected
     =<< evalOnSelectorText page (selectorFromText sel) "e => e.textContent"
 
-assertId :: Page -> Text -> Text -> IO ()
+assertId :: Page -> Text -> Text -> Playwright ()
 assertId page sel expected =
   assertEqual (unpack sel) expected
     =<< evalOnSelectorText page (selectorFromText sel) "e => e.id"
 
-assertCount :: Page -> Text -> Double -> IO ()
+assertCount :: Page -> Text -> Double -> Playwright ()
 assertCount page sel expected =
   assertEqual (unpack sel) expected
     =<< evalOnSelectorAllNumber page (selectorFromText sel) "els => els.length"
 
-htmlsJoined :: Page -> Text -> Text -> IO Text
+htmlsJoined :: Page -> Text -> Text -> Playwright Text
 htmlsJoined page sel sep = do
   parts <- evalOnSelectorAllTexts page (selectorFromText sel) "els => els.map(e => e.outerHTML)"
   pure (intercalate sep parts)
 
-setText :: ElementHandle -> Text -> IO ()
+setText :: ElementHandle -> Text -> Playwright ()
 setText handle value = do
   _ <- evaluateOnElement handle ("div => { div.textContent = '" <> value <> "'; }")
   pure ()

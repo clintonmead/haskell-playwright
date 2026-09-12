@@ -5,6 +5,9 @@ module Playwright.PageClickTimeoutSpec
   , timeout4Tests
   ) where
 
+import Control.Monad.IO.Class
+  ( MonadIO
+  )
 import Control.Monad
   ( unless
   )
@@ -38,6 +41,8 @@ import Playwright.Harness
   , requireHandle
   , withAssetPage
   , withChromiumPage
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
@@ -46,9 +51,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 timeout1Tests :: TestTree
@@ -182,7 +185,7 @@ withLongTimeout :: TestTree -> TestTree
 withLongTimeout =
   localOption (mkTimeout 30000000)
 
-requireTimeout :: Double -> IO Timeout
+requireTimeout :: (MonadIO m) => Double -> m Timeout
 requireTimeout n =
   case milliseconds n of
     Nothing ->

@@ -25,15 +25,15 @@ import Playwright.Harness
   ( requireHandle
   , withAssets
   , withChromiumPage
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree

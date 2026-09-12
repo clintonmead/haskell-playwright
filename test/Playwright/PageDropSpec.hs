@@ -2,7 +2,7 @@ module Playwright.PageDropSpec
   ( tests
   ) where
 
-import Control.Exception
+import UnliftIO.Exception
   ( try
   )
 import Data.ByteString.Char8 qualified as BS8
@@ -24,6 +24,7 @@ import Playwright
   , evaluateText
   , setContent
   , waitForFunction
+  , Playwright
   )
 import Playwright.Error
   ( PlaywrightError (DecodeFailure)
@@ -32,16 +33,16 @@ import Playwright.Harness
   ( assertProtocolContains
   , locate
   , withChromiumPage
+  , assertBool
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertBool
-  , assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -136,13 +137,13 @@ tests =
               assertFailure "expected empty drop to fail"
     ]
 
-setupDropzone :: Page -> IO ()
+setupDropzone :: Page -> Playwright ()
 setupDropzone page =
   setContent
     page
     "<style>#dropzone { width: 300px; height: 200px; border: 2px dashed #888; }</style><div id=\"dropzone\"></div><script>window.__dropInfo = null; const zone = document.getElementById('dropzone'); zone.addEventListener('dragenter', e => e.preventDefault()); zone.addEventListener('dragover', e => e.preventDefault()); zone.addEventListener('drop', async e => { e.preventDefault(); const files = []; for (const file of e.dataTransfer.files) files.push({ name: file.name, type: file.type, size: file.size, text: await file.text() }); const data = {}; for (const t of e.dataTransfer.types) { if (t !== 'Files') data[t] = e.dataTransfer.getData(t); } window.__dropInfo = { files, data }; });</script>"
 
-waitForDrop :: Page -> IO ()
+waitForDrop :: Page -> Playwright ()
 waitForDrop page = do
   _ <- waitForFunction page "() => window.__dropInfo"
   pure ()

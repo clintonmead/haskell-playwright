@@ -2,7 +2,7 @@ module Playwright.PageEventPageErrorSpec
   ( tests
   ) where
 
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( wait
   , withAsync
   )
@@ -20,15 +20,15 @@ import Playwright
 import Playwright.Harness
   ( withAssets
   , withChromiumPage
+  , assertBool
+  , assertEqual
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertBool
-  , assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree

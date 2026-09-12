@@ -11,19 +11,20 @@ import Playwright
   , pageTextContentWith
   , selectorFromText
   , setContent
+  , Playwright
   )
 import Playwright.Harness
   ( assertProtocolContains
   , withChromiumContextWith
   , withChromiumPage
+  , assertEqual
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -54,7 +55,7 @@ tests =
             =<< pageTextContentWith page (selectorFromText "span") (Just False)
     ]
 
-withStrictPage :: (Page -> IO a) -> IO a
+withStrictPage :: (Page -> Playwright a) -> IO a
 withStrictPage action =
   withChromiumContextWith
     defaultNewContextOptions {newContextStrictSelectors = Just True}

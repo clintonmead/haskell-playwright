@@ -2,11 +2,11 @@ module Playwright.PageClockSpec
   ( tests
   ) where
 
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( wait
   , withAsync
   )
-import Control.Concurrent.STM
+import UnliftIO.STM
   ( TVar
   , atomically
   , modifyTVar'
@@ -37,10 +37,13 @@ import Playwright
   , urlFromText
   , waitForPopup
   , waitForTimeout
+  , Playwright
   )
 import Playwright.Harness
   ( assertProtocolContains
   , withChromiumPage
+  , assertEqual
+  , assertFailure
   )
 import Playwright.SerializedArgument
   ( undefinedArgument
@@ -54,9 +57,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -281,7 +282,7 @@ tests =
         ]
     ]
 
-withPausedClock :: (Page -> TVar [[SerializedValue]] -> IO a) -> IO a
+withPausedClock :: (Page -> TVar [[SerializedValue]] -> Playwright a) -> IO a
 withPausedClock action =
   withChromiumPage $ \page -> do
     calls <- newTVarIO ([] :: [[SerializedValue]])
@@ -293,17 +294,17 @@ withPausedClock action =
     clockPauseAt page (ClockTimeMillis (clockMillisFromInt 1000))
     action page calls
 
-assertCallCount :: TVar [[SerializedValue]] -> Int -> IO ()
+assertCallCount :: TVar [[SerializedValue]] -> Int -> Playwright ()
 assertCallCount var expected = do
   listed <- readTVarIO var
   assertEqual "calls" expected (length listed)
 
-assertNoCalls :: TVar [[SerializedValue]] -> IO ()
+assertNoCalls :: TVar [[SerializedValue]] -> Playwright ()
 assertNoCalls var = do
   listed <- readTVarIO var
   assertEqual "calls" (0 :: Int) (length listed)
 
-sleepMillis :: Page -> Double -> IO ()
+sleepMillis :: Page -> Double -> Playwright ()
 sleepMillis page n =
   case milliseconds n of
     Nothing ->

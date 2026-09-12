@@ -25,6 +25,9 @@ module Playwright.ElementHandle
   , waitForElementStateWith
   ) where
 
+import Playwright.Monad
+  ( Playwright
+  )
 import Data.Aeson
   ( FromJSON
   , ToJSON
@@ -39,16 +42,13 @@ import Playwright.BoundingBox
   ( BoundingBox (BoundingBox, boundingBoxHeight, boundingBoxWidth, boundingBoxX, boundingBoxY)
   )
 import Playwright.Channel
-  ( Channel (Channel, channelConnection, channelGuid)
+  ( Channel (Channel, channelGuid)
   , ElementHandleTag
   , send
   )
 import Playwright.ClickOptions
   ( ClickOptions (clickOptionsForce, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsTimeout)
   , defaultClickOptions
-  )
-import Playwright.Connection
-  ( Connection
   )
 import Playwright.CssPixel
   ( CssPixel (CssPixel)
@@ -141,23 +141,23 @@ newtype ElementHandle = ElementHandle
   { elementHandleChannel :: Channel ElementHandleTag
   }
 
-elementHandleFromRef :: Connection -> ChannelRef -> ElementHandle
-elementHandleFromRef conn ref =
-  ElementHandle (Channel conn (channelRefGuid ref))
+elementHandleFromRef :: ChannelRef -> ElementHandle
+elementHandleFromRef ref =
+  ElementHandle (Channel (channelRefGuid ref))
 
 elementArgument :: ElementHandle -> SerializedArgument
 elementArgument handle =
   channelArgument (ChannelRef (channelGuid (elementHandleChannel handle)))
 
-handleSend :: (ToJSON params, FromJSON result) => ElementHandle -> Text -> params -> IO result
+handleSend :: (ToJSON params, FromJSON result) => ElementHandle -> Text -> params -> Playwright result
 handleSend handle method =
   send (elementHandleChannel handle) (MethodName method)
 
-clickHandle :: ElementHandle -> IO ()
+clickHandle :: ElementHandle -> Playwright ()
 clickHandle handle =
   clickHandleWith handle defaultClickOptions
 
-clickHandleWith :: ElementHandle -> ClickOptions -> IO ()
+clickHandleWith :: ElementHandle -> ClickOptions -> Playwright ()
 clickHandleWith handle opts = do
   timeout <-
     case clickOptionsTimeout opts of
@@ -180,18 +180,18 @@ toProtocolPoint :: Point -> Protocol.Point
 toProtocolPoint point =
   Protocol.mkPoint (cssPixelToScientific (pointX point)) (cssPixelToScientific (pointY point))
 
-tapHandle :: ElementHandle -> IO ()
+tapHandle :: ElementHandle -> Playwright ()
 tapHandle handle = do
   _ :: ElementHandleTapResult <-
     handleSend handle "tap" (mkElementHandleTapParams defaultTimeout)
   pure ()
 
-screenshotHandle :: ElementHandle -> IO ByteString
+screenshotHandle :: ElementHandle -> Playwright ByteString
 screenshotHandle handle = do
   result <- handleSend handle "screenshot" (mkElementHandleScreenshotParams defaultTimeout)
   pure (protocolBinaryToByteString (elementHandleScreenshotResultBinary result))
 
-boundingBox :: ElementHandle -> IO (Maybe BoundingBox)
+boundingBox :: ElementHandle -> Playwright (Maybe BoundingBox)
 boundingBox handle = do
   result <- handleSend handle "boundingBox" mkElementHandleBoundingBoxParams
   pure (fmap fromRect (elementHandleBoundingBoxResultValue result))
@@ -205,81 +205,81 @@ fromRect rect =
     , boundingBoxHeight = CssPixel (rectHeight rect)
     }
 
-innerTextHandle :: ElementHandle -> IO Text
+innerTextHandle :: ElementHandle -> Playwright Text
 innerTextHandle handle = do
   result <- handleSend handle "innerText" mkElementHandleInnerTextParams
   pure (elementHandleInnerTextResultValue result)
 
-innerHtmlHandle :: ElementHandle -> IO Text
+innerHtmlHandle :: ElementHandle -> Playwright Text
 innerHtmlHandle handle = do
   result <- handleSend handle "innerHTML" mkElementHandleInnerHTMLParams
   pure (elementHandleInnerHTMLResultValue result)
 
-textContentHandle :: ElementHandle -> IO (Maybe Text)
+textContentHandle :: ElementHandle -> Playwright (Maybe Text)
 textContentHandle handle = do
   result <- handleSend handle "textContent" mkElementHandleTextContentParams
   pure (elementHandleTextContentResultValue result)
 
-getAttributeHandle :: ElementHandle -> Text -> IO (Maybe Text)
+getAttributeHandle :: ElementHandle -> Text -> Playwright (Maybe Text)
 getAttributeHandle handle name = do
   result <- handleSend handle "getAttribute" (mkElementHandleGetAttributeParams name)
   pure (elementHandleGetAttributeResultValue result)
 
-inputValueHandle :: ElementHandle -> IO Text
+inputValueHandle :: ElementHandle -> Playwright Text
 inputValueHandle handle = do
   result <- handleSend handle "inputValue" mkElementHandleInputValueParams
   pure (elementHandleInputValueResultValue result)
 
-isEditableHandle :: ElementHandle -> IO Bool
+isEditableHandle :: ElementHandle -> Playwright Bool
 isEditableHandle handle = do
   result <- handleSend handle "isEditable" mkElementHandleIsEditableParams
   pure (elementHandleIsEditableResultValue result)
 
-contentFrameHandle :: ElementHandle -> IO (Maybe Frame)
+contentFrameHandle :: ElementHandle -> Playwright (Maybe Frame)
 contentFrameHandle handle = do
   result <- handleSend handle "contentFrame" mkElementHandleContentFrameParams
   case elementHandleContentFrameResultFrame result of
     Nothing ->
       pure Nothing
     Just ref ->
-      Just <$> frameFromRef (channelConnection (elementHandleChannel handle)) ref
+      Just <$> frameFromRef ref
 
-ownerFrameHandle :: ElementHandle -> IO (Maybe Frame)
+ownerFrameHandle :: ElementHandle -> Playwright (Maybe Frame)
 ownerFrameHandle handle = do
   result <- handleSend handle "ownerFrame" mkElementHandleOwnerFrameParams
   case elementHandleOwnerFrameResultFrame result of
     Nothing ->
       pure Nothing
     Just ref ->
-      Just <$> frameFromRef (channelConnection (elementHandleChannel handle)) ref
+      Just <$> frameFromRef ref
 
-typeHandle :: ElementHandle -> Text -> IO ()
+typeHandle :: ElementHandle -> Text -> Playwright ()
 typeHandle handle text = do
   _ :: ElementHandleTypeResult <-
     handleSend handle "type" (mkElementHandleTypeParams text defaultTimeout)
   pure ()
 
-scrollIntoViewIfNeeded :: ElementHandle -> IO ()
+scrollIntoViewIfNeeded :: ElementHandle -> Playwright ()
 scrollIntoViewIfNeeded handle =
   scrollIntoViewIfNeededWith handle defaultTimeout
 
-scrollIntoViewIfNeededWith :: ElementHandle -> Timeout -> IO ()
+scrollIntoViewIfNeededWith :: ElementHandle -> Timeout -> Playwright ()
 scrollIntoViewIfNeededWith handle timeout = do
   _ :: ElementHandleScrollIntoViewIfNeededResult <-
     handleSend handle "scrollIntoViewIfNeeded" (mkElementHandleScrollIntoViewIfNeededParams timeout)
   pure ()
 
-selectText :: ElementHandle -> IO ()
+selectText :: ElementHandle -> Playwright ()
 selectText handle =
   selectTextWith handle defaultTimeout
 
-selectTextWith :: ElementHandle -> Timeout -> IO ()
+selectTextWith :: ElementHandle -> Timeout -> Playwright ()
 selectTextWith handle timeout = do
   _ :: ElementHandleSelectTextResult <-
     handleSend handle "selectText" (mkElementHandleSelectTextParams timeout)
   pure ()
 
-setInputFilesHandle :: ElementHandle -> [InputFile] -> IO ()
+setInputFilesHandle :: ElementHandle -> [InputFile] -> Playwright ()
 setInputFilesHandle handle files = do
   _ :: ElementHandleSetInputFilesResult <-
     handleSend
@@ -296,11 +296,11 @@ toPayload file =
     (protocolBinaryFromByteString (inputFileBytes file))
     (inputFileNameToText (inputFileName file))
 
-waitForElementState :: ElementHandle -> ElementState -> IO ()
+waitForElementState :: ElementHandle -> ElementState -> Playwright ()
 waitForElementState handle state =
   waitForElementStateWith handle state defaultTimeout
 
-waitForElementStateWith :: ElementHandle -> ElementState -> Timeout -> IO ()
+waitForElementStateWith :: ElementHandle -> ElementState -> Timeout -> Playwright ()
 waitForElementStateWith handle state timeout = do
   _ :: ElementHandleWaitForElementStateResult <-
     handleSend

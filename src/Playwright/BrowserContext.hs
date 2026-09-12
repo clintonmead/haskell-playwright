@@ -33,7 +33,10 @@ module Playwright.BrowserContext
   , waitForContextPage
   ) where
 
-import Control.Exception
+import Playwright.Monad
+  ( Playwright
+  )
+import UnliftIO.Exception
   ( throwIO
   )
 import Control.Monad
@@ -49,12 +52,11 @@ import Playwright.APIRequestContext
   )
 import Playwright.Channel
   ( BrowserContextTag
-  , Channel (Channel, channelConnection, channelGuid)
+  , Channel (Channel, channelGuid)
   , send
   )
 import Playwright.Connection
-  ( Connection
-  , closedGuids
+  ( closedGuids
   , contextHasOwnerPage
   , guidsOfType
   , lookupObject
@@ -178,15 +180,14 @@ newtype BrowserContext = BrowserContext
   { browserContextChannel :: Channel BrowserContextTag
   }
 
-contextFromRef :: Connection -> ChannelRef -> IO BrowserContext
-contextFromRef conn ref =
-  pure (BrowserContext (Channel conn (channelRefGuid ref)))
+contextFromRef :: ChannelRef -> Playwright BrowserContext
+contextFromRef ref =
+  pure (BrowserContext (Channel (channelRefGuid ref)))
 
-newPage :: BrowserContext -> IO Page
+newPage :: BrowserContext -> Playwright Page
 newPage ctx = do
   owned <-
     contextHasOwnerPage
-      (channelConnection (browserContextChannel ctx))
       (channelGuid (browserContextChannel ctx))
   when owned $
     throwIO (DecodeFailure "Please use browser.newContext()")
@@ -199,7 +200,7 @@ newPage ctx = do
     (browserContextChannel ctx)
     (browserContextNewPageResultPage result)
 
-addContextInitScript :: BrowserContext -> Text -> IO Disposable
+addContextInitScript :: BrowserContext -> Text -> Playwright Disposable
 addContextInitScript ctx source = do
   result <-
     send
@@ -208,15 +209,14 @@ addContextInitScript ctx source = do
       (mkBrowserContextAddInitScriptParams source)
   pure
     ( disposableFromRef
-        (channelConnection (browserContextChannel ctx))
         (browserContextAddInitScriptResultDisposable result)
     )
 
-closeContext :: BrowserContext -> IO ()
+closeContext :: BrowserContext -> Playwright ()
 closeContext ctx =
   closeContextWith ctx Nothing
 
-closeContextWith :: BrowserContext -> Maybe Text -> IO ()
+closeContextWith :: BrowserContext -> Maybe Text -> Playwright ()
 closeContextWith ctx reason =
   ignoreTargetClosed $ do
     _ :: BrowserContextCloseResult <-
@@ -230,23 +230,20 @@ pageContext :: Page -> BrowserContext
 pageContext page =
   BrowserContext (pageContextChannel page)
 
-contextRequest :: BrowserContext -> IO APIRequestContext
+contextRequest :: BrowserContext -> Playwright APIRequestContext
 contextRequest ctx =
   apiRequestContextFor
-    (channelConnection (browserContextChannel ctx))
     (channelGuid (browserContextChannel ctx))
 
-setContextDefaultTimeout :: BrowserContext -> Timeout -> IO ()
+setContextDefaultTimeout :: BrowserContext -> Timeout -> Playwright ()
 setContextDefaultTimeout ctx timeout =
   setTimeoutDefault
-    (channelConnection (browserContextChannel ctx))
     (channelGuid (browserContextChannel ctx))
     (Just timeout)
 
-setContextDefaultNavigationTimeout :: BrowserContext -> Timeout -> IO ()
+setContextDefaultNavigationTimeout :: BrowserContext -> Timeout -> Playwright ()
 setContextDefaultNavigationTimeout ctx timeout =
   setTimeoutNavigation
-    (channelConnection (browserContextChannel ctx))
     (channelGuid (browserContextChannel ctx))
     (Just timeout)
 
@@ -254,15 +251,14 @@ contextsEqual :: BrowserContext -> BrowserContext -> Bool
 contextsEqual left right =
   channelGuid (browserContextChannel left) == channelGuid (browserContextChannel right)
 
-isContextClosed :: BrowserContext -> IO Bool
+isContextClosed :: BrowserContext -> Playwright Bool
 isContextClosed ctx = do
-  closed <- closedGuids (channelConnection (browserContextChannel ctx))
+  closed <- closedGuids
   pure (Set.member (channelGuid (browserContextChannel ctx)) closed)
 
-onContextPage :: BrowserContext -> (Page -> IO ()) -> IO ()
+onContextPage :: BrowserContext -> (Page -> Playwright ()) -> Playwright ()
 onContextPage ctx run =
   registerEventHandler
-    (channelConnection (browserContextChannel ctx))
     (channelGuid (browserContextChannel ctx))
     (MethodName "page")
     ( \params -> do
@@ -271,7 +267,7 @@ onContextPage ctx run =
         run page
     )
 
-waitForContextClose :: BrowserContext -> IO BrowserContext
+waitForContextClose :: BrowserContext -> Playwright BrowserContext
 waitForContextClose ctx = do
   already <- isContextClosed ctx
   if already
@@ -279,18 +275,16 @@ waitForContextClose ctx = do
     else do
       _ <-
         waitForChannelEvent
-          (channelConnection (browserContextChannel ctx))
           (channelGuid (browserContextChannel ctx))
           (MethodName "close")
       pure ctx
 
-contextPages :: BrowserContext -> IO [Page]
+contextPages :: BrowserContext -> Playwright [Page]
 contextPages ctx = do
   let
-    conn = channelConnection (browserContextChannel ctx)
     parent = channelGuid (browserContextChannel ctx)
-  closed <- closedGuids conn
-  objects <- traverse (lookupObject conn) =<< guidsOfType conn ChannelTypePage
+  closed <- closedGuids
+  objects <- traverse (lookupObject) =<< guidsOfType ChannelTypePage
   traverse
     (pageFromRef (browserContextChannel ctx) . ChannelRef . remoteGuid)
     ( filter
@@ -302,17 +296,16 @@ contextPages ctx = do
         objects
     )
 
-waitForContextPage :: BrowserContext -> IO Page
+waitForContextPage :: BrowserContext -> Playwright Page
 waitForContextPage ctx = do
   params <-
     waitForFutureChannelEventUnlessClosed
-      (channelConnection (browserContextChannel ctx))
       (channelGuid (browserContextChannel ctx))
       (MethodName "page")
   event <- either throwIO pure (fromJsonValue params)
   pageFromRef (browserContextChannel ctx) (browserContextPageEventPage event)
 
-addCookies :: BrowserContext -> [CookieToSet] -> IO ()
+addCookies :: BrowserContext -> [CookieToSet] -> Playwright ()
 addCookies ctx cookiesToSet = do
   _ :: BrowserContextAddCookiesResult <-
     send
@@ -321,11 +314,11 @@ addCookies ctx cookiesToSet = do
       (mkBrowserContextAddCookiesParams (fmap toSetNetworkCookie cookiesToSet))
   pure ()
 
-cookies :: BrowserContext -> IO [Cookie]
+cookies :: BrowserContext -> Playwright [Cookie]
 cookies ctx =
   cookiesFor ctx []
 
-cookiesFor :: BrowserContext -> [Url] -> IO [Cookie]
+cookiesFor :: BrowserContext -> [Url] -> Playwright [Cookie]
 cookiesFor ctx urls = do
   result <-
     send
@@ -334,15 +327,15 @@ cookiesFor ctx urls = do
       (mkBrowserContextCookiesParams (fmap urlToText urls))
   pure (fmap fromNetworkCookie (browserContextCookiesResultCookies result))
 
-clearCookies :: BrowserContext -> IO ()
+clearCookies :: BrowserContext -> Playwright ()
 clearCookies ctx =
   clearCookiesWith ctx defaultClearCookiesOptions
 
-clearCookiesNamed :: BrowserContext -> CookieName -> IO ()
+clearCookiesNamed :: BrowserContext -> CookieName -> Playwright ()
 clearCookiesNamed ctx name =
   clearCookiesWith ctx defaultClearCookiesOptions {clearCookiesName = Just name}
 
-clearCookiesWith :: BrowserContext -> ClearCookiesOptions -> IO ()
+clearCookiesWith :: BrowserContext -> ClearCookiesOptions -> Playwright ()
 clearCookiesWith ctx opts = do
   _ :: BrowserContextClearCookiesResult <-
     send
@@ -362,15 +355,15 @@ clearCookiesWith ctx opts = do
         }
   pure ()
 
-grantPermissions :: BrowserContext -> [PermissionName] -> IO ()
+grantPermissions :: BrowserContext -> [PermissionName] -> Playwright ()
 grantPermissions ctx names =
   grantPermissionsForOrigin ctx names Nothing
 
-grantPermissionsFor :: BrowserContext -> [PermissionName] -> Url -> IO ()
+grantPermissionsFor :: BrowserContext -> [PermissionName] -> Url -> Playwright ()
 grantPermissionsFor ctx names origin =
   grantPermissionsForOrigin ctx names (Just origin)
 
-grantPermissionsForOrigin :: BrowserContext -> [PermissionName] -> Maybe Url -> IO ()
+grantPermissionsForOrigin :: BrowserContext -> [PermissionName] -> Maybe Url -> Playwright ()
 grantPermissionsForOrigin ctx names origin = do
   _ :: BrowserContextGrantPermissionsResult <-
     send
@@ -381,13 +374,13 @@ grantPermissionsForOrigin ctx names origin = do
         }
   pure ()
 
-clearPermissions :: BrowserContext -> IO ()
+clearPermissions :: BrowserContext -> Playwright ()
 clearPermissions ctx = do
   _ :: BrowserContextClearPermissionsResult <-
     send (browserContextChannel ctx) (MethodName "clearPermissions") mkBrowserContextClearPermissionsParams
   pure ()
 
-setGeolocation :: BrowserContext -> Geolocation -> IO ()
+setGeolocation :: BrowserContext -> Geolocation -> Playwright ()
 setGeolocation ctx location = do
   _ :: BrowserContextSetGeolocationResult <-
     send
@@ -407,7 +400,7 @@ setGeolocation ctx location = do
         }
   pure ()
 
-clearGeolocation :: BrowserContext -> IO ()
+clearGeolocation :: BrowserContext -> Playwright ()
 clearGeolocation ctx = do
   _ :: BrowserContextSetGeolocationResult <-
     send
@@ -416,7 +409,7 @@ clearGeolocation ctx = do
       mkBrowserContextSetGeolocationParams
   pure ()
 
-setOffline :: BrowserContext -> Bool -> IO ()
+setOffline :: BrowserContext -> Bool -> Playwright ()
 setOffline ctx offline = do
   _ :: BrowserContextSetOfflineResult <-
     send
@@ -425,7 +418,7 @@ setOffline ctx offline = do
       (mkBrowserContextSetOfflineParams offline)
   pure ()
 
-setContextExtraHTTPHeaders :: BrowserContext -> [HttpHeader] -> IO ()
+setContextExtraHTTPHeaders :: BrowserContext -> [HttpHeader] -> Playwright ()
 setContextExtraHTTPHeaders ctx headers = do
   _ :: BrowserContextSetExtraHTTPHeadersResult <-
     send
@@ -434,7 +427,7 @@ setContextExtraHTTPHeaders ctx headers = do
       (mkBrowserContextSetExtraHTTPHeadersParams (fmap toNameValue headers))
   pure ()
 
-setHTTPCredentials :: BrowserContext -> HttpCredentials -> IO ()
+setHTTPCredentials :: BrowserContext -> HttpCredentials -> Playwright ()
 setHTTPCredentials ctx creds = do
   _ :: BrowserContextSetHTTPCredentialsResult <-
     send
@@ -454,7 +447,7 @@ setHTTPCredentials ctx creds = do
         }
   pure ()
 
-storageState :: BrowserContext -> IO StorageState
+storageState :: BrowserContext -> Playwright StorageState
 storageState ctx = do
   result :: BrowserContextStorageStateResult <-
     send
@@ -463,7 +456,7 @@ storageState ctx = do
       mkBrowserContextStorageStateParams
   pure (fromStorageStateResult result)
 
-setStorageState :: BrowserContext -> StorageState -> IO ()
+setStorageState :: BrowserContext -> StorageState -> Playwright ()
 setStorageState ctx state = do
   _ :: BrowserContextSetStorageStateResult <-
     send

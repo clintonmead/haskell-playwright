@@ -33,14 +33,17 @@ module Playwright.Page.Wait
   , waitForURLWith
   ) where
 
-import Control.Exception
+import Playwright.Monad
+  ( Playwright
+  )
+import UnliftIO.Exception
   ( throwIO
   )
 import Data.Text
   ( Text
   )
 import Playwright.Channel
-  ( Channel (channelConnection, channelGuid)
+  ( Channel (channelGuid)
   )
 import Playwright.Connection
   ( registerEventHandler
@@ -143,33 +146,32 @@ import Playwright.WaitForState
   ( WaitForState
   )
 
-waitForSelector :: Page -> Selector -> WaitForState -> IO ()
+waitForSelector :: Page -> Selector -> WaitForState -> Playwright ()
 waitForSelector page selector state = do
   timeout <- pageActionTimeout page
   waitForSelectorFrame (pageMainFrame page) selector state timeout Nothing
 
-waitForSelectorHandle :: Page -> Selector -> WaitForState -> IO (Maybe ElementHandle)
+waitForSelectorHandle :: Page -> Selector -> WaitForState -> Playwright (Maybe ElementHandle)
 waitForSelectorHandle page selector state = do
   timeout <- pageActionTimeout page
   waitForSelectorHandleWith page selector state timeout
 
-waitForSelectorHandleWith :: Page -> Selector -> WaitForState -> Timeout -> IO (Maybe ElementHandle)
+waitForSelectorHandleWith :: Page -> Selector -> WaitForState -> Timeout -> Playwright (Maybe ElementHandle)
 waitForSelectorHandleWith page selector state timeout =
   waitForSelectorHandleFrame (pageMainFrame page) selector state timeout Nothing
 
-waitForSelectorStrict :: Page -> Selector -> WaitForState -> IO ()
+waitForSelectorStrict :: Page -> Selector -> WaitForState -> Playwright ()
 waitForSelectorStrict page selector state = do
   timeout <- pageActionTimeout page
   waitForSelectorFrame (pageMainFrame page) selector state timeout (Just True)
 
-waitForLoadState :: Page -> LoadState -> IO ()
+waitForLoadState :: Page -> LoadState -> Playwright ()
 waitForLoadState page =
   waitForLoadStateFrame (pageMainFrame page)
 
-onLoad :: Page -> IO () -> IO ()
+onLoad :: Page -> Playwright () -> Playwright ()
 onLoad page run =
   registerEventHandler
-    (channelConnection (pageChannel page))
     (channelGuid (frameChannel (pageMainFrame page)))
     (MethodName "loadstate")
     $ \params -> do
@@ -180,23 +182,20 @@ onLoad page run =
         _ ->
           pure ()
 
-waitForLoadEvent :: Page -> IO ()
+waitForLoadEvent :: Page -> Playwright ()
 waitForLoadEvent page = do
   timeout <- pageNavigationTimeout page
   takeLoad <- armLoadEvent page
   waitWithTimeout timeout takeLoad
 
-armLoadEvent :: Page -> IO (IO ())
+armLoadEvent :: Page -> Playwright (Playwright ())
 armLoadEvent page = do
-  let
-    conn = channelConnection (pageChannel page)
   waitId <-
     registerFutureEventWaiter
-      conn
       (channelGuid (frameChannel (pageMainFrame page)))
       (MethodName "loadstate")
   pure $ do
-    params <- waitForWaiter conn waitId
+    params <- waitForWaiter waitId
     event <- either throwIO pure (fromJsonValue params)
     case frameLoadstateEventAdd event of
       Just LifecycleEventLoad ->
@@ -205,81 +204,77 @@ armLoadEvent page = do
         takeLoad <- armLoadEvent page
         takeLoad
 
-waitForTimeout :: Page -> Timeout -> IO ()
+waitForTimeout :: Page -> Timeout -> Playwright ()
 waitForTimeout page =
   waitForTimeoutFrame (pageMainFrame page)
 
-waitForFunction :: Page -> Text -> IO JsHandle
+waitForFunction :: Page -> Text -> Playwright JsHandle
 waitForFunction page expression = do
   timeout <- pageActionTimeout page
   waitForFunctionWith page expression timeout
 
-waitForFunctionWith :: Page -> Text -> Timeout -> IO JsHandle
+waitForFunctionWith :: Page -> Text -> Timeout -> Playwright JsHandle
 waitForFunctionWith page expression timeout =
   waitForFunctionFrame (pageMainFrame page) expression undefinedArgument timeout
 
-waitForURL :: Page -> UrlGlob -> IO ()
+waitForURL :: Page -> UrlGlob -> Playwright ()
 waitForURL page glob = do
   timeout <- pageNavigationTimeout page
   waitForURLWith page glob timeout
 
-waitForURLWith :: Page -> UrlGlob -> Timeout -> IO ()
+waitForURLWith :: Page -> UrlGlob -> Timeout -> Playwright ()
 waitForURLWith page glob timeout =
   waitWithTimeout timeout $ do
     waitUntilUrl
-      (channelConnection (pageChannel page))
       (channelGuid (frameChannel (pageMainFrame page)))
       (matchesUrlGlob glob)
     waitForLoadState page LoadStateLoad
 
-waitForNavigation :: Page -> IO (Maybe Response)
+waitForNavigation :: Page -> Playwright (Maybe Response)
 waitForNavigation page = do
   timeout <- pageNavigationTimeout page
   waitForNavigationWith page timeout Nothing
 
-waitForFrameNavigated :: Page -> IO ()
+waitForFrameNavigated :: Page -> Playwright ()
 waitForFrameNavigated page = do
   timeout <- pageNavigationTimeout page
   takeNavigated <- armFrameNavigated page
   waitWithTimeout timeout takeNavigated
 
-armFrameNavigated :: Page -> IO (IO ())
+armFrameNavigated :: Page -> Playwright (Playwright ())
 armFrameNavigated page = do
   let
-    conn = channelConnection (pageChannel page)
     frameGuid = channelGuid (frameChannel (pageMainFrame page))
-  waitId <- registerFutureEventWaiter conn frameGuid (MethodName "navigated")
+  waitId <- registerFutureEventWaiter frameGuid (MethodName "navigated")
   pure $ do
-    _ <- waitForWaiter conn waitId
+    _ <- waitForWaiter waitId
     pure ()
 
-waitForFrameDetached :: Page -> IO Frame
+waitForFrameDetached :: Page -> Playwright Frame
 waitForFrameDetached page = do
   timeout <- pageNavigationTimeout page
   takeFrame <- armFrameDetached page
   waitWithTimeout timeout takeFrame
 
-armFrameDetached :: Page -> IO (IO Frame)
+armFrameDetached :: Page -> Playwright (Playwright Frame)
 armFrameDetached page = do
   let
-    conn = channelConnection (pageChannel page)
     guid = channelGuid (pageChannel page)
-  waitId <- registerFutureEventWaiter conn guid (MethodName "frameDetached")
+  waitId <- registerFutureEventWaiter guid (MethodName "frameDetached")
   pure $ do
-    params <- waitForWaiter conn waitId
+    params <- waitForWaiter waitId
     event <- either throwIO pure (fromJsonValue params)
-    frameFromRef conn (pageFrameDetachedEventFrame event)
+    frameFromRef (pageFrameDetachedEventFrame event)
 
-waitForNavigationWith :: Page -> Timeout -> Maybe UrlGlob -> IO (Maybe Response)
+waitForNavigationWith :: Page -> Timeout -> Maybe UrlGlob -> Playwright (Maybe Response)
 waitForNavigationWith page timeout glob =
   waitWithTimeout timeout (collectNavigation page glob)
 
-collectNavigation :: Page -> Maybe UrlGlob -> IO (Maybe Response)
+collectNavigation :: Page -> Maybe UrlGlob -> Playwright (Maybe Response)
 collectNavigation page glob = do
   let
-    conn = channelConnection (pageChannel page)
     frameGuid = channelGuid (frameChannel (pageMainFrame page))
-  params <- waitForFutureChannelEvent conn frameGuid (MethodName "navigated")
+  params <- waitForFutureChannelEvent frameGuid (MethodName "navigated")
   event <- either throwIO pure (fromJsonValue params)
   let matches = maybe True (`matchesUrlGlob` frameNavigatedEventUrl event) glob
   if matches
@@ -289,149 +284,135 @@ collectNavigation page glob = do
         Nothing ->
           pure Nothing
         Just requestRef -> do
-          responseRef <- requestResponseRef (requestFromRef conn requestRef)
-          pure (fmap (responseFromRef conn) responseRef)
+          responseRef <- requestResponseRef (requestFromRef requestRef)
+          pure (fmap (responseFromRef) responseRef)
     else
       collectNavigation page glob
 
-armDialog :: Page -> IO (IO Dialog)
+armDialog :: Page -> Playwright (Playwright Dialog)
 armDialog page = do
   subscribeContext page BrowserContextUpdateSubscriptionParamsEventDialog
-  let
-    conn = channelConnection (pageContextChannel page)
   waitId <-
     registerEventWaiter
-      conn
       (channelGuid (pageContextChannel page))
       (MethodName "dialog")
   pure $ do
-    params <- waitForWaiter conn waitId
+    params <- waitForWaiter waitId
     event <- either throwIO pure (fromJsonValue params)
     dialogFromRef
-      (channelConnection (pageContextChannel page))
       (browserContextDialogEventDialog event)
 
-waitForDialog :: Page -> IO Dialog
+waitForDialog :: Page -> Playwright Dialog
 waitForDialog page = do
   takeDialog <- armDialog page
   takeDialog
 
-armConsole :: Page -> IO (IO ConsoleMessage)
+armConsole :: Page -> Playwright (Playwright ConsoleMessage)
 armConsole page = do
   subscribeContext page BrowserContextUpdateSubscriptionParamsEventConsole
-  let
-    conn = channelConnection (pageContextChannel page)
   waitId <-
     registerEventWaiter
-      conn
       (channelGuid (pageContextChannel page))
       (MethodName "console")
   pure $ do
-    params <- waitForWaiter conn waitId
+    params <- waitForWaiter waitId
     event <- either throwIO pure (fromJsonValue params :: Either PlaywrightError BrowserContextConsoleEvent)
-    consoleMessageFromEvent (channelConnection (pageContextChannel page)) event
+    consoleMessageFromEvent event
 
-waitForConsole :: Page -> IO ConsoleMessage
+waitForConsole :: Page -> Playwright ConsoleMessage
 waitForConsole page = do
   takeMessage <- armConsole page
   takeMessage
 
-waitForResponse :: Page -> UrlGlob -> IO Response
+waitForResponse :: Page -> UrlGlob -> Playwright Response
 waitForResponse page glob = do
   timeout <- pageActionTimeout page
   waitForResponseWith page glob timeout
 
-waitForResponseWith :: Page -> UrlGlob -> Timeout -> IO Response
+waitForResponseWith :: Page -> UrlGlob -> Timeout -> Playwright Response
 waitForResponseWith page glob timeout =
   waitWithTimeout timeout $ do
     subscribeContext page BrowserContextUpdateSubscriptionParamsEventResponse
     collectResponse
   where
-    conn = channelConnection (pageContextChannel page)
     guid = channelGuid (pageContextChannel page)
     collectResponse = do
-      params <- waitForChannelEvent conn guid (MethodName "response")
+      params <- waitForChannelEvent guid (MethodName "response")
       event <- either throwIO pure (fromJsonValue params)
-      let response = responseFromRef conn (browserContextResponseEventResponse event)
+      let response = responseFromRef (browserContextResponseEventResponse event)
       current <- responseUrl response
       if matchesUrlGlob glob current
         then pure response
         else collectResponse
 
-waitForRequest :: Page -> UrlGlob -> IO Request
+waitForRequest :: Page -> UrlGlob -> Playwright Request
 waitForRequest page glob = do
   timeout <- pageActionTimeout page
   waitForRequestWith page glob timeout
 
-waitForRequestWith :: Page -> UrlGlob -> Timeout -> IO Request
+waitForRequestWith :: Page -> UrlGlob -> Timeout -> Playwright Request
 waitForRequestWith page glob timeout =
   waitWithTimeout timeout $ do
     subscribeContext page BrowserContextUpdateSubscriptionParamsEventRequest
     collectRequest
   where
-    conn = channelConnection (pageContextChannel page)
     guid = channelGuid (pageContextChannel page)
     collectRequest = do
-      params <- waitForChannelEvent conn guid (MethodName "request")
+      params <- waitForChannelEvent guid (MethodName "request")
       event <- either throwIO pure (fromJsonValue params)
-      let request = requestFromRef conn (browserContextRequestEventRequest event)
+      let request = requestFromRef (browserContextRequestEventRequest event)
       current <- requestUrl request
       if matchesUrlGlob glob current
         then pure request
         else collectRequest
 
-waitForRequestFailed :: Page -> IO Request
+waitForRequestFailed :: Page -> Playwright Request
 waitForRequestFailed page = do
   timeout <- pageActionTimeout page
   waitForRequestFailedWith page timeout
 
-waitForRequestFailedWith :: Page -> Timeout -> IO Request
+waitForRequestFailedWith :: Page -> Timeout -> Playwright Request
 waitForRequestFailedWith page timeout =
   waitWithTimeout timeout $ do
     subscribeContext page BrowserContextUpdateSubscriptionParamsEventRequestFailed
     params <-
       waitForChannelEvent
-        (channelConnection (pageContextChannel page))
         (channelGuid (pageContextChannel page))
         (MethodName "requestFailed")
     event <- either throwIO pure (fromJsonValue params)
     pure
       ( requestFromRef
-          (channelConnection (pageContextChannel page))
           (browserContextRequestFailedEventRequest event)
       )
 
-waitForRequestFinished :: Page -> IO Request
+waitForRequestFinished :: Page -> Playwright Request
 waitForRequestFinished page = do
   timeout <- pageActionTimeout page
   waitWithTimeout timeout $ do
     subscribeContext page BrowserContextUpdateSubscriptionParamsEventRequestFinished
     params <-
       waitForChannelEvent
-        (channelConnection (pageContextChannel page))
         (channelGuid (pageContextChannel page))
         (MethodName "requestFinished")
     event <- either throwIO pure (fromJsonValue params)
     pure
       ( requestFromRef
-          (channelConnection (pageContextChannel page))
           (browserContextRequestFinishedEventRequest event)
       )
 
-waitForPopup :: Page -> IO Page
+waitForPopup :: Page -> Playwright Page
 waitForPopup page = do
   takePopup <- armPopup page
   takePopup
 
-armPopup :: Page -> IO (IO Page)
+armPopup :: Page -> Playwright (Playwright Page)
 armPopup page =
   pure (collectPopup page)
 
-collectPopup :: Page -> IO Page
+collectPopup :: Page -> Playwright Page
 collectPopup page = do
   params <-
     waitForChannelEvent
-      (channelConnection (pageContextChannel page))
       (channelGuid (pageContextChannel page))
       (MethodName "page")
   event <- either throwIO pure (fromJsonValue params)

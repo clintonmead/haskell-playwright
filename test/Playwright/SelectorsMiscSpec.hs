@@ -2,11 +2,14 @@ module Playwright.SelectorsMiscSpec
   ( tests
   ) where
 
-import Control.Concurrent.Async
+import Control.Monad.IO.Class
+  ( MonadIO
+  )
+import UnliftIO.Async
   ( wait
   , withAsync
   )
-import Control.Exception
+import UnliftIO.Exception
   ( try
   )
 import Control.Monad
@@ -47,6 +50,7 @@ import Playwright
   , waitForSelector
   , waitForSelectorHandle
   , waitForSelectorHandleWith
+  , Playwright
   )
 import Playwright.Error
   ( PlaywrightError (ProtocolRpc)
@@ -58,6 +62,9 @@ import Playwright.Harness
   , requireHandle
   , withAssetPage
   , withChromiumPage
+  , assertBool
+  , assertEqual
+  , assertFailure
   )
 import Playwright.SerializedArgument
   ( SerializedArgument (SerializedArgument, serializedArgumentHandles, serializedArgumentValue)
@@ -73,10 +80,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertBool
-  , assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -380,37 +384,37 @@ tests =
               assertCount page sel 1
     ]
 
-assertText :: Page -> Text -> Text -> IO ()
+assertText :: Page -> Text -> Text -> Playwright ()
 assertText page sel expected =
   assertEqual (unpack sel) expected
     =<< evalOnSelectorText page (selectorFromText sel) "e => e.textContent"
 
-assertHtml :: Page -> Text -> Text -> IO ()
+assertHtml :: Page -> Text -> Text -> Playwright ()
 assertHtml page sel expected =
   assertEqual (unpack sel) expected
     =<< evalOnSelectorText page (selectorFromText sel) "e => e.outerHTML"
 
-assertId :: Page -> Text -> Text -> IO ()
+assertId :: Page -> Text -> Text -> Playwright ()
 assertId page sel expected =
   assertEqual (unpack sel) expected
     =<< evalOnSelectorText page (selectorFromText sel) "e => e.id"
 
-assertIds :: Page -> Text -> Text -> IO ()
+assertIds :: Page -> Text -> Text -> Playwright ()
 assertIds page sel expected = do
   ids <- evalOnSelectorAllTexts page (selectorFromText sel) "els => els.map(e => e.id)"
   assertEqual (unpack sel) expected (intercalate "," ids)
 
-assertCount :: Page -> Text -> Double -> IO ()
+assertCount :: Page -> Text -> Double -> Playwright ()
 assertCount page sel expected =
   assertEqual (unpack sel) expected
     =<< evalOnSelectorAllNumber page (selectorFromText sel) "els => els.length"
 
-assertTexts :: Page -> Text -> [Text] -> IO ()
+assertTexts :: Page -> Text -> [Text] -> Playwright ()
 assertTexts page sel expected =
   assertEqual (unpack sel) expected
     =<< evalOnSelectorAllTexts page (selectorFromText sel) "els => els.map(e => e.textContent)"
 
-assertMissing :: Page -> Text -> IO ()
+assertMissing :: Page -> Text -> Playwright ()
 assertMissing page sel =
   assertEqual (unpack sel) True . isNothing =<< querySelector page (selectorFromText sel)
 
@@ -447,7 +451,7 @@ layoutBoxes =
   , [201, -101, 50, 50]
   ]
 
-requireTimeout :: Double -> IO Timeout
+requireTimeout :: (MonadIO m) => Double -> m Timeout
 requireTimeout n =
   case milliseconds n of
     Nothing ->

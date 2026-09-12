@@ -2,7 +2,7 @@ module Playwright.LocatorMisc2Spec
   ( tests
   ) where
 
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( wait
   , withAsync
   )
@@ -49,6 +49,7 @@ import Playwright
   , typeText
   , urlFromText
   , waitFor
+  , Playwright
   )
 import Playwright.Harness
   ( assertProtocolContains
@@ -56,6 +57,8 @@ import Playwright.Harness
   , withAssetPage
   , withAssets
   , withChromiumPage
+  , assertEqual
+  , assertFailure
   )
 import Playwright.Locator qualified as Locator
 import Test.Tasty
@@ -63,9 +66,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -177,7 +178,7 @@ tests =
           assertProtocolContains "Unknown key: \"😊\"" (press loc (Key "😊"))
     ]
 
-assertScrollsIntoView :: Page -> Int -> IO ()
+assertScrollsIntoView :: Page -> Int -> Playwright ()
 assertScrollsIntoView page i = do
   let
     button = locate page ("#btn" <> pack (show i))

@@ -60,7 +60,10 @@ module Playwright.Locator
   , waitForWith
   ) where
 
-import Control.Exception
+import Playwright.Monad
+  ( Playwright
+  )
+import UnliftIO.Exception
   ( finally
   , throwIO
   )
@@ -87,7 +90,7 @@ import Playwright.BoundingBox
   ( BoundingBox
   )
 import Playwright.Channel
-  ( Channel (channelConnection, channelGuid)
+  ( Channel (channelGuid)
   , BrowserContextTag
   , PageTag
   )
@@ -284,23 +287,22 @@ getByRole :: Locator -> AriaRole -> GetByRoleOptions -> Locator
 getByRole loc role opts =
   childLocator loc (getByRoleSelector role opts)
 
-locatorActionTimeout :: Locator -> IO Timeout
+locatorActionTimeout :: Locator -> Playwright Timeout
 locatorActionTimeout loc = do
-  let conn = channelConnection (locatorPageChannel loc)
-  pageDefaults <- lookupTimeoutDefaults conn (channelGuid (locatorPageChannel loc))
-  contextDefaults <- lookupTimeoutDefaults conn (channelGuid (locatorContextChannel loc))
+  pageDefaults <- lookupTimeoutDefaults (channelGuid (locatorPageChannel loc))
+  contextDefaults <- lookupTimeoutDefaults (channelGuid (locatorContextChannel loc))
   pure (resolveActionTimeout pageDefaults contextDefaults)
 
-withActionTimeout :: Locator -> (Timeout -> IO a) -> IO a
+withActionTimeout :: Locator -> (Timeout -> Playwright a) -> Playwright a
 withActionTimeout loc action = do
   timeout <- locatorActionTimeout loc
   action timeout
 
-click :: Locator -> IO ()
+click :: Locator -> Playwright ()
 click loc =
   withActionTimeout loc (clickFrame (locatorFrame loc) (locatorSelector loc))
 
-clickWith :: Locator -> ClickOptions -> IO ()
+clickWith :: Locator -> ClickOptions -> Playwright ()
 clickWith loc opts = do
   timeout <-
     case clickOptionsTimeout opts of
@@ -314,101 +316,101 @@ clickWith loc opts = do
     timeout
     opts
 
-dblclick :: Locator -> IO ()
+dblclick :: Locator -> Playwright ()
 dblclick loc =
   withActionTimeout loc (dblclickFrame (locatorFrame loc) (locatorSelector loc))
 
-dispatchEvent :: Locator -> DomEventType -> IO ()
+dispatchEvent :: Locator -> DomEventType -> Playwright ()
 dispatchEvent loc eventType =
   withActionTimeout loc (dispatchEventFrame (locatorFrame loc) (locatorSelector loc) eventType)
 
-fill :: Locator -> Text -> IO ()
+fill :: Locator -> Text -> Playwright ()
 fill loc value =
   withActionTimeout loc (\timeout -> fillFrame (locatorFrame loc) (locatorSelector loc) value timeout)
 
-elementHandle :: Locator -> IO (Maybe ElementHandle)
+elementHandle :: Locator -> Playwright (Maybe ElementHandle)
 elementHandle loc = do
   waitFor loc WaitForAttached
   querySelectorFrame (locatorFrame loc) (locatorSelector loc) (Just True)
 
-elementHandles :: Locator -> IO [ElementHandle]
+elementHandles :: Locator -> Playwright [ElementHandle]
 elementHandles loc =
   querySelectorAllFrame (locatorFrame loc) (locatorSelector loc)
 
-allLocators :: Locator -> IO [Locator]
+allLocators :: Locator -> Playwright [Locator]
 allLocators loc = do
   n <- locatorCount loc
   pure [nth loc i | i <- [0 .. n - 1]]
 
-clear :: Locator -> IO ()
+clear :: Locator -> Playwright ()
 clear loc =
   fill loc ""
 
-check :: Locator -> IO ()
+check :: Locator -> Playwright ()
 check loc = do
   timeout <- locatorActionTimeout loc
   checkWith loc defaultCheckOptions {checkOptionsTimeout = timeout}
 
-checkWith :: Locator -> CheckOptions -> IO ()
+checkWith :: Locator -> CheckOptions -> Playwright ()
 checkWith loc =
   checkFrame (locatorFrame loc) (locatorSelector loc)
 
-uncheck :: Locator -> IO ()
+uncheck :: Locator -> Playwright ()
 uncheck loc = do
   timeout <- locatorActionTimeout loc
   uncheckWith loc defaultCheckOptions {checkOptionsTimeout = timeout}
 
-uncheckWith :: Locator -> CheckOptions -> IO ()
+uncheckWith :: Locator -> CheckOptions -> Playwright ()
 uncheckWith loc =
   uncheckFrame (locatorFrame loc) (locatorSelector loc)
 
-setChecked :: Locator -> Bool -> IO ()
+setChecked :: Locator -> Bool -> Playwright ()
 setChecked loc wanted =
   if wanted
     then check loc
     else uncheck loc
 
-focus :: Locator -> IO ()
+focus :: Locator -> Playwright ()
 focus loc =
   withActionTimeout loc (focusFrame (locatorFrame loc) (locatorSelector loc))
 
-blur :: Locator -> IO ()
+blur :: Locator -> Playwright ()
 blur loc =
   withActionTimeout loc (blurFrame (locatorFrame loc) (locatorSelector loc))
 
-hover :: Locator -> IO ()
+hover :: Locator -> Playwright ()
 hover loc =
   withActionTimeout loc (hoverFrame (locatorFrame loc) (locatorSelector loc))
 
-highlight :: Locator -> IO ()
+highlight :: Locator -> Playwright ()
 highlight loc =
   highlightFrame (locatorFrame loc) (locatorSelector loc)
 
-hideHighlight :: Locator -> IO ()
+hideHighlight :: Locator -> Playwright ()
 hideHighlight loc =
   hideHighlightFrame (locatorFrame loc) (locatorSelector loc)
 
-tap :: Locator -> IO ()
+tap :: Locator -> Playwright ()
 tap loc =
   withActionTimeout loc (tapFrame (locatorFrame loc) (locatorSelector loc))
 
-press :: Locator -> Key -> IO ()
+press :: Locator -> Key -> Playwright ()
 press loc key =
   withActionTimeout loc (pressFrame (locatorFrame loc) (locatorSelector loc) key)
 
-typeText :: Locator -> Text -> IO ()
+typeText :: Locator -> Text -> Playwright ()
 typeText loc text =
   withActionTimeout loc (typeTextFrame (locatorFrame loc) (locatorSelector loc) text)
 
-pressSequentially :: Locator -> Text -> IO ()
+pressSequentially :: Locator -> Text -> Playwright ()
 pressSequentially =
   typeText
 
-setInputFiles :: Locator -> [InputFile] -> IO ()
+setInputFiles :: Locator -> [InputFile] -> Playwright ()
 setInputFiles loc files =
   withActionTimeout loc (setInputFilesFrame (locatorFrame loc) (locatorSelector loc) files)
 
-dragAndDrop :: Locator -> Locator -> IO ()
+dragAndDrop :: Locator -> Locator -> Playwright ()
 dragAndDrop source target =
   withActionTimeout
     source
@@ -418,81 +420,81 @@ dragAndDrop source target =
         (locatorSelector target)
     )
 
-dropOnto :: Locator -> DropPayload -> IO ()
+dropOnto :: Locator -> DropPayload -> Playwright ()
 dropOnto loc payload =
   withActionTimeout loc (dropFrame (locatorFrame loc) (locatorSelector loc) payload)
 
-selectOption :: Locator -> [SelectOption] -> IO [Text]
+selectOption :: Locator -> [SelectOption] -> Playwright [Text]
 selectOption loc options =
   withActionTimeout loc (selectOptionFrame (locatorFrame loc) (locatorSelector loc) options)
 
-innerText :: Locator -> IO Text
+innerText :: Locator -> Playwright Text
 innerText loc =
   withActionTimeout loc (innerTextWith loc)
 
-innerTextWith :: Locator -> Timeout -> IO Text
+innerTextWith :: Locator -> Timeout -> Playwright Text
 innerTextWith loc timeout =
   innerTextFrame (locatorFrame loc) (locatorSelector loc) timeout
 
-innerHtml :: Locator -> IO Text
+innerHtml :: Locator -> Playwright Text
 innerHtml loc =
   withActionTimeout loc (innerHtmlFrame (locatorFrame loc) (locatorSelector loc))
 
-textContent :: Locator -> IO (Maybe Text)
+textContent :: Locator -> Playwright (Maybe Text)
 textContent loc =
   withActionTimeout loc (textContentFrame (locatorFrame loc) (locatorSelector loc))
 
-getAttribute :: Locator -> Text -> IO (Maybe Text)
+getAttribute :: Locator -> Text -> Playwright (Maybe Text)
 getAttribute loc name =
   withActionTimeout loc (getAttributeFrame (locatorFrame loc) (locatorSelector loc) name)
 
-inputValue :: Locator -> IO Text
+inputValue :: Locator -> Playwright Text
 inputValue loc =
   withActionTimeout loc (inputValueFrame (locatorFrame loc) (locatorSelector loc))
 
-isVisible :: Locator -> IO Bool
+isVisible :: Locator -> Playwright Bool
 isVisible loc =
   isVisibleFrame (locatorFrame loc) (locatorSelector loc)
 
-isHidden :: Locator -> IO Bool
+isHidden :: Locator -> Playwright Bool
 isHidden loc =
   isHiddenFrame (locatorFrame loc) (locatorSelector loc)
 
-isChecked :: Locator -> IO Bool
+isChecked :: Locator -> Playwright Bool
 isChecked loc =
   withActionTimeout loc (isCheckedFrame (locatorFrame loc) (locatorSelector loc))
 
-isEnabled :: Locator -> IO Bool
+isEnabled :: Locator -> Playwright Bool
 isEnabled loc =
   withActionTimeout loc (isEnabledFrame (locatorFrame loc) (locatorSelector loc))
 
-isDisabled :: Locator -> IO Bool
+isDisabled :: Locator -> Playwright Bool
 isDisabled loc =
   withActionTimeout loc (isDisabledFrame (locatorFrame loc) (locatorSelector loc))
 
-isEditable :: Locator -> IO Bool
+isEditable :: Locator -> Playwright Bool
 isEditable loc =
   withActionTimeout loc (isEditableFrame (locatorFrame loc) (locatorSelector loc))
 
-locatorCount :: Locator -> IO Int
+locatorCount :: Locator -> Playwright Int
 locatorCount loc =
   queryCountFrame (locatorFrame loc) (locatorSelector loc)
 
-waitFor :: Locator -> WaitForState -> IO ()
+waitFor :: Locator -> WaitForState -> Playwright ()
 waitFor loc state = do
   timeout <- locatorActionTimeout loc
   waitForWith loc timeout state
 
-waitForWith :: Locator -> Timeout -> WaitForState -> IO ()
+waitForWith :: Locator -> Timeout -> WaitForState -> Playwright ()
 waitForWith loc timeout state =
   waitForSelectorFrame (locatorFrame loc) (locatorSelector loc) state timeout (Just True)
 
-withLocatorElement :: Locator -> (ElementHandle -> IO a) -> IO a
+withLocatorElement :: Locator -> (ElementHandle -> Playwright a) -> Playwright a
 withLocatorElement loc action = do
   handle <- requireLocatorHandle loc
   action handle `finally` disposeHandle handle
 
-requireLocatorHandle :: Locator -> IO ElementHandle
+requireLocatorHandle :: Locator -> Playwright ElementHandle
 requireLocatorHandle loc = do
   found <- elementHandle loc
   case found of
@@ -501,14 +503,14 @@ requireLocatorHandle loc = do
     Nothing ->
       throwIO (DecodeFailure "Could not resolve locator to DOM Element")
 
-locatorBoundingBox :: Locator -> IO (Maybe BoundingBox)
+locatorBoundingBox :: Locator -> Playwright (Maybe BoundingBox)
 locatorBoundingBox loc =
   withLocatorElement loc boundingBox
 
-locatorScrollIntoView :: Locator -> IO ()
+locatorScrollIntoView :: Locator -> Playwright ()
 locatorScrollIntoView loc =
   withLocatorElement loc scrollIntoViewIfNeeded
 
-locatorSelectText :: Locator -> IO ()
+locatorSelectText :: Locator -> Playwright ()
 locatorSelectText loc =
   withLocatorElement loc selectText

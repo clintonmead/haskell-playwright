@@ -2,7 +2,7 @@ module Playwright.BrowserContextRouteSpec
   ( tests
   ) where
 
-import Data.IORef
+import UnliftIO.IORef
   ( modifyIORef'
   , newIORef
   , readIORef
@@ -59,19 +59,20 @@ import Playwright
   , unrouteContextAll
   , urlFromText
   , urlToText
+  , Playwright
   )
 import Playwright.Harness
   ( withAssetsContextWith
+  , assertBool
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertBool
-  , assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -192,7 +193,7 @@ tests =
               assertEqual "ok" True =<< responseOk value
     ]
 
-withAssetsContextWithDefault :: (Text -> BrowserContext -> Page -> IO a) -> IO a
+withAssetsContextWithDefault :: (Text -> BrowserContext -> Page -> Playwright a) -> IO a
 withAssetsContextWithDefault =
   withAssetsContextWith defaultNewContextOptions
 

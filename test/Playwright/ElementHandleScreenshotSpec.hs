@@ -21,14 +21,14 @@ import Playwright
 import Playwright.Harness
   ( requireHandle
   , withAssets
+  , assertBool
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertBool
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree

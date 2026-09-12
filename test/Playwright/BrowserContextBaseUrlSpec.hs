@@ -16,10 +16,13 @@ import Playwright
   , url
   , urlFromText
   , urlToText
+  , Playwright
   )
 import Playwright.Harness
   ( withAssetsPrefix
   , withChromiumContextWith
+  , assertEqual
+  , assertFailure
   )
 import Playwright.Url
   ( resolveAgainstBase
@@ -29,9 +32,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -108,7 +109,7 @@ tests =
               assertEqual "page url" "about:blank" current
     ]
 
-expectGotoUrl :: Page -> Text -> Text -> IO ()
+expectGotoUrl :: Page -> Text -> Text -> Playwright ()
 expectGotoUrl page target expected = do
   response <- goto page (urlFromText target) defaultGotoOptions
   case response of

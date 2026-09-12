@@ -7,7 +7,10 @@ module Playwright.BrowserType
   , withBrowser
   ) where
 
-import Control.Exception
+import Playwright.Monad
+  ( Playwright
+  )
+import UnliftIO.Exception
   ( bracket
   , throwIO
   )
@@ -21,12 +24,11 @@ import Playwright.Browser
   )
 import Playwright.Channel
   ( BrowserTypeTag
-  , Channel (Channel, channelConnection, channelGuid)
+  , Channel (Channel, channelGuid)
   , send
   )
 import Playwright.Connection
-  ( Connection
-  , lookupBrowserTypeGuid
+  ( lookupBrowserTypeGuid
   , lookupObject
   , rememberBrowserType
   )
@@ -56,18 +58,18 @@ data BrowserType = BrowserType
   , browserTypeExecutablePath :: Text
   }
 
-browserTypeFromRef :: Connection -> ChannelRef -> IO BrowserType
-browserTypeFromRef conn ref = do
-  obj <- lookupObject conn (channelRefGuid ref)
+browserTypeFromRef :: ChannelRef -> Playwright BrowserType
+browserTypeFromRef ref = do
+  obj <- lookupObject (channelRefGuid ref)
   initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
   pure
     BrowserType
-      { browserTypeChannel = Channel conn (channelRefGuid ref)
+      { browserTypeChannel = Channel (channelRefGuid ref)
       , browserTypeName = browserTypeInitializerName initializer
       , browserTypeExecutablePath = browserTypeInitializerExecutablePath initializer
       }
 
-launch :: BrowserType -> LaunchOptions -> IO Browser
+launch :: BrowserType -> LaunchOptions -> Playwright Browser
 launch browserType opts = do
   result <-
     send
@@ -76,10 +78,8 @@ launch browserType opts = do
       opts
   browser <-
     browserFromRef
-      (channelConnection (browserTypeChannel browserType))
       (browserTypeLaunchResultBrowser result)
   rememberBrowserType
-    (channelConnection (browserTypeChannel browserType))
     (channelGuid (browserChannel browser))
     (channelGuid (browserTypeChannel browserType))
   pure browser
@@ -88,19 +88,18 @@ browserTypesEqual :: BrowserType -> BrowserType -> Bool
 browserTypesEqual left right =
   channelGuid (browserTypeChannel left) == channelGuid (browserTypeChannel right)
 
-browserBrowserType :: Browser -> IO BrowserType
+browserBrowserType :: Browser -> Playwright BrowserType
 browserBrowserType browser = do
   let
-    conn = channelConnection (browserChannel browser)
     guid = channelGuid (browserChannel browser)
-  owner <- lookupBrowserTypeGuid conn guid
+  owner <- lookupBrowserTypeGuid guid
   case owner of
     Just typeGuid ->
-      browserTypeFromRef conn (ChannelRef typeGuid)
+      browserTypeFromRef (ChannelRef typeGuid)
     Nothing -> do
-      obj <- lookupObject conn guid
-      browserTypeFromRef conn (ChannelRef (remoteParent obj))
+      obj <- lookupObject guid
+      browserTypeFromRef (ChannelRef (remoteParent obj))
 
-withBrowser :: BrowserType -> LaunchOptions -> (Browser -> IO a) -> IO a
+withBrowser :: BrowserType -> LaunchOptions -> (Browser -> Playwright a) -> Playwright a
 withBrowser browserType opts =
   bracket (launch browserType opts) closeBrowser

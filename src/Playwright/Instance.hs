@@ -1,43 +1,48 @@
 module Playwright.Instance
-  ( Playwright (..)
-  , withPlaywright
-  , initializePlaywright
-  , chromium
+  ( chromium
   , firefox
+  , initializePlaywright
+  , runPlaywright
   , webkit
   ) where
 
-import Control.Exception
-  ( throwIO
-  )
 import Playwright.BrowserType
-  ( BrowserType
+  ( BrowserType (browserTypeChannel)
   , browserTypeFromRef
   )
 import Playwright.Channel
-  ( Channel (Channel)
-  , PlaywrightTag
+  ( Channel (channelGuid)
   )
 import Playwright.Connection
-  ( Connection
+  ( lookupChromiumGuid
+  , lookupFirefoxGuid
   , lookupObject
+  , lookupWebkitGuid
   , sendCommand
+  , storePlaywrightGuids
   , withConnection
   )
 import Playwright.Driver
   ( findDriver
   )
+import Playwright.Error
+  ( PlaywrightError
+  )
 import Playwright.Guid
   ( rootGuid
   )
 import Playwright.Json.ChannelRef
-  ( ChannelRef (channelRefGuid)
+  ( ChannelRef (ChannelRef, channelRefGuid)
   )
 import Playwright.Json.Decode
   ( fromJsonValue
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
+  )
+import Playwright.Monad
+  ( Playwright
+  , runPlaywrightWith
   )
 import Playwright.Protocol
   ( PlaywrightInitializer (playwrightInitializerChromium, playwrightInitializerFirefox, playwrightInitializerWebkit)
@@ -51,51 +56,48 @@ import Playwright.RemoteObject
 import Playwright.Transport.Stdio
   ( withStdioTransport
   )
+import UnliftIO.Exception
+  ( throwIO
+  )
 
-data Playwright = Playwright
-  { playwrightChannel :: Channel PlaywrightTag
-  , playwrightChromium :: BrowserType
-  , playwrightFirefox :: BrowserType
-  , playwrightWebkit :: BrowserType
-  }
-
-chromium :: Playwright -> BrowserType
-chromium = playwrightChromium
-
-firefox :: Playwright -> BrowserType
-firefox = playwrightFirefox
-
-webkit :: Playwright -> BrowserType
-webkit = playwrightWebkit
-
-withPlaywright :: (Playwright -> IO a) -> IO a
-withPlaywright action = do
+runPlaywright :: Playwright a -> IO a
+runPlaywright action = do
   paths <- findDriver
   withStdioTransport paths $ \transport ->
-    withConnection transport $ \conn -> do
-      pw <- initializePlaywright conn
-      action pw
+    withConnection transport $ \conn ->
+      runPlaywrightWith conn $ do
+        initializePlaywright
+        action
 
-initializePlaywright :: Connection -> IO Playwright
-initializePlaywright conn = do
+initializePlaywright :: Playwright ()
+initializePlaywright = do
   result <-
     sendCommand
-      conn
       rootGuid
       (MethodName "initialize")
       (mkRootInitializeParams SDKLanguageJavascript)
   let
     pwRef :: ChannelRef
     pwRef = rootInitializeResultPlaywright result
-  obj <- lookupObject conn (channelRefGuid pwRef)
-  initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
-  chromiumType <- browserTypeFromRef conn (playwrightInitializerChromium initializer)
-  firefoxType <- browserTypeFromRef conn (playwrightInitializerFirefox initializer)
-  webkitType <- browserTypeFromRef conn (playwrightInitializerWebkit initializer)
-  pure
-    Playwright
-      { playwrightChannel = Channel conn (channelRefGuid pwRef)
-      , playwrightChromium = chromiumType
-      , playwrightFirefox = firefoxType
-      , playwrightWebkit = webkitType
-      }
+  obj <- lookupObject (channelRefGuid pwRef)
+  initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj) :: Either PlaywrightError PlaywrightInitializer)
+  chromiumType <- browserTypeFromRef (playwrightInitializerChromium initializer)
+  firefoxType <- browserTypeFromRef (playwrightInitializerFirefox initializer)
+  webkitType <- browserTypeFromRef (playwrightInitializerWebkit initializer)
+  storePlaywrightGuids
+    (channelRefGuid pwRef)
+    (channelGuid (browserTypeChannel chromiumType))
+    (channelGuid (browserTypeChannel firefoxType))
+    (channelGuid (browserTypeChannel webkitType))
+
+chromium :: Playwright BrowserType
+chromium =
+  lookupChromiumGuid >>= browserTypeFromRef . ChannelRef
+
+firefox :: Playwright BrowserType
+firefox =
+  lookupFirefoxGuid >>= browserTypeFromRef . ChannelRef
+
+webkit :: Playwright BrowserType
+webkit =
+  lookupWebkitGuid >>= browserTypeFromRef . ChannelRef

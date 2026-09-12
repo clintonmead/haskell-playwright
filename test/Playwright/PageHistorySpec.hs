@@ -2,7 +2,7 @@ module Playwright.PageHistorySpec
   ( tests
   ) where
 
-import Data.IORef
+import UnliftIO.IORef
   ( IORef
   , newIORef
   , readIORef
@@ -11,7 +11,6 @@ import Data.IORef
 import Data.Text
   ( Text
   , isInfixOf
-  , pack
   , replace
   )
 import Data.Text.Encoding
@@ -27,9 +26,6 @@ import Network.Wai
   ( Application
   , pathInfo
   , responseLBS
-  )
-import Network.Wai.Handler.Warp
-  ( withApplication
   )
 import Playwright
   ( SpecialJsValue (SpecialUndefined)
@@ -50,15 +46,16 @@ import Playwright
 import Playwright.Harness
   ( withAssets
   , withChromiumPage
+  , withLocalApp
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -160,9 +157,8 @@ reloadRedirect cross =
   withChromiumPage $ \page -> do
     served <- newIORef False
     destination <- newIORef ("" :: Text)
-    withApplication (pure (reloadRedirectApp served destination)) $ \port -> do
+    withLocalApp (reloadRedirectApp served destination) $ \prefix -> do
       let
-        prefix = "http://127.0.0.1:" <> pack (show port)
         expected =
           ( if cross
               then replace "127.0.0.1" "localhost" prefix

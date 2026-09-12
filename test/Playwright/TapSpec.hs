@@ -2,7 +2,7 @@ module Playwright.TapSpec
   ( tests
   ) where
 
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( wait
   , withAsync
   )
@@ -28,19 +28,20 @@ import Playwright
   , tap
   , tapHandle
   , textContentHandle
+  , Playwright
   )
 import Playwright.Harness
   ( locate
   , requireHandle
   , withChromiumContextWith
+  , assertEqual
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -100,13 +101,13 @@ tests =
           tap (locator page (selectorFromText "#b"))
     ]
 
-withTouchPage :: (Page -> IO a) -> IO a
+withTouchPage :: (Page -> Playwright a) -> IO a
 withTouchPage action =
   withChromiumContextWith
     defaultNewContextOptions {newContextHasTouch = Just True}
     (\_ page -> action page)
 
-trackEvents :: ElementHandle -> IO JsHandle
+trackEvents :: ElementHandle -> Playwright JsHandle
 trackEvents target =
   evaluateHandleOnElement
     target

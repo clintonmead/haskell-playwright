@@ -2,7 +2,7 @@ module Playwright.PageWaitForResponseSpec
   ( tests
   ) where
 
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( wait
   , withAsync
   )
@@ -21,15 +21,15 @@ import Playwright
 import Playwright.Harness
   ( assertWaitTimeout
   , withAssets
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree

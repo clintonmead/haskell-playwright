@@ -17,6 +17,9 @@ module Playwright.Frame.Inspect
   , textContentFrameStrict
   ) where
 
+import Playwright.Monad
+  ( Playwright
+  )
 import Data.Aeson
   ( FromJSON
   , ToJSON
@@ -24,15 +27,12 @@ import Data.Aeson
 import Data.Text
   ( Text
   )
-import Playwright.Channel
-  ( channelConnection
-  )
 import Playwright.ElementHandle
   ( ElementHandle
   , elementHandleFromRef
   )
 import Playwright.Frame
-  ( Frame (frameChannel)
+  ( Frame
   , frameSend
   )
 import Playwright.Protocol
@@ -86,12 +86,11 @@ import Playwright.Timeout
   ( Timeout
   )
 
-frameElement :: Frame -> IO ElementHandle
+frameElement :: Frame -> Playwright ElementHandle
 frameElement frame = do
   result <- frameSend frame "frameElement" mkFrameFrameElementParams
   pure
     ( elementHandleFromRef
-        (channelConnection (frameChannel frame))
         (frameFrameElementResultElement result)
     )
 
@@ -104,11 +103,11 @@ queryWithTimeout ::
   Frame ->
   Selector ->
   Timeout ->
-  IO a
+  Playwright a
 queryWithTimeout method mk setStrict project frame selector timeout =
   project <$> frameSend frame method (setStrict (mk selector timeout))
 
-innerTextFrame :: Frame -> Selector -> Timeout -> IO Text
+innerTextFrame :: Frame -> Selector -> Timeout -> Playwright Text
 innerTextFrame =
   queryWithTimeout
     "innerText"
@@ -116,7 +115,7 @@ innerTextFrame =
     (\params -> params {frameInnerTextParamsStrict = Just True})
     frameInnerTextResultValue
 
-innerHtmlFrame :: Frame -> Selector -> Timeout -> IO Text
+innerHtmlFrame :: Frame -> Selector -> Timeout -> Playwright Text
 innerHtmlFrame =
   queryWithTimeout
     "innerHTML"
@@ -124,11 +123,11 @@ innerHtmlFrame =
     (\params -> params {frameInnerHTMLParamsStrict = Just True})
     frameInnerHTMLResultValue
 
-textContentFrame :: Frame -> Selector -> Timeout -> IO (Maybe Text)
+textContentFrame :: Frame -> Selector -> Timeout -> Playwright (Maybe Text)
 textContentFrame frame selector timeout =
   textContentFrameStrict frame selector timeout (Just True)
 
-textContentFrameStrict :: Frame -> Selector -> Timeout -> Maybe Bool -> IO (Maybe Text)
+textContentFrameStrict :: Frame -> Selector -> Timeout -> Maybe Bool -> Playwright (Maybe Text)
 textContentFrameStrict frame selector timeout strict =
   queryWithTimeout
     "textContent"
@@ -139,7 +138,7 @@ textContentFrameStrict frame selector timeout strict =
     selector
     timeout
 
-inputValueFrame :: Frame -> Selector -> Timeout -> IO Text
+inputValueFrame :: Frame -> Selector -> Timeout -> Playwright Text
 inputValueFrame =
   queryWithTimeout
     "inputValue"
@@ -147,7 +146,7 @@ inputValueFrame =
     (\params -> params {frameInputValueParamsStrict = Just True})
     frameInputValueResultValue
 
-isCheckedFrame :: Frame -> Selector -> Timeout -> IO Bool
+isCheckedFrame :: Frame -> Selector -> Timeout -> Playwright Bool
 isCheckedFrame =
   queryWithTimeout
     "isChecked"
@@ -155,7 +154,7 @@ isCheckedFrame =
     (\params -> params {frameIsCheckedParamsStrict = Just True})
     frameIsCheckedResultValue
 
-isEnabledFrame :: Frame -> Selector -> Timeout -> IO Bool
+isEnabledFrame :: Frame -> Selector -> Timeout -> Playwright Bool
 isEnabledFrame =
   queryWithTimeout
     "isEnabled"
@@ -163,7 +162,7 @@ isEnabledFrame =
     (\params -> params {frameIsEnabledParamsStrict = Just True})
     frameIsEnabledResultValue
 
-isDisabledFrame :: Frame -> Selector -> Timeout -> IO Bool
+isDisabledFrame :: Frame -> Selector -> Timeout -> Playwright Bool
 isDisabledFrame =
   queryWithTimeout
     "isDisabled"
@@ -171,7 +170,7 @@ isDisabledFrame =
     (\params -> params {frameIsDisabledParamsStrict = Just True})
     frameIsDisabledResultValue
 
-isEditableFrame :: Frame -> Selector -> Timeout -> IO Bool
+isEditableFrame :: Frame -> Selector -> Timeout -> Playwright Bool
 isEditableFrame =
   queryWithTimeout
     "isEditable"
@@ -179,7 +178,7 @@ isEditableFrame =
     (\params -> params {frameIsEditableParamsStrict = Just True})
     frameIsEditableResultValue
 
-getAttributeFrame :: Frame -> Selector -> Text -> Timeout -> IO (Maybe Text)
+getAttributeFrame :: Frame -> Selector -> Text -> Timeout -> Playwright (Maybe Text)
 getAttributeFrame frame selector name timeout =
   queryWithTimeout
     "getAttribute"
@@ -190,7 +189,7 @@ getAttributeFrame frame selector name timeout =
     selector
     timeout
 
-isVisibleFrame :: Frame -> Selector -> IO Bool
+isVisibleFrame :: Frame -> Selector -> Playwright Bool
 isVisibleFrame frame selector = do
   result <-
     frameSend
@@ -201,7 +200,7 @@ isVisibleFrame frame selector = do
         }
   pure (frameIsVisibleResultValue result)
 
-isHiddenFrame :: Frame -> Selector -> IO Bool
+isHiddenFrame :: Frame -> Selector -> Playwright Bool
 isHiddenFrame frame selector = do
   result <-
     frameSend
@@ -212,21 +211,21 @@ isHiddenFrame frame selector = do
         }
   pure (frameIsHiddenResultValue result)
 
-queryCountFrame :: Frame -> Selector -> IO Int
+queryCountFrame :: Frame -> Selector -> Playwright Int
 queryCountFrame frame selector = do
   result <- frameSend frame "queryCount" (mkFrameQueryCountParams selector)
   pure (frameQueryCountResultValue result)
 
-querySelectorAllFrame :: Frame -> Selector -> IO [ElementHandle]
+querySelectorAllFrame :: Frame -> Selector -> Playwright [ElementHandle]
 querySelectorAllFrame frame selector = do
   result <- frameSend frame "querySelectorAll" (mkFrameQuerySelectorAllParams selector)
   pure
     ( fmap
-        (elementHandleFromRef (channelConnection (frameChannel frame)))
+        (elementHandleFromRef)
         (frameQuerySelectorAllResultElements result)
     )
 
-querySelectorFrame :: Frame -> Selector -> Maybe Bool -> IO (Maybe ElementHandle)
+querySelectorFrame :: Frame -> Selector -> Maybe Bool -> Playwright (Maybe ElementHandle)
 querySelectorFrame frame selector strict = do
   result <-
     frameSend
@@ -237,6 +236,6 @@ querySelectorFrame frame selector strict = do
         }
   pure
     ( fmap
-        (elementHandleFromRef (channelConnection (frameChannel frame)))
+        (elementHandleFromRef)
         (frameQuerySelectorResultElement result)
     )

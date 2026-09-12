@@ -2,10 +2,10 @@ module Playwright.PageAutowaitingBasicSpec
   ( tests
   ) where
 
-import Control.Concurrent
+import UnliftIO.Concurrent
   ( threadDelay
   )
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( wait
   , withAsync
   )
@@ -16,7 +16,7 @@ import Data.ByteString
   ( ByteString
   )
 import Data.ByteString.Lazy qualified as LBS
-import Data.IORef
+import UnliftIO.IORef
   ( IORef
   , modifyIORef'
   , newIORef
@@ -24,7 +24,6 @@ import Data.IORef
   )
 import Data.Text
   ( Text
-  , pack
   , replace
   )
 import Data.Text qualified as Text
@@ -37,9 +36,6 @@ import Network.Wai
   ( Application
   , pathInfo
   , responseLBS
-  )
-import Network.Wai.Handler.Warp
-  ( withApplication
   )
 import Playwright
   ( ClickOptions (clickOptionsNoWaitAfter)
@@ -57,19 +53,21 @@ import Playwright
   , setContent
   , urlFromText
   , waitForLoadState
+  , Playwright
   )
 import Playwright.Harness
   ( locate
   , readTestAsset
   , withChromiumPage
+  , withLocalApp
+  , assertEqual
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -128,7 +126,7 @@ awaitFormClick method =
       modifyIORef' messages (<> ["click"])
       assertEqual "order" "route|navigated|click" . Text.intercalate "|" =<< readIORef messages
 
-clickAndNavigate :: IORef [Text] -> Page -> IO ()
+clickAndNavigate :: IORef [Text] -> Page -> Playwright ()
 clickAndNavigate messages page = do
   awaitNav <- armFrameNavigated page
   withAsync (click (locate page "a")) $ \clicked -> do
@@ -177,19 +175,19 @@ gotoAfterClick =
     _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
     pure ()
 
-withMessagesApp :: (IORef [Text] -> Text -> Page -> IO a) -> IO a
+withMessagesApp :: (IORef [Text] -> Text -> Page -> Playwright a) -> IO a
 withMessagesApp action = do
   messages <- newIORef ([] :: [Text])
   css <- readTestAsset "one-style.css"
   withChromiumPage $ \page ->
-    withApplication (pure (messagesApp messages css)) $ \port ->
-      action messages ("http://127.0.0.1:" <> pack (show port)) page
+    withLocalApp (messagesApp messages css) $ \prefix ->
+      action messages prefix page
 
-withHangEmpty :: (Text -> Page -> IO a) -> IO a
+withHangEmpty :: (Text -> Page -> Playwright a) -> IO a
 withHangEmpty action =
   withChromiumPage $ \page ->
-    withApplication (pure hangEmptyApp) $ \port ->
-      action ("http://127.0.0.1:" <> pack (show port)) page
+    withLocalApp hangEmptyApp $ \prefix ->
+      action prefix page
 
 messagesApp :: IORef [Text] -> ByteString -> Application
 messagesApp messages css request respond =

@@ -2,14 +2,17 @@ module Playwright.SelectorsFrameSpec
   ( tests
   ) where
 
-import Control.Concurrent
+import Control.Monad.IO.Class
+  ( MonadIO
+  )
+import UnliftIO.Concurrent
   ( threadDelay
   )
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( wait
   , withAsync
   )
-import Control.Exception
+import UnliftIO.Exception
   ( try
   )
 import Control.Monad
@@ -62,6 +65,7 @@ import Playwright
   , waitForSelector
   , waitForSelectorOnHandle
   , waitForTimeout
+  , Playwright
   )
 import Playwright.Error
   ( PlaywrightError (ProtocolRpc)
@@ -73,6 +77,8 @@ import Playwright.Harness
   , requireHandle
   , withAssets
   , withChromiumPage
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
@@ -81,9 +87,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -349,12 +353,12 @@ nestedHello :: Text
 nestedHello =
   "iframe >> internal:control=enter-frame >> button:has-text(\"Hello nested iframe\")"
 
-gotoEmpty :: Text -> Page -> IO ()
+gotoEmpty :: Text -> Page -> Playwright ()
 gotoEmpty prefix page = do
   _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
   pure ()
 
-routeIframe :: Page -> IO ()
+routeIframe :: Page -> Playwright ()
 routeIframe page = do
   route page (UrlGlob "**/empty.html") $ \handled ->
     fulfillRoute
@@ -382,7 +386,7 @@ routeIframe page = do
         , fulfillBody = Just (FulfillText "<html><button>Hello nested iframe</button></html>")
         }
 
-reattachNested :: Page -> IO ()
+reattachNested :: Page -> Playwright ()
 reattachNested page = do
   _ <- evaluateOnLocator (locator page (selectorFromText "iframe")) "e => e.remove()"
   _ <-
@@ -391,7 +395,7 @@ reattachNested page = do
       "() => { const iframe = document.createElement('iframe'); iframe.src = 'iframe-2.html'; document.body.appendChild(iframe); }"
   pure ()
 
-addLazyIframe :: Page -> IO ()
+addLazyIframe :: Page -> Playwright ()
 addLazyIframe page = do
   threadDelay 500000
   _ <- evaluate page "() => { const iframe = document.createElement('iframe'); document.body.appendChild(iframe); }"
@@ -399,7 +403,7 @@ addLazyIframe page = do
   _ <- evaluate page "() => document.querySelector('iframe').src = 'iframe.html'"
   pure ()
 
-requireTimeout :: Double -> IO Timeout
+requireTimeout :: (MonadIO m) => Double -> m Timeout
 requireTimeout n =
   case milliseconds n of
     Nothing ->
@@ -407,7 +411,7 @@ requireTimeout n =
     Just timeout ->
       pure timeout
 
-assertProtocolContainsAll :: [Text] -> IO a -> IO ()
+assertProtocolContainsAll :: [Text] -> Playwright a -> Playwright ()
 assertProtocolContainsAll needles action = do
   result <- try action
   case result of

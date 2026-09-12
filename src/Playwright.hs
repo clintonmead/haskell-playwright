@@ -91,7 +91,7 @@ module Playwright
   , PageError (..)
   , PdfOptions (..)
   , PermissionName (..)
-  , Playwright (..)
+  , Playwright
   , Point (..)
   , PropertyName (..)
   , RegisterSelectorOptions (..)
@@ -371,7 +371,6 @@ module Playwright
   , hideHighlight
   , hoverHandle
   , httpStatusOk
-  , initializePlaywright
   , innerHtml
   , innerHtmlHandle
   , innerText
@@ -605,7 +604,7 @@ module Playwright
   , withBrowser
   , withPage
   , withPageWith
-  , withPlaywright
+  , runPlaywright
   , workerUrl
   , workers
   ) where
@@ -1020,12 +1019,13 @@ import Playwright.InputFileName
   ( InputFileName (InputFileName, inputFileNameToText)
   )
 import Playwright.Instance
-  ( Playwright (Playwright, playwrightChannel, playwrightChromium, playwrightFirefox, playwrightWebkit)
-  , chromium
+  ( chromium
   , firefox
-  , initializePlaywright
+  , runPlaywright
   , webkit
-  , withPlaywright
+  )
+import Playwright.Monad
+  ( Playwright
   )
 import Playwright.JsHandle
   ( JsHandle (JsHandle)

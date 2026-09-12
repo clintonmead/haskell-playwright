@@ -8,7 +8,10 @@ module Playwright.Worker
   , workers
   ) where
 
-import Control.Exception
+import Playwright.Monad
+  ( Playwright
+  )
+import UnliftIO.Exception
   ( throwIO
   )
 import Data.Maybe
@@ -19,13 +22,12 @@ import Data.Text
   ( Text
   )
 import Playwright.Channel
-  ( Channel (Channel, channelConnection, channelGuid)
+  ( Channel (Channel, channelGuid)
   , WorkerTag
   , send
   )
 import Playwright.Connection
-  ( Connection
-  , closedGuids
+  ( closedGuids
   , guidsOfType
   , lookupObject
   , waitForChannelEvent
@@ -71,44 +73,42 @@ newtype Worker = Worker
   { workerChannel :: Channel WorkerTag
   }
 
-workerFromRef :: Connection -> ChannelRef -> Worker
-workerFromRef conn ref =
-  Worker (Channel conn (channelRefGuid ref))
+workerFromRef :: ChannelRef -> Worker
+workerFromRef ref =
+  Worker (Channel (channelRefGuid ref))
 
-workerUrl :: Worker -> IO Url
+workerUrl :: Worker -> Playwright Url
 workerUrl worker = do
-  obj <- lookupObject (channelConnection (workerChannel worker)) (channelGuid (workerChannel worker))
+  obj <- lookupObject (channelGuid (workerChannel worker))
   initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
   pure (workerInitializerUrl initializer)
 
-waitForWorker :: Page -> IO Worker
+waitForWorker :: Page -> Playwright Worker
 waitForWorker page = do
   params <-
     waitForChannelEvent
-      (channelConnection (pageChannel page))
       (channelGuid (pageChannel page))
       (MethodName "worker")
   event <- either throwIO pure (fromJsonValue params)
-  pure (workerFromRef (channelConnection (pageChannel page)) (pageWorkerEventWorker event))
+  pure (workerFromRef (pageWorkerEventWorker event))
 
-workers :: Page -> IO [Worker]
+workers :: Page -> Playwright [Worker]
 workers page = do
-  let conn = channelConnection (pageChannel page)
-  closed <- closedGuids conn
-  objects <- traverse (lookupObject conn) =<< guidsOfType conn ChannelTypeWorker
+  closed <- closedGuids
+  objects <- traverse (lookupObject) =<< guidsOfType ChannelTypeWorker
   pure
     ( mapMaybe
         ( \obj ->
             if remoteType obj == ChannelTypeWorker
               && remoteParent obj == channelGuid (pageChannel page)
               && Set.notMember (remoteGuid obj) closed
-              then Just (Worker (Channel conn (remoteGuid obj)))
+              then Just (Worker (Channel (remoteGuid obj)))
               else Nothing
         )
         objects
     )
 
-evaluateOnWorker :: Worker -> Text -> IO SerializedValue
+evaluateOnWorker :: Worker -> Text -> Playwright SerializedValue
 evaluateOnWorker worker expression = do
   result <-
     send
@@ -119,7 +119,7 @@ evaluateOnWorker worker expression = do
         }
   pure (workerEvaluateExpressionResultValue result)
 
-evaluateOnWorkerText :: Worker -> Text -> IO Text
+evaluateOnWorkerText :: Worker -> Text -> Playwright Text
 evaluateOnWorkerText worker expression = do
   value <- evaluateOnWorker worker expression
   case value of

@@ -15,7 +15,10 @@ module Playwright.APIResponse
   , apiResponseUrl
   ) where
 
-import Control.Exception
+import Playwright.Monad
+  ( Playwright
+  )
+import UnliftIO.Exception
   ( throwIO
   )
 import Data.Aeson
@@ -121,7 +124,7 @@ apiResponseHeaders :: APIResponse -> [HttpHeader]
 apiResponseHeaders response =
   collapseHeaders (fmap lowercaseName (apiResponseHeadersArray response))
 
-apiResponseBody :: APIResponse -> IO ByteString
+apiResponseBody :: APIResponse -> Playwright ByteString
 apiResponseBody response = do
   result <-
     send
@@ -134,11 +137,11 @@ apiResponseBody response = do
     Just binary ->
       pure (protocolBinaryToByteString binary)
 
-apiResponseText :: APIResponse -> IO Text
+apiResponseText :: APIResponse -> Playwright Text
 apiResponseText response =
   decodeUtf8 <$> apiResponseBody response
 
-apiResponseJson :: APIResponse -> IO Value
+apiResponseJson :: APIResponse -> Playwright Value
 apiResponseJson response = do
   bytes <- apiResponseBody response
   case eitherDecodeStrict bytes of
@@ -147,7 +150,7 @@ apiResponseJson response = do
     Right value ->
       pure value
 
-apiResponseDispose :: APIResponse -> IO ()
+apiResponseDispose :: APIResponse -> Playwright ()
 apiResponseDispose response = do
   _ :: Protocol.APIRequestContextDisposeAPIResponseResult <-
     send

@@ -2,7 +2,7 @@ module Playwright.PageNavigationSpec
   ( tests
   ) where
 
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( wait
   , withAsync
   )

@@ -13,6 +13,9 @@ module Playwright.Clock
   , clockSetSystemTime
   ) where
 
+import Playwright.Monad
+  ( Playwright
+  )
 import Data.Scientific
   ( Scientific
   )
@@ -70,13 +73,13 @@ clockMillisFromInt :: Int -> ClockMillis
 clockMillisFromInt value =
   ClockMillis (fromIntegral value)
 
-clockInstall :: Page -> IO ()
+clockInstall :: Page -> Playwright ()
 clockInstall page = do
   _ :: BrowserContextClockInstallResult <-
     send (pageContextChannel page) (MethodName "clockInstall") mkBrowserContextClockInstallParams
   pure ()
 
-clockInstallAt :: Page -> ClockTime -> IO ()
+clockInstallAt :: Page -> ClockTime -> Playwright ()
 clockInstallAt page time = do
   let
     (number, string) = timeFields time
@@ -90,7 +93,7 @@ clockInstallAt page time = do
         }
   pure ()
 
-clockPauseAt :: Page -> ClockTime -> IO ()
+clockPauseAt :: Page -> ClockTime -> Playwright ()
 clockPauseAt page time = do
   let
     (number, string) = timeFields time
@@ -104,7 +107,7 @@ clockPauseAt page time = do
         }
   pure ()
 
-clockRunFor :: Page -> ClockTicks -> IO ()
+clockRunFor :: Page -> ClockTicks -> Playwright ()
 clockRunFor page ticks = do
   let
     (number, string) = tickFields ticks
@@ -118,7 +121,7 @@ clockRunFor page ticks = do
         }
   pure ()
 
-clockFastForward :: Page -> ClockTicks -> IO ()
+clockFastForward :: Page -> ClockTicks -> Playwright ()
 clockFastForward page ticks = do
   let
     (number, string) = tickFields ticks
@@ -132,13 +135,13 @@ clockFastForward page ticks = do
         }
   pure ()
 
-clockResume :: Page -> IO ()
+clockResume :: Page -> Playwright ()
 clockResume page = do
   _ :: BrowserContextClockResumeResult <-
     send (pageContextChannel page) (MethodName "clockResume") mkBrowserContextClockResumeParams
   pure ()
 
-clockSetFixedTime :: Page -> ClockTime -> IO ()
+clockSetFixedTime :: Page -> ClockTime -> Playwright ()
 clockSetFixedTime page time = do
   let
     (number, string) = timeFields time
@@ -152,7 +155,7 @@ clockSetFixedTime page time = do
         }
   pure ()
 
-clockSetSystemTime :: Page -> ClockTime -> IO ()
+clockSetSystemTime :: Page -> ClockTime -> Playwright ()
 clockSetSystemTime page time = do
   let
     (number, string) = timeFields time

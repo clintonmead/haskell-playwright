@@ -47,11 +47,14 @@ library:
     - bytestring
     - containers
     - directory
+    - exceptions
     - filepath
+    - mtl
     - scientific
     - stm
     - text
     - typed-process
+    - unliftio
 
 tests:
   playwright-test:
@@ -63,7 +66,6 @@ tests:
       - -with-rtsopts=-N
     dependencies:
       - aeson
-      - async
       - base
       - bytestring
       - case-insensitive
@@ -76,6 +78,7 @@ tests:
       - tasty-hedgehog
       - tasty-hunit
       - text
+      - unliftio
       - wai
       - wai-app-static
       - warp

@@ -11,6 +11,8 @@ import Playwright
   )
 import Playwright.Harness
   ( withChromiumPage
+  , assertEqual
+  , assertFailure
   )
 import Playwright.SerializedValue
   ( SerializedPayload (PayloadDate, PayloadObject, PayloadString)
@@ -21,9 +23,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree

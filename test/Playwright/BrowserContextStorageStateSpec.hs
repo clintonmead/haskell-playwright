@@ -37,19 +37,20 @@ import Playwright
   , storageState
   , urlFromText
   , urlToText
+  , Playwright
   )
 import Playwright.Harness
   ( withAssetsContextWith
   , withChromiumContext
   , withChromiumContextWith
+  , assertEqual
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -119,7 +120,7 @@ replaced =
         ]
     }
 
-fulfillBlank :: Page -> IO ()
+fulfillBlank :: Page -> Playwright ()
 fulfillBlank page =
   route page (UrlGlob "**/*") $ \handled ->
     fulfillRoute handled defaultFulfillOptions {fulfillBody = Just (FulfillText " ")}

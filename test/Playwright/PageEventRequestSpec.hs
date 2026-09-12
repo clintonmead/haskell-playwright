@@ -2,7 +2,7 @@ module Playwright.PageEventRequestSpec
   ( tests
   ) where
 
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( wait
   , withAsync
   )
@@ -11,7 +11,7 @@ import Control.Monad
   )
 import Data.ByteString.Char8 qualified as ByteString.Char8
 import Data.ByteString.Lazy.Char8 qualified as LBS8
-import Data.IORef
+import UnliftIO.IORef
   ( IORef
   , modifyIORef'
   , newIORef
@@ -45,9 +45,6 @@ import Network.Wai
 import Network.Wai qualified as Wai
   ( requestMethod
   )
-import Network.Wai.Handler.Warp
-  ( withApplication
-  )
 import Playwright
   ( Frame
   , HttpMethod (httpMethodToText)
@@ -79,11 +76,16 @@ import Playwright
   , urlFromText
   , urlToText
   , waitForRequest
+  , Playwright
   )
 import Playwright.Harness
   ( requireHandle
   , withAssets
   , withChromiumPage
+  , withLocalApp
+  , assertBool
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
@@ -92,10 +94,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertBool
-  , assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -131,8 +130,8 @@ tests =
           assertEqual "count" 2 =<< readIORef seen
     , testCase "should return response body when Cross-Origin-Opener-Policy is set" $
         withChromiumPage $ \page ->
-          withApplication (pure coopApp) $ \port -> do
-            let empty = "http://127.0.0.1:" <> pack (show port) <> "/empty.html"
+          withLocalApp coopApp $ \prefix -> do
+            let empty = prefix <> "/empty.html"
             response <- goto page (urlFromText empty) defaultGotoOptions
             case response of
               Nothing ->
@@ -171,9 +170,8 @@ tests =
     , testCase "should not expose preflight OPTIONS request" $
         withChromiumPage $ \page -> do
           serverHits <- newIORef ([] :: [Text])
-          withApplication (pure (corsApp serverHits)) $ \port -> do
+          withLocalApp (corsApp serverHits) $ \prefix -> do
             let
-              prefix = "http://127.0.0.1:" <> pack (show port)
               cross = replace "127.0.0.1" "localhost" prefix <> "/cors"
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
             clientHits <- newIORef ([] :: [Text])
@@ -199,8 +197,7 @@ tests =
 lastRequestsTest :: IO ()
 lastRequestsTest =
   withChromiumPage $ \page ->
-    withApplication (pure fetchLogApp) $ \port -> do
-      let prefix = "http://127.0.0.1:" <> pack (show port)
+    withLocalApp fetchLogApp $ \prefix -> do
       _ <- goto page (urlFromText (prefix <> "/title.html")) defaultGotoOptions
       forM_ [0 .. 98 :: Int] $ \i ->
         evaluate page ("() => fetch('" <> prefix <> "/fetch?" <> pack (show i) <> "').then(r => r.text())")
@@ -216,7 +213,7 @@ lastRequestsTest =
             ]
       assertEqual "all" expected received
 
-requestSummary :: Request -> IO (Text, Text)
+requestSummary :: Request -> Playwright (Text, Text)
 requestSummary request = do
   location <- urlToText <$> requestUrl request
   maybeResponse <- requestResponse request
@@ -228,7 +225,7 @@ requestSummary request = do
         responseText response
   pure (location, body)
 
-attachFrame :: Page -> Text -> Text -> IO Frame
+attachFrame :: Page -> Text -> Text -> Playwright Frame
 attachFrame page prefix frameId = do
   handle <-
     evaluateHandle

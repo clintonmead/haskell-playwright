@@ -15,8 +15,6 @@ import Autodocodec
   )
 import Control.Exception
   ( Exception
-  , throwIO
-  , try
   )
 import Data.Aeson
   ( FromJSON
@@ -39,6 +37,13 @@ import Playwright.Timeout
   )
 import Playwright.Transport.Frame
   ( FrameError
+  )
+import UnliftIO
+  ( MonadUnliftIO
+  )
+import UnliftIO.Exception
+  ( throwIO
+  , try
   )
 
 data ProtocolFailure = ProtocolFailure
@@ -85,7 +90,7 @@ targetClosedError =
       , protocolFailureStack = Nothing
       }
 
-ignoreTargetClosed :: IO a -> IO ()
+ignoreTargetClosed :: (MonadUnliftIO m) => m a -> m ()
 ignoreTargetClosed action = do
   result <- try action
   case result of

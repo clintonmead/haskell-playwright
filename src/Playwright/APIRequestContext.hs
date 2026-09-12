@@ -21,7 +21,10 @@ module Playwright.APIRequestContext
   , fetchRequestWith
   ) where
 
-import Control.Exception
+import Playwright.Monad
+  ( Playwright
+  )
+import UnliftIO.Exception
   ( throwIO
   , try
   )
@@ -49,12 +52,11 @@ import Playwright.APIResponse
   )
 import Playwright.Channel
   ( APIRequestContextTag
-  , Channel (Channel, channelConnection)
+  , Channel (Channel)
   , send
   )
 import Playwright.Connection
-  ( Connection
-  , lookupObject
+  ( lookupObject
   , lookupTimeoutDefaults
   )
 import Playwright.Error
@@ -143,23 +145,23 @@ data PostBody = PostBody
   , postBodyJson :: Maybe Text
   }
 
-apiRequestContextFor :: Connection -> Guid -> IO APIRequestContext
-apiRequestContextFor conn guid = do
-  contextGuid <- findBrowserContextGuid conn guid
-  obj <- lookupObject conn contextGuid
+apiRequestContextFor :: Guid -> Playwright APIRequestContext
+apiRequestContextFor guid = do
+  contextGuid <- findBrowserContextGuid guid
+  obj <- lookupObject contextGuid
   initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
   pure
     APIRequestContext
       { apiRequestContextChannel =
-          Channel conn (channelRefGuid (browserContextInitializerRequestContext initializer))
+          Channel (channelRefGuid (browserContextInitializerRequestContext initializer))
       , apiRequestContextTimeoutOwner = contextGuid
       }
 
-fetchRequest :: APIRequestContext -> Request -> IO APIResponse
+fetchRequest :: APIRequestContext -> Request -> Playwright APIResponse
 fetchRequest ctx request =
   fetchRequestWith ctx request defaultFetchOptions
 
-fetchRequestWith :: APIRequestContext -> Request -> FetchOptions -> IO APIResponse
+fetchRequestWith :: APIRequestContext -> Request -> FetchOptions -> Playwright APIResponse
 fetchRequestWith ctx request opts = do
   url <- maybe (requestUrl request) pure (fetchUrl opts)
   method <- maybe (requestMethod request) pure (fetchMethod opts)
@@ -167,11 +169,11 @@ fetchRequestWith ctx request opts = do
   post <- resolveRequestPost (fetchPostData opts) request
   sendFetch ctx url (Just method) (Just headers) post opts
 
-fetchFromUrl :: APIRequestContext -> Url -> IO APIResponse
+fetchFromUrl :: APIRequestContext -> Url -> Playwright APIResponse
 fetchFromUrl ctx url =
   fetchFromUrlWith ctx url defaultFetchOptions
 
-fetchFromUrlWith :: APIRequestContext -> Url -> FetchOptions -> IO APIResponse
+fetchFromUrlWith :: APIRequestContext -> Url -> FetchOptions -> Playwright APIResponse
 fetchFromUrlWith ctx url opts =
   sendFetch
     ctx
@@ -181,51 +183,51 @@ fetchFromUrlWith ctx url opts =
     (postFromOverlay (fetchPostData opts))
     opts
 
-fetchGet :: APIRequestContext -> Url -> IO APIResponse
+fetchGet :: APIRequestContext -> Url -> Playwright APIResponse
 fetchGet ctx url =
   fetchGetWith ctx url defaultFetchOptions
 
-fetchGetWith :: APIRequestContext -> Url -> FetchOptions -> IO APIResponse
+fetchGetWith :: APIRequestContext -> Url -> FetchOptions -> Playwright APIResponse
 fetchGetWith ctx url opts =
   fetchFromUrlWith ctx url (withFetchMethod "GET" opts)
 
-fetchDelete :: APIRequestContext -> Url -> IO APIResponse
+fetchDelete :: APIRequestContext -> Url -> Playwright APIResponse
 fetchDelete ctx url =
   fetchDeleteWith ctx url defaultFetchOptions
 
-fetchDeleteWith :: APIRequestContext -> Url -> FetchOptions -> IO APIResponse
+fetchDeleteWith :: APIRequestContext -> Url -> FetchOptions -> Playwright APIResponse
 fetchDeleteWith ctx url opts =
   fetchFromUrlWith ctx url (withFetchMethod "DELETE" opts)
 
-fetchHead :: APIRequestContext -> Url -> IO APIResponse
+fetchHead :: APIRequestContext -> Url -> Playwright APIResponse
 fetchHead ctx url =
   fetchHeadWith ctx url defaultFetchOptions
 
-fetchHeadWith :: APIRequestContext -> Url -> FetchOptions -> IO APIResponse
+fetchHeadWith :: APIRequestContext -> Url -> FetchOptions -> Playwright APIResponse
 fetchHeadWith ctx url opts =
   fetchFromUrlWith ctx url (withFetchMethod "HEAD" opts)
 
-fetchPatch :: APIRequestContext -> Url -> IO APIResponse
+fetchPatch :: APIRequestContext -> Url -> Playwright APIResponse
 fetchPatch ctx url =
   fetchPatchWith ctx url defaultFetchOptions
 
-fetchPatchWith :: APIRequestContext -> Url -> FetchOptions -> IO APIResponse
+fetchPatchWith :: APIRequestContext -> Url -> FetchOptions -> Playwright APIResponse
 fetchPatchWith ctx url opts =
   fetchFromUrlWith ctx url (withFetchMethod "PATCH" opts)
 
-fetchPost :: APIRequestContext -> Url -> IO APIResponse
+fetchPost :: APIRequestContext -> Url -> Playwright APIResponse
 fetchPost ctx url =
   fetchPostWith ctx url defaultFetchOptions
 
-fetchPostWith :: APIRequestContext -> Url -> FetchOptions -> IO APIResponse
+fetchPostWith :: APIRequestContext -> Url -> FetchOptions -> Playwright APIResponse
 fetchPostWith ctx url opts =
   fetchFromUrlWith ctx url (withFetchMethod "POST" opts)
 
-fetchPut :: APIRequestContext -> Url -> IO APIResponse
+fetchPut :: APIRequestContext -> Url -> Playwright APIResponse
 fetchPut ctx url =
   fetchPutWith ctx url defaultFetchOptions
 
-fetchPutWith :: APIRequestContext -> Url -> FetchOptions -> IO APIResponse
+fetchPutWith :: APIRequestContext -> Url -> FetchOptions -> Playwright APIResponse
 fetchPutWith ctx url opts =
   fetchFromUrlWith ctx url (withFetchMethod "PUT" opts)
 
@@ -240,7 +242,7 @@ sendFetch ::
   Maybe [HttpHeader] ->
   PostBody ->
   FetchOptions ->
-  IO APIResponse
+  Playwright APIResponse
 sendFetch ctx url method headers post opts = do
   validateFetchBound "maxRedirects" (fetchMaxRedirects opts)
   validateFetchBound "maxRetries" (fetchMaxRetries opts)
@@ -269,7 +271,7 @@ sendFetch ctx url method headers post opts = do
       , apiResponsePayload = aPIRequestContextFetchResultResponse result
       }
 
-validateFetchBound :: Text -> Maybe Int -> IO ()
+validateFetchBound :: Text -> Maybe Int -> Playwright ()
 validateFetchBound name value =
   case value of
     Just n | n < 0 ->
@@ -277,7 +279,7 @@ validateFetchBound name value =
     _ ->
       pure ()
 
-resolveFetchTimeout :: APIRequestContext -> Maybe Timeout -> IO Timeout
+resolveFetchTimeout :: APIRequestContext -> Maybe Timeout -> Playwright Timeout
 resolveFetchTimeout ctx timeoutOverride =
   case timeoutOverride of
     Just timeout ->
@@ -285,21 +287,20 @@ resolveFetchTimeout ctx timeoutOverride =
     Nothing -> do
       defaults <-
         lookupTimeoutDefaults
-          (channelConnection (apiRequestContextChannel ctx))
           (apiRequestContextTimeoutOwner ctx)
       pure (resolveActionTimeout emptyTimeoutDefaults defaults)
 
-findBrowserContextGuid :: Connection -> Guid -> IO Guid
-findBrowserContextGuid conn guid = do
-  obj <- lookupObject conn guid
+findBrowserContextGuid :: Guid -> Playwright Guid
+findBrowserContextGuid guid = do
+  obj <- lookupObject guid
   if remoteType obj == ChannelTypeBrowserContext
     then pure guid
     else
       if remoteParent obj == guid
         then throwIO (DecodeFailure "No browser context for APIRequestContext")
-        else findBrowserContextGuid conn (remoteParent obj)
+        else findBrowserContextGuid (remoteParent obj)
 
-resolveRequestPost :: Maybe FetchPostData -> Request -> IO PostBody
+resolveRequestPost :: Maybe FetchPostData -> Request -> Playwright PostBody
 resolveRequestPost overlay request =
   case overlay of
     Just payload ->
@@ -349,7 +350,7 @@ toFormField field =
               )
         }
 
-apiRequestStorageState :: APIRequestContext -> IO StorageState
+apiRequestStorageState :: APIRequestContext -> Playwright StorageState
 apiRequestStorageState ctx = do
   result :: APIRequestContextStorageStateResult <-
     send
@@ -358,7 +359,7 @@ apiRequestStorageState ctx = do
       mkAPIRequestContextStorageStateParams
   pure (fromRequestStorageState result)
 
-disposeAPIRequestContext :: APIRequestContext -> IO ()
+disposeAPIRequestContext :: APIRequestContext -> Playwright ()
 disposeAPIRequestContext ctx = do
   result <-
     try $

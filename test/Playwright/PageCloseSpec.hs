@@ -2,7 +2,7 @@ module Playwright.PageCloseSpec
   ( tests
   ) where
 
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( concurrently_
   , wait
   , withAsync
@@ -26,14 +26,14 @@ import Playwright.Harness
   ( assertProtocolContains
   , withChromiumContext
   , withChromiumPage
+  , assertEqual
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree

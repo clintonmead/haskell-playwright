@@ -2,7 +2,7 @@ module Playwright.BrowserContextExposeFunctionSpec
   ( tests
   ) where
 
-import Control.Exception
+import UnliftIO.Exception
   ( throwIO
   )
 import Playwright
@@ -15,6 +15,7 @@ import Playwright
   , goto
   , numberArgument
   , urlFromText
+  , Playwright
   )
 import Playwright.Error
   ( PlaywrightError (EvaluateUnexpected)
@@ -23,6 +24,7 @@ import Playwright.Harness
   ( assertProtocolContains
   , withAssetsContextWith
   , withChromiumContext
+  , assertEqual
   )
 import Playwright.SerializedArgument
   ( SerializedArgument
@@ -36,8 +38,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -71,7 +72,7 @@ tests =
             =<< evaluateNumber page "async () => window.add(5, 6)"
     ]
 
-add :: [SerializedValue] -> IO SerializedArgument
+add :: [SerializedValue] -> Playwright SerializedArgument
 add args =
   case args of
     [SerializedNode (PayloadNumber left) _, SerializedNode (PayloadNumber right) _] ->
@@ -79,7 +80,7 @@ add args =
     _ ->
       throwIO (EvaluateUnexpected (SerializedNode (PayloadNumber 0) Nothing))
 
-multiply :: [SerializedValue] -> IO SerializedArgument
+multiply :: [SerializedValue] -> Playwright SerializedArgument
 multiply args =
   case args of
     [SerializedNode (PayloadNumber left) _, SerializedNode (PayloadNumber right) _] ->

@@ -22,17 +22,18 @@ import Playwright
   , selectorFromText
   , urlFromText
   , waitFor
+  , Playwright
   )
 import Playwright.Harness
   ( withAssets
+  , assertEqual
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -67,7 +68,7 @@ tests =
           assertEqual "nested" "Hello nested iframe" =<< innerText button
     ]
 
-routeIframe :: Page -> IO ()
+routeIframe :: Page -> Playwright ()
 routeIframe page = do
   route page (UrlGlob "**/empty.html") $ \handled ->
     fulfillRoute

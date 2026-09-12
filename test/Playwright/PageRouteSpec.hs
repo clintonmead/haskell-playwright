@@ -2,7 +2,7 @@ module Playwright.PageRouteSpec
   ( tests
   ) where
 
-import Data.IORef
+import UnliftIO.IORef
   ( modifyIORef'
   , newIORef
   , readIORef
@@ -50,16 +50,16 @@ import Playwright
   )
 import Playwright.Harness
   ( withAssets
+  , assertBool
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertBool
-  , assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree

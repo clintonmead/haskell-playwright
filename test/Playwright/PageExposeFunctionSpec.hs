@@ -2,7 +2,7 @@ module Playwright.PageExposeFunctionSpec
   ( tests
   ) where
 
-import Control.Exception
+import UnliftIO.Exception
   ( throwIO
   )
 import Playwright
@@ -17,6 +17,7 @@ import Playwright
   , numberArgument
   , setContent
   , urlFromText
+  , Playwright
   )
 import Playwright.Error
   ( PlaywrightError (EvaluateUnexpected)
@@ -25,6 +26,7 @@ import Playwright.Harness
   ( assertProtocolContains
   , withAssets
   , withChromiumPage
+  , assertEqual
   )
 import Playwright.SerializedArgument
   ( SerializedArgument
@@ -38,8 +40,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -88,7 +89,7 @@ tests =
           assertEqual "product" (6 :: Double) =<< evaluateNumber page "() => window.result"
     ]
 
-multiply :: [SerializedValue] -> IO SerializedArgument
+multiply :: [SerializedValue] -> Playwright SerializedArgument
 multiply args =
   case args of
     [SerializedNode (PayloadNumber left) _, SerializedNode (PayloadNumber right) _] ->
@@ -96,7 +97,7 @@ multiply args =
     _ ->
       throwIO (EvaluateUnexpected (SerializedNode (PayloadNumber 0) Nothing))
 
-requireNumber :: SerializedValue -> IO Double
+requireNumber :: SerializedValue -> Playwright Double
 requireNumber value =
   case value of
     SerializedNode (PayloadNumber number) _ ->

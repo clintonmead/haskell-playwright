@@ -2,6 +2,9 @@ module Playwright.PageClickReactSpec
   ( tests
   ) where
 
+import Control.Monad.IO.Class
+  ( MonadIO
+  )
 import Playwright
   ( ClickOptions (clickOptionsTimeout)
   , SpecialJsValue (SpecialUndefined)
@@ -22,6 +25,8 @@ import Playwright.Harness
   , locate
   , withAssetPage
   , withChromiumPage
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
@@ -30,9 +35,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -75,7 +78,7 @@ tests =
             assertEqual "button2" True =<< evaluateBool page "() => window.button2"
       ]
 
-requireTimeout :: Double -> IO Timeout
+requireTimeout :: (MonadIO m) => Double -> m Timeout
 requireTimeout n =
   case milliseconds n of
     Nothing ->

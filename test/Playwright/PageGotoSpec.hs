@@ -2,20 +2,26 @@ module Playwright.PageGotoSpec
   ( tests
   ) where
 
-import Control.Concurrent
+import Control.Monad.IO.Class
+  ( MonadIO
+  )
+import UnliftIO
+  ( withRunInIO
+  )
+import UnliftIO.Concurrent
   ( threadDelay
   )
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( async
   , wait
   , withAsync
   )
-import Control.Concurrent.MVar
+import UnliftIO.MVar
   ( newEmptyMVar
   , putMVar
   , takeMVar
   )
-import Control.Exception
+import UnliftIO.Exception
   ( SomeException
   , try
   )
@@ -27,7 +33,7 @@ import Data.ByteString.Lazy
   ( ByteString
   )
 import Data.ByteString.Lazy qualified as LBS
-import Data.IORef
+import UnliftIO.IORef
   ( IORef
   , atomicModifyIORef'
   , modifyIORef'
@@ -126,6 +132,7 @@ import Playwright
   , urlFromText
   , urlToText
   , waitForTimeout
+  , Playwright
   )
 import Playwright.Harness
   ( assertProtocolContains
@@ -133,6 +140,9 @@ import Playwright.Harness
   , testAssetsDir
   , withAssets
   , withChromiumPage
+  , withLocalApp
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
@@ -141,9 +151,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -540,7 +548,7 @@ tests =
           urlBarDuringPending
     ]
 
-requireMs :: Double -> IO Timeout
+requireMs :: (MonadIO m) => Double -> m Timeout
 requireMs n =
   case milliseconds n of
     Nothing ->
@@ -548,7 +556,7 @@ requireMs n =
     Just timeout ->
       pure timeout
 
-assetFileUrl :: FilePath -> IO Text
+assetFileUrl :: (MonadIO m) => FilePath -> m Text
 assetFileUrl relative = do
   dir <- testAssetsDir
   pure ("file://" <> pack dir <> "/" <> pack relative)
@@ -557,16 +565,15 @@ crossProcess :: Text -> Text
 crossProcess =
   replace "127.0.0.1" "localhost"
 
-withHangServer :: (Text -> IO a) -> IO a
-withHangServer action =
-  withApplication (pure hangApp) $ \port ->
-    action ("http://127.0.0.1:" <> pack (show port))
+withHangServer :: (Text -> Playwright a) -> Playwright a
+withHangServer =
+  withLocalApp hangApp
 
-withGotoServer :: Application -> (Text -> Page -> IO a) -> IO a
+withGotoServer :: Application -> (Text -> Page -> Playwright a) -> IO a
 withGotoServer app action =
   withChromiumPage $ \page ->
-    withApplication (pure app) $ \port ->
-      action ("http://127.0.0.1:" <> pack (show port)) page
+    withLocalApp app $ \prefix ->
+      action prefix page
 
 hangApp :: Application
 hangApp _request _respond =
@@ -624,12 +631,12 @@ coopRedirectApp request respond =
     _ ->
       respond (responseLBS status404 [] "")
 
-listenNetwork :: Page -> IO (IORef [Text], IORef [Request])
+listenNetwork :: Page -> Playwright (IORef [Text], IORef [Request])
 listenNetwork page = do
   events <- newIORef ([] :: [Text])
   seen <- newIORef ([] :: [Request])
   let
-    remember :: Text -> Request -> IO ()
+    remember :: Text -> Request -> Playwright ()
     remember label request = do
       modifyIORef' events (<> [label])
       modifyIORef' seen (addUnique request)
@@ -838,7 +845,7 @@ canceledNavigation = do
   withGotoServer app $ \prefix page ->
     withAsync
       ( try (goto page (urlFromText (prefix <> "/one-style.html")) defaultGotoOptions) ::
-          IO (Either SomeException (Maybe Response))
+          Playwright (Either SomeException (Maybe Response))
       )
       $ \pending -> do
         takeMVar started
@@ -945,7 +952,7 @@ failBeforeCommit = do
         responseFinished value
     result <-
       try (goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions) ::
-        IO (Either SomeException (Maybe Response))
+        Playwright (Either SomeException (Maybe Response))
     case result of
       Left _ ->
         pure ()
@@ -980,7 +987,7 @@ windowStopGoto = do
       ( do
           result <-
             try (goto page (urlFromText (prefix <> "/window-stop.html")) defaultGotoOptions) ::
-              IO (Either SomeException (Maybe Response))
+              Playwright (Either SomeException (Maybe Response))
           case result of
             Left _ ->
               pure ()
@@ -1077,6 +1084,7 @@ replacedByAnotherNavigation = do
   assets <- testAssetsDir
   prefixRef <- newIORef ("" :: Text)
   pageRef <- newIORef (Nothing :: Maybe Page)
+  gotoIO <- newIORef (Nothing :: Maybe (Page -> Text -> IO (Maybe Response)))
   another <- newEmptyMVar
   let
     static = staticApp (defaultFileServerSettings assets)
@@ -1086,34 +1094,37 @@ replacedByAnotherNavigation = do
         ["empty.html"] -> do
           prefix <- readIORef prefixRef
           maybePage <- readIORef pageRef
-          case maybePage of
-            Nothing ->
-              respond (responseLBS status500 [] "")
-            Just page -> do
+          maybeGoto <- readIORef gotoIO
+          case (maybePage, maybeGoto) of
+            (Just page, Just runGoto) -> do
               void $
                 async $
                   putMVar another
-                    =<< goto
-                      page
-                      (urlFromText (prefix <> "/one-style.html"))
-                      defaultGotoOptions
+                    =<< runGoto page (prefix <> "/one-style.html")
               forever (threadDelay 1000000)
+            _ ->
+              respond (responseLBS status500 [] "")
         _ ->
           static request respond
   withChromiumPage $ \page ->
-    withApplication (pure app) $ \port -> do
-      let prefix = "http://127.0.0.1:" <> pack (show port)
-      writeIORef prefixRef prefix
+    withRunInIO $ \run -> do
+      writeIORef
+        gotoIO
+        (Just (\targetPage target -> run (goto targetPage (urlFromText target) defaultGotoOptions)))
       writeIORef pageRef (Just page)
-      result <-
-        try (goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions) ::
-          IO (Either SomeException (Maybe Response))
-      _ <- takeMVar another
-      case result of
-        Left _ ->
-          pure ()
-        Right _ ->
-          assertFailure "expected replaced navigation to fail"
+      withApplication (pure app) $ \port ->
+        run $ do
+          let prefix = "http://127.0.0.1:" <> pack (show port)
+          writeIORef prefixRef prefix
+          result <-
+            try (goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions) ::
+              Playwright (Either SomeException (Maybe Response))
+          _ <- takeMVar another
+          case result of
+            Left _ ->
+              pure ()
+            Right _ ->
+              assertFailure "expected replaced navigation to fail"
 
 jsRedirectUrlBar :: IO ()
 jsRedirectUrlBar = do
@@ -1150,7 +1161,7 @@ jsRedirectUrlBar = do
     _ <- goto page (urlFromText (prefix <> "/a")) defaultGotoOptions
     result <-
       try (goto page (urlFromText (prefix <> "/b")) defaultGotoOptions) ::
-        IO (Either SomeException (Maybe Response))
+        Playwright (Either SomeException (Maybe Response))
     recorded <- readIORef events
     assertEqual "events" ["started b", "finished b"] recorded
     case result of
@@ -1196,7 +1207,7 @@ urlBarDuringPending = do
     waitForTimeout page timeout
     result <-
       try (goto page (urlFromText (prefix <> "/b")) defaultGotoOptions) ::
-        IO (Either SomeException (Maybe Response))
+        Playwright (Either SomeException (Maybe Response))
     recorded <- readIORef events
     assertEqual "events" ["started c", "started b", "finished c", "finished b"] recorded
     case result of

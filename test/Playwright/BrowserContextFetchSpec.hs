@@ -2,26 +2,32 @@ module Playwright.BrowserContextFetchSpec
   ( tests
   ) where
 
+import Control.Monad.IO.Class
+  ( MonadIO
+  , liftIO
+  )
 import Codec.Compression.GZip qualified as GZip
 import Codec.Compression.Zlib qualified as Zlib
 import Control.Concurrent
   ( Chan
   , newChan
   , readChan
-  , threadDelay
   , writeChan
   )
-import Control.Concurrent.Async
+import UnliftIO.Concurrent
+  ( threadDelay
+  )
+import UnliftIO.Async
   ( wait
   , withAsync
   )
-import Control.Concurrent.MVar
+import UnliftIO.MVar
   ( MVar
   , newEmptyMVar
   , takeMVar
   , tryPutMVar
   )
-import Control.Exception
+import UnliftIO.Exception
   ( try
   )
 import Control.Monad
@@ -40,7 +46,7 @@ import Data.ByteString
   )
 import Data.ByteString qualified as ByteString
 import Data.ByteString.Lazy qualified as LBS
-import Data.IORef
+import UnliftIO.IORef
   ( IORef
   , atomicModifyIORef'
   , newIORef
@@ -173,6 +179,7 @@ import Playwright
   , urlFromText
   , urlToText
   , waitForRequest
+  , Playwright
   )
 import Playwright.Error
   ( PlaywrightError (DecodeFailure, ProtocolRpc)
@@ -187,6 +194,9 @@ import Playwright.Harness
   , withChromiumBrowser
   , withChromiumContext
   , withChromiumContextWith
+  , assertBool
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
@@ -195,10 +205,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertBool
-  , assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -715,7 +722,7 @@ tests =
           multipartRepeatingTest
       ]
 
-assertSimpleJson :: Text -> APIResponse -> IO ()
+assertSimpleJson :: Text -> APIResponse -> Playwright ()
 assertSimpleJson prefix response = do
   assertEqual "url" (urlToText (simpleJson prefix)) (urlToText (apiResponseUrl response))
   assertEqual "status" 200 (httpStatusToInt (apiResponseStatus response))
@@ -728,7 +735,7 @@ assertSimpleJson prefix response = do
 
 methodPostDataTest ::
   Text ->
-  (APIRequestContext -> Url -> FetchOptions -> IO APIResponse) ->
+  (APIRequestContext -> Url -> FetchOptions -> Playwright APIResponse) ->
   IO ()
 methodPostDataTest methodName send =
   withCapturedSimple $ \prefix captured ctx -> do
@@ -744,7 +751,7 @@ methodPostDataTest methodName send =
     assertEqual "body" "My request" (decodeUtf8 body)
     assertEqual "path" "/simple.json" (dropOrigin (urlToText (apiResponseUrl response)))
 
-assertNetworkError :: IO a -> IO ()
+assertNetworkError :: Playwright a -> Playwright ()
 assertNetworkError action = do
   result <- try action
   case result of
@@ -757,12 +764,12 @@ assertNetworkError action = do
     Right _ ->
       assertFailure "expected network error"
 
-withAssetsContext :: (Text -> BrowserContext -> IO a) -> IO a
+withAssetsContext :: (Text -> BrowserContext -> Playwright a) -> IO a
 withAssetsContext action =
   withAssetsContextWith defaultNewContextOptions $ \prefix ctx _page ->
     action prefix ctx
 
-withHangupApp :: (Text -> BrowserContext -> IO a) -> IO a
+withHangupApp :: (Text -> BrowserContext -> Playwright a) -> IO a
 withHangupApp action =
   withApplication (pure hangupApp) $ \port ->
     withChromiumContext $ \ctx _page ->
@@ -778,7 +785,7 @@ hangupApp request respond =
     _ ->
       respond (responseLBS status404 [] "")
 
-withRedirectJsonApp :: (Text -> BrowserContext -> IO a) -> IO a
+withRedirectJsonApp :: (Text -> BrowserContext -> Playwright a) -> IO a
 withRedirectJsonApp action = do
   assets <- testAssetsDir
   withApplication (pure (redirectJsonApp assets)) $ \port ->
@@ -795,7 +802,7 @@ redirectJsonApp assets request respond =
     _ ->
       staticApp (defaultFileServerSettings assets) request respond
 
-withSetCookieApp :: (Text -> BrowserContext -> Page -> IO a) -> IO a
+withSetCookieApp :: (Text -> BrowserContext -> Page -> Playwright a) -> IO a
 withSetCookieApp action =
   withApplication (pure setCookieApp) $ \port ->
     withChromiumContext $ \ctx page ->
@@ -816,7 +823,7 @@ setCookieApp request respond =
     _ ->
       respond (responseLBS status404 [] "")
 
-withSlowApp :: (Text -> BrowserContext -> IO a) -> IO a
+withSlowApp :: (Text -> BrowserContext -> Playwright a) -> IO a
 withSlowApp action =
   withApplication (pure slowApp) $ \port ->
     withChromiumContext $ \ctx _page ->
@@ -830,7 +837,7 @@ slowApp request respond =
     _ ->
       respond (responseLBS status404 [] "")
 
-withMissingApp :: (Text -> BrowserContext -> IO a) -> IO a
+withMissingApp :: (Text -> BrowserContext -> Playwright a) -> IO a
 withMissingApp action =
   withApplication (pure missingApp) $ \port ->
     withChromiumContext $ \ctx _page ->
@@ -840,7 +847,7 @@ missingApp :: Application
 missingApp _request respond =
   respond (responseLBS status404 [(hContentType, "text/plain")] "File not found: nope")
 
-withCapturedSimple :: (Text -> MVar (ByteString, ByteString) -> BrowserContext -> IO a) -> IO a
+withCapturedSimple :: (Text -> MVar (ByteString, ByteString) -> BrowserContext -> Playwright a) -> IO a
 withCapturedSimple action = do
   captured <- newEmptyMVar
   withApplication (pure (captureSimple captured)) $ \port ->
@@ -859,7 +866,7 @@ captureSimple captured request respond = do
     )
 
 objectParamsTest ::
-  (APIRequestContext -> Url -> FetchOptions -> IO APIResponse) ->
+  (APIRequestContext -> Url -> FetchOptions -> Playwright APIResponse) ->
   IO ()
 objectParamsTest send =
   queryParamsTest
@@ -874,7 +881,7 @@ objectParamsTest send =
     [("param1", "value1"), ("парам2", "знач2")]
 
 duplicateParamsTest ::
-  (APIRequestContext -> Url -> FetchOptions -> IO APIResponse) ->
+  (APIRequestContext -> Url -> FetchOptions -> Playwright APIResponse) ->
   IO ()
 duplicateParamsTest send =
   queryParamsTest
@@ -890,7 +897,7 @@ duplicateParamsTest send =
     [("param1", "value1"), ("param1", "value2"), ("парам2", "знач2")]
 
 encodedParamsTest ::
-  (APIRequestContext -> Url -> FetchOptions -> IO APIResponse) ->
+  (APIRequestContext -> Url -> FetchOptions -> Playwright APIResponse) ->
   IO ()
 encodedParamsTest send =
   queryParamsTest
@@ -899,7 +906,7 @@ encodedParamsTest send =
     [("param1", "value1"), ("param1", "value2"), ("парам2", "знач2")]
 
 queryParamsTest ::
-  (APIRequestContext -> Url -> FetchOptions -> IO APIResponse) ->
+  (APIRequestContext -> Url -> FetchOptions -> Playwright APIResponse) ->
   FetchOptions ->
   [(Text, Text)] ->
   IO ()
@@ -911,7 +918,7 @@ queryParamsTest send opts expected =
     assertEqual "request query" expected (decodeQuery raw)
     assertEqual "response query" expected (decodeQueryText (urlToText (apiResponseUrl response)))
 
-withQueryCapture :: (Text -> MVar ByteString -> BrowserContext -> IO a) -> IO a
+withQueryCapture :: (Text -> MVar ByteString -> BrowserContext -> Playwright a) -> IO a
 withQueryCapture action = do
   captured <- newEmptyMVar
   withApplication (pure (queryApp captured)) $ \port ->
@@ -950,7 +957,7 @@ decodePair (name, value) =
   )
 
 failOnStatusTest ::
-  (APIRequestContext -> Url -> FetchOptions -> IO APIResponse) ->
+  (APIRequestContext -> Url -> FetchOptions -> Playwright APIResponse) ->
   Bool ->
   IO ()
 failOnStatusTest send expectBody =
@@ -975,7 +982,7 @@ failOnStatusTest send expectBody =
       Right _ ->
         assertFailure "expected failOnStatusCode error"
 
-withPartialBodyApp :: (Text -> BrowserContext -> IO a) -> IO a
+withPartialBodyApp :: (Text -> BrowserContext -> Playwright a) -> IO a
 withPartialBodyApp action =
   withApplication (pure partialBodyApp) $ \port ->
     withChromiumContext $ \ctx _page ->
@@ -997,7 +1004,7 @@ partialBodyApp request respond =
     _ ->
       respond (responseLBS status404 [] "")
 
-withCookieCapture :: (Text -> MVar (Maybe ByteString) -> BrowserContext -> IO a) -> IO a
+withCookieCapture :: (Text -> MVar (Maybe ByteString) -> BrowserContext -> Playwright a) -> IO a
 withCookieCapture action = do
   captured <- newEmptyMVar
   withApplication (pure (cookieCaptureApp captured)) $ \port ->
@@ -1009,7 +1016,7 @@ cookieCaptureApp captured request respond = do
   _ <- tryPutMVar captured (lookupHeader "cookie" (requestHeaders request))
   respond (responseLBS status200 [(hContentType, "text/html")] "<html><body></body></html>")
 
-withUtf8RedirectApp :: (Text -> BrowserContext -> IO a) -> IO a
+withUtf8RedirectApp :: (Text -> BrowserContext -> Playwright a) -> IO a
 withUtf8RedirectApp action =
   withApplication (pure utf8RedirectApp) $ \port ->
     withChromiumContext $ \ctx _page ->
@@ -1031,7 +1038,7 @@ utf8RedirectApp request respond =
     _ ->
       respond (responseLBS status404 [] "")
 
-withOrderedCookieApp :: (Text -> MVar (Maybe ByteString) -> BrowserContext -> Page -> IO a) -> IO a
+withOrderedCookieApp :: (Text -> MVar (Maybe ByteString) -> BrowserContext -> Page -> Playwright a) -> IO a
 withOrderedCookieApp action = do
   captured <- newEmptyMVar
   withApplication (pure (orderedCookieApp captured)) $ \port ->
@@ -1054,7 +1061,7 @@ orderedCookieApp captured request respond =
     _ ->
       respond (responseLBS status404 [] "")
 
-withEmptyCookieApp :: (Text -> BrowserContext -> Page -> IO a) -> IO a
+withEmptyCookieApp :: (Text -> BrowserContext -> Page -> Playwright a) -> IO a
 withEmptyCookieApp action =
   withApplication (pure emptyCookieApp) $ \port ->
     withChromiumContext $ \ctx page ->
@@ -1070,7 +1077,7 @@ emptyCookieApp request respond =
     _ ->
       respond (responseLBS status404 [] "")
 
-withSetCookieBodyApp :: (Text -> BrowserContext -> IO a) -> IO a
+withSetCookieBodyApp :: (Text -> BrowserContext -> Playwright a) -> IO a
 withSetCookieBodyApp action =
   withApplication (pure setCookieBodyApp) $ \port ->
     withChromiumContext $ \ctx _page ->
@@ -1085,7 +1092,7 @@ setCookieBodyApp _request respond =
         "text content"
     )
 
-withNegativeMaxAgeApp :: (Text -> MVar (Maybe ByteString) -> BrowserContext -> IO a) -> IO a
+withNegativeMaxAgeApp :: (Text -> MVar (Maybe ByteString) -> BrowserContext -> Playwright a) -> IO a
 withNegativeMaxAgeApp action = do
   captured <- newEmptyMVar
   withApplication (pure (negativeMaxAgeApp captured)) $ \port ->
@@ -1115,7 +1122,7 @@ negativeMaxAgeApp captured request respond =
     _ ->
       respond (responseLBS status404 [] "")
 
-withPastExpiresApp :: (Text -> MVar (Maybe ByteString) -> BrowserContext -> IO a) -> IO a
+withPastExpiresApp :: (Text -> MVar (Maybe ByteString) -> BrowserContext -> Playwright a) -> IO a
 withPastExpiresApp action = do
   captured <- newEmptyMVar
   withApplication (pure (pastExpiresApp captured)) $ \port ->
@@ -1197,9 +1204,9 @@ cookieRedirectApp captured assets request respond = do
     _ ->
       staticApp (defaultFileServerSettings assets) request respond
 
-drainCookieChan :: Chan ([Text], Maybe ByteString) -> Int -> IO [([Text], Maybe ByteString)]
+drainCookieChan :: (MonadIO m) => Chan ([Text], Maybe ByteString) -> Int -> m [([Text], Maybe ByteString)]
 drainCookieChan captured n =
-  replicateM n (readChan captured)
+  replicateM n (liftIO (readChan captured))
 
 cookieRedirectPair :: Cookie -> (Text, Text, Text, CookieSameSite)
 cookieRedirectPair cookie =
@@ -1209,7 +1216,7 @@ cookieRedirectPair cookie =
   , cookieSameSite cookie
   )
 
-withRawHeadersApp :: (Text -> BrowserContext -> IO a) -> IO a
+withRawHeadersApp :: (Text -> BrowserContext -> Playwright a) -> IO a
 withRawHeadersApp action =
   withApplication (pure rawHeadersApp) $ \port ->
     withChromiumContext $ \ctx _page ->
@@ -1229,7 +1236,7 @@ headerNameContains :: Text -> HttpHeader -> Bool
 headerNameContains needle header =
   needle `isInfixOf` toLower (headerNameToText (httpHeaderName header))
 
-withAuthApp :: (Text -> MVar (Maybe ByteString) -> BrowserContext -> IO a) -> IO a
+withAuthApp :: (Text -> MVar (Maybe ByteString) -> BrowserContext -> Playwright a) -> IO a
 withAuthApp action = do
   captured <- newEmptyMVar
   withApplication (pure (authApp captured)) $ \port ->
@@ -1244,7 +1251,7 @@ authApp captured request respond = do
     then respond (responseLBS status200 [(hContentType, "text/html")] "<html><title>ok</title></html>")
     else respond (responseLBS status401 [("WWW-Authenticate", "Basic realm=\"test\"")] "")
 
-withHeaderCapture :: (Text -> MVar RequestHeaders -> BrowserContext -> Page -> IO a) -> IO a
+withHeaderCapture :: (Text -> MVar RequestHeaders -> BrowserContext -> Page -> Playwright a) -> IO a
 withHeaderCapture action = do
   captured <- newEmptyMVar
   withApplication (pure (headerCaptureApp captured)) $ \port ->
@@ -1256,7 +1263,7 @@ headerCaptureApp captured request respond = do
   _ <- tryPutMVar captured (requestHeaders request)
   respond (responseLBS status200 [(hContentType, "text/html")] "<html><body></body></html>")
 
-withRedirectHeaderCapture :: (Text -> MVar RequestHeaders -> BrowserContext -> Page -> IO a) -> IO a
+withRedirectHeaderCapture :: (Text -> MVar RequestHeaders -> BrowserContext -> Page -> Playwright a) -> IO a
 withRedirectHeaderCapture action = do
   captured <- newEmptyMVar
   withApplication (pure (redirectHeaderCaptureApp captured)) $ \port ->
@@ -1272,7 +1279,7 @@ redirectHeaderCaptureApp captured request respond =
       _ <- tryPutMVar captured (requestHeaders request)
       respond (responseLBS status200 [(hContentType, "text/html")] "<html><body></body></html>")
 
-withPropagatedRedirects :: (Text -> Chan RequestHeaders -> BrowserContext -> IO a) -> IO a
+withPropagatedRedirects :: (Text -> Chan RequestHeaders -> BrowserContext -> Playwright a) -> IO a
 withPropagatedRedirects action = do
   captured <- newChan
   assets <- testAssetsDir
@@ -1291,9 +1298,9 @@ propagatedRedirectApp captured assets request respond = do
     _ ->
       staticApp (defaultFileServerSettings assets) request respond
 
-drainCaptured :: Chan RequestHeaders -> Int -> IO [RequestHeaders]
+drainCaptured :: (MonadIO m) => Chan RequestHeaders -> Int -> m [RequestHeaders]
 drainCaptured captured n =
-  replicateM n (readChan captured)
+  replicateM n (liftIO (readChan captured))
 
 lookupHeader :: HTTP.HeaderName -> RequestHeaders -> Maybe ByteString
 lookupHeader =
@@ -1325,7 +1332,7 @@ compressedApp encoding body _request respond =
         body
     )
 
-withSlowThenDoneApp :: (Text -> BrowserContext -> IO a) -> IO a
+withSlowThenDoneApp :: (Text -> BrowserContext -> Playwright a) -> IO a
 withSlowThenDoneApp action =
   withApplication (pure slowThenDoneApp) $ \port ->
     withChromiumContext $ \ctx _page ->
@@ -1340,7 +1347,7 @@ slowThenDoneApp request respond =
     _ ->
       respond (responseLBS status404 [] "")
 
-withSlowRedirectApp :: (Text -> BrowserContext -> IO a) -> IO a
+withSlowRedirectApp :: (Text -> BrowserContext -> Playwright a) -> IO a
 withSlowRedirectApp action =
   withApplication (pure slowRedirectApp) $ \port ->
     withChromiumContext $ \ctx _page ->
@@ -1412,7 +1419,7 @@ postCaptureApp captured request respond = do
       else pure False
   respond (responseLBS status200 [(hContentType, "text/html")] "<html><body></body></html>")
 
-withBodyCapture :: (Text -> MVar (RequestHeaders, ByteString) -> BrowserContext -> IO a) -> IO a
+withBodyCapture :: (Text -> MVar (RequestHeaders, ByteString) -> BrowserContext -> Playwright a) -> IO a
 withBodyCapture action = do
   captured <- newEmptyMVar
   withApplication (pure (bodyCaptureApp captured)) $ \port ->
@@ -1433,7 +1440,7 @@ sampleJson =
     , "file" .= object ["name" .= ("f.js" :: Text)]
     ]
 
-decodeBodyJson :: ByteString -> IO Value
+decodeBodyJson :: (MonadIO m) => ByteString -> m Value
 decodeBodyJson body =
   case eitherDecodeStrict body of
     Left err ->
@@ -1703,9 +1710,9 @@ httpCredentialsSendTest = do
       $ \ctx _page -> do
         request <- contextRequest ctx
         responseLocal <- fetchGet request (urlFromText (localPrefix <> "/empty.html"))
-        authLocal <- readChan captured
+        authLocal <- liftIO (readChan captured)
         responseCross <- fetchGet request (urlFromText (crossPrefix <> "/empty.html"))
-        authCross <- readChan captured
+        authCross <- liftIO (readChan captured)
         assertEqual "local status" 200 (httpStatusToInt (apiResponseStatus responseLocal))
         assertEqual "local auth" (Just "Basic dXNlcjpwYXNz") authLocal
         assertEqual "cross status" 200 (httpStatusToInt (apiResponseStatus responseCross))
@@ -1874,7 +1881,7 @@ headerValue name headers =
     _ ->
       Nothing
 
-requireTimeout :: Double -> IO Timeout
+requireTimeout :: (MonadIO m) => Double -> m Timeout
 requireTimeout n =
   case milliseconds n of
     Nothing ->

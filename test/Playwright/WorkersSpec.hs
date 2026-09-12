@@ -2,7 +2,7 @@ module Playwright.WorkersSpec
   ( tests
   ) where
 
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( wait
   , withAsync
   )
@@ -22,15 +22,15 @@ import Playwright
 import Playwright.Harness
   ( withAssetPage
   , withAssets
+  , assertBool
+  , assertEqual
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertBool
-  , assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree

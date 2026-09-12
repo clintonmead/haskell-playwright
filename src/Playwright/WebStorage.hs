@@ -9,6 +9,9 @@ module Playwright.WebStorage
   , storageSetItem
   ) where
 
+import Playwright.Monad
+  ( Playwright
+  )
 import Playwright.Channel
   ( send
   )
@@ -58,7 +61,7 @@ sessionStorage :: Page -> WebStorage
 sessionStorage page =
   WebStorage page StorageSession
 
-storageItems :: WebStorage -> IO [StorageItem]
+storageItems :: WebStorage -> Playwright [StorageItem]
 storageItems storage = do
   result <-
     send
@@ -67,7 +70,7 @@ storageItems storage = do
       (mkPageWebStorageItemsParams (itemsKind (webStorageKind storage)))
   pure (fmap fromNameValue (pageWebStorageItemsResultItems result))
 
-storageGetItem :: WebStorage -> StorageName -> IO (Maybe StorageValue)
+storageGetItem :: WebStorage -> StorageName -> Playwright (Maybe StorageValue)
 storageGetItem storage name = do
   result <-
     send
@@ -79,7 +82,7 @@ storageGetItem storage name = do
       )
   pure (fmap StorageValue (pageWebStorageGetItemResultValue result))
 
-storageSetItem :: WebStorage -> StorageName -> StorageValue -> IO ()
+storageSetItem :: WebStorage -> StorageName -> StorageValue -> Playwright ()
 storageSetItem storage name value = do
   _ :: PageWebStorageSetItemResult <-
     send
@@ -92,7 +95,7 @@ storageSetItem storage name value = do
       )
   pure ()
 
-storageRemoveItem :: WebStorage -> StorageName -> IO ()
+storageRemoveItem :: WebStorage -> StorageName -> Playwright ()
 storageRemoveItem storage name = do
   _ :: PageWebStorageRemoveItemResult <-
     send
@@ -104,7 +107,7 @@ storageRemoveItem storage name = do
       )
   pure ()
 
-storageClear :: WebStorage -> IO ()
+storageClear :: WebStorage -> Playwright ()
 storageClear storage = do
   _ :: PageWebStorageClearResult <-
     send

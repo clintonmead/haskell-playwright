@@ -5,11 +5,14 @@ module Playwright.FileChooser
   , waitForFileChooserWith
   ) where
 
-import Control.Exception
+import Playwright.Monad
+  ( Playwright
+  )
+import UnliftIO.Exception
   ( throwIO
   )
 import Playwright.Channel
-  ( Channel (channelConnection, channelGuid)
+  ( Channel (channelGuid)
   , send
   )
 import Playwright.Connection
@@ -48,17 +51,17 @@ data FileChooser = FileChooser
   , fileChooserMultiple :: Bool
   }
 
-waitForFileChooser :: Page -> IO FileChooser
+waitForFileChooser :: Page -> Playwright FileChooser
 waitForFileChooser page = do
   timeout <- pageActionTimeout page
   waitForFileChooserWith page timeout
 
-waitForFileChooserWith :: Page -> Timeout -> IO FileChooser
+waitForFileChooserWith :: Page -> Timeout -> Playwright FileChooser
 waitForFileChooserWith page timeout = do
   takeChooser <- armFileChooser page
   waitWithTimeout timeout takeChooser
 
-armFileChooser :: Page -> IO (IO FileChooser)
+armFileChooser :: Page -> Playwright (Playwright FileChooser)
 armFileChooser page = do
   _ :: PageUpdateSubscriptionResult <-
     send
@@ -66,14 +69,13 @@ armFileChooser page = do
       (MethodName "updateSubscription")
       (mkPageUpdateSubscriptionParams True PageUpdateSubscriptionParamsEventFileChooser)
   let
-    conn = channelConnection (pageChannel page)
     guid = channelGuid (pageChannel page)
-  waitId <- registerEventWaiter conn guid (MethodName "fileChooser")
+  waitId <- registerEventWaiter guid (MethodName "fileChooser")
   pure $ do
-    params <- waitForWaiter conn waitId
+    params <- waitForWaiter waitId
     event <- either throwIO pure (fromJsonValue params)
     pure
       FileChooser
-        { fileChooserElement = elementHandleFromRef conn (pageFileChooserEventElement event)
+        { fileChooserElement = elementHandleFromRef (pageFileChooserEventElement event)
         , fileChooserMultiple = pageFileChooserEventIsMultiple event
         }

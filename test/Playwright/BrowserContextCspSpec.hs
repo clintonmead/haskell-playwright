@@ -2,7 +2,7 @@ module Playwright.BrowserContextCspSpec
   ( tests
   ) where
 
-import Control.Exception
+import UnliftIO.Exception
   ( try
   )
 import Control.Monad
@@ -10,6 +10,7 @@ import Control.Monad
   )
 import Playwright
   ( NewContextOptions (newContextBypassCSP)
+  , Playwright
   , ScriptTag (scriptTagContent)
   , addScriptTag
   , defaultGotoOptions
@@ -25,14 +26,14 @@ import Playwright.Error
   )
 import Playwright.Harness
   ( withAssetsWith
+  , assertEqual
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -45,7 +46,7 @@ tests =
           assertEqual "inline blocked" False
             =<< evaluateBool page "() => window.__inlineScriptValue === 42"
           void
-            ( try @PlaywrightError
+            ( try @Playwright @PlaywrightError
                 ( addScriptTag
                     page
                     emptyScriptTag {scriptTagContent = Just "window[\"__injected\"] = 42;"}

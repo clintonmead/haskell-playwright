@@ -7,11 +7,14 @@ module Playwright.Page.Network
   , responseFinished
   ) where
 
-import Control.Exception
+import Playwright.Monad
+  ( Playwright
+  )
+import UnliftIO.Exception
   ( throwIO
   )
 import Playwright.Channel
-  ( Channel (channelConnection, channelGuid)
+  ( Channel (channelGuid)
   , send
   )
 import Playwright.Connection
@@ -50,55 +53,51 @@ import Playwright.Response
   , responseRequest
   )
 
-onRequest :: Page -> (Request -> IO ()) -> IO ()
+onRequest :: Page -> (Request -> Playwright ()) -> Playwright ()
 onRequest page run = do
   subscribeContext page BrowserContextUpdateSubscriptionParamsEventRequest
   registerEventHandler
-    (channelConnection (pageContextChannel page))
     (channelGuid (pageContextChannel page))
     (MethodName "request")
     $ \params -> do
       event <- either throwIO pure (fromJsonValue params)
       whenForPage page (browserContextRequestEventPage event) $
-        run (requestFromRef (channelConnection (pageContextChannel page)) (browserContextRequestEventRequest event))
+        run (requestFromRef (browserContextRequestEventRequest event))
 
-onResponse :: Page -> (Response -> IO ()) -> IO ()
+onResponse :: Page -> (Response -> Playwright ()) -> Playwright ()
 onResponse page run = do
   subscribeContext page BrowserContextUpdateSubscriptionParamsEventResponse
   registerEventHandler
-    (channelConnection (pageContextChannel page))
     (channelGuid (pageContextChannel page))
     (MethodName "response")
     $ \params -> do
       event <- either throwIO pure (fromJsonValue params)
       whenForPage page (browserContextResponseEventPage event) $
-        run (responseFromRef (channelConnection (pageContextChannel page)) (browserContextResponseEventResponse event))
+        run (responseFromRef (browserContextResponseEventResponse event))
 
-onRequestFailed :: Page -> (Request -> IO ()) -> IO ()
+onRequestFailed :: Page -> (Request -> Playwright ()) -> Playwright ()
 onRequestFailed page run = do
   subscribeContext page BrowserContextUpdateSubscriptionParamsEventRequestFailed
   registerEventHandler
-    (channelConnection (pageContextChannel page))
     (channelGuid (pageContextChannel page))
     (MethodName "requestFailed")
     $ \params -> do
       event <- either throwIO pure (fromJsonValue params)
       whenForPage page (browserContextRequestFailedEventPage event) $
-        run (requestFromRef (channelConnection (pageContextChannel page)) (browserContextRequestFailedEventRequest event))
+        run (requestFromRef (browserContextRequestFailedEventRequest event))
 
-onRequestFinished :: Page -> (Request -> IO ()) -> IO ()
+onRequestFinished :: Page -> (Request -> Playwright ()) -> Playwright ()
 onRequestFinished page run = do
   subscribeContext page BrowserContextUpdateSubscriptionParamsEventRequestFinished
   registerEventHandler
-    (channelConnection (pageContextChannel page))
     (channelGuid (pageContextChannel page))
     (MethodName "requestFinished")
     $ \params -> do
       event <- either throwIO pure (fromJsonValue params)
       whenForPage page (browserContextRequestFinishedEventPage event) $
-        run (requestFromRef (channelConnection (pageContextChannel page)) (browserContextRequestFinishedEventRequest event))
+        run (requestFromRef (browserContextRequestFinishedEventRequest event))
 
-requests :: Page -> IO [Request]
+requests :: Page -> Playwright [Request]
 requests page = do
   result <-
     send
@@ -107,18 +106,17 @@ requests page = do
       mkPageRequestsParams
   pure
     ( fmap
-        (requestFromRef (channelConnection (pageChannel page)))
+        (requestFromRef)
         (pageRequestsResultRequests result)
     )
 
-responseFinished :: Response -> IO ()
+responseFinished :: Response -> Playwright ()
 responseFinished response = do
   request <- responseRequest response
   waitUntilRequestSettled
-    (channelConnection (requestChannel request))
     (channelGuid (requestChannel request))
 
-whenForPage :: Page -> Maybe ChannelRef -> IO () -> IO ()
+whenForPage :: Page -> Maybe ChannelRef -> Playwright () -> Playwright ()
 whenForPage page maybeRef run =
   case maybeRef of
     Just ref

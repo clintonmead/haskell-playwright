@@ -1,5 +1,8 @@
 module Playwright.Harness
-  ( assertProtocolContains
+  ( assertBool
+  , assertEqual
+  , assertFailure
+  , assertProtocolContains
   , assertWaitTimeout
   , locate
   , readTestAsset
@@ -14,11 +17,12 @@ module Playwright.Harness
   , withChromiumContext
   , withChromiumContextWith
   , withChromiumPage
+  , withLocalApp
   ) where
 
-import Control.Exception
-  ( bracket
-  , try
+import Control.Monad.IO.Class
+  ( MonadIO
+  , liftIO
   )
 import Data.ByteString
   ( ByteString
@@ -29,6 +33,9 @@ import Data.Text
   , isInfixOf
   , pack
   , unpack
+  )
+import Network.Wai
+  ( Application
   )
 import Network.Wai.Application.Static
   ( defaultFileServerSettings
@@ -44,6 +51,7 @@ import Playwright
   , Locator
   , NewContextOptions
   , Page
+  , Playwright
   , closeContext
   , chromium
   , defaultGotoOptions
@@ -53,11 +61,11 @@ import Playwright
   , locator
   , newContextWith
   , newPage
+  , runPlaywright
   , selectorFromText
   , urlFromText
   , withBrowser
   , withPage
-  , withPlaywright
   )
 import Playwright.Error
   ( PlaywrightError (ProtocolRpc, WaitTimeout)
@@ -69,15 +77,18 @@ import System.Directory
 import System.Environment
   ( lookupEnv
   )
-import Test.Tasty.HUnit
-  ( assertFailure
+import Test.Tasty.HUnit qualified as HUnit
+import UnliftIO
+  ( bracket
+  , try
+  , withRunInIO
   )
 
 locate :: Page -> Text -> Locator
 locate page =
   locator page . selectorFromText
 
-requireHandle :: Maybe ElementHandle -> IO ElementHandle
+requireHandle :: Maybe ElementHandle -> Playwright ElementHandle
 requireHandle handle =
   case handle of
     Nothing ->
@@ -85,18 +96,19 @@ requireHandle handle =
     Just value ->
       pure value
 
-withChromiumBrowser :: (Browser -> IO a) -> IO a
+withChromiumBrowser :: (Browser -> Playwright a) -> IO a
 withChromiumBrowser action = do
   _ <- requireNonEmptyEnv "PLAYWRIGHT_BROWSERS_PATH"
-  withPlaywright $ \pw ->
-    withBrowser (chromium pw) defaultLaunchOptions action
+  runPlaywright $ do
+    browserType <- chromium
+    withBrowser browserType defaultLaunchOptions action
 
-withChromiumPage :: (Page -> IO a) -> IO a
+withChromiumPage :: (Page -> Playwright a) -> IO a
 withChromiumPage action =
   withChromiumBrowser $ \browser ->
     withPage browser action
 
-withChromiumContextWith :: NewContextOptions -> (BrowserContext -> Page -> IO a) -> IO a
+withChromiumContextWith :: NewContextOptions -> (BrowserContext -> Page -> Playwright a) -> IO a
 withChromiumContextWith opts action =
   withChromiumBrowser $ \browser ->
     bracket
@@ -108,11 +120,11 @@ withChromiumContextWith opts action =
       (\(ctx, _) -> closeContext ctx)
       (\(ctx, page) -> action ctx page)
 
-withChromiumContext :: (BrowserContext -> Page -> IO a) -> IO a
+withChromiumContext :: (BrowserContext -> Page -> Playwright a) -> IO a
 withChromiumContext =
   withChromiumContextWith defaultNewContextOptions
 
-withAssetPage :: FilePath -> (Page -> IO a) -> IO a
+withAssetPage :: FilePath -> (Page -> Playwright a) -> IO a
 withAssetPage relativePath action =
   withAssets $ \prefix page -> do
     _ <-
@@ -122,34 +134,41 @@ withAssetPage relativePath action =
         defaultGotoOptions
     action page
 
+withLocalApp :: Application -> (Text -> Playwright a) -> Playwright a
+withLocalApp app action =
+  withRunInIO $ \run ->
+    withApplication (pure app) $ \port ->
+      run (action ("http://127.0.0.1:" <> pack (show port)))
+
 withAssetsPrefix :: (Text -> IO a) -> IO a
 withAssetsPrefix action = do
   assets <- requireAssets
   withApplication (pure (staticApp (defaultFileServerSettings assets))) $ \port ->
     action ("http://127.0.0.1:" <> pack (show port))
 
-withAssetsContextWith :: NewContextOptions -> (Text -> BrowserContext -> Page -> IO a) -> IO a
+withAssetsContextWith :: NewContextOptions -> (Text -> BrowserContext -> Page -> Playwright a) -> IO a
 withAssetsContextWith opts action =
   withAssetsPrefix $ \prefix ->
     withChromiumContextWith opts $ \ctx page ->
       action prefix ctx page
 
-withAssetsWith :: NewContextOptions -> (Text -> Page -> IO a) -> IO a
+withAssetsWith :: NewContextOptions -> (Text -> Page -> Playwright a) -> IO a
 withAssetsWith opts action =
   withAssetsContextWith opts (\prefix _ page -> action prefix page)
 
-withAssets :: (Text -> Page -> IO a) -> IO a
+withAssets :: (Text -> Page -> Playwright a) -> IO a
 withAssets =
   withAssetsWith defaultNewContextOptions
 
-readTestAsset :: FilePath -> IO ByteString
-readTestAsset relativePath = do
-  dir <- requireAssets
-  ByteString.readFile (dir <> "/" <> relativePath)
+readTestAsset :: (MonadIO m) => FilePath -> m ByteString
+readTestAsset relativePath =
+  liftIO $ do
+    dir <- requireAssets
+    ByteString.readFile (dir <> "/" <> relativePath)
 
-testAssetsDir :: IO FilePath
+testAssetsDir :: (MonadIO m) => m FilePath
 testAssetsDir =
-  requireAssets
+  liftIO requireAssets
 
 requireAssets :: IO FilePath
 requireAssets = do
@@ -157,9 +176,9 @@ requireAssets = do
   exists <- doesDirectoryExist dir
   if exists
     then pure dir
-    else assertFailure ("PLAYWRIGHT_TEST_ASSETS does not exist: " <> dir)
+    else HUnit.assertFailure ("PLAYWRIGHT_TEST_ASSETS does not exist: " <> dir)
 
-assertProtocolContains :: Text -> IO a -> IO ()
+assertProtocolContains :: Text -> Playwright a -> Playwright ()
 assertProtocolContains needle action = do
   result <- try action
   case result of
@@ -178,7 +197,7 @@ assertProtocolContains needle action = do
     Right _ ->
       assertFailure ("expected protocol error containing " <> unpack needle)
 
-assertWaitTimeout :: IO a -> IO ()
+assertWaitTimeout :: Playwright a -> Playwright ()
 assertWaitTimeout action = do
   result <- try action
   case result of
@@ -189,13 +208,25 @@ assertWaitTimeout action = do
     Right _ ->
       assertFailure "expected WaitTimeout"
 
+assertEqual :: (MonadIO m, Eq a, Show a) => String -> a -> a -> m ()
+assertEqual label expected actual =
+  liftIO (HUnit.assertEqual label expected actual)
+
+assertBool :: (MonadIO m) => String -> Bool -> m ()
+assertBool label value =
+  liftIO (HUnit.assertBool label value)
+
+assertFailure :: (MonadIO m) => String -> m a
+assertFailure message =
+  liftIO (HUnit.assertFailure message)
+
 requireNonEmptyEnv :: String -> IO String
 requireNonEmptyEnv name = do
   value <- lookupEnv name
   case value of
     Nothing ->
-      assertFailure (name <> " is not set")
+      HUnit.assertFailure (name <> " is not set")
     Just "" ->
-      assertFailure (name <> " is empty")
+      HUnit.assertFailure (name <> " is empty")
     Just path ->
       pure path

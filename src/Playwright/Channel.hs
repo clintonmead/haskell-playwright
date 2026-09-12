@@ -29,14 +29,16 @@ import Data.Kind
   ( Type
   )
 import Playwright.Connection
-  ( Connection
-  , sendCommand
+  ( sendCommand
   )
 import Playwright.Guid
   ( Guid
   )
 import Playwright.MethodName
   ( MethodName
+  )
+import Playwright.Monad
+  ( Playwright
   )
 
 data RootTag
@@ -59,9 +61,8 @@ data ArtifactTag
 data APIRequestContextTag
 
 type Channel :: Type -> Type
-data Channel a = Channel
-  { channelConnection :: Connection
-  , channelGuid :: Guid
+newtype Channel a = Channel
+  { channelGuid :: Guid
   }
 
 send ::
@@ -69,6 +70,6 @@ send ::
   Channel a ->
   MethodName ->
   params ->
-  IO result
+  Playwright result
 send channel method params =
-  sendCommand (channelConnection channel) (channelGuid channel) method params
+  sendCommand (channelGuid channel) method params

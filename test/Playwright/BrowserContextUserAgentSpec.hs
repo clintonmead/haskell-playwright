@@ -2,13 +2,16 @@ module Playwright.BrowserContextUserAgentSpec
   ( tests
   ) where
 
+import Control.Monad.IO.Class
+  ( liftIO
+  )
 import Control.Concurrent
   ( Chan
   , newChan
   , readChan
   , writeChan
   )
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( withAsync
   )
 import Data.ByteString
@@ -57,6 +60,7 @@ import Playwright
   , goto
   , setContent
   , urlFromText
+  , Playwright
   )
 import Playwright.Harness
   ( locate
@@ -64,6 +68,8 @@ import Playwright.Harness
   , withAssetsContextWith
   , withChromiumContext
   , withChromiumContextWith
+  , assertBool
+  , assertEqual
   )
 import Test.Tasty
   ( TestTree
@@ -72,9 +78,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertBool
-  , assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -104,7 +108,7 @@ userAgentWorkTest = do
   withHeaderCapture defaultNewContextOptions {newContextUserAgent = Just (UserAgent "foobar")} $
     \prefix captured page -> do
       _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-      headers <- readChan captured
+      headers <- liftIO (readChan captured)
       assertEqual "ua" (Just "foobar") (lookupHeader "user-agent" headers)
 
 userAgentSubframeTest :: IO ()
@@ -115,7 +119,7 @@ userAgentSubframeTest = do
   withHeaderCapture defaultNewContextOptions {newContextUserAgent = Just (UserAgent "foobar")} $
     \prefix captured page -> do
       _ <- attachFrame page prefix "frame1"
-      headers <- readChan captured
+      headers <- liftIO (readChan captured)
       assertEqual "ua" (Just "foobar") (lookupHeader "user-agent" headers)
 
 iPhoneUserAgentTest :: IO ()
@@ -138,7 +142,7 @@ copyOptionsTest =
   in
     withHeaderCapture opts $ \prefix captured page -> do
       _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-      headers <- readChan captured
+      headers <- liftIO (readChan captured)
       assertEqual "ua" (Just "foobar") (lookupHeader "user-agent" headers)
       assertEqual
         "unchanged"
@@ -159,14 +163,14 @@ downloadUserAgentTest = do
         _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
         setContent page "<a id=\"download\" download=\"name\" href=\"/download\">Download</a>"
         withAsync (click (locate page "#download")) $ \_ -> do
-          headers <- readChan captured
+          headers <- liftIO (readChan captured)
           assertEqual "ua" (Just "MyCustomUA") (lookupHeader "user-agent" headers)
 
 userAgentDataTest :: IO ()
 userAgentDataTest = do
   withHeaderCapture defaultNewContextOptions $ \prefix captured page -> do
     _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-    headers <- readChan captured
+    headers <- liftIO (readChan captured)
     assertBool
       "chromium hint"
       (maybe False ("Chromium" `isInfixOf`) (fmap decodeUtf8 (lookupHeader "sec-ch-ua" headers)))
@@ -182,7 +186,7 @@ userAgentDataTest = do
       }
     $ \prefix captured page -> do
       _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-      headers <- readChan captured
+      headers <- liftIO (readChan captured)
       assertBool
         "chromium hint"
         (maybe False ("Chromium" `isInfixOf`) (fmap decodeUtf8 (lookupHeader "sec-ch-ua" headers)))
@@ -199,7 +203,7 @@ pixelUserAgent :: Text
 pixelUserAgent =
   "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6778.33 Mobile Safari/537.36"
 
-withHeaderCapture :: NewContextOptions -> (Text -> Chan RequestHeaders -> Page -> IO a) -> IO a
+withHeaderCapture :: NewContextOptions -> (Text -> Chan RequestHeaders -> Page -> Playwright a) -> IO a
 withHeaderCapture opts action = do
   captured <- newChan
   withApplication (pure (headerCaptureApp captured)) $ \port ->
@@ -225,7 +229,7 @@ downloadApp captured request respond =
     _ ->
       respond (responseLBS status200 [(hContentType, "text/html")] "<html></html>")
 
-attachFrame :: Page -> Text -> Text -> IO ()
+attachFrame :: Page -> Text -> Text -> Playwright ()
 attachFrame page prefix frameId = do
   handle <-
     evaluateHandle

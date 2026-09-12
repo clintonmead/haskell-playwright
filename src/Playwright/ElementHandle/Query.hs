@@ -5,9 +5,11 @@ module Playwright.ElementHandle.Query
   , waitForSelectorOnHandleWith
   ) where
 
+import Playwright.Monad
+  ( Playwright
+  )
 import Playwright.Channel
-  ( Channel (channelConnection)
-  , send
+  ( send
   )
 import Playwright.ElementHandle
   ( ElementHandle (elementHandleChannel)
@@ -38,7 +40,7 @@ import Playwright.WaitForState
   ( WaitForState (WaitForAttached, WaitForDetached, WaitForHidden, WaitForVisible)
   )
 
-querySelectorHandle :: ElementHandle -> Selector -> IO (Maybe ElementHandle)
+querySelectorHandle :: ElementHandle -> Selector -> Playwright (Maybe ElementHandle)
 querySelectorHandle handle selector = do
   result <-
     send
@@ -49,11 +51,11 @@ querySelectorHandle handle selector = do
         }
   pure
     ( fmap
-        (elementHandleFromRef (channelConnection (elementHandleChannel handle)))
+        (elementHandleFromRef)
         (elementHandleQuerySelectorResultElement result)
     )
 
-querySelectorAllHandle :: ElementHandle -> Selector -> IO [ElementHandle]
+querySelectorAllHandle :: ElementHandle -> Selector -> Playwright [ElementHandle]
 querySelectorAllHandle handle selector = do
   result <-
     send
@@ -62,15 +64,15 @@ querySelectorAllHandle handle selector = do
       (mkElementHandleQuerySelectorAllParams selector)
   pure
     ( fmap
-        (elementHandleFromRef (channelConnection (elementHandleChannel handle)))
+        (elementHandleFromRef)
         (elementHandleQuerySelectorAllResultElements result)
     )
 
-waitForSelectorOnHandle :: ElementHandle -> Selector -> WaitForState -> IO (Maybe ElementHandle)
+waitForSelectorOnHandle :: ElementHandle -> Selector -> WaitForState -> Playwright (Maybe ElementHandle)
 waitForSelectorOnHandle handle selector state =
   waitForSelectorOnHandleWith handle selector state defaultTimeout
 
-waitForSelectorOnHandleWith :: ElementHandle -> Selector -> WaitForState -> Timeout -> IO (Maybe ElementHandle)
+waitForSelectorOnHandleWith :: ElementHandle -> Selector -> WaitForState -> Timeout -> Playwright (Maybe ElementHandle)
 waitForSelectorOnHandleWith handle selector state timeout = do
   result <-
     send
@@ -81,7 +83,7 @@ waitForSelectorOnHandleWith handle selector state timeout = do
         }
   pure
     ( fmap
-        (elementHandleFromRef (channelConnection (elementHandleChannel handle)))
+        (elementHandleFromRef)
         (elementHandleWaitForSelectorResultElement result)
     )
 

@@ -106,6 +106,7 @@ library
       Playwright.MediaType
       Playwright.MethodName
       Playwright.MimeType
+      Playwright.Monad
       Playwright.Mouse
       Playwright.NetworkSizes
       Playwright.NewContextOptions
@@ -191,11 +192,14 @@ library
     , bytestring
     , containers
     , directory
+    , exceptions
     , filepath
+    , mtl
     , scientific
     , stm
     , text
     , typed-process
+    , unliftio
   default-language: GHC2021
 
 test-suite playwright-test
@@ -361,7 +365,6 @@ test-suite playwright-test
   ghc-options: -Werror -Weverything -Wno-all-missed-specialisations -Wno-implicit-prelude -Wno-missing-safe-haskell-mode -Wno-prepositive-qualified-module -Wno-safe -Wno-unsafe -Wno-missing-kind-signatures -Wno-missing-role-annotations -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       aeson
-    , async
     , base
     , bytestring
     , case-insensitive
@@ -374,6 +377,7 @@ test-suite playwright-test
     , tasty-hedgehog
     , tasty-hunit
     , text
+    , unliftio
     , wai
     , wai-app-static
     , warp

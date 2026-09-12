@@ -2,6 +2,9 @@ module Playwright.BrowserTypeBasicSpec
   ( tests
   ) where
 
+import Control.Monad.IO.Class
+  ( liftIO
+  )
 import Data.Text
   ( unpack
   )
@@ -9,18 +12,20 @@ import Playwright
   ( browserTypeExecutablePath
   , browserTypeName
   , chromium
-  , withPlaywright
+  , runPlaywright
   )
-import System.Directory
+import UnliftIO.Directory
   ( doesFileExist
+  )
+import Playwright.Harness
+  ( assertEqual
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -28,12 +33,14 @@ tests =
   testGroup
     "browsertype-basic"
     [ testCase "browserType.executablePath should work" $
-        withPlaywright $ \pw -> do
-          exists <- doesFileExist (unpack (browserTypeExecutablePath (chromium pw)))
+        runPlaywright $ do
+          browserType <- chromium
+          exists <- liftIO (doesFileExist (unpack (browserTypeExecutablePath browserType)))
           assertEqual "exists" True exists
     , testCase "browserType.name should work" $
-        withPlaywright $ \pw ->
-          assertEqual "chromium" "chromium" (browserTypeName (chromium pw))
+        runPlaywright $ do
+          browserType <- chromium
+          assertEqual "chromium" "chromium" (browserTypeName browserType)
     ]
 
 -- Official `should throw when trying to connect with not-chromium` skips Chromium.

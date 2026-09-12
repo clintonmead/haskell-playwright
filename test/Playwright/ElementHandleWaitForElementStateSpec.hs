@@ -2,7 +2,7 @@ module Playwright.ElementHandleWaitForElementStateSpec
   ( tests
   ) where
 
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( concurrently_
   )
 import Playwright
@@ -19,14 +19,14 @@ import Playwright.Harness
   ( assertProtocolContains
   , requireHandle
   , withChromiumPage
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree

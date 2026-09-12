@@ -3,12 +3,6 @@ module Playwright.Expose
   , exposeFunction
   ) where
 
-import Control.Exception
-  ( SomeException
-  , displayException
-  , throwIO
-  , try
-  )
 import Data.Aeson
   ( Value
   )
@@ -23,12 +17,11 @@ import Playwright.BrowserContext
   )
 import Playwright.Channel
   ( BindingCallTag
-  , Channel (Channel, channelConnection, channelGuid)
+  , Channel (Channel, channelGuid)
   , send
   )
 import Playwright.Connection
-  ( Connection
-  , lookupObject
+  ( lookupObject
   , registerEventHandler
   )
 import Playwright.Disposable
@@ -43,6 +36,9 @@ import Playwright.Json.Decode
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
+  )
+import Playwright.Monad
+  ( Playwright
   )
 import Playwright.Page
   ( Page (pageChannel)
@@ -75,65 +71,66 @@ import Playwright.SerializedErrorInfo
 import Playwright.SerializedValue
   ( SerializedValue
   )
+import UnliftIO.Exception
+  ( SomeException
+  , displayException
+  , throwIO
+  , try
+  )
 
-exposeFunction :: Page -> BindingName -> ([SerializedValue] -> IO SerializedArgument) -> IO Disposable
+exposeFunction :: Page -> BindingName -> ([SerializedValue] -> Playwright SerializedArgument) -> Playwright Disposable
 exposeFunction page name handler = do
   let
-    conn = channelConnection (pageChannel page)
     guid = channelGuid (pageChannel page)
-  registerEventHandler conn guid (MethodName "bindingCall") $ \params ->
-    handlePageBindingCall conn name handler params
+  registerEventHandler guid (MethodName "bindingCall") $ \params ->
+    handlePageBindingCall name handler params
   result <-
     send
       (pageChannel page)
       (MethodName "exposeBinding")
       (mkPageExposeBindingParams (bindingNameToText name))
-  pure (disposableFromRef conn (pageExposeBindingResultDisposable result))
+  pure (disposableFromRef (pageExposeBindingResultDisposable result))
 
-contextExposeFunction :: BrowserContext -> BindingName -> ([SerializedValue] -> IO SerializedArgument) -> IO Disposable
+contextExposeFunction :: BrowserContext -> BindingName -> ([SerializedValue] -> Playwright SerializedArgument) -> Playwright Disposable
 contextExposeFunction ctx name handler = do
   let
-    conn = channelConnection (browserContextChannel ctx)
     guid = channelGuid (browserContextChannel ctx)
-  registerEventHandler conn guid (MethodName "bindingCall") $ \params ->
-    handleContextBindingCall conn name handler params
+  registerEventHandler guid (MethodName "bindingCall") $ \params ->
+    handleContextBindingCall name handler params
   result <-
     send
       (browserContextChannel ctx)
       (MethodName "exposeBinding")
       (mkBrowserContextExposeBindingParams (bindingNameToText name))
-  pure (disposableFromRef conn (browserContextExposeBindingResultDisposable result))
+  pure (disposableFromRef (browserContextExposeBindingResultDisposable result))
 
 handlePageBindingCall ::
-  Connection ->
   BindingName ->
-  ([SerializedValue] -> IO SerializedArgument) ->
+  ([SerializedValue] -> Playwright SerializedArgument) ->
   Value ->
-  IO ()
-handlePageBindingCall conn name handler params = do
+  Playwright ()
+handlePageBindingCall name handler params = do
   event <- either throwIO pure (fromJsonValue params)
-  handleNamedBinding conn name handler (pageBindingCallEventBinding event)
+  handleNamedBinding name handler (pageBindingCallEventBinding event)
 
 handleContextBindingCall ::
-  Connection ->
   BindingName ->
-  ([SerializedValue] -> IO SerializedArgument) ->
+  ([SerializedValue] -> Playwright SerializedArgument) ->
   Value ->
-  IO ()
-handleContextBindingCall conn name handler params = do
+  Playwright ()
+handleContextBindingCall name handler params = do
   event <- either throwIO pure (fromJsonValue params)
-  handleNamedBinding conn name handler (browserContextBindingCallEventBinding event)
+  handleNamedBinding name handler (browserContextBindingCallEventBinding event)
 
 handleNamedBinding ::
-  Connection ->
   BindingName ->
-  ([SerializedValue] -> IO SerializedArgument) ->
+  ([SerializedValue] -> Playwright SerializedArgument) ->
   ChannelRef ->
-  IO ()
-handleNamedBinding conn name handler bindingRef = do
+  Playwright ()
+handleNamedBinding name handler bindingRef = do
   let
-    call = Channel conn (channelRefGuid bindingRef) :: Channel BindingCallTag
-  obj <- lookupObject conn (channelRefGuid bindingRef)
+    call = Channel (channelRefGuid bindingRef) :: Channel BindingCallTag
+  obj <- lookupObject (channelRefGuid bindingRef)
   initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
   if bindingCallInitializerName initializer == bindingNameToText name
     then do
@@ -148,7 +145,7 @@ handleNamedBinding conn name handler bindingRef = do
     else
       pure ()
 
-rejectBinding :: Channel BindingCallTag -> SomeException -> IO ()
+rejectBinding :: Channel BindingCallTag -> SomeException -> Playwright ()
 rejectBinding call err = do
   let
     info =

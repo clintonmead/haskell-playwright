@@ -2,22 +2,30 @@ module Playwright.GlobalFetchSpec
   ( tests
   ) where
 
+import Control.Monad.IO.Class
+  ( MonadIO
+  , liftIO
+  )
 import Control.Concurrent
   ( Chan
-  , MVar
   , newChan
-  , newEmptyMVar
   , readChan
-  , takeMVar
-  , threadDelay
-  , tryPutMVar
   , writeChan
   )
-import Control.Concurrent.Async
+import UnliftIO.MVar
+  ( MVar
+  , newEmptyMVar
+  , takeMVar
+  , tryPutMVar
+  )
+import UnliftIO.Concurrent
+  ( threadDelay
+  )
+import UnliftIO.Async
   ( wait
   , withAsync
   )
-import Control.Exception
+import UnliftIO.Exception
   ( try
   )
 import Control.Monad
@@ -38,7 +46,7 @@ import Data.ByteString
 import Data.ByteString qualified as ByteString
 import Data.ByteString.Lazy qualified as LBS
 import Data.CaseInsensitive qualified as CI
-import Data.IORef
+import UnliftIO.IORef
   ( IORef
   , atomicModifyIORef'
   , newIORef
@@ -133,7 +141,8 @@ import Playwright
   , newRequestContextWith
   , urlFromText
   , urlToText
-  , withPlaywright
+  , runPlaywright
+  , Playwright
   )
 import Playwright.Error
   ( PlaywrightError (DecodeFailure, ProtocolRpc)
@@ -143,6 +152,9 @@ import Playwright.Harness
   ( assertProtocolContains
   , testAssetsDir
   , withAssetsPrefix
+  , assertBool
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
@@ -151,10 +163,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertBool
-  , assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 import Text.Read
   ( readMaybe
@@ -201,10 +210,9 @@ tests =
               disposeAPIRequestContext request
         , testCase "should support global userAgent option" $
             withHeaderCapture $ \prefix captured ->
-              withPlaywright $ \pw -> do
+              runPlaywright $ do
                 request <-
                   newRequestContextWith
-                    pw
                     defaultNewRequestOptions {newRequestUserAgent = Just (UserAgent "My Agent")}
                 response <- fetchGet request (urlFromText (prefix <> "/empty.html"))
                 headers <- takeCaptured captured
@@ -214,11 +222,10 @@ tests =
                 disposeAPIRequestContext request
         , testCase "should support global timeout option" $
             withHangApp $ \prefix ->
-              withPlaywright $ \pw -> do
+              runPlaywright $ do
                 timeout <- requireTimeout 100
                 request <-
                   newRequestContextWith
-                    pw
                     defaultNewRequestOptions {newRequestTimeout = Just timeout}
                 assertProtocolContains
                   "Timeout 100ms exceeded"
@@ -230,24 +237,22 @@ tests =
             authorizationRedirectTest
         , testCase "should support global httpCredentials option" $
             withAuthApp $ \prefix ->
-              withPlaywright $ \pw -> do
-                request1 <- newRequestContext pw
+              runPlaywright $ do
+                request1 <- newRequestContext
                 first <- fetchGet request1 (urlFromText (prefix <> "/empty.html"))
                 assertEqual "unauthorized" 401 (httpStatusToInt (apiResponseStatus first))
                 disposeAPIRequestContext request1
                 request2 <-
                   newRequestContextWith
-                    pw
                     defaultNewRequestOptions {newRequestHttpCredentials = Just validCredentials}
                 second <- fetchGet request2 (urlFromText (prefix <> "/empty.html"))
                 assertEqual "authorized" 200 (httpStatusToInt (apiResponseStatus second))
                 disposeAPIRequestContext request2
         , testCase "should return error with wrong credentials" $
             withAuthApp $ \prefix ->
-              withPlaywright $ \pw -> do
+              runPlaywright $ do
                 request <-
                   newRequestContextWith
-                    pw
                     defaultNewRequestOptions
                       { newRequestHttpCredentials =
                           Just
@@ -279,27 +284,25 @@ tests =
             serverAddrTest
         , testCase "should return null security details for http response" $
             withAssetsPrefix $ \prefix ->
-              withPlaywright $ \pw -> do
-                request <- newRequestContext pw
+              runPlaywright $ do
+                request <- newRequestContext
                 response <- fetchGet request (urlFromText (prefix <> "/empty.html"))
                 assertEqual "securityDetails" Nothing (apiResponseSecurityDetails response)
                 disposeAPIRequestContext request
         , testCase "should resolve url relative to global baseURL option" $
             withAssetsPrefix $ \prefix ->
-              withPlaywright $ \pw -> do
+              runPlaywright $ do
                 request <-
                   newRequestContextWith
-                    pw
                     defaultNewRequestOptions {newRequestBaseURL = Just (urlFromText prefix)}
                 response <- fetchGet request (urlFromText "/empty.html")
                 assertEqual "url" (prefix <> "/empty.html") (urlToText (apiResponseUrl response))
                 disposeAPIRequestContext request
         , testCase "should fallback to given URL if baseURL is bogus" $
             withAssetsPrefix $ \prefix ->
-              withPlaywright $ \pw -> do
+              runPlaywright $ do
                 request <-
                   newRequestContextWith
-                    pw
                     defaultNewRequestOptions {newRequestBaseURL = Just (urlFromText "bogus")}
                 response <- fetchGet request (urlFromText (prefix <> "/empty.html"))
                 assertEqual "url" (prefix <> "/empty.html") (urlToText (apiResponseUrl response))
@@ -308,8 +311,8 @@ tests =
             playwrightUserAgentTest
         , testCase "should return empty body" $
             withAssetsPrefix $ \prefix ->
-              withPlaywright $ \pw -> do
-                request <- newRequestContext pw
+              runPlaywright $ do
+                request <- newRequestContext
                 response <- fetchGet request (urlFromText (prefix <> "/empty.html"))
                 body <- apiResponseBody response
                 assertEqual "length" 0 (ByteString.length body)
@@ -343,8 +346,8 @@ tests =
             headerCapitalizationTest
         , testCase "should throw after dispose" $
             withAssetsPrefix $ \prefix ->
-              withPlaywright $ \pw -> do
-                request <- newRequestContext pw
+              runPlaywright $ do
+                request <- newRequestContext
                 disposeAPIRequestContext request
                 assertProtocolContains
                   "Target page, context or browser has been closed"
@@ -359,7 +362,7 @@ tests =
           <> jsonSerializationTests
       )
 
-methodSmoke :: (APIRequestContext -> Url -> IO APIResponse) -> Bool -> IO ()
+methodSmoke :: (APIRequestContext -> Url -> Playwright APIResponse) -> Bool -> IO ()
 methodSmoke send isHead =
   withGlobalSimple $ \request url -> do
     response <- send request url
@@ -381,11 +384,11 @@ methodSmoke send isHead =
         assertEqual "body" "{\"foo\": \"bar\"}\n" =<< apiResponseText response
     disposeAPIRequestContext request
 
-withGlobalSimple :: (APIRequestContext -> Url -> IO a) -> IO a
+withGlobalSimple :: (APIRequestContext -> Url -> Playwright a) -> IO a
 withGlobalSimple action =
   withApplication (pure simpleJsonApp) $ \port ->
-    withPlaywright $ \pw -> do
-      request <- newRequestContext pw
+    runPlaywright $ do
+      request <- newRequestContext
       action request (urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/simple.json"))
 
 simpleJsonApp :: Application
@@ -408,9 +411,9 @@ headerCaptureApp captured request respond = do
   writeChan captured (requestHeaders request)
   respond (responseLBS status200 [(hContentType, "text/html")] "<html><body></body></html>")
 
-takeCaptured :: Chan RequestHeaders -> IO RequestHeaders
-takeCaptured =
-  readChan
+takeCaptured :: (MonadIO m) => Chan RequestHeaders -> m RequestHeaders
+takeCaptured captured =
+  liftIO (readChan captured)
 
 withHangApp :: (Text -> IO a) -> IO a
 withHangApp action =
@@ -426,17 +429,16 @@ extraHeadersRedirects = do
   captured <- newChan
   assets <- testAssetsDir
   withApplication (pure (redirectApp captured assets)) $ \port ->
-    withPlaywright $ \pw -> do
+    runPlaywright $ do
       let prefix = "http://127.0.0.1:" <> pack (show port)
       request <-
         newRequestContextWith
-          pw
           defaultNewRequestOptions
             { newRequestExtraHTTPHeaders =
                 Just [HttpHeader (HeaderName "My-Secret") (HeaderValue "Value")]
             }
       _ <- fetchGet request (urlFromText (prefix <> "/a/redirect1"))
-      got <- replicateM 3 (readChan captured)
+      got <- replicateM 3 (liftIO (readChan captured))
       assertEqual "secret" ["Value", "Value", "Value"] (fmap (fromMaybe "" . lookupHeader "my-secret") got)
       disposeAPIRequestContext request
 
@@ -455,19 +457,18 @@ authorizationRedirectTest :: IO ()
 authorizationRedirectTest = do
   captured <- newChan
   withApplication (pure (authorizationRedirectApp captured)) $ \port ->
-    withPlaywright $ \pw -> do
+    runPlaywright $ do
       let localPrefix = "http://127.0.0.1:" <> pack (show port)
       request <-
         newRequestContextWith
-          pw
           defaultNewRequestOptions
             { newRequestExtraHTTPHeaders =
                 Just [HttpHeader (HeaderName "Authorization") (HeaderValue "Bearer secret")]
             }
       _ <- fetchGet request (urlFromText (localPrefix <> "/same/redirect"))
-      sameHeaders <- readChan captured
+      sameHeaders <- liftIO (readChan captured)
       _ <- fetchGet request (urlFromText (localPrefix <> "/cross/redirect"))
-      crossHeaders <- readChan captured
+      crossHeaders <- liftIO (readChan captured)
       assertEqual "same-origin" (Just "Bearer secret") (lookupHeader "authorization" sameHeaders)
       assertEqual "cross-origin" Nothing (lookupHeader "authorization" crossHeaders)
       disposeAPIRequestContext request
@@ -518,10 +519,9 @@ validCredentials =
 credentialsOriginTest :: (Text -> Text) -> IO ()
 credentialsOriginTest originMap =
   withAuthApp $ \prefix ->
-    withPlaywright $ \pw -> do
+    runPlaywright $ do
       request <-
         newRequestContextWith
-          pw
           defaultNewRequestOptions
             { newRequestHttpCredentials =
                 Just
@@ -545,10 +545,9 @@ credentialsOriginPortTest =
 
 credentialsOriginWith :: Text -> Text -> IO ()
 credentialsOriginWith prefix origin =
-  withPlaywright $ \pw -> do
+  runPlaywright $ do
     request <-
       newRequestContextWith
-        pw
         defaultNewRequestOptions
           { newRequestHttpCredentials =
               Just validCredentials {httpCredentialsOrigin = Just (urlFromText origin)}
@@ -571,13 +570,12 @@ wwwAuthenticateBasicTest :: IO ()
 wwwAuthenticateBasicTest = do
   captured <- newChan
   withApplication (pure (wwwAuthenticateApp captured)) $ \port ->
-    withPlaywright $ \pw -> do
+    runPlaywright $ do
       request <-
         newRequestContextWith
-          pw
           defaultNewRequestOptions {newRequestHttpCredentials = Just validCredentials}
       response <- fetchGet request (urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/empty.html"))
-      auth <- lookupHeader "authorization" <$> readChan captured
+      auth <- lookupHeader "authorization" <$> liftIO (readChan captured)
       assertEqual "status" 200 (httpStatusToInt (apiResponseStatus response))
       assertEqual "auth" (Just "Basic dXNlcjpwYXNz") auth
       disposeAPIRequestContext request
@@ -595,13 +593,12 @@ httpCredentialsSendTest :: IO ()
 httpCredentialsSendTest = do
   captured <- newChan
   withApplication (pure (headerCaptureApp captured)) $ \port ->
-    withPlaywright $ \pw -> do
+    runPlaywright $ do
       let
         localPrefix = "http://localhost:" <> pack (show port)
         crossPrefix = "http://127.0.0.1:" <> pack (show port)
       request <-
         newRequestContextWith
-          pw
           defaultNewRequestOptions
             { newRequestHttpCredentials =
                 Just
@@ -613,9 +610,9 @@ httpCredentialsSendTest = do
                     }
             }
       responseLocal <- fetchGet request (urlFromText (localPrefix <> "/empty.html"))
-      authLocal <- lookupHeader "authorization" <$> readChan captured
+      authLocal <- lookupHeader "authorization" <$> liftIO (readChan captured)
       responseCross <- fetchGet request (urlFromText (crossPrefix <> "/empty.html"))
-      authCross <- lookupHeader "authorization" <$> readChan captured
+      authCross <- lookupHeader "authorization" <$> liftIO (readChan captured)
       assertEqual "local status" 200 (httpStatusToInt (apiResponseStatus responseLocal))
       assertEqual "local auth" (Just "Basic dXNlcjpwYXNz") authLocal
       assertEqual "cross status" 200 (httpStatusToInt (apiResponseStatus responseCross))
@@ -625,11 +622,11 @@ httpCredentialsSendTest = do
 serverAddrTest :: IO ()
 serverAddrTest =
   withAssetsPrefix $ \prefix ->
-    withPlaywright $ \pw -> do
-      request <- newRequestContext pw
+    runPlaywright $ do
+      request <- newRequestContext
       expectedPort <- portFromPrefix prefix
       let
-        checkOnce :: IO ()
+        checkOnce :: Playwright ()
         checkOnce = do
           response <- fetchGet request (urlFromText (prefix <> "/empty.html"))
           case apiResponseServerAddr response of
@@ -648,7 +645,7 @@ serverAddrTest =
       checkOnce
       disposeAPIRequestContext request
 
-portFromPrefix :: Text -> IO Int
+portFromPrefix :: (MonadIO m) => Text -> m Int
 portFromPrefix prefix =
   case breakOnEnd ":" prefix of
     (_, portText) ->
@@ -661,8 +658,8 @@ portFromPrefix prefix =
 playwrightUserAgentTest :: IO ()
 playwrightUserAgentTest =
   withHeaderCapture $ \prefix captured ->
-    withPlaywright $ \pw -> do
-      request <- newRequestContext pw
+    runPlaywright $ do
+      request <- newRequestContext
       _ <- fetchGet request (urlFromText (prefix <> "/empty.html"))
       headers <- takeCaptured captured
       ua <- maybe (assertFailure "missing user-agent") (pure . decodeUtf8) (lookupHeader "user-agent" headers)
@@ -674,8 +671,8 @@ abortWhenDisposed :: IO ()
 abortWhenDisposed = do
   arrived <- newEmptyMVar
   withApplication (pure (hangForever arrived)) $ \port ->
-    withPlaywright $ \pw -> do
-      request <- newRequestContext pw
+    runPlaywright $ do
+      request <- newRequestContext
       let url = urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/empty.html")
       withAsync (try (fetchGet request url)) $ \pendingGet ->
         withAsync (try (fetchPost request url)) $ \pendingPost ->
@@ -690,8 +687,8 @@ abortRedirectWhenDisposed :: IO ()
 abortRedirectWhenDisposed = do
   arrived <- newEmptyMVar
   withApplication (pure (redirectHangApp arrived)) $ \port ->
-    withPlaywright $ \pw -> do
-      request <- newRequestContext pw
+    runPlaywright $ do
+      request <- newRequestContext
       withAsync
         (try (fetchGet request (urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/redirect"))))
         $ \pending -> do
@@ -699,7 +696,7 @@ abortRedirectWhenDisposed = do
           disposeAPIRequestContext request
           assertAborted =<< wait pending
 
-assertAborted :: Either PlaywrightError APIResponse -> IO ()
+assertAborted :: Either PlaywrightError APIResponse -> Playwright ()
 assertAborted result =
   case result of
     Left (ProtocolRpc failure) ->
@@ -736,15 +733,15 @@ stripContentLengthOnRedirect :: IO ()
 stripContentLengthOnRedirect = do
   captured <- newChan
   withApplication (pure (contentLengthRedirectApp captured)) $ \port ->
-    withPlaywright $ \pw -> do
-      request <- newRequestContext pw
+    runPlaywright $ do
+      request <- newRequestContext
       response <-
         fetchPostWith
           request
           (urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/redirect"))
           defaultFetchOptions {fetchPostData = Just (FetchPostJson (object ["foo" .= ("bar" :: Text)]))}
-      firstHeaders <- readChan captured
-      secondHeaders <- readChan captured
+      firstHeaders <- liftIO (readChan captured)
+      secondHeaders <- liftIO (readChan captured)
       assertEqual "status" 200 (httpStatusToInt (apiResponseStatus response))
       assertEqual "first content-length" (Just "13") (lookupHeader "content-length" firstHeaders)
       assertEqual "second content-length" Nothing (lookupHeader "content-length" secondHeaders)
@@ -790,8 +787,8 @@ jsonBodyTest :: FetchPostData -> ByteString -> IO ()
 jsonBodyTest payload expected = do
   captured <- newChan
   withApplication (pure (bodyCaptureApp captured)) $ \port ->
-    withPlaywright $ \pw -> do
-      request <- newRequestContext pw
+    runPlaywright $ do
+      request <- newRequestContext
       _ <-
         fetchPostWith
           request
@@ -800,7 +797,7 @@ jsonBodyTest payload expected = do
             { fetchHeaders = Just [HttpHeader (HeaderName "content-type") (HeaderValue "application/json")]
             , fetchPostData = Just payload
             }
-      body <- readChan captured
+      body <- liftIO (readChan captured)
       assertEqual "body" expected body
       disposeAPIRequestContext request
 
@@ -821,8 +818,8 @@ bodyCaptureApp captured request respond = do
 emptyEncodedBodyTest :: IO ()
 emptyEncodedBodyTest =
   withApplication (pure encodedEmptyApp) $ \port ->
-    withPlaywright $ \pw -> do
-      request <- newRequestContext pw
+    runPlaywright $ do
+      request <- newRequestContext
       let url = urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/empty.html")
       forM_ encodedEmptyMethods $ \send ->
         forM_ ["br", "gzip", "deflate"] $ \encoding -> do
@@ -835,21 +832,21 @@ emptyEncodedBodyTest =
           assertEmptyBody response
       disposeAPIRequestContext request
 
-encodedEmptyMethods :: [APIRequestContext -> Url -> FetchOptions -> IO APIResponse]
+encodedEmptyMethods :: [APIRequestContext -> Url -> FetchOptions -> Playwright APIResponse]
 encodedEmptyMethods =
   [ fetchHeadWith'
   , fetchPutWith'
   ]
 
-fetchHeadWith' :: APIRequestContext -> Url -> FetchOptions -> IO APIResponse
+fetchHeadWith' :: APIRequestContext -> Url -> FetchOptions -> Playwright APIResponse
 fetchHeadWith' =
   fetchFromUrlWithMethod "HEAD"
 
-fetchPutWith' :: APIRequestContext -> Url -> FetchOptions -> IO APIResponse
+fetchPutWith' :: APIRequestContext -> Url -> FetchOptions -> Playwright APIResponse
 fetchPutWith' =
   fetchFromUrlWithMethod "PUT"
 
-fetchFromUrlWithMethod :: Text -> APIRequestContext -> Url -> FetchOptions -> IO APIResponse
+fetchFromUrlWithMethod :: Text -> APIRequestContext -> Url -> FetchOptions -> Playwright APIResponse
 fetchFromUrlWithMethod method ctx url opts =
   fetchFromUrlWith ctx url (opts {fetchMethod = Just (HttpMethod method)})
 
@@ -866,7 +863,7 @@ encodedEmptyApp request respond = do
         ""
     )
 
-assertEmptyBody :: APIResponse -> IO ()
+assertEmptyBody :: APIResponse -> Playwright ()
 assertEmptyBody response = do
   result <- try (apiResponseBody response)
   case result of
@@ -880,8 +877,8 @@ assertEmptyBody response = do
 failingRequestBodyTest :: IO ()
 failingRequestBodyTest =
   withApplication (pure notFoundApp) $ \port ->
-    withPlaywright $ \pw -> do
-      request <- newRequestContext pw
+    runPlaywright $ do
+      request <- newRequestContext
       let url = urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/empty.html")
       forM_ ["HEAD", "PUT", "TRACE"] $ \method -> do
         response <- fetchFromUrlWithMethod method request url defaultFetchOptions
@@ -903,8 +900,8 @@ notFoundApp _request respond =
 maxRedirectsExceededTest :: IO ()
 maxRedirectsExceededTest =
   withRedirectChain $ \prefix ->
-    withPlaywright $ \pw -> do
-      request <- newRequestContext pw
+    runPlaywright $ do
+      request <- newRequestContext
       forM_ httpMethods $ \method ->
         forM_ [1, 2, 3] $ \limit ->
           assertMessageContains
@@ -922,8 +919,8 @@ maxRedirectsExceededTest =
 maxRedirectsZeroTest :: IO ()
 maxRedirectsZeroTest =
   withRedirectChain $ \prefix ->
-    withPlaywright $ \pw -> do
-      request <- newRequestContext pw
+    runPlaywright $ do
+      request <- newRequestContext
       forM_ httpMethods $ \method -> do
         response <-
           fetchFromUrlWith
@@ -940,8 +937,8 @@ maxRedirectsZeroTest =
 maxRedirectsNegativeTest :: IO ()
 maxRedirectsNegativeTest =
   withRedirectChain $ \prefix ->
-    withPlaywright $ \pw -> do
-      request <- newRequestContext pw
+    runPlaywright $ do
+      request <- newRequestContext
       forM_ httpMethods $ \method ->
         assertMessageContains
           "'maxRedirects' must be greater than or equal to '0'"
@@ -958,10 +955,9 @@ maxRedirectsNegativeTest =
 maxRedirectsZeroContextTest :: IO ()
 maxRedirectsZeroContextTest =
   withRedirectChain $ \prefix ->
-    withPlaywright $ \pw -> do
+    runPlaywright $ do
       request <-
         newRequestContextWith
-          pw
           defaultNewRequestOptions {newRequestMaxRedirects = Just 0}
       forM_ httpMethods $ \method -> do
         response <-
@@ -976,11 +972,10 @@ maxRedirectsZeroContextTest =
 maxRedirectsContextLimitTest :: IO ()
 maxRedirectsContextLimitTest =
   withRedirectChain $ \prefix ->
-    withPlaywright $ \pw ->
+    runPlaywright $
       forM_ [1, 2, 3, 4] $ \limit -> do
         request <-
           newRequestContextWith
-            pw
             defaultNewRequestOptions {newRequestMaxRedirects = Just limit}
         forM_ httpMethods $ \method ->
           if limit < 4
@@ -1004,10 +999,9 @@ maxRedirectsContextLimitTest =
 maxRedirectsFetchOverrideTest :: IO ()
 maxRedirectsFetchOverrideTest =
   withRedirectChain $ \prefix ->
-    withPlaywright $ \pw -> do
+    runPlaywright $ do
       request <-
         newRequestContextWith
-          pw
           defaultNewRequestOptions {newRequestMaxRedirects = Just 1}
       forM_ httpMethods $ \method -> do
         response <-
@@ -1049,8 +1043,8 @@ redirectChainApp request respond =
 headerCapitalizationTest :: IO ()
 headerCapitalizationTest =
   withHeaderCapture $ \prefix captured ->
-    withPlaywright $ \pw -> do
-      request <- newRequestContext pw
+    runPlaywright $ do
+      request <- newRequestContext
       response <-
         fetchGetWith
           request
@@ -1068,8 +1062,8 @@ retryHangupTest :: IO ()
 retryHangupTest = do
   count <- newIORef (0 :: Int)
   withApplication (pure (retryHangupApp count)) $ \port ->
-    withPlaywright $ \pw -> do
-      request <- newRequestContext pw
+    runPlaywright $ do
+      request <- newRequestContext
       response <-
         fetchFromUrlWith
           request
@@ -1091,10 +1085,9 @@ retryHangupApp count _request respond = do
 contextFailOnStatus :: Bool -> IO ()
 contextFailOnStatus shouldFail =
   withApplication (pure notFoundApp) $ \port ->
-    withPlaywright $ \pw -> do
+    runPlaywright $ do
       request <-
         newRequestContextWith
-          pw
           defaultNewRequestOptions {newRequestFailOnStatusCode = Just shouldFail}
       let url = urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/empty.html")
       if shouldFail
@@ -1104,7 +1097,7 @@ contextFailOnStatus shouldFail =
           assertEqual "status" 404 (httpStatusToInt (apiResponseStatus response))
       disposeAPIRequestContext request
 
-assertMessageContains :: Text -> IO a -> IO ()
+assertMessageContains :: Text -> Playwright a -> Playwright ()
 assertMessageContains needle action = do
   result <- try action
   case result of
@@ -1151,7 +1144,7 @@ headerValue name headers =
     _ ->
       Nothing
 
-requireTimeout :: Double -> IO Timeout
+requireTimeout :: (MonadIO m) => Double -> m Timeout
 requireTimeout n =
   case milliseconds n of
     Nothing ->

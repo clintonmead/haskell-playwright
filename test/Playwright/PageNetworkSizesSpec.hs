@@ -5,11 +5,11 @@ module Playwright.PageNetworkSizesSpec
 import Codec.Compression.GZip
   ( compress
   )
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( wait
   , withAsync
   )
-import Control.Exception
+import UnliftIO.Exception
   ( try
   )
 import Data.ByteString
@@ -22,7 +22,6 @@ import Data.ByteString.Lazy.Char8 qualified as LBS8
 import Data.Text
   ( Text
   , isInfixOf
-  , pack
   )
 import Numeric
   ( showHex
@@ -49,9 +48,6 @@ import Network.Wai
   , responseLBS
   , responseRaw
   )
-import Network.Wai.Handler.Warp
-  ( withApplication
-  )
 import Playwright
   ( BodySize (bodySizeToInt)
   , HeadersSize (headersSizeToInt)
@@ -70,6 +66,7 @@ import Playwright
   , urlFromText
   , waitForRequest
   , waitForRequestFailed
+  , Playwright
   )
 import Playwright.Error
   ( PlaywrightError (DecodeFailure)
@@ -78,16 +75,17 @@ import Playwright.Harness
   ( readTestAsset
   , withAssets
   , withChromiumPage
+  , withLocalApp
+  , assertBool
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertBool
-  , assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -146,8 +144,7 @@ tests =
     , testCase "should have the correct responseBodySize for chunked request" $
         withChromiumPage $ \page -> do
           asset <- readTestAsset "simplezip.json"
-          withApplication (pure (chunkedApp asset)) $ \port -> do
-            let prefix = "http://127.0.0.1:" <> pack (show port)
+          withLocalApp (chunkedApp asset) $ \prefix -> do
             response <- goto page (urlFromText (prefix <> "/chunked-simplezip.json")) defaultGotoOptions
             case response of
               Nothing ->
@@ -160,8 +157,7 @@ tests =
         withChromiumPage $ \page -> do
           asset <- readTestAsset "simplezip.json"
           let compressed = compress (LBS.fromStrict asset)
-          withApplication (pure (gzipApp compressed)) $ \port -> do
-            let prefix = "http://127.0.0.1:" <> pack (show port)
+          withLocalApp (gzipApp compressed) $ \prefix -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
             withAsync (waitForRequest page (UrlGlob (prefix <> "/simplezip.json"))) $ \pending -> do
               _ <- evaluate page "() => fetch('./simplezip.json').then(r => r.text())"
@@ -191,8 +187,7 @@ tests =
     , testCase "should throw for failed requests" $
         withChromiumPage $ \page -> do
           html <- readTestAsset "one-style.html"
-          withApplication (pure (failedCssApp html)) $ \port -> do
-            let prefix = "http://127.0.0.1:" <> pack (show port)
+          withLocalApp (failedCssApp html) $ \prefix -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
             withAsync (waitForRequestFailed page) $ \pending -> do
               _ <- goto page (urlFromText (prefix <> "/one-style.html")) defaultGotoOptions
@@ -233,11 +228,10 @@ statusCodeTest code status =
         assertEqual "request body" 5 (bodySizeToInt (networkRequestBodySize sizes))
         assertEqual "response body" 3 (bodySizeToInt (networkResponseBodySize sizes))
 
-withServerPage :: Application -> (Text -> Page -> IO a) -> IO a
+withServerPage :: Application -> (Text -> Page -> Playwright a) -> IO a
 withServerPage app action =
   withChromiumPage $ \page ->
-    withApplication (pure app) $ \port -> do
-      let prefix = "http://127.0.0.1:" <> pack (show port)
+    withLocalApp app $ \prefix -> do
       _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
       action prefix page
 

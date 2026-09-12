@@ -14,6 +14,7 @@ import Data.Text
   )
 import Playwright
   ( Frame
+  , Playwright
   , childFrames
   , currentName
   , currentUrl
@@ -25,18 +26,19 @@ import Playwright
   , setContent
   , urlFromText
   , urlToText
+  , Playwright
   )
 import Playwright.Harness
   ( withAssets
   , withChromiumPage
+  , assertEqual
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -74,7 +76,7 @@ tests =
           assertEqual "iframe url" [prefix <> "/empty.html"] matching
     ]
 
-dumpFrames :: Frame -> Text -> IO [Text]
+dumpFrames :: Frame -> Text -> Playwright [Text]
 dumpFrames frame indent = do
   urlText <- fmap urlToText (currentUrl frame)
   name <- currentName frame
@@ -87,12 +89,12 @@ dumpFrames frame indent = do
   nested <- traverse (\child -> dumpFrames child ("    " <> indent)) sorted
   pure (description : concat nested)
 
-sortChildren :: [Frame] -> IO [Frame]
+sortChildren :: [Frame] -> Playwright [Frame]
 sortChildren children = do
   keyed <- traverse keyFrame children
   pure (fmap (\(_, _, child) -> child) (sortBy (comparing (\(urlText, name, _) -> (urlText, name))) keyed))
 
-keyFrame :: Frame -> IO (Text, Text, Frame)
+keyFrame :: Frame -> Playwright (Text, Text, Frame)
 keyFrame frame = do
   urlText <- fmap urlToText (currentUrl frame)
   name <- currentName frame

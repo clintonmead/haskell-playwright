@@ -14,11 +14,14 @@ module Playwright.JsHandle
   , waitUntilJsHandlePreview
   ) where
 
+import Playwright.Monad
+  ( Playwright
+  )
 import Control.Concurrent.STM
   ( retry
   , throwSTM
   )
-import Control.Exception
+import UnliftIO.Exception
   ( throwIO
   )
 import Control.Monad
@@ -28,13 +31,12 @@ import Data.Text
   ( Text
   )
 import Playwright.Channel
-  ( Channel (Channel, channelConnection, channelGuid)
+  ( Channel (Channel, channelGuid)
   , JsHandleTag
   , send
   )
 import Playwright.Connection
-  ( Connection
-  , lookupObject
+  ( lookupObject
   , waitUntilRemote
   )
 import Playwright.ElementHandle
@@ -85,27 +87,25 @@ newtype JsHandle = JsHandle
   { jsHandleChannel :: Channel JsHandleTag
   }
 
-jsHandleFromRef :: Connection -> ChannelRef -> JsHandle
-jsHandleFromRef conn ref =
-  JsHandle (Channel conn (channelRefGuid ref))
+jsHandleFromRef :: ChannelRef -> JsHandle
+jsHandleFromRef ref =
+  JsHandle (Channel (channelRefGuid ref))
 
 jsHandleArgument :: JsHandle -> SerializedArgument
 jsHandleArgument handle =
   channelArgument (ChannelRef (channelGuid (jsHandleChannel handle)))
 
-jsHandleToString :: JsHandle -> IO Text
+jsHandleToString :: JsHandle -> Playwright Text
 jsHandleToString handle = do
   obj <-
     lookupObject
-      (channelConnection (jsHandleChannel handle))
       (channelGuid (jsHandleChannel handle))
   initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
   pure (jSHandleInitializerPreview initializer)
 
-waitUntilJsHandlePreview :: JsHandle -> (Text -> Bool) -> IO Text
+waitUntilJsHandlePreview :: JsHandle -> (Text -> Bool) -> Playwright Text
 waitUntilJsHandlePreview handle predicate =
   waitUntilRemote
-    (channelConnection (jsHandleChannel handle))
     (channelGuid (jsHandleChannel handle))
     $ \obj -> do
       initializer <- either throwSTM pure (fromJsonValue (remoteInitializer obj))
@@ -114,19 +114,18 @@ waitUntilJsHandlePreview handle predicate =
       unless (predicate preview) retry
       pure preview
 
-asElement :: JsHandle -> IO (Maybe ElementHandle)
+asElement :: JsHandle -> Playwright (Maybe ElementHandle)
 asElement handle = do
   obj <-
     lookupObject
-      (channelConnection (jsHandleChannel handle))
       (channelGuid (jsHandleChannel handle))
   case remoteType obj of
     ChannelTypeElementHandle ->
-      pure (Just (ElementHandle (Channel (channelConnection (jsHandleChannel handle)) (channelGuid (jsHandleChannel handle)))))
+      pure (Just (ElementHandle (Channel (channelGuid (jsHandleChannel handle)))))
     _ ->
       pure Nothing
 
-jsonValue :: JsHandle -> IO SerializedValue
+jsonValue :: JsHandle -> Playwright SerializedValue
 jsonValue handle = do
   result <-
     send
@@ -135,7 +134,7 @@ jsonValue handle = do
       mkJSHandleJsonValueParams
   pure (jSHandleJsonValueResultValue result)
 
-jsonValueNumber :: JsHandle -> IO Double
+jsonValueNumber :: JsHandle -> Playwright Double
 jsonValueNumber handle = do
   value <- jsonValue handle
   case value of
@@ -144,7 +143,7 @@ jsonValueNumber handle = do
     _ ->
       throwIO (EvaluateUnexpected value)
 
-jsonValueText :: JsHandle -> IO Text
+jsonValueText :: JsHandle -> Playwright Text
 jsonValueText handle = do
   value <- jsonValue handle
   case value of
@@ -153,7 +152,7 @@ jsonValueText handle = do
     _ ->
       throwIO (EvaluateUnexpected value)
 
-jsonValueTexts :: JsHandle -> IO [Text]
+jsonValueTexts :: JsHandle -> Playwright [Text]
 jsonValueTexts handle = do
   value <- jsonValue handle
   case value of
@@ -162,7 +161,7 @@ jsonValueTexts handle = do
     _ ->
       throwIO (EvaluateUnexpected value)
 
-requireJsonText :: SerializedValue -> IO Text
+requireJsonText :: SerializedValue -> Playwright Text
 requireJsonText value =
   case value of
     SerializedNode (PayloadString text) _ ->
@@ -170,7 +169,7 @@ requireJsonText value =
     _ ->
       throwIO (EvaluateUnexpected value)
 
-jsonValueSpecial :: JsHandle -> IO SpecialJsValue
+jsonValueSpecial :: JsHandle -> Playwright SpecialJsValue
 jsonValueSpecial handle = do
   value <- jsonValue handle
   case value of
@@ -179,7 +178,7 @@ jsonValueSpecial handle = do
     _ ->
       throwIO (EvaluateUnexpected value)
 
-getProperty :: JsHandle -> PropertyName -> IO JsHandle
+getProperty :: JsHandle -> PropertyName -> Playwright JsHandle
 getProperty handle name = do
   result <-
     send
@@ -188,23 +187,21 @@ getProperty handle name = do
       (mkJSHandleGetPropertyParams (propertyNameToText name))
   pure
     ( jsHandleFromRef
-        (channelConnection (jsHandleChannel handle))
         (jSHandleGetPropertyResultHandle result)
     )
 
-getPropertyList :: JsHandle -> IO [(PropertyName, JsHandle)]
+getPropertyList :: JsHandle -> Playwright [(PropertyName, JsHandle)]
 getPropertyList handle = do
   result <-
     send
       (jsHandleChannel handle)
       (MethodName "getPropertyList")
       mkJSHandleGetPropertyListParams
-  let conn = channelConnection (jsHandleChannel handle)
   pure
     ( fmap
         ( \prop ->
             ( PropertyName (jSHandleGetPropertyListResultPropertiesName prop)
-            , jsHandleFromRef conn (jSHandleGetPropertyListResultPropertiesValue prop)
+            , jsHandleFromRef (jSHandleGetPropertyListResultPropertiesValue prop)
             )
         )
         (jSHandleGetPropertyListResultProperties result)

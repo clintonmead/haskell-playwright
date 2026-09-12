@@ -7,11 +7,14 @@ module Playwright.Frame.Wait
   , waitForTimeoutFrame
   ) where
 
+import Playwright.Monad
+  ( Playwright
+  )
 import Data.Text
   ( Text
   )
 import Playwright.Channel
-  ( Channel (channelConnection, channelGuid)
+  ( Channel (channelGuid)
   )
 import Playwright.Connection
   ( waitForLifecycle
@@ -58,7 +61,7 @@ import Playwright.WaitForState
   ( WaitForState (WaitForAttached, WaitForDetached, WaitForHidden, WaitForVisible)
   )
 
-waitForSelectorFrame :: Frame -> Selector -> WaitForState -> Timeout -> Maybe Bool -> IO ()
+waitForSelectorFrame :: Frame -> Selector -> WaitForState -> Timeout -> Maybe Bool -> Playwright ()
 waitForSelectorFrame frame selector state timeout strict = do
   _ :: FrameWaitForSelectorResult <-
     frameSend
@@ -71,7 +74,7 @@ waitForSelectorFrame frame selector state timeout strict = do
         }
   pure ()
 
-waitForSelectorHandleFrame :: Frame -> Selector -> WaitForState -> Timeout -> Maybe Bool -> IO (Maybe ElementHandle)
+waitForSelectorHandleFrame :: Frame -> Selector -> WaitForState -> Timeout -> Maybe Bool -> Playwright (Maybe ElementHandle)
 waitForSelectorHandleFrame frame selector state timeout strict = do
   result <-
     frameSend
@@ -84,22 +87,22 @@ waitForSelectorHandleFrame frame selector state timeout strict = do
         }
   pure
     ( fmap
-        (elementHandleFromRef (channelConnection (frameChannel frame)))
+        (elementHandleFromRef)
         (frameWaitForSelectorResultElement result)
     )
 
-waitForSelectorHandleOnFrame :: Frame -> Selector -> WaitForState -> IO (Maybe ElementHandle)
+waitForSelectorHandleOnFrame :: Frame -> Selector -> WaitForState -> Playwright (Maybe ElementHandle)
 waitForSelectorHandleOnFrame frame selector state =
   waitForSelectorHandleFrame frame selector state defaultTimeout Nothing
 
-waitForTimeoutFrame :: Frame -> Timeout -> IO ()
+waitForTimeoutFrame :: Frame -> Timeout -> Playwright ()
 waitForTimeoutFrame frame timeout =
   frameSend_ @FrameWaitForTimeoutResult
     frame
     "waitForTimeout"
     (mkFrameWaitForTimeoutParams timeout)
 
-waitForFunctionFrame :: Frame -> Text -> SerializedArgument -> Timeout -> IO JsHandle
+waitForFunctionFrame :: Frame -> Text -> SerializedArgument -> Timeout -> Playwright JsHandle
 waitForFunctionFrame frame expression arg timeout = do
   result <-
     frameSend
@@ -110,14 +113,12 @@ waitForFunctionFrame frame expression arg timeout = do
         }
   pure
     ( jsHandleFromRef
-        (channelConnection (frameChannel frame))
         (frameWaitForFunctionResultHandle result)
     )
 
-waitForLoadStateFrame :: Frame -> LoadState -> IO ()
+waitForLoadStateFrame :: Frame -> LoadState -> Playwright ()
 waitForLoadStateFrame frame state =
   waitForLifecycle
-    (channelConnection (frameChannel frame))
     (channelGuid (frameChannel frame))
     (toLifecycle state)
 

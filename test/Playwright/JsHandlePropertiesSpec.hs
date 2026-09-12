@@ -4,6 +4,7 @@ module Playwright.JsHandlePropertiesSpec
 
 import Playwright
   ( PropertyName (PropertyName)
+  , Playwright
   , asElement
   , evaluateHandle
   , getProperty
@@ -17,6 +18,8 @@ import Playwright
 import Playwright.Harness
   ( requireHandle
   , withChromiumPage
+  , assertEqual
+  , assertFailure
   )
 import Playwright.SpecialJsValue
   ( SpecialJsValue (SpecialInfinity, SpecialNaN, SpecialNegInfinity, SpecialNegZero, SpecialNull, SpecialUndefined)
@@ -26,9 +29,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -93,7 +94,7 @@ tests =
           assertEqual "hello" (Just "Hello") =<< textContentHandle body
     ]
 
-requireProperty :: PropertyName -> [(PropertyName, a)] -> IO a
+requireProperty :: PropertyName -> [(PropertyName, a)] -> Playwright a
 requireProperty name props =
   case lookup name props of
     Nothing ->

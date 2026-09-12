@@ -9,7 +9,10 @@ module Playwright.Download
   , waitForDownload
   ) where
 
-import Control.Exception
+import Playwright.Monad
+  ( Playwright
+  )
+import UnliftIO.Exception
   ( throwIO
   )
 import Data.Text
@@ -18,7 +21,7 @@ import Data.Text
   )
 import Playwright.Channel
   ( ArtifactTag
-  , Channel (Channel, channelConnection, channelGuid)
+  , Channel (Channel, channelGuid)
   , send
   )
 import Playwright.Connection
@@ -58,31 +61,30 @@ data Download = Download
   , downloadSuggestedFilename :: SuggestedFilename
   }
 
-waitForDownload :: Page -> IO Download
+waitForDownload :: Page -> Playwright Download
 waitForDownload page = do
   takeDownload <- armDownload page
   takeDownload
 
-armDownload :: Page -> IO (IO Download)
+armDownload :: Page -> Playwright (Playwright Download)
 armDownload page = do
   let
-    conn = channelConnection (pageChannel page)
     guid = channelGuid (pageChannel page)
-  waitId <- registerEventWaiter conn guid (MethodName "download")
+  waitId <- registerEventWaiter guid (MethodName "download")
   pure $ do
-    params <- waitForWaiter conn waitId
+    params <- waitForWaiter waitId
     event <- either throwIO pure (fromJsonValue params)
     pure
       ( Download
           { downloadPage = page
-          , downloadArtifact = Channel conn (channelRefGuid (pageDownloadEventArtifact event))
+          , downloadArtifact = Channel (channelRefGuid (pageDownloadEventArtifact event))
           , downloadUrl = pageDownloadEventUrl event
           , downloadSuggestedFilename =
               SuggestedFilename (pageDownloadEventSuggestedFilename event)
           }
       )
 
-downloadPath :: Download -> IO FilePath
+downloadPath :: Download -> Playwright FilePath
 downloadPath download = do
   result <-
     send

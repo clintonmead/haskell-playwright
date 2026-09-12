@@ -3,9 +3,6 @@ module Playwright.Selectors
   , registerSelectorWith
   ) where
 
-import Control.Exception
-  ( throwIO
-  )
 import Control.Monad
   ( forM_
   , unless
@@ -20,9 +17,6 @@ import Data.Text
   ( Text
   )
 import Data.Text qualified as Text
-import Playwright.Channel
-  ( Channel (channelConnection)
-  )
 import Playwright.Connection
   ( addSelectorEngine
   , closedGuids
@@ -33,11 +27,11 @@ import Playwright.Connection
 import Playwright.Error
   ( PlaywrightError (SelectorsRegister)
   )
-import Playwright.Instance
-  ( Playwright (playwrightChannel)
-  )
 import Playwright.MethodName
   ( MethodName (MethodName)
+  )
+import Playwright.Monad
+  ( Playwright
   )
 import Playwright.Protocol
   ( BrowserContextRegisterSelectorEngineResult
@@ -50,15 +44,17 @@ import Playwright.RegisterSelectorOptions
   ( RegisterSelectorOptions (registerSelectorContentScript)
   , defaultRegisterSelectorOptions
   )
+import UnliftIO.Exception
+  ( throwIO
+  )
 
-registerSelector :: Playwright -> Text -> Text -> IO ()
-registerSelector pw name source =
-  registerSelectorWith pw name source defaultRegisterSelectorOptions
+registerSelector :: Text -> Text -> Playwright ()
+registerSelector name source =
+  registerSelectorWith name source defaultRegisterSelectorOptions
 
-registerSelectorWith :: Playwright -> Text -> Text -> RegisterSelectorOptions -> IO ()
-registerSelectorWith pw name source opts = do
+registerSelectorWith :: Text -> Text -> RegisterSelectorOptions -> Playwright ()
+registerSelectorWith name source opts = do
   let
-    conn = channelConnection (playwrightChannel pw)
     engine =
       (mkSelectorEngine name source)
         { selectorEngineContentScript = registerSelectorContentScript opts
@@ -67,21 +63,20 @@ registerSelectorWith pw name source opts = do
     throwIO (SelectorsRegister "selectors.register: Selector engine name may only contain [a-zA-Z0-9_] characters")
   when (predefinedEngine name) $
     throwIO (SelectorsRegister ("selectors.register: \"" <> name <> "\" is a predefined selector engine"))
-  engines <- lookupSelectorEngines conn
+  engines <- lookupSelectorEngines
   when (any ((== name) . selectorEngineName) engines) $
     throwIO (SelectorsRegister ("selectors.register: \"" <> name <> "\" selector engine has been already registered"))
-  guids <- guidsOfType conn ChannelTypeBrowserContext
-  closed <- closedGuids conn
+  guids <- guidsOfType ChannelTypeBrowserContext
+  closed <- closedGuids
   forM_ guids $ \guid ->
     unless (Set.member guid closed) $ do
       _ :: BrowserContextRegisterSelectorEngineResult <-
         sendCommand
-          conn
           guid
           (MethodName "registerSelectorEngine")
           (mkBrowserContextRegisterSelectorEngineParams engine)
       pure ()
-  addSelectorEngine conn engine
+  addSelectorEngine engine
 
 validEngineName :: Text -> Bool
 validEngineName name =

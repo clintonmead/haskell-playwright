@@ -2,7 +2,7 @@ module Playwright.PageRequestFallbackSpec
   ( tests
   ) where
 
-import Control.Concurrent.MVar
+import UnliftIO.MVar
   ( MVar
   , newEmptyMVar
   , putMVar
@@ -13,7 +13,7 @@ import Data.ByteString
   )
 import Data.ByteString.Char8 qualified as Char8
 import Data.ByteString.Lazy qualified as LBS
-import Data.IORef
+import UnliftIO.IORef
   ( IORef
   , modifyIORef'
   , newIORef
@@ -77,20 +77,21 @@ import Playwright
   , routeWith
   , urlFromText
   , urlToText
+  , Playwright
   )
 import Playwright.Harness
   ( assertProtocolContains
   , withAssets
   , withChromiumPage
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -246,7 +247,7 @@ tests =
           assertEqual "globalVar" (123 :: Double) =<< evaluateNumber page "() => window['globalVar']"
     ]
 
-writeTrue :: IORef Bool -> IO ()
+writeTrue :: IORef Bool -> Playwright ()
 writeTrue ref =
   writeIORef ref True
 
@@ -256,7 +257,7 @@ data Captured = Captured
   , capturedMethod :: Text
   }
 
-withCaptureServer :: (Text -> MVar Captured -> Page -> IO a) -> IO a
+withCaptureServer :: (Text -> MVar Captured -> Page -> Playwright a) -> IO a
 withCaptureServer action = do
   captured <- newEmptyMVar
   withApplication (pure (captureSleep captured)) $ \port ->

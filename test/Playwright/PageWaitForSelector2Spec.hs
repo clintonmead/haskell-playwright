@@ -2,17 +2,20 @@ module Playwright.PageWaitForSelector2Spec
   ( tests
   ) where
 
-import Control.Concurrent.Async
+import Control.Monad.IO.Class
+  ( MonadIO
+  )
+import UnliftIO.Async
   ( wait
   , withAsync
   )
-import Control.Exception
+import UnliftIO.Exception
   ( try
   )
 import Control.Monad
   ( void
   )
-import Data.IORef
+import UnliftIO.IORef
   ( newIORef
   , readIORef
   , writeIORef
@@ -63,6 +66,7 @@ import Playwright
   , waitForSelectorHandleWith
   , waitForSelectorOnHandle
   , waitForTimeout
+  , Playwright
   )
 import Playwright.Error
   ( PlaywrightError (MissingObject, ProtocolRpc)
@@ -73,15 +77,15 @@ import Playwright.Harness
   , requireHandle
   , withAssets
   , withChromiumPage
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -371,7 +375,7 @@ tests =
             void (wait pending)
     ]
 
-requireTimeout :: Double -> IO Timeout
+requireTimeout :: (MonadIO m) => Double -> m Timeout
 requireTimeout n =
   case milliseconds n of
     Nothing ->
@@ -379,7 +383,7 @@ requireTimeout n =
     Just timeout ->
       pure timeout
 
-attachFrame :: Page -> Text -> Text -> IO Frame
+attachFrame :: Page -> Text -> Text -> Playwright Frame
 attachFrame page prefix frameId = do
   handle <-
     evaluateHandle
@@ -393,7 +397,7 @@ attachFrame page prefix frameId = do
   element <- requireHandle =<< asElement handle
   requireFrame =<< contentFrameHandle element
 
-detachFrame :: Page -> Text -> IO ()
+detachFrame :: Page -> Text -> Playwright ()
 detachFrame page frameId = do
   _ <-
     evaluateWith
@@ -402,7 +406,7 @@ detachFrame page frameId = do
       (textArgument frameId)
   pure ()
 
-frameAt :: Page -> Int -> IO Frame
+frameAt :: Page -> Int -> Playwright Frame
 frameAt page index = do
   listed <- frames page
   case drop index listed of
@@ -411,7 +415,7 @@ frameAt page index = do
     [] ->
       assertFailure ("expected frame at index " <> show index)
 
-requireFrame :: Maybe Frame -> IO Frame
+requireFrame :: Maybe Frame -> Playwright Frame
 requireFrame frame =
   case frame of
     Just value ->
@@ -419,7 +423,7 @@ requireFrame frame =
     Nothing ->
       assertFailure "expected a frame"
 
-assertDetached :: Either PlaywrightError a -> IO ()
+assertDetached :: Either PlaywrightError a -> Playwright ()
 assertDetached result =
   case result of
     Left (ProtocolRpc failure)

@@ -6,6 +6,9 @@ module Playwright.Mouse
   , mouseWheel
   ) where
 
+import Playwright.Monad
+  ( Playwright
+  )
 import Playwright.Channel
   ( send
   )
@@ -37,7 +40,7 @@ import Playwright.WheelDelta
   ( WheelDelta (wheelDeltaToScientific)
   )
 
-mouseClick :: Page -> Point -> IO ()
+mouseClick :: Page -> Point -> Playwright ()
 mouseClick page point = do
   _ :: PageMouseClickResult <-
     send
@@ -46,7 +49,7 @@ mouseClick page point = do
       (mkPageMouseClickParams (cssPixelToScientific (pointX point)) (cssPixelToScientific (pointY point)))
   pure ()
 
-mouseMove :: Page -> Point -> IO ()
+mouseMove :: Page -> Point -> Playwright ()
 mouseMove page point = do
   _ :: PageMouseMoveResult <-
     send
@@ -55,19 +58,19 @@ mouseMove page point = do
       (mkPageMouseMoveParams (cssPixelToScientific (pointX point)) (cssPixelToScientific (pointY point)))
   pure ()
 
-mouseDown :: Page -> IO ()
+mouseDown :: Page -> Playwright ()
 mouseDown page = do
   _ :: PageMouseDownResult <-
     send (pageChannel page) (MethodName "mouseDown") mkPageMouseDownParams
   pure ()
 
-mouseUp :: Page -> IO ()
+mouseUp :: Page -> Playwright ()
 mouseUp page = do
   _ :: PageMouseUpResult <-
     send (pageChannel page) (MethodName "mouseUp") mkPageMouseUpParams
   pure ()
 
-mouseWheel :: Page -> WheelDelta -> WheelDelta -> IO ()
+mouseWheel :: Page -> WheelDelta -> WheelDelta -> Playwright ()
 mouseWheel page deltaX deltaY = do
   _ :: PageMouseWheelResult <-
     send

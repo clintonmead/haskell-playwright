@@ -6,6 +6,9 @@ module Playwright.Keyboard
   , keyboardUp
   ) where
 
+import Playwright.Monad
+  ( Playwright
+  )
 import Data.Text
   ( Text
   )
@@ -34,31 +37,31 @@ import Playwright.Protocol
   , mkPageKeyboardUpParams
   )
 
-keyboardType :: Page -> Text -> IO ()
+keyboardType :: Page -> Text -> Playwright ()
 keyboardType page text = do
   _ :: PageKeyboardTypeResult <-
     send (pageChannel page) (MethodName "keyboardType") (mkPageKeyboardTypeParams text)
   pure ()
 
-keyboardPress :: Page -> Key -> IO ()
+keyboardPress :: Page -> Key -> Playwright ()
 keyboardPress page key = do
   _ :: PageKeyboardPressResult <-
     send (pageChannel page) (MethodName "keyboardPress") (mkPageKeyboardPressParams (keyToText key))
   pure ()
 
-keyboardDown :: Page -> Key -> IO ()
+keyboardDown :: Page -> Key -> Playwright ()
 keyboardDown page key = do
   _ :: PageKeyboardDownResult <-
     send (pageChannel page) (MethodName "keyboardDown") (mkPageKeyboardDownParams (keyToText key))
   pure ()
 
-keyboardUp :: Page -> Key -> IO ()
+keyboardUp :: Page -> Key -> Playwright ()
 keyboardUp page key = do
   _ :: PageKeyboardUpResult <-
     send (pageChannel page) (MethodName "keyboardUp") (mkPageKeyboardUpParams (keyToText key))
   pure ()
 
-keyboardInsertText :: Page -> Text -> IO ()
+keyboardInsertText :: Page -> Text -> Playwright ()
 keyboardInsertText page text = do
   _ :: PageKeyboardInsertTextResult <-
     send (pageChannel page) (MethodName "keyboardInsertText") (mkPageKeyboardInsertTextParams text)

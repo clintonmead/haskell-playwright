@@ -3,14 +3,14 @@ module Playwright.ConsoleMessage
   , consoleMessageFromEvent
   ) where
 
-import Control.Exception
+import Playwright.Monad
+  ( Playwright
+  )
+import UnliftIO.Exception
   ( throwIO
   )
 import Data.Text
   ( Text
-  )
-import Playwright.Connection
-  ( Connection
   )
 import Playwright.ConsoleType
   ( ConsoleType
@@ -33,8 +33,8 @@ data ConsoleMessage = ConsoleMessage
   , consoleMessageArgs :: [JsHandle]
   }
 
-consoleMessageFromEvent :: Connection -> BrowserContextConsoleEvent -> IO ConsoleMessage
-consoleMessageFromEvent conn event = do
+consoleMessageFromEvent :: BrowserContextConsoleEvent -> Playwright ConsoleMessage
+consoleMessageFromEvent event = do
   kind <-
     case consoleTypeFromText (browserContextConsoleEventType event) of
       Just parsed ->
@@ -45,5 +45,5 @@ consoleMessageFromEvent conn event = do
     ConsoleMessage
       { consoleMessageType = kind
       , consoleMessageText = browserContextConsoleEventText event
-      , consoleMessageArgs = fmap (jsHandleFromRef conn) (browserContextConsoleEventArgs event)
+      , consoleMessageArgs = fmap (jsHandleFromRef) (browserContextConsoleEventArgs event)
       }

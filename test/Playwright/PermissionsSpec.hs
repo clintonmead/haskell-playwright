@@ -19,19 +19,20 @@ import Playwright
   , pageContext
   , textArgument
   , urlFromText
+  , Playwright
   )
 import Playwright.Harness
   ( assertProtocolContains
   , withAssets
   , withAssetsWith
+  , assertEqual
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -102,7 +103,7 @@ tests =
             assertEqual "state" "granted" =<< permissionState page "geolocation"
     ]
 
-permissionState :: Page -> Text -> IO Text
+permissionState :: Page -> Text -> Playwright Text
 permissionState page name =
   evaluateTextWith
     page

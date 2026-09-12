@@ -2,14 +2,14 @@ module Playwright.RetargetSpec
   ( tests
   ) where
 
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( wait
   , withAsync
   )
 import Control.Monad
   ( forM_
   )
-import Data.IORef
+import UnliftIO.IORef
   ( newIORef
   , readIORef
   , writeIORef
@@ -60,20 +60,21 @@ import Playwright
   , textContent
   , uncheck
   , waitForElementState
+  , Playwright
   )
 import Playwright.Harness
   ( locate
   , readTestAsset
   , requireHandle
   , withChromiumPage
+  , assertEqual
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -296,7 +297,7 @@ tests =
           assertEqual "clicked 2" (2 :: Double) =<< evaluateNumber page "() => window.__clicked"
     ]
 
-rafraf :: Page -> Int -> IO ()
+rafraf :: Page -> Int -> Playwright ()
 rafraf page count =
   forM_ [1 .. count] $ \(_ :: Int) -> do
     _ <-

@@ -2,7 +2,7 @@ module Playwright.ConnectionSpec
   ( tests
   ) where
 
-import Control.Concurrent.Async
+import UnliftIO.Async
   ( async
   , cancel
   )
@@ -24,12 +24,17 @@ import Data.Text
 import Playwright.BrowserType
   ( BrowserType (browserTypeName)
   )
+import Playwright
+  ( chromium
+  )
 import Playwright.Connection
   ( withConnection
   )
 import Playwright.Instance
-  ( Playwright (playwrightChromium)
-  , initializePlaywright
+  ( initializePlaywright
+  )
+import Playwright.Monad
+  ( runPlaywrightWith
   )
 import Playwright.Transport
   ( Transport (closeTransport, recvPayload, sendPayload)
@@ -37,13 +42,15 @@ import Playwright.Transport
 import Playwright.Transport.Memory
   ( newConnectedPair
   )
+import Playwright.Harness
+  ( assertEqual
+  )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-    ( assertEqual
-    , testCase
+    ( testCase
     )
 
 tests :: TestTree
@@ -53,9 +60,11 @@ tests =
     [ testCase "initialize against a fake driver" $ do
         (client, server) <- newConnectedPair
         worker <- async (fakeDriver server)
-        withConnection client $ \conn -> do
-          pw <- initializePlaywright conn
-          assertEqual "chromium browser type" "chromium" (browserTypeName (playwrightChromium pw))
+        withConnection client $ \conn ->
+          runPlaywrightWith conn $ do
+            initializePlaywright
+            browserType <- chromium
+            assertEqual "chromium browser type" "chromium" (browserTypeName browserType)
         cancel worker
     ]
 

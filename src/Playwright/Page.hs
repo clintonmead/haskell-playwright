@@ -47,7 +47,10 @@ module Playwright.Page
   , setDefaultNavigationTimeout
   ) where
 
-import Control.Exception
+import Playwright.Monad
+  ( Playwright
+  )
+import UnliftIO.Exception
   ( try
   , throwIO
   )
@@ -70,7 +73,7 @@ import Playwright.APIRequestContext
   )
 import Playwright.Channel
   ( BrowserContextTag
-  , Channel (Channel, channelConnection, channelGuid)
+  , Channel (Channel, channelGuid)
   , PageTag
   , send
   )
@@ -229,61 +232,53 @@ data Page = Page
   , pageContextChannel :: Channel BrowserContextTag
   }
 
-pageFromRef :: Channel BrowserContextTag -> ChannelRef -> IO Page
+pageFromRef :: Channel BrowserContextTag -> ChannelRef -> Playwright Page
 pageFromRef contextChannel ref = do
-  let conn = channelConnection contextChannel
-  obj <- lookupObject conn (channelRefGuid ref)
+  obj <- lookupObject (channelRefGuid ref)
   initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
-  resolvedMainFrame <- frameFromRef conn (pageInitializerMainFrame initializer)
+  resolvedMainFrame <- frameFromRef (pageInitializerMainFrame initializer)
   let
     pageGuid = channelRefGuid ref
-  registerMainFramePage conn (channelGuid (frameChannel resolvedMainFrame)) pageGuid
+  registerMainFramePage (channelGuid (frameChannel resolvedMainFrame)) pageGuid
   pure
     Page
-      { pageChannel = Channel conn pageGuid
+      { pageChannel = Channel pageGuid
       , pageMainFrame = resolvedMainFrame
       , pageContextChannel = contextChannel
       }
 
-pageActionTimeout :: Page -> IO Timeout
+pageActionTimeout :: Page -> Playwright Timeout
 pageActionTimeout page = do
-  let conn = channelConnection (pageChannel page)
-  pageDefaults <- lookupTimeoutDefaults conn (channelGuid (pageChannel page))
-  contextDefaults <- lookupTimeoutDefaults conn (channelGuid (pageContextChannel page))
+  pageDefaults <- lookupTimeoutDefaults (channelGuid (pageChannel page))
+  contextDefaults <- lookupTimeoutDefaults (channelGuid (pageContextChannel page))
   pure (resolveActionTimeout pageDefaults contextDefaults)
 
-pageRequest :: Page -> IO APIRequestContext
+pageRequest :: Page -> Playwright APIRequestContext
 pageRequest page =
   apiRequestContextFor
-    (channelConnection (pageChannel page))
     (channelGuid (pageContextChannel page))
 
-pageNavigationTimeout :: Page -> IO Timeout
+pageNavigationTimeout :: Page -> Playwright Timeout
 pageNavigationTimeout page = do
-  let conn = channelConnection (pageChannel page)
-  pageDefaults <- lookupTimeoutDefaults conn (channelGuid (pageChannel page))
-  contextDefaults <- lookupTimeoutDefaults conn (channelGuid (pageContextChannel page))
+  pageDefaults <- lookupTimeoutDefaults (channelGuid (pageChannel page))
+  contextDefaults <- lookupTimeoutDefaults (channelGuid (pageContextChannel page))
   pure (resolveNavigationTimeout pageDefaults contextDefaults)
 
-setDefaultTimeout :: Page -> Timeout -> IO ()
+setDefaultTimeout :: Page -> Timeout -> Playwright ()
 setDefaultTimeout page timeout =
   setTimeoutDefault
-    (channelConnection (pageChannel page))
     (channelGuid (pageChannel page))
     (Just timeout)
 
-setDefaultNavigationTimeout :: Page -> Timeout -> IO ()
+setDefaultNavigationTimeout :: Page -> Timeout -> Playwright ()
 setDefaultNavigationTimeout page timeout =
   setTimeoutNavigation
-    (channelConnection (pageChannel page))
     (channelGuid (pageChannel page))
     (Just timeout)
 
-closePage :: Page -> IO ()
+closePage :: Page -> Playwright ()
 closePage page = do
-  let
-    conn = channelConnection (pageChannel page)
-  ownsContext <- pageOwnsContext conn (channelGuid (pageChannel page))
+  ownsContext <- pageOwnsContext (channelGuid (pageChannel page))
   if ownsContext
     then
       ignoreTargetClosed $ do
@@ -296,12 +291,12 @@ closePage page = do
           send (pageChannel page) (MethodName "close") mkPageCloseParams
         pure ()
 
-isClosed :: Page -> IO Bool
+isClosed :: Page -> Playwright Bool
 isClosed page = do
-  closed <- closedGuids (channelConnection (pageChannel page))
+  closed <- closedGuids
   pure (Set.member (channelGuid (pageChannel page)) closed)
 
-waitForClose :: Page -> IO ()
+waitForClose :: Page -> Playwright ()
 waitForClose page = do
   already <- isClosed page
   if already
@@ -309,49 +304,47 @@ waitForClose page = do
     else do
       _ <-
         waitForChannelEvent
-          (channelConnection (pageChannel page))
           (channelGuid (pageChannel page))
           (MethodName "close")
       pure ()
 
-onPageClose :: Page -> IO () -> IO ()
+onPageClose :: Page -> Playwright () -> Playwright ()
 onPageClose page run =
   registerEventHandler
-    (channelConnection (pageChannel page))
     (channelGuid (pageChannel page))
     (MethodName "close")
     (\_ -> run)
 
-bringToFront :: Page -> IO ()
+bringToFront :: Page -> Playwright ()
 bringToFront page = do
   _ :: PageBringToFrontResult <-
     send (pageChannel page) (MethodName "bringToFront") mkPageBringToFrontParams
   pure ()
 
-requestGC :: Page -> IO ()
+requestGC :: Page -> Playwright ()
 requestGC page = do
   _ :: PageRequestGCResult <-
     send (pageChannel page) (MethodName "requestGC") mkPageRequestGCParams
   pure ()
 
-goto :: Page -> Url -> GotoOptions -> IO (Maybe Response)
+goto :: Page -> Url -> GotoOptions -> Playwright (Maybe Response)
 goto page = gotoFrame (pageMainFrame page)
 
-title :: Page -> IO Text
+title :: Page -> Playwright Text
 title page = titleFrame (pageMainFrame page)
 
-url :: Page -> IO Url
+url :: Page -> Playwright Url
 url page = currentUrl (pageMainFrame page)
 
-content :: Page -> IO Text
+content :: Page -> Playwright Text
 content page = contentFrame (pageMainFrame page)
 
-setContent :: Page -> Text -> IO ()
+setContent :: Page -> Text -> Playwright ()
 setContent page html = do
   timeout <- pageNavigationTimeout page
   setContentFrame (pageMainFrame page) html timeout
 
-setViewportSize :: Page -> ViewportSize -> IO ()
+setViewportSize :: Page -> ViewportSize -> Playwright ()
 setViewportSize page size = do
   _ :: PageSetViewportSizeResult <-
     send
@@ -365,7 +358,7 @@ setViewportSize page size = do
       )
   pure ()
 
-screenshot :: Page -> ScreenshotOptions -> IO ByteString
+screenshot :: Page -> ScreenshotOptions -> Playwright ByteString
 screenshot page opts = do
   result <-
     send
@@ -376,11 +369,11 @@ screenshot page opts = do
         }
   pure (protocolBinaryToByteString (pageScreenshotResultBinary result))
 
-pdf :: Page -> IO ByteString
+pdf :: Page -> Playwright ByteString
 pdf page =
   pdfWith page defaultPdfOptions
 
-pdfWith :: Page -> PdfOptions -> IO ByteString
+pdfWith :: Page -> PdfOptions -> Playwright ByteString
 pdfWith page opts = do
   result <-
     send
@@ -440,43 +433,43 @@ getByRole :: Page -> AriaRole -> GetByRoleOptions -> Locator
 getByRole page role opts =
   locator page (getByRoleSelector role opts)
 
-goBack :: Page -> IO (Maybe Response)
+goBack :: Page -> Playwright (Maybe Response)
 goBack page = do
   timeout <- pageNavigationTimeout page
   result <- send (pageChannel page) (MethodName "goBack") (mkPageGoBackParams timeout)
-  pure (fmap (responseFromRef (channelConnection (pageChannel page))) (pageGoBackResultResponse result))
+  pure (fmap (responseFromRef) (pageGoBackResultResponse result))
 
-goForward :: Page -> IO (Maybe Response)
+goForward :: Page -> Playwright (Maybe Response)
 goForward page = do
   timeout <- pageNavigationTimeout page
   result <- send (pageChannel page) (MethodName "goForward") (mkPageGoForwardParams timeout)
-  pure (fmap (responseFromRef (channelConnection (pageChannel page))) (pageGoForwardResultResponse result))
+  pure (fmap (responseFromRef) (pageGoForwardResultResponse result))
 
-reload :: Page -> IO (Maybe Response)
+reload :: Page -> Playwright (Maybe Response)
 reload page = do
   timeout <- pageNavigationTimeout page
   result <- send (pageChannel page) (MethodName "reload") (mkPageReloadParams timeout)
-  pure (fmap (responseFromRef (channelConnection (pageChannel page))) (pageReloadResultResponse result))
+  pure (fmap (responseFromRef) (pageReloadResultResponse result))
 
-querySelector :: Page -> Selector -> IO (Maybe ElementHandle)
+querySelector :: Page -> Selector -> Playwright (Maybe ElementHandle)
 querySelector page selector =
   querySelectorFrame (pageMainFrame page) selector Nothing
 
-querySelectorAll :: Page -> Selector -> IO [ElementHandle]
+querySelectorAll :: Page -> Selector -> Playwright [ElementHandle]
 querySelectorAll page selector =
   querySelectorAllFrame (pageMainFrame page) selector
 
-querySelectorStrict :: Page -> Selector -> IO (Maybe ElementHandle)
+querySelectorStrict :: Page -> Selector -> Playwright (Maybe ElementHandle)
 querySelectorStrict page selector =
   querySelectorFrame (pageMainFrame page) selector (Just True)
 
-addInitScript :: Page -> Text -> IO ()
+addInitScript :: Page -> Text -> Playwright ()
 addInitScript page source = do
   _ :: PageAddInitScriptResult <-
     send (pageChannel page) (MethodName "addInitScript") (mkPageAddInitScriptParams source)
   pure ()
 
-addScriptTag :: Page -> ScriptTag -> IO ElementHandle
+addScriptTag :: Page -> ScriptTag -> Playwright ElementHandle
 addScriptTag page tag = do
   result <-
     frameSend
@@ -489,11 +482,10 @@ addScriptTag page tag = do
         }
   pure
     ( elementHandleFromRef
-        (channelConnection (frameChannel (pageMainFrame page)))
         (frameAddScriptTagResultElement result)
     )
 
-addStyleTag :: Page -> StyleTag -> IO ElementHandle
+addStyleTag :: Page -> StyleTag -> Playwright ElementHandle
 addStyleTag page tag = do
   result <-
     frameSend
@@ -505,11 +497,10 @@ addStyleTag page tag = do
         }
   pure
     ( elementHandleFromRef
-        (channelConnection (frameChannel (pageMainFrame page)))
         (frameAddStyleTagResultElement result)
     )
 
-setExtraHTTPHeaders :: Page -> [HttpHeader] -> IO ()
+setExtraHTTPHeaders :: Page -> [HttpHeader] -> Playwright ()
 setExtraHTTPHeaders page headers = do
   _ :: PageSetExtraHTTPHeadersResult <-
     send
@@ -522,7 +513,7 @@ mainFrame :: Page -> Frame
 mainFrame =
   pageMainFrame
 
-frames :: Page -> IO [Frame]
+frames :: Page -> Playwright [Frame]
 frames page =
   collect (pageMainFrame page)
   where
@@ -531,7 +522,7 @@ frames page =
       nested <- traverse collect children
       pure (current : concat nested)
 
-frameByName :: Page -> Text -> IO (Maybe Frame)
+frameByName :: Page -> Text -> Playwright (Maybe Frame)
 frameByName page name = do
   allFrames <- frames page
   named <- traverse pairName allFrames
@@ -542,7 +533,7 @@ frameByName page name = do
       pure (frame, frameName)
 
 
-subscribeContext :: Page -> BrowserContextUpdateSubscriptionParamsEvent -> IO ()
+subscribeContext :: Page -> BrowserContextUpdateSubscriptionParamsEvent -> Playwright ()
 subscribeContext page event = do
   _ :: BrowserContextUpdateSubscriptionResult <-
     send
@@ -552,17 +543,15 @@ subscribeContext page event = do
   pure ()
 
 
-opener :: Page -> IO (Maybe Page)
+opener :: Page -> Playwright (Maybe Page)
 opener page = do
-  let
-    conn = channelConnection (pageChannel page)
-  obj <- lookupObject conn (channelGuid (pageChannel page))
+  obj <- lookupObject (channelGuid (pageChannel page))
   initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
   case pageInitializerOpener initializer of
     Nothing ->
       pure Nothing
     Just ref -> do
-      closed <- closedGuids conn
+      closed <- closedGuids
       if Set.member (channelRefGuid ref) closed
         then pure Nothing
         else do

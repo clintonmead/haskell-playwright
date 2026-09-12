@@ -2,7 +2,10 @@ module Playwright.PageWaitForFunctionSpec
   ( tests
   ) where
 
-import Control.Concurrent.Async
+import Control.Monad.IO.Class
+  ( liftIO
+  )
+import UnliftIO.Async
   ( concurrently_
   )
 import GHC.Clock
@@ -20,16 +23,16 @@ import Playwright
 import Playwright.Harness
   ( assertProtocolContains
   , withChromiumPage
+  , assertBool
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertBool
-  , assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -38,13 +41,13 @@ tests =
     "page-wait-for-function"
     [ testCase "should timeout" $
         withChromiumPage $ \page -> do
-          start <- getMonotonicTimeNSec
+          start <- liftIO getMonotonicTimeNSec
           case milliseconds 42 of
             Nothing ->
               assertFailure "timeout"
             Just timeout ->
               waitForTimeout page timeout
-          end <- getMonotonicTimeNSec
+          end <- liftIO getMonotonicTimeNSec
           assertBool "waited at least half the timeout" (end - start >= 21000000)
     , testCase "should work when predicate is already true" $
         withChromiumPage $ \page -> do

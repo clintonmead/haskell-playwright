@@ -2,17 +2,20 @@ module Playwright.PageAddLocatorHandlerSpec
   ( tests
   ) where
 
-import Control.Concurrent
+import Control.Monad.IO.Class
+  ( MonadIO
+  )
+import UnliftIO.Concurrent
   ( threadDelay
   )
-import Control.Exception
+import UnliftIO.Exception
   ( try
   )
 import Control.Monad
   ( forever
   , when
   )
-import Data.IORef
+import UnliftIO.IORef
   ( IORef
   , modifyIORef'
   , newIORef
@@ -66,6 +69,7 @@ import Playwright
   , selectorFromText
   , urlFromText
   , waitFor
+  , Playwright
   )
 import Playwright.Error
   ( PlaywrightError (ProtocolRpc)
@@ -76,6 +80,8 @@ import Playwright.Harness
   , locate
   , withAssetPage
   , withAssets
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
@@ -84,9 +90,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -373,7 +377,7 @@ customCheckCases =
   , ("hide", 1)
   ]
 
-runCoveredClick :: Page -> IORef Int -> IORef Int -> (Text, Int, Maybe Text) -> IO ()
+runCoveredClick :: Page -> IORef Int -> IORef Int -> (Text, Int, Maybe Text) -> Playwright ()
 runCoveredClick page beforeCount afterCount (event, times, capture) = do
   hover (locate page "#aside")
   writeIORef beforeCount 0
@@ -393,7 +397,7 @@ runCoveredClick page beforeCount afterCount (event, times, capture) = do
   visible <- isVisible (locate page "#interstitial")
   assertEqual "hidden" False visible
 
-runCustomCheck :: Page -> (Text, Int) -> IO ()
+runCustomCheck :: Page -> (Text, Int) -> Playwright ()
 runCustomCheck page (event, times) = do
   hover (locate page "#aside")
   setupInterstitial page event times Nothing
@@ -403,7 +407,7 @@ runCustomCheck page (event, times) = do
   visible <- isVisible (locate page "#interstitial")
   assertEqual "hidden" False visible
 
-setupInterstitial :: Page -> Text -> Int -> Maybe Text -> IO ()
+setupInterstitial :: Page -> Text -> Int -> Maybe Text -> Playwright ()
 setupInterstitial page event times capture = do
   let
     captureArg =
@@ -431,7 +435,7 @@ closeButton page =
     (AriaRole "button")
     defaultGetByRoleOptions {getByRoleName = Just "close"}
 
-withHandleLocator :: (Page -> IO a) -> IO a
+withHandleLocator :: (Page -> Playwright a) -> IO a
 withHandleLocator action =
   withAssets $ \prefix page -> do
     addInitScript
@@ -444,7 +448,7 @@ withHandleLocator action =
         defaultGotoOptions
     action page
 
-requireTimeout :: Double -> IO Timeout
+requireTimeout :: (MonadIO m) => Double -> m Timeout
 requireTimeout n =
   case milliseconds n of
     Nothing ->
@@ -452,7 +456,7 @@ requireTimeout n =
     Just timeout ->
       pure timeout
 
-assertProtocolContainsAll :: [Text] -> IO a -> IO ()
+assertProtocolContainsAll :: [Text] -> Playwright a -> Playwright ()
 assertProtocolContainsAll needles action = do
   result <- tryProtocol action
   case result of
@@ -463,11 +467,11 @@ assertProtocolContainsAll needles action = do
     Right _ ->
       assertFailure "expected protocol error"
 
-tryProtocol :: IO a -> IO (Either PlaywrightError a)
+tryProtocol :: Playwright a -> Playwright (Either PlaywrightError a)
 tryProtocol action =
   try action
 
-requireNeedle :: Text -> Text -> IO ()
+requireNeedle :: Text -> Text -> Playwright ()
 requireNeedle haystack needle =
   if needle `isInfixOf` haystack
     then pure ()

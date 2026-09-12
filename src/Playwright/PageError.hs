@@ -6,7 +6,10 @@ module Playwright.PageError
   , waitForPageError
   ) where
 
-import Control.Exception
+import Playwright.Monad
+  ( Playwright
+  )
+import UnliftIO.Exception
   ( throwIO
   )
 import Data.Text
@@ -14,7 +17,7 @@ import Data.Text
   , pack
   )
 import Playwright.Channel
-  ( Channel (channelConnection, channelGuid)
+  ( Channel (channelGuid)
   , send
   )
 import Playwright.Connection
@@ -60,18 +63,17 @@ data PageError = PageError
   }
   deriving stock (Eq, Show)
 
-waitForPageError :: Page -> IO PageError
+waitForPageError :: Page -> Playwright PageError
 waitForPageError page = do
   let
-    conn = channelConnection (pageContextChannel page)
     contextGuid = channelGuid (pageContextChannel page)
-  params <- waitForChannelEvent conn contextGuid (MethodName "pageError")
+  params <- waitForChannelEvent contextGuid (MethodName "pageError")
   event <- either throwIO pure (fromJsonValue params)
   if channelRefGuid (browserContextPageErrorEventPage event) == channelGuid (pageChannel page)
     then pure (pageErrorFromSerialized (browserContextPageErrorEventError event))
     else waitForPageError page
 
-pageErrors :: Page -> IO [PageError]
+pageErrors :: Page -> Playwright [PageError]
 pageErrors page = do
   result <-
     send
@@ -80,7 +82,7 @@ pageErrors page = do
       mkPagePageErrorsParams
   pure (fmap pageErrorFromSerialized (pagePageErrorsResultErrors result))
 
-clearPageErrors :: Page -> IO ()
+clearPageErrors :: Page -> Playwright ()
 clearPageErrors page = do
   _ :: PageClearPageErrorsResult <-
     send (pageChannel page) (MethodName "clearPageErrors") mkPageClearPageErrorsParams

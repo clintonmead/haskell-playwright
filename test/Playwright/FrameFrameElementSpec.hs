@@ -24,21 +24,22 @@ import Playwright
   , selectorFromText
   , setContent
   , urlFromText
+  , Playwright
   )
 import Playwright.Harness
   ( assertProtocolContains
   , requireHandle
   , withAssets
   , withChromiumPage
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -104,7 +105,7 @@ tests =
           assertEqual "name" (Just "myframe") =<< getAttributeHandle element "name"
     ]
 
-attachFrame :: Page -> Text -> Text -> IO Frame
+attachFrame :: Page -> Text -> Text -> Playwright Frame
 attachFrame page prefix frameId = do
   handle <-
     evaluateHandle
@@ -118,7 +119,7 @@ attachFrame page prefix frameId = do
   element <- requireHandle =<< asElement handle
   requireFrame =<< contentFrameHandle element
 
-childFrame :: Page -> IO Frame
+childFrame :: Page -> Playwright Frame
 childFrame page = do
   allFrames <- frames page
   case allFrames of
@@ -127,7 +128,7 @@ childFrame page = do
     _ ->
       assertFailure "expected a child frame"
 
-requireFrame :: Maybe Frame -> IO Frame
+requireFrame :: Maybe Frame -> Playwright Frame
 requireFrame frame =
   case frame of
     Just value ->

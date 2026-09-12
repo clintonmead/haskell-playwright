@@ -15,7 +15,10 @@ module Playwright.Browser
   , withPageWith
   ) where
 
-import Control.Exception
+import Playwright.Monad
+  ( Playwright
+  )
+import UnliftIO.Exception
   ( bracket
   , throwIO
   )
@@ -37,12 +40,11 @@ import Playwright.BrowserContext
   )
 import Playwright.Channel
   ( BrowserTag
-  , Channel (Channel, channelConnection, channelGuid)
+  , Channel (Channel, channelGuid)
   , send
   )
 import Playwright.Connection
-  ( Connection
-  , closedGuids
+  ( closedGuids
   , lookupContextBrowserGuid
   , lookupObject
   , lookupOwnedContextGuids
@@ -90,78 +92,70 @@ newtype Browser = Browser
   { browserChannel :: Channel BrowserTag
   }
 
-browserFromRef :: Connection -> ChannelRef -> IO Browser
-browserFromRef conn ref =
-  pure (Browser (Channel conn (channelRefGuid ref)))
+browserFromRef :: ChannelRef -> Playwright Browser
+browserFromRef ref =
+  pure (Browser (Channel (channelRefGuid ref)))
 
 browsersEqual :: Browser -> Browser -> Bool
 browsersEqual left right =
   channelGuid (browserChannel left) == channelGuid (browserChannel right)
 
-browserVersion :: Browser -> IO Text
+browserVersion :: Browser -> Playwright Text
 browserVersion browser = do
-  let
-    conn = channelConnection (browserChannel browser)
-  obj <- lookupObject conn (channelGuid (browserChannel browser))
+  obj <- lookupObject (channelGuid (browserChannel browser))
   initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
   pure (browserInitializerVersion initializer)
 
-onBrowserContext :: Browser -> (BrowserContext -> IO ()) -> IO ()
+onBrowserContext :: Browser -> (BrowserContext -> Playwright ()) -> Playwright ()
 onBrowserContext browser run =
   registerEventHandler
-    (channelConnection (browserChannel browser))
     (channelGuid (browserChannel browser))
     (MethodName "context")
     ( \params -> do
         event <- either throwIO pure (fromJsonValue params)
         ctx <-
           contextFromRef
-            (channelConnection (browserChannel browser))
             (browserContextEventContext event)
         run ctx
     )
 
-browserContexts :: Browser -> IO [BrowserContext]
+browserContexts :: Browser -> Playwright [BrowserContext]
 browserContexts browser = do
   let
-    conn = channelConnection (browserChannel browser)
     browserGuid = channelGuid (browserChannel browser)
-  owned <- lookupOwnedContextGuids conn browserGuid
-  closed <- closedGuids conn
+  owned <- lookupOwnedContextGuids browserGuid
+  closed <- closedGuids
   traverse
-    (contextFromRef conn . ChannelRef)
+    (contextFromRef . ChannelRef)
     (filter (`Set.notMember` closed) owned)
 
-contextBrowser :: BrowserContext -> IO Browser
+contextBrowser :: BrowserContext -> Playwright Browser
 contextBrowser ctx = do
   let
-    conn = channelConnection (browserContextChannel ctx)
     guid = channelGuid (browserContextChannel ctx)
-  owner <- lookupContextBrowserGuid conn guid
+  owner <- lookupContextBrowserGuid guid
   case owner of
     Just browserGuid ->
-      browserFromRef conn (ChannelRef browserGuid)
+      browserFromRef (ChannelRef browserGuid)
     Nothing -> do
-      obj <- lookupObject conn guid
-      browserFromRef conn (ChannelRef (remoteParent obj))
+      obj <- lookupObject guid
+      browserFromRef (ChannelRef (remoteParent obj))
 
-closeBrowser :: Browser -> IO ()
+closeBrowser :: Browser -> Playwright ()
 closeBrowser browser =
   ignoreTargetClosed $ do
     _ :: BrowserCloseResult <-
       send (browserChannel browser) (MethodName "close") mkBrowserCloseParams
     pure ()
 
-newContext :: Browser -> IO BrowserContext
+newContext :: Browser -> Playwright BrowserContext
 newContext browser =
   newContextWith browser defaultNewContextOptions
 
-newContextWith :: Browser -> NewContextOptions -> IO BrowserContext
+newContextWith :: Browser -> NewContextOptions -> Playwright BrowserContext
 newContextWith browser opts = do
   validateNewContextOptions opts
-  let
-    conn = channelConnection (browserChannel browser)
-  engines <- lookupSelectorEngines conn
+  engines <- lookupSelectorEngines
   result <-
     send
       (browserChannel browser)
@@ -177,15 +171,15 @@ newContextWith browser opts = do
       )
   let
     ref = browserNewContextResultContext result
-  rememberBrowserContext conn (channelGuid (browserChannel browser)) (channelRefGuid ref)
+  rememberBrowserContext (channelGuid (browserChannel browser)) (channelRefGuid ref)
   case newContextBaseURL opts of
     Nothing ->
       pure ()
     Just base ->
-      writeContextBaseUrl conn (channelRefGuid ref) base
-  contextFromRef conn ref
+      writeContextBaseUrl (channelRefGuid ref) base
+  contextFromRef ref
 
-validateNewContextOptions :: NewContextOptions -> IO ()
+validateNewContextOptions :: NewContextOptions -> Playwright ()
 validateNewContextOptions opts = do
   let
     noViewport = newContextNoDefaultViewport opts == Just True
@@ -194,25 +188,23 @@ validateNewContextOptions opts = do
   when (noViewport && isJust (newContextIsMobile opts)) $
     throwIO (DecodeFailure "\"isMobile\" option is not supported with null \"viewport\"")
 
-newBrowserPage :: Browser -> IO Page
+newBrowserPage :: Browser -> Playwright Page
 newBrowserPage browser =
   newBrowserPageWith browser defaultNewContextOptions
 
-newBrowserPageWith :: Browser -> NewContextOptions -> IO Page
+newBrowserPageWith :: Browser -> NewContextOptions -> Playwright Page
 newBrowserPageWith browser opts = do
   ctx <- newContextWith browser opts
   page <- newPage ctx
-  let
-    conn = channelConnection (browserChannel browser)
-  markPageOwnsContext conn (channelGuid (pageChannel page))
-  markContextHasOwnerPage conn (channelGuid (browserContextChannel ctx))
+  markPageOwnsContext (channelGuid (pageChannel page))
+  markContextHasOwnerPage (channelGuid (browserContextChannel ctx))
   pure page
 
-withPage :: Browser -> (Page -> IO a) -> IO a
+withPage :: Browser -> (Page -> Playwright a) -> Playwright a
 withPage browser =
   withPageWith browser defaultNewContextOptions
 
-withPageWith :: Browser -> NewContextOptions -> (Page -> IO a) -> IO a
+withPageWith :: Browser -> NewContextOptions -> (Page -> Playwright a) -> Playwright a
 withPageWith browser opts action =
   bracket
     ( do

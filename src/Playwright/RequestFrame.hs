@@ -3,15 +3,15 @@ module Playwright.RequestFrame
   , responseFrame
   ) where
 
-import Playwright.Channel
-  ( Channel (channelConnection)
+import Playwright.Monad
+  ( Playwright
   )
 import Playwright.Frame
   ( Frame
   , frameFromRef
   )
 import Playwright.Request
-  ( Request (requestChannel)
+  ( Request
   , requestFrameRef
   )
 import Playwright.Response
@@ -19,15 +19,15 @@ import Playwright.Response
   , responseRequest
   )
 
-requestFrame :: Request -> IO (Maybe Frame)
+requestFrame :: Request -> Playwright (Maybe Frame)
 requestFrame request = do
   ref <- requestFrameRef request
   case ref of
     Nothing ->
       pure Nothing
     Just frameRef ->
-      Just <$> frameFromRef (channelConnection (requestChannel request)) frameRef
+      Just <$> frameFromRef frameRef
 
-responseFrame :: Response -> IO (Maybe Frame)
+responseFrame :: Response -> Playwright (Maybe Frame)
 responseFrame response =
   requestFrame =<< responseRequest response

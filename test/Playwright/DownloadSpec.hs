@@ -2,7 +2,10 @@ module Playwright.DownloadSpec
   ( tests
   ) where
 
-import Control.Concurrent.Async
+import Control.Monad.IO.Class
+  ( liftIO
+  )
+import UnliftIO.Async
   ( wait
   , withAsync
   )
@@ -39,8 +42,9 @@ import Playwright
 import Playwright.Harness
   ( assertProtocolContains
   , withChromiumContextWith
+  , assertEqual
   )
-import System.Directory
+import UnliftIO.Directory
   ( doesFileExist
   )
 import Test.Tasty
@@ -48,8 +52,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -73,7 +76,7 @@ tests =
                 path <- downloadPath download
                 exists <- doesFileExist path
                 assertEqual "exists" True exists
-                contents <- BS8.readFile path
+                contents <- liftIO (BS8.readFile path)
                 assertEqual "body" (BS8.pack "Hello world") contents
     ]
 

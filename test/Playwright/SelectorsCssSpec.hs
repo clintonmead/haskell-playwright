@@ -16,6 +16,7 @@ import Data.Text
 import Playwright
   ( ElementHandle
   , Page
+  , Playwright
   , asElement
   , childLocator
   , evalOnSelectorAllHandleNumber
@@ -36,11 +37,14 @@ import Playwright
   , setContent
   , textArgument
   , textContent
+  , Playwright
   )
 import Playwright.Harness
   ( requireHandle
   , withAssetPage
   , withChromiumPage
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
@@ -49,9 +53,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -424,37 +426,37 @@ tests =
           assertEqual "text" "Foo" =<< evalOnSelectorText page (selectorFromText "my-button > .content") "e => e.textContent"
     ]
 
-assertText :: Page -> Text -> Text -> IO ()
+assertText :: Page -> Text -> Text -> Playwright ()
 assertText page sel expected =
   assertEqual (unpack sel) expected
     =<< evalOnSelectorText page (selectorFromText sel) "e => e.textContent"
 
-assertCount :: Page -> Text -> Double -> IO ()
+assertCount :: Page -> Text -> Double -> Playwright ()
 assertCount page sel expected =
   assertEqual (unpack sel) expected
     =<< evalOnSelectorAllNumber page (selectorFromText sel) "els => els.length"
 
-assertHandleCount :: ElementHandle -> Text -> Double -> IO ()
+assertHandleCount :: ElementHandle -> Text -> Double -> Playwright ()
 assertHandleCount handle sel expected =
   assertEqual (unpack sel) expected
     =<< evalOnSelectorAllHandleNumber handle (selectorFromText sel) "els => els.length"
 
-assertNames :: Page -> Text -> [Text] -> IO ()
+assertNames :: Page -> Text -> [Text] -> Playwright ()
 assertNames page sel expected =
   assertEqual (unpack sel) expected
     =<< evalOnSelectorAllTexts page (selectorFromText sel) "els => els.map(e => e.nodeName)"
 
-assertIds :: Page -> Text -> [Text] -> IO ()
+assertIds :: Page -> Text -> [Text] -> Playwright ()
 assertIds page sel expected =
   assertEqual (unpack sel) expected
     =<< evalOnSelectorAllTexts page (selectorFromText sel) "els => els.map(e => e.id)"
 
-assertContents :: Page -> Text -> [Text] -> IO ()
+assertContents :: Page -> Text -> [Text] -> Playwright ()
 assertContents page sel expected =
   assertEqual (unpack sel) expected
     =<< evalOnSelectorAllTexts page (selectorFromText sel) "els => els.map(e => e.textContent)"
 
-requireNth :: Int -> [ElementHandle] -> IO ElementHandle
+requireNth :: Int -> [ElementHandle] -> Playwright ElementHandle
 requireNth n handles =
   case drop n handles of
     handle : _ ->

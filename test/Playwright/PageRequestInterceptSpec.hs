@@ -2,10 +2,13 @@ module Playwright.PageRequestInterceptSpec
   ( tests
   ) where
 
-import Control.Concurrent
+import Control.Monad.IO.Class
+  ( MonadIO
+  )
+import UnliftIO.Concurrent
   ( threadDelay
   )
-import Control.Concurrent.MVar
+import UnliftIO.MVar
   ( MVar
   , newEmptyMVar
   , takeMVar
@@ -22,7 +25,7 @@ import Data.ByteString
   ( ByteString
   )
 import Data.ByteString.Lazy qualified as LBS
-import Data.IORef
+import UnliftIO.IORef
   ( IORef
   , atomicModifyIORef'
   , newIORef
@@ -111,6 +114,7 @@ import Playwright
   , textArgument
   , urlFromText
   , urlToText
+  , Playwright
   )
 import Playwright.Harness
   ( assertProtocolContains
@@ -118,6 +122,9 @@ import Playwright.Harness
   , testAssetsDir
   , withAssets
   , withChromiumPage
+  , assertBool
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
@@ -126,10 +133,7 @@ import Test.Tasty
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertBool
-  , assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -404,7 +408,7 @@ headerValue name headers =
     _ ->
       Nothing
 
-requireTimeout :: Double -> IO Timeout
+requireTimeout :: (MonadIO m) => Double -> m Timeout
 requireTimeout n =
   case milliseconds n of
     Nothing ->
@@ -412,7 +416,7 @@ requireTimeout n =
     Just timeout ->
       pure timeout
 
-withEmptyFooApp :: (Text -> Page -> IO a) -> IO a
+withEmptyFooApp :: (Text -> Page -> Playwright a) -> IO a
 withEmptyFooApp action =
   withApplication (pure emptyFooApp) $ \port ->
     withChromiumPage $ \page ->
@@ -426,7 +430,7 @@ emptyFooApp request respond =
     _ ->
       respond (responseLBS status200 [(hContentType, "text/html")] "<html><body></body></html>")
 
-withSampleApp :: (Text -> Page -> IO a) -> IO a
+withSampleApp :: (Text -> Page -> Playwright a) -> IO a
 withSampleApp action = do
   assets <- testAssetsDir
   withApplication (pure (sampleApp assets)) $ \port ->
@@ -441,7 +445,7 @@ sampleApp assets request respond =
     _ ->
       staticApp (defaultFileServerSettings assets) request respond
 
-withSlowApp :: (Text -> Page -> IO a) -> IO a
+withSlowApp :: (Text -> Page -> Playwright a) -> IO a
 withSlowApp action =
   withApplication (pure slowApp) $ \port ->
     withChromiumPage $ \page ->
@@ -455,7 +459,7 @@ slowApp request respond =
     _ ->
       respond (responseLBS status200 [(hContentType, "text/html")] "<html></html>")
 
-withRedirectApp :: (Text -> Page -> IO a) -> IO a
+withRedirectApp :: (Text -> Page -> Playwright a) -> IO a
 withRedirectApp action = do
   assets <- testAssetsDir
   withApplication (pure (redirectApp assets)) $ \port ->
@@ -470,7 +474,7 @@ redirectApp assets request respond =
     _ ->
       staticApp (defaultFileServerSettings assets) request respond
 
-withCapturedEmpty :: (Text -> MVar ByteString -> Page -> IO a) -> IO a
+withCapturedEmpty :: (Text -> MVar ByteString -> Page -> Playwright a) -> IO a
 withCapturedEmpty action = do
   captured <- newEmptyMVar
   assets <- testAssetsDir
@@ -488,7 +492,7 @@ captureEmpty assets captured request respond =
     _ ->
       staticApp (defaultFileServerSettings assets) request respond
 
-withFaviconApp :: (Text -> IORef Int -> Page -> IO a) -> IO a
+withFaviconApp :: (Text -> IORef Int -> Page -> Playwright a) -> IO a
 withFaviconApp action = do
   hits <- newIORef (0 :: Int)
   assets <- testAssetsDir

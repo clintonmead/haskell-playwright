@@ -35,18 +35,19 @@ import Playwright
   , responseStatus
   , setHTTPCredentials
   , urlFromText
+  , Playwright
   )
 import Playwright.Harness
   ( withChromiumContextWith
+  , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
-  ( assertEqual
-  , assertFailure
-  , testCase
+  ( testCase
   )
 
 tests :: TestTree
@@ -121,7 +122,7 @@ validCredentials =
     , httpCredentialsSend = Nothing
     }
 
-statusCode :: Maybe Response -> IO Int
+statusCode :: Maybe Response -> Playwright Int
 statusCode response =
   case response of
     Nothing ->

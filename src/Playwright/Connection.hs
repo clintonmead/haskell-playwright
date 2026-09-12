@@ -47,13 +47,19 @@ module Playwright.Connection
   , beginLocatorHandler
   , deleteLocatorHandler
   , locatorHandlerUidsMatching
+  , storePlaywrightGuids
+  , lookupPlaywrightGuid
+  , lookupChromiumGuid
+  , lookupFirefoxGuid
+  , lookupWebkitGuid
   ) where
 
 import Control.Concurrent.Async
   ( withAsync
   )
 import Control.Concurrent.STM
-  ( atomically
+  ( STM
+  , atomically
   , newTVarIO
   , retry
   , throwSTM
@@ -67,6 +73,9 @@ import Control.Exception
   )
 import Control.Monad
   ( unless
+  )
+import Control.Monad.IO.Class
+  ( liftIO
   )
 import Data.Aeson
   ( FromJSON
@@ -89,6 +98,9 @@ import Data.Map.Strict
   ( Map
   )
 import Data.Map.Strict qualified as Map
+import Data.Set
+  ( Set
+  )
 import Data.Set qualified as Set
 import Data.Text
   ( Text
@@ -96,45 +108,11 @@ import Data.Text
 import Data.Text qualified as Text
 import Playwright.Connection.Handlers
   ( handlerLoop
-  , registerEventHandler
   , runEventHandlers
   , waitForDispatchedHandlers
   )
-import Playwright.Connection.Store
-  ( addSelectorEngine
-  , beginLocatorHandler
-  , clearRouteHandlers
-  , closedGuids
-  , contextHasOwnerPage
-  , deleteLocatorHandler
-  , guidsOfType
-  , locatorHandlerUidsMatching
-  , lookupBrowserTypeGuid
-  , lookupContextBaseUrl
-  , lookupContextBrowserGuid
-  , lookupMainFramePage
-  , lookupObject
-  , lookupOwnedContextGuids
-  , lookupRequestFailure
-  , lookupRequestOverrides
-  , lookupSelectorEngines
-  , lookupTimeoutDefaults
-  , markLocatorHandlersListening
-  , markContextHasOwnerPage
-  , markPageOwnsContext
-  , pageOwnsContext
-  , pushRouteHandler
-  , putLocatorHandler
-  , registerMainFramePage
-  , rememberBrowserContext
-  , rememberBrowserType
-  , removeRouteHandlers
-  , routeHandlersFor
-  , setTimeoutDefault
-  , setTimeoutNavigation
-  , writeContextBaseUrl
-  , writeRequestOverrides
-  )
+import Playwright.Connection.Handlers qualified as Handlers
+import Playwright.Connection.Store qualified as Store
 import Playwright.Connection.Types
   ( Connection (Connection, connectionHandlerQueue, connectionSession, connectionTransport)
   , OutgoingCall (OutgoingCall, outgoingCallGuid, outgoingCallId, outgoingCallMetadata, outgoingCallMethod, outgoingCallParams)
@@ -145,17 +123,8 @@ import Playwright.Connection.Types
   )
 import Playwright.Connection.Wait
   ( deliverEvent
-  , registerEventWaiter
-  , registerFutureEventWaiter
-  , waitForChannelEvent
-  , waitForFutureChannelEvent
-  , waitForFutureChannelEventUnlessClosed
-  , waitForLifecycle
-  , waitForWaiter
-  , waitUntilRemote
-  , waitUntilRequestSettled
-  , waitUntilUrl
   )
+import Playwright.Connection.Wait qualified as Wait
 import Playwright.Error
   ( PlaywrightError (ConnectionClosed, DecodeFailure, ProtocolRpc, UnexpectedResponse)
   , ProtocolFailure
@@ -177,14 +146,21 @@ import Playwright.Json.Decode
 import Playwright.MethodName
   ( MethodName (MethodName)
   )
+import Playwright.Monad
+  ( Playwright
+  , askConnection
+  , runPlaywrightWith
+  )
 import Playwright.Protocol
   ( BrowserContextRequestFailedEvent (browserContextRequestFailedEventFailureText, browserContextRequestFailedEventRequest)
   , BrowserContextRequestFinishedEvent (browserContextRequestFinishedEventRequest)
+  , ChannelType
   , FrameInitializer (frameInitializerLoadStates)
   , FrameLoadstateEvent (frameLoadstateEventAdd, frameLoadstateEventRemove)
   , FrameNavigatedEvent (frameNavigatedEventName, frameNavigatedEventUrl)
   , JSHandlePreviewUpdatedEvent (jSHandlePreviewUpdatedEventPreview)
   , LifecycleEvent
+  , SelectorEngine
   )
 import Playwright.RemoteObject
   ( RemoteObject (RemoteObject, remoteGuid, remoteInitializer, remoteParent, remoteType)
@@ -192,18 +168,33 @@ import Playwright.RemoteObject
 import Playwright.RequestId
   ( RequestId
   )
+import Playwright.RequestOverrides
+  ( RequestOverrides
+  )
 import Playwright.Session
-  ( Session (sessionBrowserContexts, sessionClosed, sessionClosedGuids, sessionFinishedRequests, sessionNextId, sessionObjects, sessionPending, sessionRequestFailures, sessionResults)
+  ( Session (sessionBrowserContexts, sessionChromiumGuid, sessionClosed, sessionClosedGuids, sessionFinishedRequests, sessionFirefoxGuid, sessionNextId, sessionObjects, sessionPending, sessionPlaywrightGuid, sessionRequestFailures, sessionResults, sessionWebkitGuid)
   , emptySession
   )
 import Playwright.StoredLocatorHandler
   ( StoredLocatorHandler (StoredLocatorHandler, storedLocatorHandlerFrame, storedLocatorHandlerRun, storedLocatorHandlerSelector, storedLocatorHandlerTimes)
+  )
+import Playwright.Timeout
+  ( Timeout
+  )
+import Playwright.TimeoutDefaults
+  ( TimeoutDefaults
   )
 import Playwright.Transport
   ( Transport (closeTransport, recvPayload, sendPayload)
   )
 import Playwright.Url
   ( Url
+  )
+import Playwright.UrlGlob
+  ( UrlGlob
+  )
+import Playwright.WaitId
+  ( WaitId
   )
 
 withConnection :: Transport -> (Connection -> IO a) -> IO a
@@ -224,12 +215,243 @@ withConnection transport action = do
 
 sendCommand ::
   (ToJSON params, FromJSON result) =>
+  Guid ->
+  MethodName ->
+  params ->
+  Playwright result
+sendCommand guid method params = do
+  conn <- askConnection
+  liftIO (sendCommandIO conn guid method params)
+
+inConnection :: (Connection -> IO a) -> Playwright a
+inConnection action = do
+  conn <- askConnection
+  liftIO (action conn)
+
+lookupObject :: Guid -> Playwright RemoteObject
+lookupObject guid =
+  inConnection (`Store.lookupObject` guid)
+
+guidsOfType :: ChannelType -> Playwright [Guid]
+guidsOfType ty =
+  inConnection (`Store.guidsOfType` ty)
+
+closedGuids :: Playwright (Set Guid)
+closedGuids =
+  inConnection Store.closedGuids
+
+pushRouteHandler :: Guid -> UrlGlob -> (ChannelRef -> IO Bool) -> Playwright Bool
+pushRouteHandler guid glob run =
+  inConnection $ \conn -> Store.pushRouteHandler conn guid glob run
+
+removeRouteHandlers :: Guid -> UrlGlob -> Playwright ()
+removeRouteHandlers guid glob =
+  inConnection $ \conn -> Store.removeRouteHandlers conn guid glob
+
+clearRouteHandlers :: Guid -> Playwright ()
+clearRouteHandlers guid =
+  inConnection (`Store.clearRouteHandlers` guid)
+
+routeHandlersFor :: Guid -> Playwright [(UrlGlob, ChannelRef -> IO Bool)]
+routeHandlersFor guid =
+  inConnection (`Store.routeHandlersFor` guid)
+
+lookupRequestOverrides :: Guid -> Playwright RequestOverrides
+lookupRequestOverrides guid =
+  inConnection (`Store.lookupRequestOverrides` guid)
+
+writeRequestOverrides :: Guid -> RequestOverrides -> Playwright ()
+writeRequestOverrides guid overrides =
+  inConnection $ \conn -> Store.writeRequestOverrides conn guid overrides
+
+lookupContextBaseUrl :: Guid -> Playwright (Maybe Url)
+lookupContextBaseUrl guid =
+  inConnection (`Store.lookupContextBaseUrl` guid)
+
+writeContextBaseUrl :: Guid -> Url -> Playwright ()
+writeContextBaseUrl guid url =
+  inConnection $ \conn -> Store.writeContextBaseUrl conn guid url
+
+rememberBrowserContext :: Guid -> Guid -> Playwright ()
+rememberBrowserContext browserGuid contextGuid =
+  inConnection $ \conn -> Store.rememberBrowserContext conn browserGuid contextGuid
+
+lookupOwnedContextGuids :: Guid -> Playwright [Guid]
+lookupOwnedContextGuids browserGuid =
+  inConnection (`Store.lookupOwnedContextGuids` browserGuid)
+
+lookupContextBrowserGuid :: Guid -> Playwright (Maybe Guid)
+lookupContextBrowserGuid contextGuid =
+  inConnection (`Store.lookupContextBrowserGuid` contextGuid)
+
+markPageOwnsContext :: Guid -> Playwright ()
+markPageOwnsContext pageGuid =
+  inConnection (`Store.markPageOwnsContext` pageGuid)
+
+pageOwnsContext :: Guid -> Playwright Bool
+pageOwnsContext pageGuid =
+  inConnection (`Store.pageOwnsContext` pageGuid)
+
+markContextHasOwnerPage :: Guid -> Playwright ()
+markContextHasOwnerPage contextGuid =
+  inConnection (`Store.markContextHasOwnerPage` contextGuid)
+
+contextHasOwnerPage :: Guid -> Playwright Bool
+contextHasOwnerPage contextGuid =
+  inConnection (`Store.contextHasOwnerPage` contextGuid)
+
+rememberBrowserType :: Guid -> Guid -> Playwright ()
+rememberBrowserType browserGuid browserTypeGuid =
+  inConnection $ \conn -> Store.rememberBrowserType conn browserGuid browserTypeGuid
+
+lookupBrowserTypeGuid :: Guid -> Playwright (Maybe Guid)
+lookupBrowserTypeGuid browserGuid =
+  inConnection (`Store.lookupBrowserTypeGuid` browserGuid)
+
+lookupSelectorEngines :: Playwright [SelectorEngine]
+lookupSelectorEngines =
+  inConnection Store.lookupSelectorEngines
+
+addSelectorEngine :: SelectorEngine -> Playwright ()
+addSelectorEngine engine =
+  inConnection (`Store.addSelectorEngine` engine)
+
+markLocatorHandlersListening :: Guid -> Playwright Bool
+markLocatorHandlersListening guid =
+  inConnection (`Store.markLocatorHandlersListening` guid)
+
+putLocatorHandler :: Guid -> Int -> StoredLocatorHandler -> Playwright ()
+putLocatorHandler pageGuid uid stored =
+  inConnection $ \conn -> Store.putLocatorHandler conn pageGuid uid stored
+
+beginLocatorHandler :: Guid -> Int -> Playwright (Maybe StoredLocatorHandler, Bool)
+beginLocatorHandler pageGuid uid =
+  inConnection $ \conn -> Store.beginLocatorHandler conn pageGuid uid
+
+deleteLocatorHandler :: Guid -> Int -> Playwright ()
+deleteLocatorHandler pageGuid uid =
+  inConnection $ \conn -> Store.deleteLocatorHandler conn pageGuid uid
+
+locatorHandlerUidsMatching :: Guid -> Text -> Guid -> Playwright [Int]
+locatorHandlerUidsMatching pageGuid selector frameGuid =
+  inConnection $ \conn -> Store.locatorHandlerUidsMatching conn pageGuid selector frameGuid
+
+lookupTimeoutDefaults :: Guid -> Playwright TimeoutDefaults
+lookupTimeoutDefaults guid =
+  inConnection (`Store.lookupTimeoutDefaults` guid)
+
+setTimeoutDefault :: Guid -> Maybe Timeout -> Playwright ()
+setTimeoutDefault guid value =
+  inConnection $ \conn -> Store.setTimeoutDefault conn guid value
+
+setTimeoutNavigation :: Guid -> Maybe Timeout -> Playwright ()
+setTimeoutNavigation guid value =
+  inConnection $ \conn -> Store.setTimeoutNavigation conn guid value
+
+registerMainFramePage :: Guid -> Guid -> Playwright ()
+registerMainFramePage frameGuid pageGuid =
+  inConnection $ \conn -> Store.registerMainFramePage conn frameGuid pageGuid
+
+lookupMainFramePage :: Guid -> Playwright (Maybe Guid)
+lookupMainFramePage frameGuid =
+  inConnection (`Store.lookupMainFramePage` frameGuid)
+
+lookupRequestFailure :: Guid -> Playwright (Maybe Text)
+lookupRequestFailure guid =
+  inConnection (`Store.lookupRequestFailure` guid)
+
+registerEventWaiter :: Guid -> MethodName -> Playwright WaitId
+registerEventWaiter guid method =
+  inConnection $ \conn -> Wait.registerEventWaiter conn guid method
+
+registerFutureEventWaiter :: Guid -> MethodName -> Playwright WaitId
+registerFutureEventWaiter guid method =
+  inConnection $ \conn -> Wait.registerFutureEventWaiter conn guid method
+
+waitForWaiter :: WaitId -> Playwright Value
+waitForWaiter waitId =
+  inConnection (`Wait.waitForWaiter` waitId)
+
+waitForChannelEvent :: Guid -> MethodName -> Playwright Value
+waitForChannelEvent guid method =
+  inConnection $ \conn -> Wait.waitForChannelEvent conn guid method
+
+waitForFutureChannelEvent :: Guid -> MethodName -> Playwright Value
+waitForFutureChannelEvent guid method =
+  inConnection $ \conn -> Wait.waitForFutureChannelEvent conn guid method
+
+waitForFutureChannelEventUnlessClosed :: Guid -> MethodName -> Playwright Value
+waitForFutureChannelEventUnlessClosed guid method =
+  inConnection $ \conn -> Wait.waitForFutureChannelEventUnlessClosed conn guid method
+
+waitForLifecycle :: Guid -> LifecycleEvent -> Playwright ()
+waitForLifecycle guid wanted =
+  inConnection $ \conn -> Wait.waitForLifecycle conn guid wanted
+
+waitUntilUrl :: Guid -> (Url -> Bool) -> Playwright ()
+waitUntilUrl guid predicate =
+  inConnection $ \conn -> Wait.waitUntilUrl conn guid predicate
+
+waitUntilRemote :: Guid -> (RemoteObject -> STM a) -> Playwright a
+waitUntilRemote guid useObject =
+  inConnection $ \conn -> Wait.waitUntilRemote conn guid useObject
+
+waitUntilRequestSettled :: Guid -> Playwright ()
+waitUntilRequestSettled guid =
+  inConnection (`Wait.waitUntilRequestSettled` guid)
+
+registerEventHandler :: Guid -> MethodName -> (Value -> Playwright ()) -> Playwright ()
+registerEventHandler guid method run = do
+  conn <- askConnection
+  liftIO $
+    Handlers.registerEventHandler conn guid method $ \params ->
+      runPlaywrightWith conn (run params)
+
+storePlaywrightGuids :: Guid -> Guid -> Guid -> Guid -> Playwright ()
+storePlaywrightGuids playwrightGuid chromiumGuid firefoxGuid webkitGuid =
+  inConnection $ \conn ->
+    atomically $
+      modifySession conn $ \session ->
+        session
+          { sessionPlaywrightGuid = Just playwrightGuid
+          , sessionChromiumGuid = Just chromiumGuid
+          , sessionFirefoxGuid = Just firefoxGuid
+          , sessionWebkitGuid = Just webkitGuid
+          }
+
+lookupPlaywrightGuid :: Playwright Guid
+lookupPlaywrightGuid =
+  requireSessionGuid "Playwright" sessionPlaywrightGuid
+
+lookupChromiumGuid :: Playwright Guid
+lookupChromiumGuid =
+  requireSessionGuid "chromium" sessionChromiumGuid
+
+lookupFirefoxGuid :: Playwright Guid
+lookupFirefoxGuid =
+  requireSessionGuid "firefox" sessionFirefoxGuid
+
+lookupWebkitGuid :: Playwright Guid
+lookupWebkitGuid =
+  requireSessionGuid "webkit" sessionWebkitGuid
+
+requireSessionGuid :: Text -> (Session -> Maybe Guid) -> Playwright Guid
+requireSessionGuid label field = do
+  session <- inConnection (atomically . readSession)
+  case field session of
+    Just guid ->
+      pure guid
+    Nothing ->
+      liftIO (throwIO (DecodeFailure (label <> " was not initialized")))
+
+sendCommandIO ::
+  (ToJSON params, FromJSON result) =>
   Connection ->
   Guid ->
   MethodName ->
   params ->
   IO result
-sendCommand conn guid method params = do
+sendCommandIO conn guid method params = do
   closed <- atomically (sessionClosed <$> readSession conn)
   case closed of
     Just err ->

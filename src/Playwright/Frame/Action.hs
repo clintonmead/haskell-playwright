@@ -21,7 +21,10 @@ module Playwright.Frame.Action
   , setInputFilesFrame
   ) where
 
-import Control.Exception
+import Playwright.Monad
+  ( Playwright
+  )
+import UnliftIO.Exception
   ( throwIO
   )
 import Data.Text
@@ -152,11 +155,11 @@ import Playwright.Timeout
   ( Timeout
   )
 
-clickFrame :: Frame -> Selector -> Timeout -> IO ()
+clickFrame :: Frame -> Selector -> Timeout -> Playwright ()
 clickFrame frame selector timeout =
   clickFrameWith frame selector timeout defaultClickOptions
 
-clickFrameStrict :: Frame -> Selector -> Timeout -> Maybe Bool -> IO ()
+clickFrameStrict :: Frame -> Selector -> Timeout -> Maybe Bool -> Playwright ()
 clickFrameStrict frame selector timeout strict =
   frameSend_ @FrameClickResult
     frame
@@ -165,7 +168,7 @@ clickFrameStrict frame selector timeout strict =
       { frameClickParamsStrict = strict
       }
 
-clickFrameWith :: Frame -> Selector -> Timeout -> ClickOptions -> IO ()
+clickFrameWith :: Frame -> Selector -> Timeout -> ClickOptions -> Playwright ()
 clickFrameWith frame selector timeout opts =
   frameSend_ @FrameClickResult
     frame
@@ -181,7 +184,7 @@ toProtocolPoint :: Point -> Protocol.Point
 toProtocolPoint point =
   Protocol.mkPoint (cssPixelToScientific (pointX point)) (cssPixelToScientific (pointY point))
 
-dblclickFrame :: Frame -> Selector -> Timeout -> IO ()
+dblclickFrame :: Frame -> Selector -> Timeout -> Playwright ()
 dblclickFrame frame selector timeout =
   frameSend_ @FrameDblclickResult
     frame
@@ -190,7 +193,7 @@ dblclickFrame frame selector timeout =
       { frameDblclickParamsStrict = Just True
       }
 
-dispatchEventFrame :: Frame -> Selector -> DomEventType -> Timeout -> IO ()
+dispatchEventFrame :: Frame -> Selector -> DomEventType -> Timeout -> Playwright ()
 dispatchEventFrame frame selector eventType timeout =
   frameSend_ @FrameDispatchEventResult
     frame
@@ -199,7 +202,7 @@ dispatchEventFrame frame selector eventType timeout =
       { frameDispatchEventParamsStrict = Just True
       }
 
-fillFrame :: Frame -> Selector -> Text -> Timeout -> IO ()
+fillFrame :: Frame -> Selector -> Text -> Timeout -> Playwright ()
 fillFrame frame selector value timeout =
   frameSend_ @FrameFillResult
     frame
@@ -208,7 +211,7 @@ fillFrame frame selector value timeout =
       { frameFillParamsStrict = Just True
       }
 
-checkFrame :: Frame -> Selector -> CheckOptions -> IO ()
+checkFrame :: Frame -> Selector -> CheckOptions -> Playwright ()
 checkFrame frame selector opts =
   frameSend_ @FrameCheckResult
     frame
@@ -219,7 +222,7 @@ checkFrame frame selector opts =
       , frameCheckParamsTrial = checkOptionsTrial opts
       }
 
-uncheckFrame :: Frame -> Selector -> CheckOptions -> IO ()
+uncheckFrame :: Frame -> Selector -> CheckOptions -> Playwright ()
 uncheckFrame frame selector opts =
   frameSend_ @FrameUncheckResult
     frame
@@ -230,7 +233,7 @@ uncheckFrame frame selector opts =
       , frameUncheckParamsTrial = checkOptionsTrial opts
       }
 
-focusFrame :: Frame -> Selector -> Timeout -> IO ()
+focusFrame :: Frame -> Selector -> Timeout -> Playwright ()
 focusFrame frame selector timeout =
   frameSend_ @FrameFocusResult
     frame
@@ -239,7 +242,7 @@ focusFrame frame selector timeout =
       { frameFocusParamsStrict = Just True
       }
 
-blurFrame :: Frame -> Selector -> Timeout -> IO ()
+blurFrame :: Frame -> Selector -> Timeout -> Playwright ()
 blurFrame frame selector timeout =
   frameSend_ @FrameBlurResult
     frame
@@ -248,7 +251,7 @@ blurFrame frame selector timeout =
       { frameBlurParamsStrict = Just True
       }
 
-hoverFrame :: Frame -> Selector -> Timeout -> IO ()
+hoverFrame :: Frame -> Selector -> Timeout -> Playwright ()
 hoverFrame frame selector timeout =
   frameSend_ @FrameHoverResult
     frame
@@ -257,21 +260,21 @@ hoverFrame frame selector timeout =
       { frameHoverParamsStrict = Just True
       }
 
-highlightFrame :: Frame -> Selector -> IO ()
+highlightFrame :: Frame -> Selector -> Playwright ()
 highlightFrame frame selector =
   frameSend_ @FrameHighlightResult
     frame
     "highlight"
     (mkFrameHighlightParams selector)
 
-hideHighlightFrame :: Frame -> Selector -> IO ()
+hideHighlightFrame :: Frame -> Selector -> Playwright ()
 hideHighlightFrame frame selector =
   frameSend_ @FrameHideHighlightResult
     frame
     "hideHighlight"
     (mkFrameHideHighlightParams selector)
 
-tapFrame :: Frame -> Selector -> Timeout -> IO ()
+tapFrame :: Frame -> Selector -> Timeout -> Playwright ()
 tapFrame frame selector timeout =
   frameSend_ @FrameTapResult
     frame
@@ -280,7 +283,7 @@ tapFrame frame selector timeout =
       { frameTapParamsStrict = Just True
       }
 
-pressFrame :: Frame -> Selector -> Key -> Timeout -> IO ()
+pressFrame :: Frame -> Selector -> Key -> Timeout -> Playwright ()
 pressFrame frame selector key timeout =
   frameSend_ @FramePressResult
     frame
@@ -289,7 +292,7 @@ pressFrame frame selector key timeout =
       { framePressParamsStrict = Just True
       }
 
-typeTextFrame :: Frame -> Selector -> Text -> Timeout -> IO ()
+typeTextFrame :: Frame -> Selector -> Text -> Timeout -> Playwright ()
 typeTextFrame frame selector text timeout =
   frameSend_ @FrameTypeResult
     frame
@@ -298,7 +301,7 @@ typeTextFrame frame selector text timeout =
       { frameTypeParamsStrict = Just True
       }
 
-dragAndDropFrame :: Frame -> Selector -> Selector -> Timeout -> IO ()
+dragAndDropFrame :: Frame -> Selector -> Selector -> Timeout -> Playwright ()
 dragAndDropFrame frame source target timeout =
   frameSend_ @FrameDragAndDropResult
     frame
@@ -307,7 +310,7 @@ dragAndDropFrame frame source target timeout =
       { frameDragAndDropParamsStrict = Just True
       }
 
-dropFrame :: Frame -> Selector -> DropPayload -> Timeout -> IO ()
+dropFrame :: Frame -> Selector -> DropPayload -> Timeout -> Playwright ()
 dropFrame frame selector payload timeout =
   if null (dropPayloadFiles payload) && null (dropPayloadData payload)
     then
@@ -341,7 +344,7 @@ toDropDataPayload :: DropData -> FrameDropParamsData
 toDropDataPayload item =
   mkFrameDropParamsData (mimeTypeToText (dropDataMimeType item)) (dropDataValue item)
 
-setInputFilesFrame :: Frame -> Selector -> [InputFile] -> Timeout -> IO ()
+setInputFilesFrame :: Frame -> Selector -> [InputFile] -> Timeout -> Playwright ()
 setInputFilesFrame frame selector files timeout =
   frameSend_ @FrameSetInputFilesResult
     frame
@@ -357,7 +360,7 @@ toPayload file =
     (protocolBinaryFromByteString (inputFileBytes file))
     (inputFileNameToText (inputFileName file))
 
-selectOptionFrame :: Frame -> Selector -> [SelectOption] -> Timeout -> IO [Text]
+selectOptionFrame :: Frame -> Selector -> [SelectOption] -> Timeout -> Playwright [Text]
 selectOptionFrame frame selector options timeout = do
   result <-
     frameSend

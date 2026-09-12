@@ -54,7 +54,10 @@ module Playwright.Evaluate
   , evalOnSelectorWith
   ) where
 
-import Control.Exception
+import Playwright.Monad
+  ( Playwright
+  )
+import UnliftIO.Exception
   ( finally
   , throwIO
   )
@@ -62,8 +65,7 @@ import Data.Text
   ( Text
   )
 import Playwright.Channel
-  ( channelConnection
-  , send
+  ( send
   )
 import Playwright.ElementHandle
   ( ElementHandle (elementHandleChannel)
@@ -75,7 +77,7 @@ import Playwright.Error
   ( PlaywrightError (DecodeFailure, EvaluateUnexpected)
   )
 import Playwright.Frame
-  ( Frame (frameChannel)
+  ( Frame
   , evalOnSelectorAllFrame
   , evalOnSelectorFrame
   , evalOnSelectorFrameStrict
@@ -129,34 +131,34 @@ import Playwright.SpecialJsValue
   ( SpecialJsValue
   )
 
-evaluate :: Page -> Text -> IO SerializedValue
+evaluate :: Page -> Text -> Playwright SerializedValue
 evaluate page = evaluateFrame (pageMainFrame page)
 
-evaluateWith :: Page -> Text -> SerializedArgument -> IO SerializedValue
+evaluateWith :: Page -> Text -> SerializedArgument -> Playwright SerializedValue
 evaluateWith page =
   evaluateFrameWith (pageMainFrame page)
 
-evaluateHandle :: Page -> Text -> IO JsHandle
+evaluateHandle :: Page -> Text -> Playwright JsHandle
 evaluateHandle page =
   evaluateHandleOnFrame (pageMainFrame page)
 
-evaluateHandleExpression :: Page -> Text -> IO JsHandle
+evaluateHandleExpression :: Page -> Text -> Playwright JsHandle
 evaluateHandleExpression page expression =
   evaluateHandleOnFrameIsFunction (pageMainFrame page) expression undefinedArgument False
 
-evaluateHandleWith :: Page -> Text -> SerializedArgument -> IO JsHandle
+evaluateHandleWith :: Page -> Text -> SerializedArgument -> Playwright JsHandle
 evaluateHandleWith page =
   evaluateHandleOnFrameWith (pageMainFrame page)
 
-evaluateHandleOnFrame :: Frame -> Text -> IO JsHandle
+evaluateHandleOnFrame :: Frame -> Text -> Playwright JsHandle
 evaluateHandleOnFrame frame expression =
   evaluateHandleOnFrameWith frame expression undefinedArgument
 
-evaluateHandleOnFrameWith :: Frame -> Text -> SerializedArgument -> IO JsHandle
+evaluateHandleOnFrameWith :: Frame -> Text -> SerializedArgument -> Playwright JsHandle
 evaluateHandleOnFrameWith frame expression arg =
   evaluateHandleOnFrameIsFunction frame expression arg True
 
-evaluateHandleOnFrameIsFunction :: Frame -> Text -> SerializedArgument -> Bool -> IO JsHandle
+evaluateHandleOnFrameIsFunction :: Frame -> Text -> SerializedArgument -> Bool -> Playwright JsHandle
 evaluateHandleOnFrameIsFunction frame expression arg isFunction = do
   result <-
     frameSend
@@ -167,11 +169,10 @@ evaluateHandleOnFrameIsFunction frame expression arg isFunction = do
         }
   pure
     ( jsHandleFromRef
-        (channelConnection (frameChannel frame))
         (frameEvaluateExpressionHandleResultHandle result)
     )
 
-evaluateHandleOnElement :: ElementHandle -> Text -> IO JsHandle
+evaluateHandleOnElement :: ElementHandle -> Text -> Playwright JsHandle
 evaluateHandleOnElement handle expression = do
   result <-
     send
@@ -182,27 +183,26 @@ evaluateHandleOnElement handle expression = do
         }
   pure
     ( jsHandleFromRef
-        (channelConnection (elementHandleChannel handle))
         (jSHandleEvaluateExpressionHandleResultHandle result)
     )
 
-evaluateOnFrame :: Frame -> Text -> IO SerializedValue
+evaluateOnFrame :: Frame -> Text -> Playwright SerializedValue
 evaluateOnFrame =
   evaluateFrame
 
-evaluateOnFrameText :: Frame -> Text -> IO Text
+evaluateOnFrameText :: Frame -> Text -> Playwright Text
 evaluateOnFrameText frame expression =
   requireText =<< evaluateOnFrame frame expression
 
-evaluateOnFrameBool :: Frame -> Text -> IO Bool
+evaluateOnFrameBool :: Frame -> Text -> Playwright Bool
 evaluateOnFrameBool frame expression =
   requireBool =<< evaluateOnFrame frame expression
 
-evaluateOnElement :: ElementHandle -> Text -> IO SerializedValue
+evaluateOnElement :: ElementHandle -> Text -> Playwright SerializedValue
 evaluateOnElement handle expression =
   evaluateOnElementWith handle expression undefinedArgument
 
-evaluateOnElementWith :: ElementHandle -> Text -> SerializedArgument -> IO SerializedValue
+evaluateOnElementWith :: ElementHandle -> Text -> SerializedArgument -> Playwright SerializedValue
 evaluateOnElementWith handle expression arg = do
   result <-
     send
@@ -213,35 +213,35 @@ evaluateOnElementWith handle expression arg = do
         }
   pure (jSHandleEvaluateExpressionResultValue result)
 
-evaluateOnElementBoolWith :: ElementHandle -> Text -> SerializedArgument -> IO Bool
+evaluateOnElementBoolWith :: ElementHandle -> Text -> SerializedArgument -> Playwright Bool
 evaluateOnElementBoolWith handle expression arg =
   requireBool =<< evaluateOnElementWith handle expression arg
 
-evaluateOnElementText :: ElementHandle -> Text -> IO Text
+evaluateOnElementText :: ElementHandle -> Text -> Playwright Text
 evaluateOnElementText handle expression =
   requireText =<< evaluateOnElement handle expression
 
-evaluateOnElementNumber :: ElementHandle -> Text -> IO Double
+evaluateOnElementNumber :: ElementHandle -> Text -> Playwright Double
 evaluateOnElementNumber handle expression =
   requireNumber =<< evaluateOnElement handle expression
 
-evaluateOnHandle :: JsHandle -> Text -> IO SerializedValue
+evaluateOnHandle :: JsHandle -> Text -> Playwright SerializedValue
 evaluateOnHandle handle expression =
   evaluateOnHandleIsFunction handle expression True
 
-evaluateOnHandleExpression :: JsHandle -> Text -> IO SerializedValue
+evaluateOnHandleExpression :: JsHandle -> Text -> Playwright SerializedValue
 evaluateOnHandleExpression handle expression =
   evaluateOnHandleIsFunction handle expression False
 
-evaluateOnHandleNumbers :: JsHandle -> Text -> IO [Double]
+evaluateOnHandleNumbers :: JsHandle -> Text -> Playwright [Double]
 evaluateOnHandleNumbers handle expression =
   requireNumbers =<< evaluateOnHandle handle expression
 
-evaluateOnHandleExpressionNumbers :: JsHandle -> Text -> IO [Double]
+evaluateOnHandleExpressionNumbers :: JsHandle -> Text -> Playwright [Double]
 evaluateOnHandleExpressionNumbers handle expression =
   requireNumbers =<< evaluateOnHandleExpression handle expression
 
-evaluateOnHandleIsFunction :: JsHandle -> Text -> Bool -> IO SerializedValue
+evaluateOnHandleIsFunction :: JsHandle -> Text -> Bool -> Playwright SerializedValue
 evaluateOnHandleIsFunction handle expression isFunction = do
   result <-
     send
@@ -252,15 +252,15 @@ evaluateOnHandleIsFunction handle expression isFunction = do
         }
   pure (jSHandleEvaluateExpressionResultValue result)
 
-evaluateOnLocator :: Locator -> Text -> IO SerializedValue
+evaluateOnLocator :: Locator -> Text -> Playwright SerializedValue
 evaluateOnLocator loc expression =
   evaluateOnLocatorWith loc expression undefinedArgument
 
-evaluateOnLocatorWith :: Locator -> Text -> SerializedArgument -> IO SerializedValue
+evaluateOnLocatorWith :: Locator -> Text -> SerializedArgument -> Playwright SerializedValue
 evaluateOnLocatorWith loc expression arg =
   evalOnSelectorFrameStrict (locatorFrame loc) (locatorSelector loc) expression arg
 
-evaluateHandleOnLocator :: Locator -> Text -> IO JsHandle
+evaluateHandleOnLocator :: Locator -> Text -> Playwright JsHandle
 evaluateHandleOnLocator loc expression = do
   found <- elementHandle loc
   case found of
@@ -269,15 +269,15 @@ evaluateHandleOnLocator loc expression = do
     Just handle ->
       evaluateHandleOnElement handle expression `finally` disposeHandle handle
 
-allInnerTexts :: Locator -> IO [Text]
+allInnerTexts :: Locator -> Playwright [Text]
 allInnerTexts loc =
   evaluateOnLocatorAllTexts loc "ee => ee.map(e => e.innerText)"
 
-allTextContents :: Locator -> IO [Text]
+allTextContents :: Locator -> Playwright [Text]
 allTextContents loc =
   evaluateOnLocatorAllTexts loc "ee => ee.map(e => e.textContent || '')"
 
-evalOnSelectorHandle :: ElementHandle -> Selector -> Text -> IO SerializedValue
+evalOnSelectorHandle :: ElementHandle -> Selector -> Text -> Playwright SerializedValue
 evalOnSelectorHandle handle selector expression = do
   result <-
     send
@@ -288,11 +288,11 @@ evalOnSelectorHandle handle selector expression = do
         }
   pure (elementHandleEvalOnSelectorResultValue result)
 
-evalOnSelectorHandleText :: ElementHandle -> Selector -> Text -> IO Text
+evalOnSelectorHandleText :: ElementHandle -> Selector -> Text -> Playwright Text
 evalOnSelectorHandleText handle selector expression =
   requireText =<< evalOnSelectorHandle handle selector expression
 
-evalOnSelectorAllHandle :: ElementHandle -> Selector -> Text -> IO SerializedValue
+evalOnSelectorAllHandle :: ElementHandle -> Selector -> Text -> Playwright SerializedValue
 evalOnSelectorAllHandle handle selector expression = do
   result <-
     send
@@ -303,112 +303,112 @@ evalOnSelectorAllHandle handle selector expression = do
         }
   pure (elementHandleEvalOnSelectorAllResultValue result)
 
-evalOnSelectorAllHandleTexts :: ElementHandle -> Selector -> Text -> IO [Text]
+evalOnSelectorAllHandleTexts :: ElementHandle -> Selector -> Text -> Playwright [Text]
 evalOnSelectorAllHandleTexts handle selector expression =
   requireTexts =<< evalOnSelectorAllHandle handle selector expression
 
-evalOnSelectorAllHandleNumber :: ElementHandle -> Selector -> Text -> IO Double
+evalOnSelectorAllHandleNumber :: ElementHandle -> Selector -> Text -> Playwright Double
 evalOnSelectorAllHandleNumber handle selector expression =
   requireNumber =<< evalOnSelectorAllHandle handle selector expression
 
-evalOnSelector :: Page -> Selector -> Text -> IO SerializedValue
+evalOnSelector :: Page -> Selector -> Text -> Playwright SerializedValue
 evalOnSelector page selector expression =
   evalOnSelectorWith page selector expression undefinedArgument
 
-evalOnSelectorWith :: Page -> Selector -> Text -> SerializedArgument -> IO SerializedValue
+evalOnSelectorWith :: Page -> Selector -> Text -> SerializedArgument -> Playwright SerializedValue
 evalOnSelectorWith page selector expression arg =
   evalOnSelectorFrame (pageMainFrame page) selector expression arg
 
-evalOnSelectorText :: Page -> Selector -> Text -> IO Text
+evalOnSelectorText :: Page -> Selector -> Text -> Playwright Text
 evalOnSelectorText page selector expression =
   requireText =<< evalOnSelector page selector expression
 
-evalOnSelectorTextWith :: Page -> Selector -> Text -> SerializedArgument -> IO Text
+evalOnSelectorTextWith :: Page -> Selector -> Text -> SerializedArgument -> Playwright Text
 evalOnSelectorTextWith page selector expression arg =
   requireText =<< evalOnSelectorWith page selector expression arg
 
-evalOnSelectorBool :: Page -> Selector -> Text -> IO Bool
+evalOnSelectorBool :: Page -> Selector -> Text -> Playwright Bool
 evalOnSelectorBool page selector expression =
   requireBool =<< evalOnSelector page selector expression
 
-evalOnSelectorAll :: Page -> Selector -> Text -> IO SerializedValue
+evalOnSelectorAll :: Page -> Selector -> Text -> Playwright SerializedValue
 evalOnSelectorAll page selector expression =
   evalOnSelectorAllWith page selector expression undefinedArgument
 
-evalOnSelectorAllWith :: Page -> Selector -> Text -> SerializedArgument -> IO SerializedValue
+evalOnSelectorAllWith :: Page -> Selector -> Text -> SerializedArgument -> Playwright SerializedValue
 evalOnSelectorAllWith page selector expression arg =
   evalOnSelectorAllFrame (pageMainFrame page) selector expression arg
 
-evalOnSelectorAllBool :: Page -> Selector -> Text -> IO Bool
+evalOnSelectorAllBool :: Page -> Selector -> Text -> Playwright Bool
 evalOnSelectorAllBool page selector expression =
   requireBool =<< evalOnSelectorAll page selector expression
 
-evalOnSelectorAllNumber :: Page -> Selector -> Text -> IO Double
+evalOnSelectorAllNumber :: Page -> Selector -> Text -> Playwright Double
 evalOnSelectorAllNumber page selector expression =
   requireNumber =<< evalOnSelectorAll page selector expression
 
-evalOnSelectorAllTexts :: Page -> Selector -> Text -> IO [Text]
+evalOnSelectorAllTexts :: Page -> Selector -> Text -> Playwright [Text]
 evalOnSelectorAllTexts page selector expression =
   requireTexts =<< evalOnSelectorAll page selector expression
 
-evaluateOnLocatorAllTexts :: Locator -> Text -> IO [Text]
+evaluateOnLocatorAllTexts :: Locator -> Text -> Playwright [Text]
 evaluateOnLocatorAllTexts loc expression =
   requireTexts
     =<< evalOnSelectorAllFrame (locatorFrame loc) (locatorSelector loc) expression undefinedArgument
 
-evaluateText :: Page -> Text -> IO Text
+evaluateText :: Page -> Text -> Playwright Text
 evaluateText page expression =
   requireText =<< evaluate page expression
 
-evaluateTextWith :: Page -> Text -> SerializedArgument -> IO Text
+evaluateTextWith :: Page -> Text -> SerializedArgument -> Playwright Text
 evaluateTextWith page expression arg =
   requireText =<< evaluateWith page expression arg
 
-evaluateBool :: Page -> Text -> IO Bool
+evaluateBool :: Page -> Text -> Playwright Bool
 evaluateBool page expression =
   requireBool =<< evaluate page expression
 
-evaluateBoolWith :: Page -> Text -> SerializedArgument -> IO Bool
+evaluateBoolWith :: Page -> Text -> SerializedArgument -> Playwright Bool
 evaluateBoolWith page expression arg =
   requireBool =<< evaluateWith page expression arg
 
-evaluateOnLocatorText :: Locator -> Text -> IO Text
+evaluateOnLocatorText :: Locator -> Text -> Playwright Text
 evaluateOnLocatorText loc expression =
   requireText =<< evaluateOnLocator loc expression
 
-evaluateOnLocatorBool :: Locator -> Text -> IO Bool
+evaluateOnLocatorBool :: Locator -> Text -> Playwright Bool
 evaluateOnLocatorBool loc expression =
   requireBool =<< evaluateOnLocator loc expression
 
-evaluateOnLocatorNumber :: Locator -> Text -> IO Double
+evaluateOnLocatorNumber :: Locator -> Text -> Playwright Double
 evaluateOnLocatorNumber loc expression =
   requireNumber =<< evaluateOnLocator loc expression
 
-evaluateNumber :: Page -> Text -> IO Double
+evaluateNumber :: Page -> Text -> Playwright Double
 evaluateNumber page expression =
   requireNumber =<< evaluate page expression
 
-evaluateNumberWith :: Page -> Text -> SerializedArgument -> IO Double
+evaluateNumberWith :: Page -> Text -> SerializedArgument -> Playwright Double
 evaluateNumberWith page expression arg =
   requireNumber =<< evaluateWith page expression arg
 
-evaluateNumbersWith :: Page -> Text -> SerializedArgument -> IO [Double]
+evaluateNumbersWith :: Page -> Text -> SerializedArgument -> Playwright [Double]
 evaluateNumbersWith page expression arg =
   requireNumbers =<< evaluateWith page expression arg
 
-evaluateSpecial :: Page -> Text -> IO SpecialJsValue
+evaluateSpecial :: Page -> Text -> Playwright SpecialJsValue
 evaluateSpecial page expression =
   requireSpecial =<< evaluate page expression
 
-evaluateSpecialWith :: Page -> Text -> SerializedArgument -> IO SpecialJsValue
+evaluateSpecialWith :: Page -> Text -> SerializedArgument -> Playwright SpecialJsValue
 evaluateSpecialWith page expression arg =
   requireSpecial =<< evaluateWith page expression arg
 
-evaluateTexts :: Page -> Text -> IO [Text]
+evaluateTexts :: Page -> Text -> Playwright [Text]
 evaluateTexts page expression =
   requireTexts =<< evaluate page expression
 
-requireText :: SerializedValue -> IO Text
+requireText :: SerializedValue -> Playwright Text
 requireText value =
   case value of
     SerializedNode (PayloadString text) _ ->
@@ -416,7 +416,7 @@ requireText value =
     _ ->
       throwIO (EvaluateUnexpected value)
 
-requireBool :: SerializedValue -> IO Bool
+requireBool :: SerializedValue -> Playwright Bool
 requireBool value =
   case value of
     SerializedNode (PayloadBool flag) _ ->
@@ -424,7 +424,7 @@ requireBool value =
     _ ->
       throwIO (EvaluateUnexpected value)
 
-requireNumber :: SerializedValue -> IO Double
+requireNumber :: SerializedValue -> Playwright Double
 requireNumber value =
   case value of
     SerializedNode (PayloadNumber number) _ ->
@@ -432,7 +432,7 @@ requireNumber value =
     _ ->
       throwIO (EvaluateUnexpected value)
 
-requireNumbers :: SerializedValue -> IO [Double]
+requireNumbers :: SerializedValue -> Playwright [Double]
 requireNumbers value =
   case value of
     SerializedNode (PayloadArray items) _ ->
@@ -440,7 +440,7 @@ requireNumbers value =
     _ ->
       throwIO (EvaluateUnexpected value)
 
-requireSpecial :: SerializedValue -> IO SpecialJsValue
+requireSpecial :: SerializedValue -> Playwright SpecialJsValue
 requireSpecial value =
   case value of
     SerializedNode (PayloadSpecial special) _ ->
@@ -448,7 +448,7 @@ requireSpecial value =
     _ ->
       throwIO (EvaluateUnexpected value)
 
-requireTexts :: SerializedValue -> IO [Text]
+requireTexts :: SerializedValue -> Playwright [Text]
 requireTexts value =
   case value of
     SerializedNode (PayloadArray items) _ ->

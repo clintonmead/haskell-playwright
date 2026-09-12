@@ -6,7 +6,10 @@ module Playwright.Dialog
   , dismissDialog
   ) where
 
-import Control.Exception
+import Playwright.Monad
+  ( Playwright
+  )
+import UnliftIO.Exception
   ( throwIO
   )
 import Data.Text
@@ -18,8 +21,7 @@ import Playwright.Channel
   , send
   )
 import Playwright.Connection
-  ( Connection
-  , lookupObject
+  ( lookupObject
   )
 import Playwright.DialogType
   ( DialogType
@@ -56,9 +58,9 @@ data Dialog = Dialog
   , dialogDefaultValue :: Text
   }
 
-dialogFromRef :: Connection -> ChannelRef -> IO Dialog
-dialogFromRef conn ref = do
-  obj <- lookupObject conn (channelRefGuid ref)
+dialogFromRef :: ChannelRef -> Playwright Dialog
+dialogFromRef ref = do
+  obj <- lookupObject (channelRefGuid ref)
   initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
   kind <-
     case dialogTypeFromText (dialogInitializerType initializer) of
@@ -68,17 +70,17 @@ dialogFromRef conn ref = do
         throwIO (DecodeFailure ("unknown dialog type: " <> dialogInitializerType initializer))
   pure
     Dialog
-      { dialogChannel = Channel conn (channelRefGuid ref)
+      { dialogChannel = Channel (channelRefGuid ref)
       , dialogType = kind
       , dialogMessage = dialogInitializerMessage initializer
       , dialogDefaultValue = dialogInitializerDefaultValue initializer
       }
 
-acceptDialog :: Dialog -> IO ()
+acceptDialog :: Dialog -> Playwright ()
 acceptDialog dialog =
   acceptDialogWith dialog Nothing
 
-acceptDialogWith :: Dialog -> Maybe Text -> IO ()
+acceptDialogWith :: Dialog -> Maybe Text -> Playwright ()
 acceptDialogWith dialog promptText = do
   _ :: DialogAcceptResult <-
     send
@@ -87,7 +89,7 @@ acceptDialogWith dialog promptText = do
       mkDialogAcceptParams {dialogAcceptParamsPromptText = promptText}
   pure ()
 
-dismissDialog :: Dialog -> IO ()
+dismissDialog :: Dialog -> Playwright ()
 dismissDialog dialog = do
   _ :: DialogDismissResult <-
     send (dialogChannel dialog) (MethodName "dismiss") mkDialogDismissParams

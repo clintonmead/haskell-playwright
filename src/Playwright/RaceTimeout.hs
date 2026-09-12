@@ -2,15 +2,6 @@ module Playwright.RaceTimeout
   ( waitWithTimeout
   ) where
 
-import Control.Concurrent
-  ( threadDelay
-  )
-import Control.Concurrent.Async
-  ( race
-  )
-import Control.Exception
-  ( throwIO
-  )
 import Playwright.Error
   ( PlaywrightError (WaitTimeout)
   )
@@ -18,8 +9,20 @@ import Playwright.Timeout
   ( Timeout
   , timeoutToDouble
   )
+import UnliftIO
+  ( MonadUnliftIO
+  )
+import UnliftIO.Async
+  ( race
+  )
+import UnliftIO.Concurrent
+  ( threadDelay
+  )
+import UnliftIO.Exception
+  ( throwIO
+  )
 
-waitWithTimeout :: Timeout -> IO a -> IO a
+waitWithTimeout :: (MonadUnliftIO m) => Timeout -> m a -> m a
 waitWithTimeout timeout action =
   if timeoutToDouble timeout == 0
     then action

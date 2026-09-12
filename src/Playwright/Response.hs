@@ -11,7 +11,10 @@ module Playwright.Response
   , requestResponse
   ) where
 
-import Control.Exception
+import Playwright.Monad
+  ( Playwright
+  )
+import UnliftIO.Exception
   ( throwIO
   )
 import Data.Text
@@ -21,13 +24,12 @@ import Data.Text.Encoding
   ( decodeUtf8
   )
 import Playwright.Channel
-  ( Channel (Channel, channelConnection, channelGuid)
+  ( Channel (Channel, channelGuid)
   , ResponseTag
   , send
   )
 import Playwright.Connection
-  ( Connection
-  , lookupObject
+  ( lookupObject
   )
 import Playwright.HttpHeader
   ( HeaderName (HeaderName)
@@ -60,7 +62,7 @@ import Playwright.RemoteObject
   ( RemoteObject (remoteInitializer)
   )
 import Playwright.Request
-  ( Request (requestChannel)
+  ( Request
   , requestFromRef
   , requestResponseRef
   )
@@ -72,46 +74,46 @@ newtype Response = Response
   { responseChannel :: Channel ResponseTag
   }
 
-responseFromRef :: Connection -> ChannelRef -> Response
-responseFromRef conn ref =
-  Response (Channel conn (channelRefGuid ref))
+responseFromRef :: ChannelRef -> Response
+responseFromRef ref =
+  Response (Channel (channelRefGuid ref))
 
-responseInitializer :: Response -> IO ResponseInitializer
+responseInitializer :: Response -> Playwright ResponseInitializer
 responseInitializer response = do
-  obj <- lookupObject (channelConnection (responseChannel response)) (channelGuid (responseChannel response))
+  obj <- lookupObject (channelGuid (responseChannel response))
   either throwIO pure (fromJsonValue (remoteInitializer obj))
 
-responseUrl :: Response -> IO Url
+responseUrl :: Response -> Playwright Url
 responseUrl response =
   responseInitializerUrl <$> responseInitializer response
 
-responseRequest :: Response -> IO Request
+responseRequest :: Response -> Playwright Request
 responseRequest response = do
   initializer <- responseInitializer response
-  pure (requestFromRef (channelConnection (responseChannel response)) (responseInitializerRequest initializer))
+  pure (requestFromRef (responseInitializerRequest initializer))
 
-requestResponse :: Request -> IO (Maybe Response)
+requestResponse :: Request -> Playwright (Maybe Response)
 requestResponse request = do
   ref <- requestResponseRef request
-  pure (fmap (responseFromRef (channelConnection (requestChannel request))) ref)
+  pure (fmap (responseFromRef) ref)
 
-responseStatus :: Response -> IO HttpStatus
+responseStatus :: Response -> Playwright HttpStatus
 responseStatus response =
   HttpStatus . responseInitializerStatus <$> responseInitializer response
 
-responseStatusText :: Response -> IO Text
+responseStatusText :: Response -> Playwright Text
 responseStatusText response =
   responseInitializerStatusText <$> responseInitializer response
 
-responseHeaders :: Response -> IO [HttpHeader]
+responseHeaders :: Response -> Playwright [HttpHeader]
 responseHeaders response =
   fmap (fmap fromNameValue . responseInitializerHeaders) (responseInitializer response)
 
-responseOk :: Response -> IO Bool
+responseOk :: Response -> Playwright Bool
 responseOk response =
   httpStatusOk <$> responseStatus response
 
-responseText :: Response -> IO Text
+responseText :: Response -> Playwright Text
 responseText response = do
   result <-
     send
