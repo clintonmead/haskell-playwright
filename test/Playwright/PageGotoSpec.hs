@@ -5,9 +5,26 @@ module Playwright.PageGotoSpec
 import Control.Concurrent
   ( threadDelay
   )
+import Control.Concurrent.Async
+  ( wait
+  , withAsync
+  )
+import Control.Concurrent.MVar
+  ( newEmptyMVar
+  , putMVar
+  , takeMVar
+  )
+import Control.Exception
+  ( SomeException
+  , try
+  )
 import Control.Monad
   ( forever
   )
+import Data.ByteString.Lazy
+  ( ByteString
+  )
+import Data.ByteString.Lazy qualified as LBS
 import Data.IORef
   ( IORef
   , modifyIORef'
@@ -15,8 +32,8 @@ import Data.IORef
   , readIORef
   , writeIORef
   )
-import Data.ByteString.Lazy
-  ( ByteString
+import Data.List
+  ( find
   )
 import Data.Text
   ( Text
@@ -24,10 +41,14 @@ import Data.Text
   , replace
   , toLower
   )
+import Data.Text.Encoding
+  ( decodeUtf8
+  )
 import Data.Text qualified as Text
 import Network.HTTP.Types
   ( hContentType
   , hLocation
+  , hReferer
   , status200
   , status204
   , status302
@@ -36,8 +57,10 @@ import Network.HTTP.Types
 import Network.Wai
   ( Application
   , pathInfo
+  , requestHeaders
   , responseLBS
   )
+import Network.Wai qualified as Wai
 import Network.Wai.Application.Static
   ( defaultFileServerSettings
   , staticApp
@@ -47,11 +70,15 @@ import Network.Wai.Handler.Warp
   )
 import Playwright
   ( Frame
-  , GotoOptions (gotoOptionsTimeout, gotoOptionsWaitUntil)
+  , GotoOptions (gotoOptionsReferer, gotoOptionsTimeout, gotoOptionsWaitUntil)
+  , HeaderName (HeaderName)
+  , HeaderValue (HeaderValue)
+  , HttpHeader (HttpHeader)
   , HttpStatus (httpStatusToInt)
-  , LoadState (LoadStateDomContentLoaded, LoadStateLoad)
+  , LoadState (LoadStateCommit, LoadStateDomContentLoaded, LoadStateLoad)
   , Page
   , Request
+  , Response
   , Timeout
   , UrlGlob (UrlGlob)
   , continueRoute
@@ -84,12 +111,15 @@ import Playwright
   , setContextDefaultTimeout
   , setDefaultNavigationTimeout
   , setDefaultTimeout
+  , setExtraHTTPHeaders
+  , title
   , url
   , urlFromText
   , urlToText
   )
 import Playwright.Harness
   ( assertProtocolContains
+  , readTestAsset
   , testAssetsDir
   , withAssets
   , withChromiumPage
@@ -379,6 +409,88 @@ tests =
             Just value -> do
               assertEqual "ok" True =<< responseOk value
               assertEqual "url" (prefix <> "/empty.html") . urlToText =<< responseUrl value
+    , testCase "should navigate to dataURL and not fire dataURL requests" $
+        withChromiumPage $ \page -> do
+          seen <- newIORef (0 :: Int)
+          onRequest page $ \_ -> modifyIORef' seen (+ 1)
+          response <- goto page (urlFromText "data:text/html,<div>yo</div>") defaultGotoOptions
+          case response of
+            Nothing ->
+              pure ()
+            Just _ ->
+              assertFailure "expected no response"
+          assertEqual "requests" 0 =<< readIORef seen
+    , testCase "should navigate to URL with hash and fire requests without hash" $
+        withAssets $ \prefix page -> do
+          let empty = prefix <> "/empty.html"
+          seen <- newIORef ([] :: [Text])
+          onRequest page $ \request -> do
+            location <- urlToText <$> requestUrl request
+            modifyIORef' seen (<> [location])
+          response <- goto page (urlFromText (empty <> "#hash")) defaultGotoOptions
+          case response of
+            Nothing ->
+              assertFailure "missing response"
+            Just value -> do
+              assertEqual "status" 200 . httpStatusToInt =<< responseStatus value
+              assertEqual "response url" empty . urlToText =<< responseUrl value
+          assertEqual "requests" [empty] =<< readIORef seen
+    , testCase "should work with self requesting page" $
+        withAssets $ \prefix page -> do
+          response <- goto page (urlFromText (prefix <> "/self-request.html")) defaultGotoOptions
+          case response of
+            Nothing ->
+              assertFailure "missing response"
+            Just value -> do
+              assertEqual "status" 200 . httpStatusToInt =<< responseStatus value
+              location <- urlToText <$> responseUrl value
+              assertEqual "self" True ("self-request.html" `Text.isInfixOf` location)
+    , testCase "should be able to navigate to a page controlled by service worker" $
+        withAssets $ \prefix page -> do
+          let sw = prefix <> "/serviceworkers/fetch/sw.html"
+          _ <- goto page (urlFromText sw) defaultGotoOptions
+          _ <- evaluate page "() => window['activationPromise']"
+          _ <- goto page (urlFromText sw) defaultGotoOptions
+          pure ()
+    , testCase "should send referer" $
+        refererNavigation "http://google.com/" True
+    , testCase "should send referer of cross-origin URL" $
+        refererNavigation "https://microsoft.com/xbox/" True
+    , testCase "should reject referer option when setExtraHTTPHeaders provides referer" $
+        withAssets $ \prefix page -> do
+          setExtraHTTPHeaders
+            page
+            [HttpHeader (HeaderName "referer") (HeaderValue "http://microsoft.com/")]
+          assertProtocolContains
+            "\"referer\" is already specified as extra HTTP header"
+            ( goto
+                page
+                (urlFromText (prefix <> "/grid.html"))
+                defaultGotoOptions {gotoOptionsReferer = Just (urlFromText "http://google.com/")}
+            )
+    , testCase "should override referrer-policy" $
+        refererNavigation "http://microsoft.com/" False
+    , testCase "should fail when canceled by another navigation" $
+        canceledNavigation
+    , testCase "should work with lazy loading iframes" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/frames/lazy-frame.html")) defaultGotoOptions
+          assertEqual "frames" 2 . length =<< frames page
+    , testCase "should not throw unhandled rejections on invalid url" $
+        withChromiumPage $ \page ->
+          assertProtocolContains
+            "Panel Title"
+            (goto page (urlFromText "https://www.youtube Panel Title.com/") defaultGotoOptions)
+    , testCase "should not crash when RTCPeerConnection is used" $
+        withGotoServer rtcApp $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/rtc.html")) defaultGotoOptions
+          _ <-
+            evaluate
+              page
+              "() => { window.RTCPeerConnection && new window.RTCPeerConnection({ iceServers: [] }); }"
+          pure ()
+    , testCase "should return when navigation is committed if commit is specified" $
+        commitNavigation
     ]
 
 requireMs :: Double -> IO Timeout
@@ -606,3 +718,130 @@ subframe204 waitUntil = do
         (urlFromText (prefix <> "/frames/one-frame.html"))
         defaultGotoOptions {gotoOptionsWaitUntil = waitUntil}
     pure ()
+
+refererNavigation :: Text -> Bool -> IO ()
+refererNavigation referer inheritPng = do
+  hits <- newIORef ([] :: [(Text, Maybe Text)])
+  assets <- testAssetsDir
+  grid <- readTestAsset "grid.html"
+  let
+    static = staticApp (defaultFileServerSettings assets)
+    app request respond = do
+      modifyIORef' hits (<> [(pathKey request, headerReferer request)])
+      if pathInfo request == ["grid.html"] && not inheritPng
+        then
+          respond
+            ( responseLBS
+                status200
+                [ (hContentType, "text/html")
+                , ("Referrer-Policy", "no-referrer")
+                ]
+                (LBS.fromStrict grid)
+            )
+        else
+          static request respond
+  withGotoServer app $ \prefix page -> do
+    let gridUrl = prefix <> "/grid.html"
+    _ <-
+      goto
+        page
+        (urlFromText gridUrl)
+        defaultGotoOptions {gotoOptionsReferer = Just (urlFromText referer)}
+    recorded <- readIORef hits
+    case firstReferer "grid.html" recorded of
+      Nothing ->
+        assertFailure "missing grid request"
+      Just actual ->
+        assertEqual "grid" (Just referer) actual
+    case firstReferer "digits/1.png" recorded of
+      Nothing ->
+        assertFailure "missing png request"
+      Just actual ->
+        if inheritPng
+          then assertEqual "png" (Just gridUrl) actual
+          else assertEqual "png" Nothing actual
+    assertEqual "url" gridUrl . urlToText =<< url page
+
+pathKey :: Wai.Request -> Text
+pathKey request =
+  Text.intercalate "/" (pathInfo request)
+
+headerReferer :: Wai.Request -> Maybe Text
+headerReferer request =
+  fmap decodeUtf8 (lookup hReferer (requestHeaders request))
+
+firstReferer :: Text -> [(Text, Maybe Text)] -> Maybe (Maybe Text)
+firstReferer path hits =
+  fmap snd (find (\(name, _) -> name == path) hits)
+
+canceledNavigation :: IO ()
+canceledNavigation = do
+  started <- newEmptyMVar
+  let
+    app :: Application
+    app request respond =
+      case pathInfo request of
+        ["one-style.html"] -> do
+          putMVar started ()
+          forever (threadDelay 1000000)
+        ["empty.html"] ->
+          respond (responseLBS status200 [(hContentType, "text/html")] "")
+        _ ->
+          respond (responseLBS status404 [] "")
+  withGotoServer app $ \prefix page ->
+    withAsync
+      ( try (goto page (urlFromText (prefix <> "/one-style.html")) defaultGotoOptions) ::
+          IO (Either SomeException (Maybe Response))
+      )
+      $ \pending -> do
+        takeMVar started
+        _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+        result <- wait pending
+        case result of
+          Left _ ->
+            pure ()
+          Right _ ->
+            assertFailure "expected canceled navigation to fail"
+
+commitNavigation :: IO ()
+commitNavigation =
+  withGotoServer commitApp $ \prefix page -> do
+    response <-
+      goto
+        page
+        (urlFromText (prefix <> "/empty.html"))
+        defaultGotoOptions {gotoOptionsWaitUntil = Just LoadStateCommit}
+    case response of
+      Nothing ->
+        assertFailure "missing response"
+      Just value ->
+        assertEqual "status" 200 . httpStatusToInt =<< responseStatus value
+    assertEqual "title" "Hello" =<< title page
+
+commitApp :: Application
+commitApp request respond =
+  case pathInfo request of
+    ["script.js"] ->
+      forever (threadDelay 1000000)
+    ["empty.html"] ->
+      respond
+        ( responseLBS
+            status200
+            [(hContentType, "text/html")]
+            "<title>Hello</title><script src=\"script.js\"></script>"
+        )
+    _ ->
+      respond (responseLBS status404 [] "")
+
+rtcApp :: Application
+rtcApp request respond =
+  case pathInfo request of
+    ["rtc.html"] ->
+      respond
+        ( responseLBS
+            status200
+            [(hContentType, "text/html")]
+            "<!DOCTYPE html><html><body><script>window.RTCPeerConnection && new window.RTCPeerConnection({ iceServers: [] });</script></body></html>"
+        )
+    _ ->
+      respond (responseLBS status404 [] "")
