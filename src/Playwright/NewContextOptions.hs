@@ -32,7 +32,7 @@ import Playwright.PermissionName
   ( PermissionName (permissionNameToText)
   )
 import Playwright.Protocol
-  ( BrowserNewContextParams (browserNewContextParamsBaseURL, browserNewContextParamsBypassCSP, browserNewContextParamsColorScheme, browserNewContextParamsDeviceScaleFactor, browserNewContextParamsExtraHTTPHeaders, browserNewContextParamsGeolocation, browserNewContextParamsHttpCredentials, browserNewContextParamsIgnoreHTTPSErrors, browserNewContextParamsJavaScriptEnabled, browserNewContextParamsLocale, browserNewContextParamsOffline, browserNewContextParamsPermissions, browserNewContextParamsTimezoneId, browserNewContextParamsUserAgent, browserNewContextParamsViewport)
+  ( BrowserNewContextParams (browserNewContextParamsBaseURL, browserNewContextParamsBypassCSP, browserNewContextParamsColorScheme, browserNewContextParamsDeviceScaleFactor, browserNewContextParamsExtraHTTPHeaders, browserNewContextParamsGeolocation, browserNewContextParamsHttpCredentials, browserNewContextParamsIgnoreHTTPSErrors, browserNewContextParamsJavaScriptEnabled, browserNewContextParamsLocale, browserNewContextParamsOffline, browserNewContextParamsPermissions, browserNewContextParamsStorageState, browserNewContextParamsTimezoneId, browserNewContextParamsUserAgent, browserNewContextParamsViewport)
   , BrowserNewContextParamsColorScheme (BrowserNewContextParamsColorSchemeDark, BrowserNewContextParamsColorSchemeLight, BrowserNewContextParamsColorSchemeNoOverride, BrowserNewContextParamsColorSchemeNoPreference)
   , BrowserNewContextParamsGeolocation (browserNewContextParamsGeolocationAccuracy)
   , BrowserNewContextParamsHttpCredentials (browserNewContextParamsHttpCredentialsOrigin)
@@ -41,6 +41,10 @@ import Playwright.Protocol
   , mkBrowserNewContextParamsGeolocation
   , mkBrowserNewContextParamsHttpCredentials
   , mkBrowserNewContextParamsViewport
+  )
+import Playwright.StorageState
+  ( StorageState
+  , toNewContextStorageState
   )
 import Playwright.TimezoneId
   ( TimezoneId (timezoneIdToText)
@@ -71,6 +75,7 @@ data NewContextOptions = NewContextOptions
   , newContextLocale :: Maybe Locale
   , newContextOffline :: Maybe Bool
   , newContextPermissions :: Maybe [PermissionName]
+  , newContextStorageState :: Maybe StorageState
   , newContextTimezoneId :: Maybe TimezoneId
   , newContextUserAgent :: Maybe UserAgent
   , newContextViewport :: Maybe ViewportSize
@@ -92,6 +97,7 @@ defaultNewContextOptions =
     , newContextLocale = Nothing
     , newContextOffline = Nothing
     , newContextPermissions = Nothing
+    , newContextStorageState = Nothing
     , newContextTimezoneId = Nothing
     , newContextUserAgent = Nothing
     , newContextViewport = Nothing
@@ -113,6 +119,7 @@ toBrowserNewContextParams opts =
     , browserNewContextParamsLocale = fmap localeToText (newContextLocale opts)
     , browserNewContextParamsOffline = newContextOffline opts
     , browserNewContextParamsPermissions = fmap (fmap permissionNameToText) (newContextPermissions opts)
+    , browserNewContextParamsStorageState = fmap toNewContextStorageState (newContextStorageState opts)
     , browserNewContextParamsTimezoneId = fmap timezoneIdToText (newContextTimezoneId opts)
     , browserNewContextParamsUserAgent = fmap userAgentToText (newContextUserAgent opts)
     , browserNewContextParamsViewport = fmap toProtocolViewport (newContextViewport opts)

@@ -12,6 +12,7 @@ module Playwright.Cookie
   , fromNetworkCookie
   , sessionExpires
   , toSetNetworkCookie
+  , toSetNetworkFromCookie
   ) where
 
 import Data.Scientific
@@ -159,3 +160,17 @@ toSetSameSite sameSite =
       SetNetworkCookieSameSiteLax
     CookieSameSiteNone ->
       SetNetworkCookieSameSiteNone
+
+toSetNetworkFromCookie :: Cookie -> SetNetworkCookie
+toSetNetworkFromCookie cookie =
+  ( mkSetNetworkCookie
+      (cookieNameToText (cookieName cookie))
+      (cookieValueToText (cookieValue cookie))
+  )
+    { setNetworkCookieDomain = Just (cookieDomainToText (cookieDomain cookie))
+    , setNetworkCookiePath = Just (cookiePathToText (cookiePath cookie))
+    , setNetworkCookieExpires = Just (cookieExpiresToScientific (cookieExpires cookie))
+    , setNetworkCookieHttpOnly = Just (cookieHttpOnlyToBool (cookieHttpOnly cookie))
+    , setNetworkCookieSecure = Just (cookieSecureToBool (cookieSecure cookie))
+    , setNetworkCookieSameSite = Just (toSetSameSite (cookieSameSite cookie))
+    }

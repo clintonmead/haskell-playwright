@@ -112,6 +112,7 @@ library
       Playwright.SpecialJsValue
       Playwright.StorageItem
       Playwright.StorageKind
+      Playwright.StorageState
       Playwright.StyleTag
       Playwright.Timeout
       Playwright.TimezoneId
@@ -176,6 +177,7 @@ test-suite playwright-test
       Playwright.BrowserContextPagesSpec
       Playwright.BrowserContextRouteSpec
       Playwright.BrowserContextSetExtraHTTPHeadersSpec
+      Playwright.BrowserContextStorageStateSpec
       Playwright.BrowserContextTimezoneSpec
       Playwright.BrowserContextViewportSpec
       Playwright.ConnectionSpec

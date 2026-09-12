@@ -62,6 +62,7 @@ module Playwright
   , Longitude (..)
   , MediaType (..)
   , NewContextOptions (..)
+  , OriginStorageState (..)
   , Page (..)
   , PageError (..)
   , PermissionName (..)
@@ -82,6 +83,7 @@ module Playwright
   , StorageItem (..)
   , StorageKind (..)
   , StorageName (..)
+  , StorageState (..)
   , StorageValue (..)
   , StyleTag (..)
   , Timeout
@@ -179,6 +181,7 @@ module Playwright
   , emptyScriptTag
   , emptyStyleTag
   , emulateMedia
+  , emptyStorageState
   , evaluate
   , evaluateBool
   , evaluateBoolWith
@@ -330,6 +333,7 @@ module Playwright
   , setInputFiles
   , setInputFilesHandle
   , setOffline
+  , setStorageState
   , setViewportSize
   , specialArgument
   , storageClear
@@ -337,6 +341,7 @@ module Playwright
   , storageItems
   , storageRemoveItem
   , storageSetItem
+  , storageState
   , textArgument
   , textContent
   , textContentHandle
@@ -423,6 +428,8 @@ import Playwright.BrowserContext
   , setGeolocation
   , setHTTPCredentials
   , setOffline
+  , setStorageState
+  , storageState
   , waitForContextPage
   )
 import Playwright.BrowserName
@@ -716,7 +723,7 @@ import Playwright.MediaType
   ( MediaType (MediaNoOverride, MediaPrint, MediaScreen)
   )
 import Playwright.NewContextOptions
-  ( NewContextOptions (NewContextOptions, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextGeolocation, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextJavaScriptEnabled, newContextLocale, newContextOffline, newContextPermissions, newContextTimezoneId, newContextUserAgent, newContextViewport)
+  ( NewContextOptions (NewContextOptions, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextGeolocation, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextJavaScriptEnabled, newContextLocale, newContextOffline, newContextPermissions, newContextStorageState, newContextTimezoneId, newContextUserAgent, newContextViewport)
   , defaultNewContextOptions
   )
 import Playwright.Page
@@ -868,6 +875,11 @@ import Playwright.StorageItem
   )
 import Playwright.StorageKind
   ( StorageKind (StorageLocal, StorageSession)
+  )
+import Playwright.StorageState
+  ( OriginStorageState (OriginStorageState, originStateLocalStorage, originStateOrigin)
+  , StorageState (StorageState, storageStateCookies, storageStateOrigins)
+  , emptyStorageState
   )
 import Playwright.StyleTag
   ( StyleTag (StyleTag, styleTagContent, styleTagUrl)

@@ -20,6 +20,8 @@ module Playwright.BrowserContext
   , setGeolocation
   , setHTTPCredentials
   , setOffline
+  , setStorageState
+  , storageState
   , waitForContextPage
   ) where
 
@@ -105,6 +107,9 @@ import Playwright.Protocol
   , BrowserContextSetHTTPCredentialsParamsHttpCredentials (browserContextSetHTTPCredentialsParamsHttpCredentialsOrigin)
   , BrowserContextSetHTTPCredentialsResult
   , BrowserContextSetOfflineResult
+  , BrowserContextSetStorageStateParams (browserContextSetStorageStateParamsStorageState)
+  , BrowserContextSetStorageStateResult
+  , BrowserContextStorageStateResult
   , mkBrowserContextAddCookiesParams
   , mkBrowserContextAddInitScriptParams
   , mkBrowserContextClearCookiesParams
@@ -119,9 +124,16 @@ import Playwright.Protocol
   , mkBrowserContextSetHTTPCredentialsParams
   , mkBrowserContextSetHTTPCredentialsParamsHttpCredentials
   , mkBrowserContextSetOfflineParams
+  , mkBrowserContextSetStorageStateParams
+  , mkBrowserContextStorageStateParams
   )
 import Playwright.RemoteObject
   ( RemoteObject (remoteGuid, remoteParent, remoteType)
+  )
+import Playwright.StorageState
+  ( StorageState
+  , fromStorageStateResult
+  , toSetStorageState
   )
 import Playwright.Url
   ( Url
@@ -333,5 +345,25 @@ setHTTPCredentials ctx creds = do
                       fmap urlToText (httpCredentialsOrigin creds)
                   }
               )
+        }
+  pure ()
+
+storageState :: BrowserContext -> IO StorageState
+storageState ctx = do
+  result :: BrowserContextStorageStateResult <-
+    send
+      (browserContextChannel ctx)
+      (MethodName "storageState")
+      mkBrowserContextStorageStateParams
+  pure (fromStorageStateResult result)
+
+setStorageState :: BrowserContext -> StorageState -> IO ()
+setStorageState ctx state = do
+  _ :: BrowserContextSetStorageStateResult <-
+    send
+      (browserContextChannel ctx)
+      (MethodName "setStorageState")
+      mkBrowserContextSetStorageStateParams
+        { browserContextSetStorageStateParamsStorageState = Just (toSetStorageState state)
         }
   pure ()

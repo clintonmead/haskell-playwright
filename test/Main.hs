@@ -16,6 +16,7 @@ import Playwright.BrowserContextPageEventSpec qualified as BrowserContextPageEve
 import Playwright.BrowserContextPagesSpec qualified as BrowserContextPagesSpec
 import Playwright.BrowserContextRouteSpec qualified as BrowserContextRouteSpec
 import Playwright.BrowserContextSetExtraHTTPHeadersSpec qualified as BrowserContextSetExtraHTTPHeadersSpec
+import Playwright.BrowserContextStorageStateSpec qualified as BrowserContextStorageStateSpec
 import Playwright.BrowserContextTimezoneSpec qualified as BrowserContextTimezoneSpec
 import Playwright.BrowserContextViewportSpec qualified as BrowserContextViewportSpec
 import Playwright.ConnectionSpec qualified as ConnectionSpec
@@ -125,6 +126,7 @@ main =
         , BrowserContextPagesSpec.tests
         , BrowserContextRouteSpec.tests
         , BrowserContextSetExtraHTTPHeadersSpec.tests
+        , BrowserContextStorageStateSpec.tests
         , BrowserContextTimezoneSpec.tests
         , BrowserContextViewportSpec.tests
         , ConnectionSpec.tests
