@@ -13,6 +13,7 @@ module Playwright
   , BodySize (..)
   , BindingName (..)
   , CheckOptions (..)
+  , ClearCookiesOptions (..)
   , ClickOptions (..)
   , ClockMillis (..)
   , ClockTicks (..)
@@ -184,6 +185,7 @@ module Playwright
   , clear
   , clearCookies
   , clearCookiesNamed
+  , clearCookiesWith
   , clearGeolocation
   , clearPageErrors
   , clearPermissions
@@ -215,6 +217,7 @@ module Playwright
   , contextRouteWith
   , continueRoute
   , continueRouteWith
+  , cookieForHost
   , cookieForUrl
   , cookies
   , cookiesFor
@@ -225,6 +228,7 @@ module Playwright
   , dblclick
   , defaultAddLocatorHandlerOptions
   , defaultCheckOptions
+  , defaultClearCookiesOptions
   , defaultClickOptions
   , defaultContinueOptions
   , defaultEmulateMedia
@@ -680,6 +684,7 @@ import Playwright.BrowserContext
   , addCookies
   , clearCookies
   , clearCookiesNamed
+  , clearCookiesWith
   , clearGeolocation
   , clearPermissions
   , closeContext
@@ -711,7 +716,7 @@ import Playwright.BrowserName
   ( BrowserName (Chromium, Firefox, WebKit)
   )
 import Playwright.BrowserType
-  ( BrowserType (BrowserType, browserTypeChannel, browserTypeName)
+  ( BrowserType (BrowserType, browserTypeChannel, browserTypeExecutablePath, browserTypeName)
   , browserBrowserType
   , browserTypeFromRef
   , browserTypesEqual
@@ -721,6 +726,10 @@ import Playwright.BrowserType
 import Playwright.CheckOptions
   ( CheckOptions (CheckOptions, checkOptionsForce, checkOptionsTimeout, checkOptionsTrial)
   , defaultCheckOptions
+  )
+import Playwright.ClearCookiesOptions
+  ( ClearCookiesOptions (ClearCookiesOptions, clearCookiesDomain, clearCookiesName, clearCookiesNameRegex, clearCookiesPath)
+  , defaultClearCookiesOptions
   )
 import Playwright.ClickOptions
   ( ClickOptions (ClickOptions, clickOptionsForce, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsTimeout)
@@ -763,6 +772,7 @@ import Playwright.Cookie
   , CookieSecure (CookieSecure, cookieSecureToBool)
   , CookieToSet (CookieToSet, cookieToSetDomain, cookieToSetExpires, cookieToSetHttpOnly, cookieToSetName, cookieToSetPath, cookieToSetSameSite, cookieToSetSecure, cookieToSetUrl, cookieToSetValue)
   , CookieValue (CookieValue, cookieValueToText)
+  , cookieForHost
   , cookieForUrl
   , sessionExpires
   )

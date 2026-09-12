@@ -7,6 +7,7 @@ import Playwright.BrowserContextAddCookiesSpec qualified as BrowserContextAddCoo
 import Playwright.BrowserContextAddInitScriptSpec qualified as BrowserContextAddInitScriptSpec
 import Playwright.BrowserContextBaseUrlSpec qualified as BrowserContextBaseUrlSpec
 import Playwright.BrowserContextBasicSpec qualified as BrowserContextBasicSpec
+import Playwright.BrowserContextClearCookiesSpec qualified as BrowserContextClearCookiesSpec
 import Playwright.BrowserContextCookiesSpec qualified as BrowserContextCookiesSpec
 import Playwright.BrowserContextCredentialsSpec qualified as BrowserContextCredentialsSpec
 import Playwright.BrowserContextCspSpec qualified as BrowserContextCspSpec
@@ -24,6 +25,7 @@ import Playwright.BrowserContextStrictSpec qualified as BrowserContextStrictSpec
 import Playwright.BrowserContextTimezoneSpec qualified as BrowserContextTimezoneSpec
 import Playwright.BrowserContextUserAgentSpec qualified as BrowserContextUserAgentSpec
 import Playwright.BrowserContextViewportSpec qualified as BrowserContextViewportSpec
+import Playwright.BrowserTypeBasicSpec qualified as BrowserTypeBasicSpec
 import Playwright.ConnectionSpec qualified as ConnectionSpec
 import Playwright.DownloadSpec qualified as DownloadSpec
 import Playwright.ElementHandleBoundingBoxSpec qualified as ElementHandleBoundingBoxSpec
@@ -167,6 +169,7 @@ main =
         , BrowserContextAddInitScriptSpec.tests
         , BrowserContextBaseUrlSpec.tests
         , BrowserContextBasicSpec.tests
+        , BrowserContextClearCookiesSpec.tests
         , BrowserContextCookiesSpec.tests
         , BrowserContextCredentialsSpec.tests
         , BrowserContextCspSpec.tests
@@ -184,6 +187,7 @@ main =
         , BrowserContextTimezoneSpec.tests
         , BrowserContextUserAgentSpec.tests
         , BrowserContextViewportSpec.tests
+        , BrowserTypeBasicSpec.tests
         , ConnectionSpec.tests
         , DownloadSpec.tests
         , ElementHandleBoundingBoxSpec.tests

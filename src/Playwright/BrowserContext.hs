@@ -4,6 +4,7 @@ module Playwright.BrowserContext
   , addCookies
   , clearCookies
   , clearCookiesNamed
+  , clearCookiesWith
   , clearGeolocation
   , clearPermissions
   , closeContext
@@ -67,9 +68,15 @@ import Playwright.Error
   ( PlaywrightError (DecodeFailure)
   , ignoreTargetClosed
   )
+import Playwright.ClearCookiesOptions
+  ( ClearCookiesOptions (clearCookiesDomain, clearCookiesName, clearCookiesNameRegex, clearCookiesPath)
+  , defaultClearCookiesOptions
+  )
 import Playwright.Cookie
   ( Cookie
+  , CookieDomain (cookieDomainToText)
   , CookieName (cookieNameToText)
+  , CookiePath (cookiePathToText)
   , CookieToSet
   , fromNetworkCookie
   , toSetNetworkCookie
@@ -112,7 +119,7 @@ import Playwright.PermissionName
 import Playwright.Protocol
   ( BrowserContextAddCookiesResult
   , BrowserContextAddInitScriptResult (browserContextAddInitScriptResultDisposable)
-  , BrowserContextClearCookiesParams (browserContextClearCookiesParamsName)
+  , BrowserContextClearCookiesParams (browserContextClearCookiesParamsDomain, browserContextClearCookiesParamsName, browserContextClearCookiesParamsNameRegexFlags, browserContextClearCookiesParamsNameRegexSource, browserContextClearCookiesParamsPath)
   , BrowserContextClearCookiesResult
   , BrowserContextClearPermissionsResult
   , BrowserContextCloseParams (browserContextCloseParamsReason)
@@ -328,22 +335,30 @@ cookiesFor ctx urls = do
   pure (fmap fromNetworkCookie (browserContextCookiesResultCookies result))
 
 clearCookies :: BrowserContext -> IO ()
-clearCookies ctx = do
-  _ :: BrowserContextClearCookiesResult <-
-    send
-      (browserContextChannel ctx)
-      (MethodName "clearCookies")
-      mkBrowserContextClearCookiesParams
-  pure ()
+clearCookies ctx =
+  clearCookiesWith ctx defaultClearCookiesOptions
 
 clearCookiesNamed :: BrowserContext -> CookieName -> IO ()
-clearCookiesNamed ctx name = do
+clearCookiesNamed ctx name =
+  clearCookiesWith ctx defaultClearCookiesOptions {clearCookiesName = Just name}
+
+clearCookiesWith :: BrowserContext -> ClearCookiesOptions -> IO ()
+clearCookiesWith ctx opts = do
   _ :: BrowserContextClearCookiesResult <-
     send
       (browserContextChannel ctx)
       (MethodName "clearCookies")
       mkBrowserContextClearCookiesParams
-        { browserContextClearCookiesParamsName = Just (cookieNameToText name)
+        { browserContextClearCookiesParamsName = fmap cookieNameToText (clearCookiesName opts)
+        , browserContextClearCookiesParamsNameRegexSource = clearCookiesNameRegex opts
+        , browserContextClearCookiesParamsNameRegexFlags =
+            case clearCookiesNameRegex opts of
+              Nothing ->
+                Nothing
+              Just _ ->
+                Just ("" :: Text)
+        , browserContextClearCookiesParamsDomain = fmap cookieDomainToText (clearCookiesDomain opts)
+        , browserContextClearCookiesParamsPath = fmap cookiePathToText (clearCookiesPath opts)
         }
   pure ()
 

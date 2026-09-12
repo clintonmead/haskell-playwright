@@ -8,6 +8,7 @@ module Playwright.Cookie
   , CookieSecure (..)
   , CookieToSet (..)
   , CookieValue (..)
+  , cookieForHost
   , cookieForUrl
   , fromNetworkCookie
   , sessionExpires
@@ -109,6 +110,20 @@ cookieForUrl url name value =
     , cookieToSetUrl = Just url
     , cookieToSetDomain = Nothing
     , cookieToSetPath = Nothing
+    , cookieToSetExpires = Nothing
+    , cookieToSetHttpOnly = Nothing
+    , cookieToSetSecure = Nothing
+    , cookieToSetSameSite = Nothing
+    }
+
+cookieForHost :: CookieDomain -> CookiePath -> CookieName -> CookieValue -> CookieToSet
+cookieForHost domain path name value =
+  CookieToSet
+    { cookieToSetName = name
+    , cookieToSetValue = value
+    , cookieToSetUrl = Nothing
+    , cookieToSetDomain = Just domain
+    , cookieToSetPath = Just path
     , cookieToSetExpires = Nothing
     , cookieToSetHttpOnly = Nothing
     , cookieToSetSecure = Nothing

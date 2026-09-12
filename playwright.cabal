@@ -35,6 +35,7 @@ library
       Playwright.BrowserType
       Playwright.Channel
       Playwright.CheckOptions
+      Playwright.ClearCookiesOptions
       Playwright.ClickOptions
       Playwright.Clock
       Playwright.ColorScheme
@@ -200,6 +201,7 @@ test-suite playwright-test
       Playwright.BrowserContextAddInitScriptSpec
       Playwright.BrowserContextBaseUrlSpec
       Playwright.BrowserContextBasicSpec
+      Playwright.BrowserContextClearCookiesSpec
       Playwright.BrowserContextCookiesSpec
       Playwright.BrowserContextCredentialsSpec
       Playwright.BrowserContextCspSpec
@@ -218,6 +220,7 @@ test-suite playwright-test
       Playwright.BrowserContextUserAgentSpec
       Playwright.BrowserContextViewportSpec
       Playwright.BrowserSpec
+      Playwright.BrowserTypeBasicSpec
       Playwright.ConnectionSpec
       Playwright.DownloadSpec
       Playwright.ElementHandleBoundingBoxSpec

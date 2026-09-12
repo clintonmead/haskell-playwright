@@ -45,7 +45,7 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 
 ## `tests/library` with no or thin coverage
 
-Most of `tests/library` is still open, including: browserType launch-server/connect, default browser context, proxy, HAR, tracing, video, webauthn, leftover `browsercontext-fetch` (HTTPS, DNS `__testHookLookup`, brotli, connectOverCDP), popup, crash, headful, launcher, unroute-behavior, beforeunload, capabilities, channels, client-certificates, and the rest of the 100 library specs. `browser` is ported (skip Node-only `__testHookBeforeSetStorageState` / `toImpl`). `browsercontext-basic` is ported (skip Chromium-fixme `onLine` across navigations, and `_channel.defaultUserAgentForTest`).
+Most of `tests/library` is still open, including: browserType launch-server/connect, default browser context, proxy, HAR, tracing, video, webauthn, leftover `browsercontext-fetch` (HTTPS, DNS `__testHookLookup`, brotli, connectOverCDP), popup, crash, headful, launcher, unroute-behavior, beforeunload, capabilities, channels, client-certificates, and the rest of the 100 library specs. `browser` is ported (skip Node-only `__testHookBeforeSetStorageState` / `toImpl`). `browsertype-basic` is ported (skip non-Chromium CDP). `browsercontext-clearcookies` is ported (skip partitioned CHIPS / HTTPS). `browsercontext-basic` is ported (skip Chromium-fixme `onLine` across navigations, and `_channel.defaultUserAgentForTest`).
 
 ## Other official trees (later)
 

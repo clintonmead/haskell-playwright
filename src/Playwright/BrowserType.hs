@@ -43,7 +43,7 @@ import Playwright.MethodName
   ( MethodName (MethodName)
   )
 import Playwright.Protocol
-  ( BrowserTypeInitializer (browserTypeInitializerName)
+  ( BrowserTypeInitializer (browserTypeInitializerExecutablePath, browserTypeInitializerName)
   , BrowserTypeLaunchResult (browserTypeLaunchResultBrowser)
   )
 import Playwright.RemoteObject
@@ -53,6 +53,7 @@ import Playwright.RemoteObject
 data BrowserType = BrowserType
   { browserTypeChannel :: Channel BrowserTypeTag
   , browserTypeName :: Text
+  , browserTypeExecutablePath :: Text
   }
 
 browserTypeFromRef :: Connection -> ChannelRef -> IO BrowserType
@@ -63,6 +64,7 @@ browserTypeFromRef conn ref = do
     BrowserType
       { browserTypeChannel = Channel conn (channelRefGuid ref)
       , browserTypeName = browserTypeInitializerName initializer
+      , browserTypeExecutablePath = browserTypeInitializerExecutablePath initializer
       }
 
 launch :: BrowserType -> LaunchOptions -> IO Browser
