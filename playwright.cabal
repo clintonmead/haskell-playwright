@@ -93,6 +93,7 @@ library
       Playwright.NetworkSizes
       Playwright.NewContextOptions
       Playwright.Page
+      Playwright.Page.Network
       Playwright.Page.Query
       Playwright.PageError
       Playwright.PdfOptions
@@ -103,6 +104,7 @@ library
       Playwright.RaceTimeout
       Playwright.RemoteObject
       Playwright.Request
+      Playwright.RequestFailure
       Playwright.RequestFrame
       Playwright.RequestId
       Playwright.RequestOverrides
@@ -247,6 +249,7 @@ test-suite playwright-test
       Playwright.PageEvaluateSpec
       Playwright.PageEventConsoleSpec
       Playwright.PageEventLoadSpec
+      Playwright.PageEventNetworkSpec
       Playwright.PageEventPageErrorSpec
       Playwright.PageEventPopupSpec
       Playwright.PageExposeFunctionSpec

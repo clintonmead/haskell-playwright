@@ -55,12 +55,14 @@ module Playwright.Page
   , waitForRequest
   , waitForRequestFailed
   , waitForRequestFailedWith
+  , waitForRequestFinished
   , waitForRequestWith
   , waitForSelectorStrict
   , armPopup
   , opener
   , pagesEqual
   , waitForPopup
+  , subscribeContext
   , onLoad
   , pageActionTimeout
   , pageNavigationTimeout
@@ -192,8 +194,9 @@ import Playwright.Protocol
   , BrowserContextPageEvent (browserContextPageEventPage)
   , BrowserContextRequestEvent (browserContextRequestEventRequest)
   , BrowserContextRequestFailedEvent (browserContextRequestFailedEventRequest)
+  , BrowserContextRequestFinishedEvent (browserContextRequestFinishedEventRequest)
   , BrowserContextResponseEvent (browserContextResponseEventResponse)
-  , BrowserContextUpdateSubscriptionParamsEvent (BrowserContextUpdateSubscriptionParamsEventConsole, BrowserContextUpdateSubscriptionParamsEventDialog, BrowserContextUpdateSubscriptionParamsEventRequest, BrowserContextUpdateSubscriptionParamsEventRequestFailed, BrowserContextUpdateSubscriptionParamsEventResponse)
+  , BrowserContextUpdateSubscriptionParamsEvent (BrowserContextUpdateSubscriptionParamsEventConsole, BrowserContextUpdateSubscriptionParamsEventDialog, BrowserContextUpdateSubscriptionParamsEventRequest, BrowserContextUpdateSubscriptionParamsEventRequestFailed, BrowserContextUpdateSubscriptionParamsEventRequestFinished, BrowserContextUpdateSubscriptionParamsEventResponse)
   , BrowserContextUpdateSubscriptionResult
   , FrameAddScriptTagParams (frameAddScriptTagParamsContent, frameAddScriptTagParamsType, frameAddScriptTagParamsUrl)
   , FrameAddScriptTagResult (frameAddScriptTagResultElement)
@@ -792,6 +795,23 @@ waitForRequestFailedWith page timeout =
       ( requestFromRef
           (channelConnection (pageContextChannel page))
           (browserContextRequestFailedEventRequest event)
+      )
+
+waitForRequestFinished :: Page -> IO Request
+waitForRequestFinished page = do
+  timeout <- pageActionTimeout page
+  waitWithTimeout timeout $ do
+    subscribeContext page BrowserContextUpdateSubscriptionParamsEventRequestFinished
+    params <-
+      waitForChannelEvent
+        (channelConnection (pageContextChannel page))
+        (channelGuid (pageContextChannel page))
+        (MethodName "requestFinished")
+    event <- either throwIO pure (fromJsonValue params)
+    pure
+      ( requestFromRef
+          (channelConnection (pageContextChannel page))
+          (browserContextRequestFinishedEventRequest event)
       )
 
 waitForPopup :: Page -> IO Page

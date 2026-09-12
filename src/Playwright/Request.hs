@@ -2,16 +2,18 @@ module Playwright.Request
   ( Request (..)
   , requestFromRef
   , requestFrameRef
+  , requestFailure
   , requestHeaders
   , requestIsNavigation
   , requestMethod
   , requestPostData
-  , requestResourceType
   , requestRedirectedFrom
   , requestRedirectedTo
+  , requestResourceType
   , requestResponseRef
   , requestSizes
   , requestUrl
+  , requestsEqual
   ) where
 
 import Control.Exception
@@ -34,6 +36,7 @@ import Playwright.Connection
   ( Connection
   , guidsOfType
   , lookupObject
+  , lookupRequestFailure
   , lookupRequestOverrides
   )
 import Playwright.HttpHeader
@@ -77,6 +80,9 @@ import Playwright.Protocol
 import Playwright.RemoteObject
   ( RemoteObject (remoteGuid, remoteInitializer)
   )
+import Playwright.RequestFailure
+  ( RequestFailure (RequestFailure)
+  )
 import Playwright.RequestOverrides
   ( RequestOverrides (requestOverrideHeaders, requestOverrideMethod, requestOverridePostData, requestOverrideUrl)
   )
@@ -94,6 +100,10 @@ newtype Request = Request
 requestFromRef :: Connection -> ChannelRef -> Request
 requestFromRef conn ref =
   Request (Channel conn (channelRefGuid ref))
+
+requestsEqual :: Request -> Request -> Bool
+requestsEqual left right =
+  channelGuid (requestChannel left) == channelGuid (requestChannel right)
 
 requestInitializer :: Request -> IO RequestInitializer
 requestInitializer request = do
@@ -127,6 +137,18 @@ requestMethod request = do
 requestResourceType :: Request -> IO ResourceType
 requestResourceType request =
   ResourceType . requestInitializerResourceType <$> requestInitializer request
+
+requestFailure :: Request -> IO (Maybe RequestFailure)
+requestFailure request = do
+  text <-
+    lookupRequestFailure
+      (channelConnection (requestChannel request))
+      (channelGuid (requestChannel request))
+  case text of
+    Just value | value /= mempty ->
+      pure (Just (RequestFailure value))
+    _ ->
+      pure Nothing
 
 requestIsNavigation :: Request -> IO Bool
 requestIsNavigation request =

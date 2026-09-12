@@ -22,6 +22,8 @@ module Playwright.Connection
   , lookupTimeoutDefaults
   , lookupMainFramePage
   , registerMainFramePage
+  , lookupRequestFailure
+  , waitUntilRequestSettled
   , setTimeoutDefault
   , setTimeoutNavigation
   , waitUntilRemote
@@ -118,7 +120,7 @@ import Playwright.Guid
   , rootGuid
   )
 import Playwright.Json.ChannelRef
-  ( ChannelRef
+  ( ChannelRef (channelRefGuid)
   )
 import Playwright.Incoming
   ( CreateParams (createGuid, createInitializer, createType)
@@ -132,7 +134,9 @@ import Playwright.MethodName
   ( MethodName (MethodName)
   )
 import Playwright.Protocol
-  ( ChannelType (ChannelTypeRoot)
+  ( BrowserContextRequestFailedEvent (browserContextRequestFailedEventFailureText, browserContextRequestFailedEventRequest)
+  , BrowserContextRequestFinishedEvent (browserContextRequestFinishedEventRequest)
+  , ChannelType (ChannelTypeRoot)
   , FrameInitializer (frameInitializerLoadStates, frameInitializerUrl)
   , FrameLoadstateEvent (frameLoadstateEventAdd, frameLoadstateEventRemove)
   , FrameNavigatedEvent (frameNavigatedEventName, frameNavigatedEventUrl)
@@ -182,6 +186,8 @@ data Connection = Connection
   , connectionContextBaseUrls :: TVar (Map Guid Url)
   , connectionTimeoutDefaults :: TVar (Map Guid TimeoutDefaults)
   , connectionMainFramePages :: TVar (Map Guid Guid)
+  , connectionFinishedRequests :: TVar (Set Guid)
+  , connectionRequestFailures :: TVar (Map Guid Text.Text)
   , connectionPendingHandlers :: TVar Int
   , connectionHandlerThreads :: TVar (Set ThreadId)
   , connectionHandlerQueue :: TQueue (IO ())
@@ -235,6 +241,8 @@ withConnection transport action = do
   contextBaseUrls <- newTVarIO Map.empty
   timeoutDefaults <- newTVarIO Map.empty
   mainFramePages <- newTVarIO Map.empty
+  finishedRequests <- newTVarIO (Set.empty :: Set Guid)
+  requestFailures <- newTVarIO (Map.empty :: Map Guid Text.Text)
   pendingHandlers <- newTVarIO (0 :: Int)
   handlerThreads <- newTVarIO (Set.empty :: Set ThreadId)
   handlerQueue <- newTQueueIO
@@ -257,6 +265,8 @@ withConnection transport action = do
         , connectionContextBaseUrls = contextBaseUrls
         , connectionTimeoutDefaults = timeoutDefaults
         , connectionMainFramePages = mainFramePages
+        , connectionFinishedRequests = finishedRequests
+        , connectionRequestFailures = requestFailures
         , connectionPendingHandlers = pendingHandlers
         , connectionHandlerThreads = handlerThreads
         , connectionHandlerQueue = handlerQueue
@@ -415,6 +425,10 @@ handleEvent conn guid method params = do
       applyLoadstate conn guid params
     MethodName "previewUpdated" ->
       applyPreviewUpdated conn guid params
+    MethodName "requestFailed" ->
+      applyRequestFailed conn params
+    MethodName "requestFinished" ->
+      applyRequestFinished conn params
     MethodName "close" ->
       atomically (modifyTVar' (connectionClosedGuids conn) (Set.insert guid))
     _ ->
@@ -521,6 +535,22 @@ lookupMainFramePage :: Connection -> Guid -> IO (Maybe Guid)
 lookupMainFramePage conn frameGuid =
   atomically $
     Map.lookup frameGuid <$> readTVar (connectionMainFramePages conn)
+
+lookupRequestFailure :: Connection -> Guid -> IO (Maybe Text.Text)
+lookupRequestFailure conn guid =
+  atomically $
+    Map.lookup guid <$> readTVar (connectionRequestFailures conn)
+
+waitUntilRequestSettled :: Connection -> Guid -> IO ()
+waitUntilRequestSettled conn guid =
+  atomically $ do
+    closed <- readTVar (connectionClosed conn)
+    case closed of
+      Just err ->
+        throwSTM err
+      Nothing -> do
+        finished <- readTVar (connectionFinishedRequests conn)
+        unless (Set.member guid finished) retry
 
 runEventHandlers :: Connection -> Guid -> MethodName -> Value -> IO ()
 runEventHandlers conn guid method params = do
@@ -699,6 +729,23 @@ applyPreviewUpdated conn guid params = do
       Map.adjust
         (setInitializerPreview (jSHandlePreviewUpdatedEventPreview event))
         guid
+
+applyRequestFailed :: Connection -> Value -> IO ()
+applyRequestFailed conn params = do
+  event <- either throwIO pure (fromJsonValue params)
+  atomically $ do
+    modifyTVar' (connectionFinishedRequests conn) (Set.insert (channelRefGuid (browserContextRequestFailedEventRequest event)))
+    case browserContextRequestFailedEventFailureText event of
+      Nothing ->
+        pure ()
+      Just text ->
+        modifyTVar' (connectionRequestFailures conn) (Map.insert (channelRefGuid (browserContextRequestFailedEventRequest event)) text)
+
+applyRequestFinished :: Connection -> Value -> IO ()
+applyRequestFinished conn params = do
+  event <- either throwIO pure (fromJsonValue params)
+  atomically $
+    modifyTVar' (connectionFinishedRequests conn) (Set.insert (channelRefGuid (browserContextRequestFinishedEventRequest event)))
 
 setInitializerPreview :: Text.Text -> RemoteObject -> RemoteObject
 setInitializerPreview preview obj =

@@ -72,6 +72,7 @@ import Playwright.PageDialogSpec qualified as PageDialogSpec
 import Playwright.PageDragSpec qualified as PageDragSpec
 import Playwright.PageEventConsoleSpec qualified as PageEventConsoleSpec
 import Playwright.PageEventLoadSpec qualified as PageEventLoadSpec
+import Playwright.PageEventNetworkSpec qualified as PageEventNetworkSpec
 import Playwright.PageEventPopupSpec qualified as PageEventPopupSpec
 import Playwright.PageEvaluateSpec qualified as PageEvaluateSpec
 import Playwright.PageEvaluateHandleSpec qualified as PageEvaluateHandleSpec
@@ -205,6 +206,7 @@ main =
         , PageEmulateMediaSpec.tests
         , PageEventConsoleSpec.tests
         , PageEventLoadSpec.tests
+        , PageEventNetworkSpec.tests
         , PageEventPageErrorSpec.tests
         , PageEventPopupSpec.tests
         , PageEvaluateSpec.tests

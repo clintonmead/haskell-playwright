@@ -77,6 +77,7 @@ module Playwright
   , Point (..)
   , PropertyName (..)
   , Request (..)
+  , RequestFailure (..)
   , ResourceType (..)
   , Response (..)
   , Route
@@ -347,6 +348,10 @@ module Playwright
   , objectSpecialArgument
   , objectTextArgument
   , onLoad
+  , onRequest
+  , onRequestFailed
+  , onRequestFinished
+  , onResponse
   , opener
   , ownerFrameHandle
   , pageContext
@@ -372,6 +377,7 @@ module Playwright
   , querySelectorStrict
   , reload
   , requestFrame
+  , requestFailure
   , requestGC
   , requestHeaders
   , requestIsNavigation
@@ -383,7 +389,9 @@ module Playwright
   , requestResponse
   , requestSizes
   , requestUrl
+  , requestsEqual
   , responseFrame
+  , responseFinished
   , responseHeaders
   , responseOk
   , responseRequest
@@ -469,6 +477,7 @@ module Playwright
   , waitForRequest
   , waitForRequestFailed
   , waitForRequestFailedWith
+  , waitForRequestFinished
   , waitForRequestWith
   , waitForResponse
   , waitForResponseWith
@@ -971,6 +980,7 @@ import Playwright.Page
   , waitForRequest
   , waitForRequestFailed
   , waitForRequestFailedWith
+  , waitForRequestFinished
   , waitForRequestWith
   , waitForResponse
   , waitForResponseWith
@@ -996,6 +1006,13 @@ import Playwright.Page.Query
   , pageIsEnabled
   , pageTextContent
   )
+import Playwright.Page.Network
+  ( onRequest
+  , onRequestFailed
+  , onRequestFinished
+  , onResponse
+  , responseFinished
+  )
 import Playwright.PageError
   ( PageError (PageError, pageErrorMessage, pageErrorName, pageErrorStack)
   , clearPageErrors
@@ -1017,6 +1034,7 @@ import Playwright.PropertyName
   )
 import Playwright.Request
   ( Request (Request, requestChannel)
+  , requestFailure
   , requestHeaders
   , requestIsNavigation
   , requestMethod
@@ -1026,6 +1044,10 @@ import Playwright.Request
   , requestResourceType
   , requestSizes
   , requestUrl
+  , requestsEqual
+  )
+import Playwright.RequestFailure
+  ( RequestFailure (RequestFailure, requestFailureText)
   )
 import Playwright.RequestFrame
   ( requestFrame
