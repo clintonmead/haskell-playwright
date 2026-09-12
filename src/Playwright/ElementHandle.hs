@@ -17,6 +17,8 @@ module Playwright.ElementHandle
   , setInputFilesHandle
   , textContentHandle
   , typeHandle
+  , waitForElementState
+  , waitForElementStateWith
   ) where
 
 import Data.Aeson
@@ -39,6 +41,9 @@ import Playwright.Connection
   )
 import Playwright.CssPixel
   ( CssPixel (CssPixel)
+  )
+import Playwright.ElementState
+  ( ElementState (ElementDisabled, ElementEditable, ElementEnabled, ElementHidden, ElementStable, ElementVisible)
   )
 import Playwright.Frame
   ( Frame
@@ -75,6 +80,8 @@ import Playwright.Protocol
   , ElementHandleSetInputFilesResult
   , ElementHandleTextContentResult (elementHandleTextContentResultValue)
   , ElementHandleTypeResult
+  , ElementHandleWaitForElementStateParamsState (ElementHandleWaitForElementStateParamsStateDisabled, ElementHandleWaitForElementStateParamsStateEditable, ElementHandleWaitForElementStateParamsStateEnabled, ElementHandleWaitForElementStateParamsStateHidden, ElementHandleWaitForElementStateParamsStateStable, ElementHandleWaitForElementStateParamsStateVisible)
+  , ElementHandleWaitForElementStateResult
   , Rect (rectHeight, rectWidth, rectX, rectY)
   , mkElementHandleBoundingBoxParams
   , mkElementHandleClickParams
@@ -90,6 +97,7 @@ import Playwright.Protocol
   , mkElementHandleSetInputFilesParamsPayloads
   , mkElementHandleTextContentParams
   , mkElementHandleTypeParams
+  , mkElementHandleWaitForElementStateParams
   )
 import Playwright.SerializedArgument
   ( SerializedArgument
@@ -221,3 +229,32 @@ toPayload file =
   mkElementHandleSetInputFilesParamsPayloads
     (protocolBinaryFromByteString (inputFileBytes file))
     (inputFileNameToText (inputFileName file))
+
+waitForElementState :: ElementHandle -> ElementState -> IO ()
+waitForElementState handle state =
+  waitForElementStateWith handle state defaultTimeout
+
+waitForElementStateWith :: ElementHandle -> ElementState -> Timeout -> IO ()
+waitForElementStateWith handle state timeout = do
+  _ :: ElementHandleWaitForElementStateResult <-
+    handleSend
+      handle
+      "waitForElementState"
+      (mkElementHandleWaitForElementStateParams (toProtocolElementState state) timeout)
+  pure ()
+
+toProtocolElementState :: ElementState -> ElementHandleWaitForElementStateParamsState
+toProtocolElementState state =
+  case state of
+    ElementVisible ->
+      ElementHandleWaitForElementStateParamsStateVisible
+    ElementHidden ->
+      ElementHandleWaitForElementStateParamsStateHidden
+    ElementStable ->
+      ElementHandleWaitForElementStateParamsStateStable
+    ElementEnabled ->
+      ElementHandleWaitForElementStateParamsStateEnabled
+    ElementDisabled ->
+      ElementHandleWaitForElementStateParamsStateDisabled
+    ElementEditable ->
+      ElementHandleWaitForElementStateParamsStateEditable

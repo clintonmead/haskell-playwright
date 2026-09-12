@@ -1,6 +1,7 @@
 module Playwright.Page
   ( Page (..)
   , pageFromRef
+  , bringToFront
   , closePage
   , content
   , goto
@@ -16,7 +17,9 @@ module Playwright.Page
   , getByText
   , goBack
   , goForward
+  , isClosed
   , reload
+  , requestGC
   , querySelector
   , querySelectorStrict
   , setViewportSize
@@ -36,6 +39,7 @@ module Playwright.Page
   , waitForURLWith
   , armConsole
   , armDialog
+  , waitForClose
   , waitForConsole
   , waitForDialog
   , waitForResponse
@@ -60,11 +64,13 @@ import Control.Concurrent.STM
   , takeTMVar
   )
 import Control.Exception
-  ( throwIO
+  ( try
+  , throwIO
   )
 import Data.List
   ( find
   )
+import Data.Set qualified as Set
 import Data.ByteString
   ( ByteString
   )
@@ -81,7 +87,8 @@ import Playwright.Channel
   , send
   )
 import Playwright.Connection
-  ( lookupObject
+  ( closedGuids
+  , lookupObject
   , registerEventWaiter
   , waitForChannelEvent
   , waitForFutureChannelEvent
@@ -121,7 +128,8 @@ import Playwright.ElementHandle
   , elementHandleFromRef
   )
 import Playwright.Error
-  ( PlaywrightError (WaitTimeout)
+  ( PlaywrightError (MissingObject, ProtocolRpc, WaitTimeout)
+  , ProtocolFailure (protocolFailureName)
   )
 import Playwright.Exactness
   ( Exactness
@@ -178,11 +186,13 @@ import Playwright.Protocol
   , FrameNavigatedEvent (frameNavigatedEventNewDocument, frameNavigatedEventUrl)
   , FrameNavigatedEventNewDocument (frameNavigatedEventNewDocumentRequest)
   , PageAddInitScriptResult
+  , PageBringToFrontResult
   , PageCloseResult
   , PageGoBackResult (pageGoBackResultResponse)
   , PageGoForwardResult (pageGoForwardResultResponse)
   , PageInitializer (pageInitializerMainFrame, pageInitializerOpener)
   , PageReloadResult (pageReloadResultResponse)
+  , PageRequestGCResult
   , PageScreenshotParams (pageScreenshotParamsFullPage)
   , PageScreenshotResult (pageScreenshotResultBinary)
   , PageSetExtraHTTPHeadersResult
@@ -191,10 +201,12 @@ import Playwright.Protocol
   , mkFrameAddScriptTagParams
   , mkFrameAddStyleTagParams
   , mkPageAddInitScriptParams
+  , mkPageBringToFrontParams
   , mkPageCloseParams
   , mkPageGoBackParams
   , mkPageGoForwardParams
   , mkPageReloadParams
+  , mkPageRequestGCParams
   , mkPageScreenshotParams
   , mkPageSetExtraHTTPHeadersParams
   , mkPageSetViewportSizeParams
@@ -271,7 +283,44 @@ pageFromRef contextChannel ref = do
 
 closePage :: Page -> IO ()
 closePage page = do
-  _ :: PageCloseResult <- send (pageChannel page) (MethodName "close") mkPageCloseParams
+  result <- try (send (pageChannel page) (MethodName "close") mkPageCloseParams)
+  case result of
+    Left (ProtocolRpc failure)
+      | protocolFailureName failure == "TargetClosedError" ->
+          pure ()
+    Left err ->
+      throwIO err
+    Right (_ :: PageCloseResult) ->
+      pure ()
+
+isClosed :: Page -> IO Bool
+isClosed page = do
+  closed <- closedGuids (channelConnection (pageChannel page))
+  pure (Set.member (channelGuid (pageChannel page)) closed)
+
+waitForClose :: Page -> IO ()
+waitForClose page = do
+  already <- isClosed page
+  if already
+    then pure ()
+    else do
+      _ <-
+        waitForChannelEvent
+          (channelConnection (pageChannel page))
+          (channelGuid (pageChannel page))
+          (MethodName "close")
+      pure ()
+
+bringToFront :: Page -> IO ()
+bringToFront page = do
+  _ :: PageBringToFrontResult <-
+    send (pageChannel page) (MethodName "bringToFront") mkPageBringToFrontParams
+  pure ()
+
+requestGC :: Page -> IO ()
+requestGC page = do
+  _ :: PageRequestGCResult <-
+    send (pageChannel page) (MethodName "requestGC") mkPageRequestGCParams
   pure ()
 
 goto :: Page -> Url -> GotoOptions -> IO (Maybe Response)
@@ -619,13 +668,26 @@ collectPopup page = do
 
 opener :: Page -> IO (Maybe Page)
 opener page = do
-  obj <- lookupObject (channelConnection (pageChannel page)) (channelGuid (pageChannel page))
+  let
+    conn = channelConnection (pageChannel page)
+  obj <- lookupObject conn (channelGuid (pageChannel page))
   initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
   case pageInitializerOpener initializer of
     Nothing ->
       pure Nothing
-    Just ref ->
-      Just <$> pageFromRef (pageContextChannel page) ref
+    Just ref -> do
+      closed <- closedGuids conn
+      if Set.member (channelRefGuid ref) closed
+        then pure Nothing
+        else do
+          loaded <- try (pageFromRef (pageContextChannel page) ref)
+          case loaded of
+            Left (MissingObject _) ->
+              pure Nothing
+            Left err ->
+              throwIO err
+            Right parent ->
+              pure (Just parent)
 
 pagesEqual :: Page -> Page -> Bool
 pagesEqual left right =

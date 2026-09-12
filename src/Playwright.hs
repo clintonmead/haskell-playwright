@@ -35,6 +35,7 @@ module Playwright
   , Download
   , DomEventType (..)
   , ElementHandle (..)
+  , ElementState (..)
   , EmulateMedia (..)
   , Exactness (..)
   , FileChooser (..)
@@ -118,6 +119,7 @@ module Playwright
   , asElement
   , boolArgument
   , boundingBox
+  , bringToFront
   , browserFromRef
   , browserTypeFromRef
   , check
@@ -255,6 +257,7 @@ module Playwright
   , inputValue
   , inputValueHandle
   , isChecked
+  , isClosed
   , isDisabled
   , isEditable
   , isEnabled
@@ -306,6 +309,7 @@ module Playwright
   , querySelectorStrict
   , reload
   , requestFrame
+  , requestGC
   , requestHeaders
   , requestIsNavigation
   , requestMethod
@@ -365,10 +369,13 @@ module Playwright
   , urlFromText
   , urlToText
   , waitFor
+  , waitForClose
   , waitForConsole
   , waitForContextPage
   , waitForDialog
   , waitForDownload
+  , waitForElementState
+  , waitForElementStateWith
   , waitForFileChooser
   , waitForFunction
   , waitForLoadState
@@ -552,6 +559,11 @@ import Playwright.ElementHandle
   , setInputFilesHandle
   , textContentHandle
   , typeHandle
+  , waitForElementState
+  , waitForElementStateWith
+  )
+import Playwright.ElementState
+  ( ElementState (ElementDisabled, ElementEditable, ElementEnabled, ElementHidden, ElementStable, ElementVisible)
   )
 import Playwright.EmulateMedia
   ( EmulateMedia (EmulateMedia, emulateMediaColorScheme, emulateMediaType)
@@ -756,6 +768,7 @@ import Playwright.Page
   , armConsole
   , armDialog
   , armPopup
+  , bringToFront
   , closePage
   , content
   , getByLabel
@@ -765,6 +778,7 @@ import Playwright.Page
   , goBack
   , goForward
   , goto
+  , isClosed
   , locator
   , opener
   , pageFromRef
@@ -772,6 +786,7 @@ import Playwright.Page
   , querySelector
   , querySelectorStrict
   , reload
+  , requestGC
   , screenshot
   , setContent
   , setExtraHTTPHeaders
@@ -779,6 +794,7 @@ import Playwright.Page
   , title
   , url
   , waitForConsole
+  , waitForClose
   , waitForDialog
   , waitForFunction
   , waitForLoadState

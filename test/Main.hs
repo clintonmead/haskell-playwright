@@ -30,6 +30,7 @@ import Playwright.ElementHandlePressSpec qualified as ElementHandlePressSpec
 import Playwright.ElementHandleScrollIntoViewSpec qualified as ElementHandleScrollIntoViewSpec
 import Playwright.ElementHandleSelectTextSpec qualified as ElementHandleSelectTextSpec
 import Playwright.ElementHandleTypeSpec qualified as ElementHandleTypeSpec
+import Playwright.ElementHandleWaitForElementStateSpec qualified as ElementHandleWaitForElementStateSpec
 import Playwright.FrameEvaluateSpec qualified as FrameEvaluateSpec
 import Playwright.FrameHierarchySpec qualified as FrameHierarchySpec
 import Playwright.GeolocationSpec qualified as GeolocationSpec
@@ -53,6 +54,7 @@ import Playwright.PageBasicSpec qualified as PageBasicSpec
 import Playwright.PageCheckSpec qualified as PageCheckSpec
 import Playwright.PageClockSpec qualified as PageClockSpec
 import Playwright.PageClickSpec qualified as PageClickSpec
+import Playwright.PageCloseSpec qualified as PageCloseSpec
 import Playwright.PageDispatchEventSpec qualified as PageDispatchEventSpec
 import Playwright.PageDialogSpec qualified as PageDialogSpec
 import Playwright.PageDragSpec qualified as PageDragSpec
@@ -77,6 +79,7 @@ import Playwright.PageRequestAbortSpec qualified as PageRequestAbortSpec
 import Playwright.PageRequestContinueSpec qualified as PageRequestContinueSpec
 import Playwright.PageRequestFallbackSpec qualified as PageRequestFallbackSpec
 import Playwright.PageRequestFulfillSpec qualified as PageRequestFulfillSpec
+import Playwright.PageRequestGcSpec qualified as PageRequestGcSpec
 import Playwright.PageRouteSpec qualified as PageRouteSpec
 import Playwright.PageScreenshotSpec qualified as PageScreenshotSpec
 import Playwright.PageSetContentSpec qualified as PageSetContentSpec
@@ -141,6 +144,7 @@ main =
         , ElementHandleScrollIntoViewSpec.tests
         , ElementHandleSelectTextSpec.tests
         , ElementHandleTypeSpec.tests
+        , ElementHandleWaitForElementStateSpec.tests
         , FrameEvaluateSpec.tests
         , FrameHierarchySpec.tests
         , GeolocationSpec.tests
@@ -164,6 +168,7 @@ main =
         , PageCheckSpec.tests
         , PageClockSpec.tests
         , PageClickSpec.tests
+        , PageCloseSpec.tests
         , PageDispatchEventSpec.tests
         , PageDialogSpec.tests
         , PageDragSpec.tests
@@ -188,6 +193,7 @@ main =
         , PageRequestContinueSpec.tests
         , PageRequestFallbackSpec.tests
         , PageRequestFulfillSpec.tests
+        , PageRequestGcSpec.tests
         , PageRouteSpec.tests
         , PageSelectOptionSpec.tests
         , PageScreenshotSpec.tests

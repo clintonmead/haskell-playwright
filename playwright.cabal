@@ -48,6 +48,7 @@ library
       Playwright.Download
       Playwright.Driver
       Playwright.ElementHandle
+      Playwright.ElementState
       Playwright.EmulateMedia
       Playwright.Error
       Playwright.Evaluate
@@ -193,6 +194,7 @@ test-suite playwright-test
       Playwright.ElementHandleScrollIntoViewSpec
       Playwright.ElementHandleSelectTextSpec
       Playwright.ElementHandleTypeSpec
+      Playwright.ElementHandleWaitForElementStateSpec
       Playwright.FrameEvaluateSpec
       Playwright.FrameHierarchySpec
       Playwright.GeolocationSpec
@@ -217,6 +219,7 @@ test-suite playwright-test
       Playwright.PageCheckSpec
       Playwright.PageClickSpec
       Playwright.PageClockSpec
+      Playwright.PageCloseSpec
       Playwright.PageDialogSpec
       Playwright.PageDispatchEventSpec
       Playwright.PageDragSpec
@@ -241,6 +244,7 @@ test-suite playwright-test
       Playwright.PageRequestContinueSpec
       Playwright.PageRequestFallbackSpec
       Playwright.PageRequestFulfillSpec
+      Playwright.PageRequestGcSpec
       Playwright.PageRouteSpec
       Playwright.PageScreenshotSpec
       Playwright.PageSelectOptionSpec
