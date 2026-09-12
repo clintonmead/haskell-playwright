@@ -8,8 +8,10 @@ module Playwright.BrowserContext
   , clearPermissions
   , closeContext
   , contextFromRef
+  , contextPages
   , cookies
   , cookiesFor
+  , contextsEqual
   , grantPermissions
   , grantPermissionsFor
   , newPage
@@ -18,18 +20,27 @@ module Playwright.BrowserContext
   , setGeolocation
   , setHTTPCredentials
   , setOffline
+  , waitForContextPage
   ) where
 
+import Control.Exception
+  ( throwIO
+  )
+import Data.Set qualified as Set
 import Data.Text
   ( Text
   )
 import Playwright.Channel
   ( BrowserContextTag
-  , Channel (Channel, channelConnection)
+  , Channel (Channel, channelConnection, channelGuid)
   , send
   )
 import Playwright.Connection
   ( Connection
+  , closedGuids
+  , guidsOfType
+  , lookupObject
+  , waitForFutureChannelEvent
   )
 import Playwright.Cookie
   ( Cookie
@@ -58,7 +69,10 @@ import Playwright.HttpHeader
   , toNameValue
   )
 import Playwright.Json.ChannelRef
-  ( ChannelRef (channelRefGuid)
+  ( ChannelRef (ChannelRef, channelRefGuid)
+  )
+import Playwright.Json.Decode
+  ( fromJsonValue
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -81,7 +95,9 @@ import Playwright.Protocol
   , BrowserContextGrantPermissionsParams (browserContextGrantPermissionsParamsOrigin)
   , BrowserContextGrantPermissionsResult
   , BrowserContextNewPageResult (browserContextNewPageResultPage)
+  , BrowserContextPageEvent (browserContextPageEventPage)
   , BrowserContextSetExtraHTTPHeadersResult
+  , ChannelType (ChannelTypePage)
   , BrowserContextSetGeolocationParams (browserContextSetGeolocationParamsGeolocation)
   , BrowserContextSetGeolocationParamsGeolocation (browserContextSetGeolocationParamsGeolocationAccuracy)
   , BrowserContextSetGeolocationResult
@@ -103,6 +119,9 @@ import Playwright.Protocol
   , mkBrowserContextSetHTTPCredentialsParams
   , mkBrowserContextSetHTTPCredentialsParamsHttpCredentials
   , mkBrowserContextSetOfflineParams
+  )
+import Playwright.RemoteObject
+  ( RemoteObject (remoteGuid, remoteParent, remoteType)
   )
 import Playwright.Url
   ( Url
@@ -150,6 +169,38 @@ closeContext ctx = do
 pageContext :: Page -> BrowserContext
 pageContext page =
   BrowserContext (pageContextChannel page)
+
+contextsEqual :: BrowserContext -> BrowserContext -> Bool
+contextsEqual left right =
+  channelGuid (browserContextChannel left) == channelGuid (browserContextChannel right)
+
+contextPages :: BrowserContext -> IO [Page]
+contextPages ctx = do
+  let
+    conn = channelConnection (browserContextChannel ctx)
+    parent = channelGuid (browserContextChannel ctx)
+  closed <- closedGuids conn
+  objects <- traverse (lookupObject conn) =<< guidsOfType conn ChannelTypePage
+  traverse
+    (pageFromRef (browserContextChannel ctx) . ChannelRef . remoteGuid)
+    ( filter
+        ( \obj ->
+            remoteType obj == ChannelTypePage
+              && remoteParent obj == parent
+              && Set.notMember (remoteGuid obj) closed
+        )
+        objects
+    )
+
+waitForContextPage :: BrowserContext -> IO Page
+waitForContextPage ctx = do
+  params <-
+    waitForFutureChannelEvent
+      (channelConnection (browserContextChannel ctx))
+      (channelGuid (browserContextChannel ctx))
+      (MethodName "page")
+  event <- either throwIO pure (fromJsonValue params)
+  pageFromRef (browserContextChannel ctx) (browserContextPageEventPage event)
 
 addCookies :: BrowserContext -> [CookieToSet] -> IO ()
 addCookies ctx cookiesToSet = do

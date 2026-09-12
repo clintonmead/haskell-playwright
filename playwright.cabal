@@ -163,6 +163,7 @@ test-suite playwright-test
   other-modules:
       Playwright.BrowserContextAddCookiesSpec
       Playwright.BrowserContextAddInitScriptSpec
+      Playwright.BrowserContextBaseUrlSpec
       Playwright.BrowserContextCookiesSpec
       Playwright.BrowserContextCredentialsSpec
       Playwright.BrowserContextCspSpec
@@ -170,6 +171,8 @@ test-suite playwright-test
       Playwright.BrowserContextJavaScriptSpec
       Playwright.BrowserContextLocaleSpec
       Playwright.BrowserContextOfflineSpec
+      Playwright.BrowserContextPageEventSpec
+      Playwright.BrowserContextPagesSpec
       Playwright.BrowserContextRouteSpec
       Playwright.BrowserContextSetExtraHTTPHeadersSpec
       Playwright.BrowserContextTimezoneSpec

@@ -132,6 +132,7 @@ module Playwright
   , contentFrameHandle
   , contextExposeFunction
   , contextFromRef
+  , contextPages
   , contextRoute
   , contextRouteWith
   , continueRoute
@@ -139,6 +140,7 @@ module Playwright
   , cookieForUrl
   , cookies
   , cookiesFor
+  , contextsEqual
   , cssPixelFromInt
   , currentName
   , currentUrl
@@ -339,6 +341,7 @@ module Playwright
   , urlToText
   , waitFor
   , waitForConsole
+  , waitForContextPage
   , waitForDialog
   , waitForFileChooser
   , waitForFunction
@@ -396,8 +399,10 @@ import Playwright.BrowserContext
   , clearPermissions
   , closeContext
   , contextFromRef
+  , contextPages
   , cookies
   , cookiesFor
+  , contextsEqual
   , grantPermissions
   , grantPermissionsFor
   , newPage
@@ -406,6 +411,7 @@ import Playwright.BrowserContext
   , setGeolocation
   , setHTTPCredentials
   , setOffline
+  , waitForContextPage
   )
 import Playwright.BrowserName
   ( BrowserName (Chromium, Firefox, WebKit)
@@ -684,7 +690,7 @@ import Playwright.MediaType
   ( MediaType (MediaNoOverride, MediaPrint, MediaScreen)
   )
 import Playwright.NewContextOptions
-  ( NewContextOptions (NewContextOptions, newContextBypassCSP, newContextColorScheme, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextGeolocation, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextJavaScriptEnabled, newContextLocale, newContextOffline, newContextPermissions, newContextTimezoneId, newContextUserAgent, newContextViewport)
+  ( NewContextOptions (NewContextOptions, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextGeolocation, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextJavaScriptEnabled, newContextLocale, newContextOffline, newContextPermissions, newContextTimezoneId, newContextUserAgent, newContextViewport)
   , defaultNewContextOptions
   )
 import Playwright.Page

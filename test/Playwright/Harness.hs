@@ -7,6 +7,7 @@ module Playwright.Harness
   , withAssetPage
   , withAssets
   , withAssetsContextWith
+  , withAssetsPrefix
   , withAssetsWith
   , withChromiumBrowser
   , withChromiumContext
@@ -120,12 +121,17 @@ withAssetPage relativePath action =
         defaultGotoOptions
     action page
 
-withAssetsContextWith :: NewContextOptions -> (Text -> BrowserContext -> Page -> IO a) -> IO a
-withAssetsContextWith opts action = do
+withAssetsPrefix :: (Text -> IO a) -> IO a
+withAssetsPrefix action = do
   assets <- requireAssets
   withApplication (pure (staticApp (defaultFileServerSettings assets))) $ \port ->
+    action ("http://127.0.0.1:" <> pack (show port))
+
+withAssetsContextWith :: NewContextOptions -> (Text -> BrowserContext -> Page -> IO a) -> IO a
+withAssetsContextWith opts action =
+  withAssetsPrefix $ \prefix ->
     withChromiumContextWith opts $ \ctx page ->
-      action ("http://127.0.0.1:" <> pack (show port)) ctx page
+      action prefix ctx page
 
 withAssetsWith :: NewContextOptions -> (Text -> Page -> IO a) -> IO a
 withAssetsWith opts action =

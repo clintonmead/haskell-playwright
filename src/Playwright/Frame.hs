@@ -35,6 +35,7 @@ import Playwright.Channel
 import Playwright.Connection
   ( Connection
   , guidsOfType
+  , lookupContextBaseUrl
   , lookupObject
   )
 import Playwright.GotoOptions
@@ -72,7 +73,7 @@ import Playwright.Protocol
   , mkFrameTitleParams
   )
 import Playwright.RemoteObject
-  ( RemoteObject (remoteInitializer)
+  ( RemoteObject (remoteInitializer, remoteParent)
   )
 import Playwright.Response
   ( Response
@@ -93,6 +94,7 @@ import Playwright.Timeout
   )
 import Playwright.Url
   ( Url
+  , resolveAgainstBase
   )
 
 data Frame = Frame
@@ -138,6 +140,13 @@ isChildOf :: Frame -> Frame -> Bool
 isChildOf parent child =
   frameParent child == Just (ChannelRef (channelGuid (frameChannel parent)))
 
+resolveFrameUrl :: Frame -> Url -> IO Url
+resolveFrameUrl frame url = do
+  let conn = channelConnection (frameChannel frame)
+  frameObj <- lookupObject conn (channelGuid (frameChannel frame))
+  base <- lookupContextBaseUrl conn (remoteParent frameObj)
+  pure (resolveAgainstBase base url)
+
 frameSend :: forall result params. (ToJSON params, FromJSON result) => Frame -> Text -> params -> IO result
 frameSend frame methodName params =
   send (frameChannel frame) (MethodName methodName) params
@@ -149,11 +158,12 @@ frameSend_ frame methodName params = do
 
 gotoFrame :: Frame -> Url -> GotoOptions -> IO (Maybe Response)
 gotoFrame frame url opts = do
+  resolved <- resolveFrameUrl frame url
   result <-
     frameSend
       frame
       "goto"
-      (mkFrameGotoParams (gotoOptionsTimeout opts) url)
+      (mkFrameGotoParams (gotoOptionsTimeout opts) resolved)
         { frameGotoParamsWaitUntil = gotoOptionsWaitUntil opts
         , frameGotoParamsReferer = gotoOptionsReferer opts
         }

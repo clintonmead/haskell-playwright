@@ -24,6 +24,7 @@ import Playwright.Channel
   )
 import Playwright.Connection
   ( Connection
+  , writeContextBaseUrl
   )
 import Playwright.Json.ChannelRef
   ( ChannelRef (channelRefGuid)
@@ -32,7 +33,7 @@ import Playwright.MethodName
   ( MethodName (MethodName)
   )
 import Playwright.NewContextOptions
-  ( NewContextOptions
+  ( NewContextOptions (newContextBaseURL)
   , defaultNewContextOptions
   , toBrowserNewContextParams
   )
@@ -70,9 +71,15 @@ newContextWith browser opts = do
       (browserChannel browser)
       (MethodName "newContext")
       (toBrowserNewContextParams opts)
-  contextFromRef
-    (channelConnection (browserChannel browser))
-    (browserNewContextResultContext result)
+  let
+    conn = channelConnection (browserChannel browser)
+    ref = browserNewContextResultContext result
+  case newContextBaseURL opts of
+    Nothing ->
+      pure ()
+    Just base ->
+      writeContextBaseUrl conn (channelRefGuid ref) base
+  contextFromRef conn ref
 
 withPage :: Browser -> (Page -> IO a) -> IO a
 withPage browser =

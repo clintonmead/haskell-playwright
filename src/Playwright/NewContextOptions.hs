@@ -32,7 +32,7 @@ import Playwright.PermissionName
   ( PermissionName (permissionNameToText)
   )
 import Playwright.Protocol
-  ( BrowserNewContextParams (browserNewContextParamsBypassCSP, browserNewContextParamsColorScheme, browserNewContextParamsDeviceScaleFactor, browserNewContextParamsExtraHTTPHeaders, browserNewContextParamsGeolocation, browserNewContextParamsHttpCredentials, browserNewContextParamsIgnoreHTTPSErrors, browserNewContextParamsJavaScriptEnabled, browserNewContextParamsLocale, browserNewContextParamsOffline, browserNewContextParamsPermissions, browserNewContextParamsTimezoneId, browserNewContextParamsUserAgent, browserNewContextParamsViewport)
+  ( BrowserNewContextParams (browserNewContextParamsBaseURL, browserNewContextParamsBypassCSP, browserNewContextParamsColorScheme, browserNewContextParamsDeviceScaleFactor, browserNewContextParamsExtraHTTPHeaders, browserNewContextParamsGeolocation, browserNewContextParamsHttpCredentials, browserNewContextParamsIgnoreHTTPSErrors, browserNewContextParamsJavaScriptEnabled, browserNewContextParamsLocale, browserNewContextParamsOffline, browserNewContextParamsPermissions, browserNewContextParamsTimezoneId, browserNewContextParamsUserAgent, browserNewContextParamsViewport)
   , BrowserNewContextParamsColorScheme (BrowserNewContextParamsColorSchemeDark, BrowserNewContextParamsColorSchemeLight, BrowserNewContextParamsColorSchemeNoOverride, BrowserNewContextParamsColorSchemeNoPreference)
   , BrowserNewContextParamsGeolocation (browserNewContextParamsGeolocationAccuracy)
   , BrowserNewContextParamsHttpCredentials (browserNewContextParamsHttpCredentialsOrigin)
@@ -46,7 +46,8 @@ import Playwright.TimezoneId
   ( TimezoneId (timezoneIdToText)
   )
 import Playwright.Url
-  ( urlToText
+  ( Url
+  , urlToText
   )
 import Playwright.UserAgent
   ( UserAgent (userAgentToText)
@@ -58,7 +59,8 @@ import Playwright.ViewportSize
   )
 
 data NewContextOptions = NewContextOptions
-  { newContextBypassCSP :: Maybe Bool
+  { newContextBaseURL :: Maybe Url
+  , newContextBypassCSP :: Maybe Bool
   , newContextColorScheme :: Maybe ColorScheme
   , newContextDeviceScaleFactor :: Maybe DeviceScaleFactor
   , newContextExtraHTTPHeaders :: Maybe [HttpHeader]
@@ -77,8 +79,9 @@ data NewContextOptions = NewContextOptions
 
 defaultNewContextOptions :: NewContextOptions
 defaultNewContextOptions =
-  NewContextOptions
-    { newContextBypassCSP = Nothing
+    NewContextOptions
+    { newContextBaseURL = Nothing
+    , newContextBypassCSP = Nothing
     , newContextColorScheme = Nothing
     , newContextDeviceScaleFactor = Nothing
     , newContextExtraHTTPHeaders = Nothing
@@ -97,7 +100,8 @@ defaultNewContextOptions =
 toBrowserNewContextParams :: NewContextOptions -> BrowserNewContextParams
 toBrowserNewContextParams opts =
   mkBrowserNewContextParams
-    { browserNewContextParamsBypassCSP = newContextBypassCSP opts
+    { browserNewContextParamsBaseURL = newContextBaseURL opts
+    , browserNewContextParamsBypassCSP = newContextBypassCSP opts
     , browserNewContextParamsColorScheme = fmap toProtocolColor (newContextColorScheme opts)
     , browserNewContextParamsDeviceScaleFactor =
         fmap deviceScaleFactorToScientific (newContextDeviceScaleFactor opts)

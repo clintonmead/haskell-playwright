@@ -4,6 +4,7 @@ module Main
 
 import Playwright.BrowserContextAddCookiesSpec qualified as BrowserContextAddCookiesSpec
 import Playwright.BrowserContextAddInitScriptSpec qualified as BrowserContextAddInitScriptSpec
+import Playwright.BrowserContextBaseUrlSpec qualified as BrowserContextBaseUrlSpec
 import Playwright.BrowserContextCookiesSpec qualified as BrowserContextCookiesSpec
 import Playwright.BrowserContextCredentialsSpec qualified as BrowserContextCredentialsSpec
 import Playwright.BrowserContextCspSpec qualified as BrowserContextCspSpec
@@ -11,6 +12,8 @@ import Playwright.BrowserContextExposeFunctionSpec qualified as BrowserContextEx
 import Playwright.BrowserContextJavaScriptSpec qualified as BrowserContextJavaScriptSpec
 import Playwright.BrowserContextLocaleSpec qualified as BrowserContextLocaleSpec
 import Playwright.BrowserContextOfflineSpec qualified as BrowserContextOfflineSpec
+import Playwright.BrowserContextPageEventSpec qualified as BrowserContextPageEventSpec
+import Playwright.BrowserContextPagesSpec qualified as BrowserContextPagesSpec
 import Playwright.BrowserContextRouteSpec qualified as BrowserContextRouteSpec
 import Playwright.BrowserContextSetExtraHTTPHeadersSpec qualified as BrowserContextSetExtraHTTPHeadersSpec
 import Playwright.BrowserContextTimezoneSpec qualified as BrowserContextTimezoneSpec
@@ -109,6 +112,7 @@ main =
         [ TransportSpec.tests
         , BrowserContextAddCookiesSpec.tests
         , BrowserContextAddInitScriptSpec.tests
+        , BrowserContextBaseUrlSpec.tests
         , BrowserContextCookiesSpec.tests
         , BrowserContextCredentialsSpec.tests
         , BrowserContextCspSpec.tests
@@ -116,6 +120,8 @@ main =
         , BrowserContextJavaScriptSpec.tests
         , BrowserContextLocaleSpec.tests
         , BrowserContextOfflineSpec.tests
+        , BrowserContextPageEventSpec.tests
+        , BrowserContextPagesSpec.tests
         , BrowserContextRouteSpec.tests
         , BrowserContextSetExtraHTTPHeadersSpec.tests
         , BrowserContextTimezoneSpec.tests

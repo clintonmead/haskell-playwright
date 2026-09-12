@@ -16,6 +16,8 @@ module Playwright.Connection
   , routeHandlersFor
   , lookupRequestOverrides
   , writeRequestOverrides
+  , lookupContextBaseUrl
+  , writeContextBaseUrl
   ) where
 
 import Autodocodec
@@ -152,6 +154,7 @@ data Connection = Connection
   , connectionRouteHandlers :: TVar (Map Guid [(UrlGlob, ChannelRef -> IO Bool)])
   , connectionRouteListening :: TVar (Set Guid)
   , connectionRequestOverrides :: TVar (Map Guid RequestOverrides)
+  , connectionContextBaseUrls :: TVar (Map Guid Url)
   }
 
 data EventWaiter = EventWaiter
@@ -199,6 +202,7 @@ withConnection transport action = do
   routeHandlers <- newTVarIO Map.empty
   routeListening <- newTVarIO Set.empty
   requestOverrides <- newTVarIO Map.empty
+  contextBaseUrls <- newTVarIO Map.empty
   let
     conn :: Connection
     conn =
@@ -215,6 +219,7 @@ withConnection transport action = do
         , connectionRouteHandlers = routeHandlers
         , connectionRouteListening = routeListening
         , connectionRequestOverrides = requestOverrides
+        , connectionContextBaseUrls = contextBaseUrls
         }
   withAsync (readerLoop conn) $ \_ ->
     action conn `finally` closeTransport transport
@@ -426,6 +431,16 @@ writeRequestOverrides :: Connection -> Guid -> RequestOverrides -> IO ()
 writeRequestOverrides conn guid overrides =
   atomically $
     modifyTVar' (connectionRequestOverrides conn) (Map.insert guid overrides)
+
+lookupContextBaseUrl :: Connection -> Guid -> IO (Maybe Url)
+lookupContextBaseUrl conn guid =
+  atomically $
+    Map.lookup guid <$> readTVar (connectionContextBaseUrls conn)
+
+writeContextBaseUrl :: Connection -> Guid -> Url -> IO ()
+writeContextBaseUrl conn guid url =
+  atomically $
+    modifyTVar' (connectionContextBaseUrls conn) (Map.insert guid url)
 
 runEventHandlers :: Connection -> Guid -> MethodName -> Value -> IO ()
 runEventHandlers conn guid method params = do
