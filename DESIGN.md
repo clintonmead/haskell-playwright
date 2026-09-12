@@ -32,6 +32,14 @@ Do not copy-paste code. Nix is very powerful at getting files from external sour
 
 It's okay if you've think in hindsight you've designed something the wrong way and need a bit refactor. Indeed I encourage you to do these refactors as you go. Just close your current work of with a commit that passes, then stop and perform the refactor. Ensure all the tests pass, and then commit the refactor, and continue your work. Don't be afraid to make big changes either. The code quality at the end is more important than short term progress.
 
+### Prefer immutability over mutability
+
+Whilst one can have mutable state in Haskell with things like `TVar`s and `IORef`s, prefer immutability over mutability. Using `TVar`s and `IORef`s usually code smell so avoid these without asking me first.
+
+### Don't put everything in IO
+
+Generally one should wrap IO with custom monads. Putting everything in IO is also code smell.
+
 ### Keep Haskell files small
 
 Keep Haskell files relatively small. Except for very trivial types, one data type per file is often a good idea, along with functions directly associated with that type. 
