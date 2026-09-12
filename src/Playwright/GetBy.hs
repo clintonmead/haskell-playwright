@@ -11,8 +11,12 @@ import Data.Aeson
 import Data.ByteString.Lazy
   ( toStrict
   )
+import Data.Maybe
+  ( catMaybes
+  )
 import Data.Text
   ( Text
+  , pack
   , replace
   )
 import Data.Text.Encoding
@@ -25,7 +29,7 @@ import Playwright.Exactness
   ( Exactness (Exact, Inexact)
   )
 import Playwright.GetByRoleOptions
-  ( GetByRoleOptions (getByRoleExact, getByRoleName)
+  ( GetByRoleOptions (getByRoleChecked, getByRoleDisabled, getByRoleExact, getByRoleExpanded, getByRoleIncludeHidden, getByRoleLevel, getByRoleName, getByRolePressed, getByRoleSelected)
   )
 import Playwright.Selector
   ( Selector
@@ -46,15 +50,30 @@ getByTestIdSelector testId =
 
 getByRoleSelector :: AriaRole -> GetByRoleOptions -> Selector
 getByRoleSelector role opts =
-  selectorFromText ("internal:role=" <> ariaRoleToText role <> nameAttr)
+  selectorFromText ("internal:role=" <> ariaRoleToText role <> mconcat attrs)
   where
-    nameAttr :: Text
-    nameAttr =
-      case getByRoleName opts of
-        Nothing ->
-          ""
-        Just name ->
-          "[name=" <> escapeForAttributeSelector name (getByRoleExact opts) <> "]"
+    attrs :: [Text]
+    attrs =
+      catMaybes
+        [ boolAttr "checked" (getByRoleChecked opts)
+        , boolAttr "disabled" (getByRoleDisabled opts)
+        , boolAttr "selected" (getByRoleSelected opts)
+        , boolAttr "expanded" (getByRoleExpanded opts)
+        , boolAttr "include-hidden" (getByRoleIncludeHidden opts)
+        , fmap (\level -> "[level=" <> pack (show level) <> "]") (getByRoleLevel opts)
+        , fmap (\name -> "[name=" <> escapeForAttributeSelector name (getByRoleExact opts) <> "]") (getByRoleName opts)
+        , boolAttr "pressed" (getByRolePressed opts)
+        ]
+
+boolAttr :: Text -> Maybe Bool -> Maybe Text
+boolAttr name value =
+  fmap (\flag -> "[" <> name <> "=" <> boolText flag <> "]") value
+
+boolText :: Bool -> Text
+boolText flag =
+  if flag
+    then "true"
+    else "false"
 
 escapeForTextSelector :: Text -> Exactness -> Text
 escapeForTextSelector text exactness =

@@ -815,7 +815,7 @@ import Playwright.Geolocation
   , longitudeFromInt
   )
 import Playwright.GetByRoleOptions
-  ( GetByRoleOptions (GetByRoleOptions, getByRoleExact, getByRoleName)
+  ( GetByRoleOptions (GetByRoleOptions, getByRoleChecked, getByRoleDisabled, getByRoleExact, getByRoleExpanded, getByRoleIncludeHidden, getByRoleLevel, getByRoleName, getByRolePressed, getByRoleSelected)
   , defaultGetByRoleOptions
   )
 import Playwright.GotoOptions

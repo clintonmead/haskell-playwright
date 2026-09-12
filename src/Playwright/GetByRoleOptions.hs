@@ -11,14 +11,28 @@ import Playwright.Exactness
   )
 
 data GetByRoleOptions = GetByRoleOptions
-  { getByRoleName :: Maybe Text
+  { getByRoleChecked :: Maybe Bool
+  , getByRoleDisabled :: Maybe Bool
   , getByRoleExact :: Exactness
+  , getByRoleExpanded :: Maybe Bool
+  , getByRoleIncludeHidden :: Maybe Bool
+  , getByRoleLevel :: Maybe Int
+  , getByRoleName :: Maybe Text
+  , getByRolePressed :: Maybe Bool
+  , getByRoleSelected :: Maybe Bool
   }
   deriving stock (Eq, Show)
 
 defaultGetByRoleOptions :: GetByRoleOptions
 defaultGetByRoleOptions =
   GetByRoleOptions
-    { getByRoleName = Nothing
+    { getByRoleChecked = Nothing
+    , getByRoleDisabled = Nothing
     , getByRoleExact = Inexact
+    , getByRoleExpanded = Nothing
+    , getByRoleIncludeHidden = Nothing
+    , getByRoleLevel = Nothing
+    , getByRoleName = Nothing
+    , getByRolePressed = Nothing
+    , getByRoleSelected = Nothing
     }
