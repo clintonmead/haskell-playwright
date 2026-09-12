@@ -7,6 +7,9 @@ module Playwright.HttpCredentials
 import Data.Text
   ( Text
   )
+import Playwright.HttpCredentialsSend
+  ( HttpCredentialsSend
+  )
 import Playwright.Url
   ( Url
   )
@@ -25,5 +28,6 @@ data HttpCredentials = HttpCredentials
   { httpCredentialsUsername :: HttpUsername
   , httpCredentialsPassword :: HttpPassword
   , httpCredentialsOrigin :: Maybe Url
+  , httpCredentialsSend :: Maybe HttpCredentialsSend
   }
   deriving stock (Eq, Show)

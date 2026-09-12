@@ -50,6 +50,8 @@ module Playwright
   , FetchOptions (..)
   , FetchPostData (..)
   , FetchFormField (..)
+  , FetchMultipartField (..)
+  , FetchMultipartFile (..)
   , FetchQueryParam (..)
   , Frame (..)
   , FulfillBody (..)
@@ -61,6 +63,7 @@ module Playwright
   , HeaderValue (..)
   , HeadersSize (..)
   , HttpCredentials (..)
+  , HttpCredentialsSend (..)
   , HttpHeader (..)
   , HttpMethod (..)
   , HttpPassword (..)
@@ -876,7 +879,9 @@ import Playwright.Expose
   )
 import Playwright.FetchOptions
   ( FetchFormField (FetchFormField, fetchFormFieldName, fetchFormFieldValue)
-  , FetchOptions (FetchOptions, fetchEncodedParams, fetchFailOnStatusCode, fetchFormData, fetchHeaders, fetchIgnoreHTTPSErrors, fetchMaxRedirects, fetchMaxRetries, fetchMethod, fetchPostData, fetchQueryParams, fetchTimeout, fetchUrl)
+  , FetchMultipartField (FetchMultipartField, FetchMultipartFileField)
+  , FetchMultipartFile (FetchMultipartFile, fetchMultipartFileBytes, fetchMultipartFileMimeType, fetchMultipartFileName)
+  , FetchOptions (FetchOptions, fetchEncodedParams, fetchFailOnStatusCode, fetchFormData, fetchHeaders, fetchIgnoreHTTPSErrors, fetchMaxRedirects, fetchMaxRetries, fetchMethod, fetchMultipart, fetchPostData, fetchQueryParams, fetchTimeout, fetchUrl)
   , FetchPostData (FetchPostBytes, FetchPostJson, FetchPostText)
   , FetchQueryParam (FetchQueryParam, fetchQueryParamName, fetchQueryParamValue)
   , defaultFetchOptions
@@ -933,9 +938,12 @@ import Playwright.GotoOptions
   , defaultGotoOptions
   )
 import Playwright.HttpCredentials
-  ( HttpCredentials (HttpCredentials, httpCredentialsOrigin, httpCredentialsPassword, httpCredentialsUsername)
+  ( HttpCredentials (HttpCredentials, httpCredentialsOrigin, httpCredentialsPassword, httpCredentialsSend, httpCredentialsUsername)
   , HttpPassword (HttpPassword, httpPasswordToText)
   , HttpUsername (HttpUsername, httpUsernameToText)
+  )
+import Playwright.HttpCredentialsSend
+  ( HttpCredentialsSend (HttpCredentialsSendAlways, HttpCredentialsSendUnauthorized)
   )
 import Playwright.HttpHeader
   ( HeaderName (HeaderName, headerNameToText)

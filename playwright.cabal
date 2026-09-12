@@ -74,6 +74,7 @@ library
       Playwright.GotoOptions
       Playwright.Guid
       Playwright.HttpCredentials
+      Playwright.HttpCredentialsSend
       Playwright.HttpHeader
       Playwright.HttpMethod
       Playwright.HttpStatus

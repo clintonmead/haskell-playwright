@@ -59,6 +59,7 @@ import Data.Text
   , splitOn
   , strip
   , toLower
+  , toUpper
   )
 import Data.Text.Encoding
   ( decodeUtf8
@@ -108,18 +109,21 @@ import Playwright
   , CookieSecure (cookieSecureToBool)
   , CookieValue (CookieValue, cookieValueToText)
   , FetchFormField (FetchFormField)
-  , FetchOptions (fetchEncodedParams, fetchFailOnStatusCode, fetchFormData, fetchHeaders, fetchMaxRetries, fetchMethod, fetchPostData, fetchQueryParams, fetchTimeout)
+  , FetchMultipartField (FetchMultipartField, FetchMultipartFileField)
+  , FetchMultipartFile (FetchMultipartFile, fetchMultipartFileBytes, fetchMultipartFileMimeType, fetchMultipartFileName)
+  , FetchOptions (fetchEncodedParams, fetchFailOnStatusCode, fetchFormData, fetchHeaders, fetchMaxRetries, fetchMethod, fetchMultipart, fetchPostData, fetchQueryParams, fetchTimeout)
   , FetchPostData (FetchPostBytes, FetchPostJson, FetchPostText)
   , FetchQueryParam (FetchQueryParam)
   , HeaderName (HeaderName, headerNameToText)
   , HeaderValue (HeaderValue, headerValueToText)
-  , HttpCredentials (HttpCredentials, httpCredentialsOrigin, httpCredentialsPassword, httpCredentialsUsername)
+  , HttpCredentials (HttpCredentials, httpCredentialsOrigin, httpCredentialsPassword, httpCredentialsSend, httpCredentialsUsername)
+  , HttpCredentialsSend (HttpCredentialsSendAlways)
   , HttpHeader (HttpHeader, httpHeaderName, httpHeaderValue)
   , HttpMethod (HttpMethod)
   , HttpPassword (HttpPassword)
   , HttpStatus (httpStatusToInt)
   , HttpUsername (HttpUsername)
-  , NewContextOptions (newContextBaseURL)
+  , NewContextOptions (newContextBaseURL, newContextHttpCredentials)
   , Page
   , StorageState (storageStateCookies)
   , Timeout
@@ -176,6 +180,7 @@ import Playwright.Error
   )
 import Playwright.Harness
   ( assertProtocolContains
+  , readTestAsset
   , testAssetsDir
   , withAssetsContextWith
   , withAssetsPrefix
@@ -461,6 +466,7 @@ tests =
                 { httpCredentialsUsername = HttpUsername "user"
                 , httpCredentialsPassword = HttpPassword "pass"
                 , httpCredentialsOrigin = Nothing
+                , httpCredentialsSend = Nothing
                 }
             second <- fetchGet request (urlFromText (prefix <> "/empty.html"))
             assertEqual "authorized" 200 (httpStatusToInt (apiResponseStatus second))
@@ -473,6 +479,7 @@ tests =
                 { httpCredentialsUsername = HttpUsername "user"
                 , httpCredentialsPassword = HttpPassword "wrong"
                 , httpCredentialsOrigin = Nothing
+                , httpCredentialsSend = Nothing
                 }
             response <- fetchGet request (urlFromText (prefix <> "/empty.html"))
             assertEqual "status" 401 (httpStatusToInt (apiResponseStatus response))
@@ -696,6 +703,16 @@ tests =
           retryGzipTest
       , testCase "should update host header on redirect" $
           hostHeaderRedirectTest
+      , testCase "should support HTTPCredentials.send for newContext" $
+          httpCredentialsSendTest
+      , testCase "should support multipart/form-data" $
+          multipartFileTest
+      , testCase "should support multipart/form-data with file bytes" $
+          multipartAssetTest
+      , testCase "should support multipart/form-data and keep the order" $
+          multipartOrderTest
+      , testCase "should support repeating names in multipart/form-data" $
+          multipartRepeatingTest
       ]
 
 assertSimpleJson :: Text -> APIResponse -> IO ()
@@ -1664,6 +1681,176 @@ hostRedirectApp count capturedHost request respond =
       respond (responseLBS status200 [(hContentType, "text/plain")] "Hello!")
     _ ->
       respond (responseLBS status404 [] "")
+
+httpCredentialsSendTest :: IO ()
+httpCredentialsSendTest = do
+  captured <- newChan
+  withApplication (pure (headerOnlyAuthApp captured)) $ \port -> do
+    let
+      localPrefix = "http://localhost:" <> pack (show port)
+      crossPrefix = "http://127.0.0.1:" <> pack (show port)
+    withChromiumContextWith
+      defaultNewContextOptions
+        { newContextHttpCredentials =
+            Just
+              HttpCredentials
+                { httpCredentialsUsername = HttpUsername "user"
+                , httpCredentialsPassword = HttpPassword "pass"
+                , httpCredentialsOrigin = Just (urlFromText (toUpper localPrefix))
+                , httpCredentialsSend = Just HttpCredentialsSendAlways
+                }
+        }
+      $ \ctx _page -> do
+        request <- contextRequest ctx
+        responseLocal <- fetchGet request (urlFromText (localPrefix <> "/empty.html"))
+        authLocal <- readChan captured
+        responseCross <- fetchGet request (urlFromText (crossPrefix <> "/empty.html"))
+        authCross <- readChan captured
+        assertEqual "local status" 200 (httpStatusToInt (apiResponseStatus responseLocal))
+        assertEqual "local auth" (Just "Basic dXNlcjpwYXNz") authLocal
+        assertEqual "cross status" 200 (httpStatusToInt (apiResponseStatus responseCross))
+        assertEqual "cross auth" Nothing authCross
+
+headerOnlyAuthApp :: Chan (Maybe ByteString) -> Application
+headerOnlyAuthApp captured request respond = do
+  writeChan captured (lookupHeader "authorization" (requestHeaders request))
+  respond (responseLBS status200 [(hContentType, "text/html")] "<html><body></body></html>")
+
+multipartFileTest :: IO ()
+multipartFileTest =
+  withBodyCapture $ \prefix captured ctx -> do
+    request <- contextRequest ctx
+    response <-
+      fetchPostWith
+        request
+        (urlFromText (prefix <> "/empty.html"))
+        defaultFetchOptions
+          { fetchMultipart =
+              Just
+                [ FetchMultipartField "firstName" "John"
+                , FetchMultipartField "lastName" "Doe"
+                , FetchMultipartFileField
+                    "file"
+                    FetchMultipartFile
+                      { fetchMultipartFileName = "f.js"
+                      , fetchMultipartFileMimeType = Just "text/javascript"
+                      , fetchMultipartFileBytes = "var x = 10;\r\n;console.log(x);"
+                      }
+                ]
+          }
+    (headers, body) <- takeMVar captured
+    assertEqual "status" 200 (httpStatusToInt (apiResponseStatus response))
+    assertBool "content-type" (maybe False ("multipart/form-data" `ByteString.isInfixOf`) (lookupHeader "content-type" headers))
+    assertBool "firstName" ("name=\"firstName\"" `ByteString.isInfixOf` body && "John" `ByteString.isInfixOf` body)
+    assertBool "lastName" ("name=\"lastName\"" `ByteString.isInfixOf` body && "Doe" `ByteString.isInfixOf` body)
+    assertBool "file" ("filename=\"f.js\"" `ByteString.isInfixOf` body)
+    assertBool "mime" ("text/javascript" `ByteString.isInfixOf` body)
+    assertBool "payload" ("var x = 10;\r\n;console.log(x);" `ByteString.isInfixOf` body)
+
+multipartAssetTest :: IO ()
+multipartAssetTest = do
+  asset <- readTestAsset "simplezip.json"
+  withBodyCapture $ \prefix captured ctx -> do
+    request <- contextRequest ctx
+    response <-
+      fetchPostWith
+        request
+        (urlFromText (prefix <> "/empty.html"))
+        defaultFetchOptions
+          { fetchMultipart =
+              Just
+                [ FetchMultipartField "firstName" "John"
+                , FetchMultipartField "lastName" "Doe"
+                , FetchMultipartFileField
+                    "readStream"
+                    FetchMultipartFile
+                      { fetchMultipartFileName = "simplezip.json"
+                      , fetchMultipartFileMimeType = Just "application/json"
+                      , fetchMultipartFileBytes = asset
+                      }
+                ]
+          }
+    (headers, body) <- takeMVar captured
+    assertEqual "status" 200 (httpStatusToInt (apiResponseStatus response))
+    assertBool "content-type" (maybe False ("multipart/form-data" `ByteString.isInfixOf`) (lookupHeader "content-type" headers))
+    assertBool "filename" ("filename=\"simplezip.json\"" `ByteString.isInfixOf` body)
+    assertBool "asset" (asset `ByteString.isInfixOf` body)
+
+multipartOrderTest :: IO ()
+multipartOrderTest =
+  withBodyCapture $ \prefix captured ctx -> do
+    request <- contextRequest ctx
+    response <-
+      fetchPostWith
+        request
+        (urlFromText (prefix <> "/empty.html"))
+        defaultFetchOptions
+          { fetchMultipart =
+              Just
+                [ FetchMultipartField "firstName" "John"
+                , FetchMultipartField "lastName" "Doe"
+                , FetchMultipartField "age" "27"
+                , FetchMultipartField "foo" "bar"
+                ]
+          }
+    (_, body) <- takeMVar captured
+    assertEqual "status" 200 (httpStatusToInt (apiResponseStatus response))
+    assertBool
+      "order"
+      ( fieldOffset "firstName" body
+          < fieldOffset "lastName" body
+          && fieldOffset "lastName" body < fieldOffset "age" body
+          && fieldOffset "age" body < fieldOffset "foo" body
+      )
+
+fieldOffset :: ByteString -> ByteString -> Int
+fieldOffset name body =
+  ByteString.length (fst (ByteString.breakSubstring ("name=\"" <> name <> "\"") body))
+
+multipartRepeatingTest :: IO ()
+multipartRepeatingTest =
+  withBodyCapture $ \prefix captured ctx -> do
+    request <- contextRequest ctx
+    response <-
+      fetchPostWith
+        request
+        (urlFromText (prefix <> "/empty.html"))
+        defaultFetchOptions
+          { fetchMultipart =
+              Just
+                [ FetchMultipartField "name" "John"
+                , FetchMultipartField "name" "Doe"
+                , FetchMultipartFileField
+                    "file"
+                    FetchMultipartFile
+                      { fetchMultipartFileName = "f1.js"
+                      , fetchMultipartFileMimeType = Just "text/javascript"
+                      , fetchMultipartFileBytes = "var x = 10;\r\n;console.log(x);"
+                      }
+                , FetchMultipartFileField
+                    "file"
+                    FetchMultipartFile
+                      { fetchMultipartFileName = "custom_f2.txt"
+                      , fetchMultipartFileMimeType = Just "text/plain"
+                      , fetchMultipartFileBytes = "hello"
+                      }
+                , FetchMultipartFileField
+                    "file"
+                    FetchMultipartFile
+                      { fetchMultipartFileName = "blob"
+                      , fetchMultipartFileMimeType = Just "text/plain"
+                      , fetchMultipartFileBytes = "boo"
+                      }
+                ]
+          }
+    (_, body) <- takeMVar captured
+    assertEqual "status" 200 (httpStatusToInt (apiResponseStatus response))
+    assertBool "john" ("name=\"name\"\r\n\r\nJohn" `ByteString.isInfixOf` body)
+    assertBool "doe" ("name=\"name\"\r\n\r\nDoe" `ByteString.isInfixOf` body)
+    assertBool "f1" ("filename=\"f1.js\"" `ByteString.isInfixOf` body)
+    assertBool "f2" ("filename=\"custom_f2.txt\"" `ByteString.isInfixOf` body)
+    assertBool "blob" ("filename=\"blob\"" `ByteString.isInfixOf` body)
+    assertBool "boo" ("boo" `ByteString.isInfixOf` body)
 
 simpleJson :: Text -> Url
 simpleJson prefix =

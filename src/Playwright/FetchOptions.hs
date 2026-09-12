@@ -1,6 +1,8 @@
 module Playwright.FetchOptions
   ( FetchOptions (..)
   , FetchFormField (..)
+  , FetchMultipartField (..)
+  , FetchMultipartFile (..)
   , FetchPostData (..)
   , FetchQueryParam (..)
   , defaultFetchOptions
@@ -46,6 +48,18 @@ data FetchFormField = FetchFormField
   }
   deriving stock (Eq, Show)
 
+data FetchMultipartFile = FetchMultipartFile
+  { fetchMultipartFileBytes :: ByteString
+  , fetchMultipartFileMimeType :: Maybe Text
+  , fetchMultipartFileName :: Text
+  }
+  deriving stock (Eq, Show)
+
+data FetchMultipartField
+  = FetchMultipartField Text Text
+  | FetchMultipartFileField Text FetchMultipartFile
+  deriving stock (Eq, Show)
+
 data FetchOptions = FetchOptions
   { fetchEncodedParams :: Maybe Text
   , fetchFailOnStatusCode :: Maybe Bool
@@ -55,6 +69,7 @@ data FetchOptions = FetchOptions
   , fetchMaxRedirects :: Maybe Int
   , fetchMaxRetries :: Maybe Int
   , fetchMethod :: Maybe HttpMethod
+  , fetchMultipart :: Maybe [FetchMultipartField]
   , fetchPostData :: Maybe FetchPostData
   , fetchQueryParams :: Maybe [FetchQueryParam]
   , fetchTimeout :: Maybe Timeout
@@ -73,6 +88,7 @@ defaultFetchOptions =
     , fetchMaxRedirects = Nothing
     , fetchMaxRetries = Nothing
     , fetchMethod = Nothing
+    , fetchMultipart = Nothing
     , fetchPostData = Nothing
     , fetchQueryParams = Nothing
     , fetchTimeout = Nothing

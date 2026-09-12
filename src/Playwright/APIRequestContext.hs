@@ -61,7 +61,9 @@ import Playwright.Error
   )
 import Playwright.FetchOptions
   ( FetchFormField (fetchFormFieldName, fetchFormFieldValue)
-  , FetchOptions (fetchEncodedParams, fetchFailOnStatusCode, fetchFormData, fetchHeaders, fetchIgnoreHTTPSErrors, fetchMaxRedirects, fetchMaxRetries, fetchMethod, fetchPostData, fetchQueryParams, fetchTimeout, fetchUrl)
+  , FetchMultipartField (FetchMultipartField, FetchMultipartFileField)
+  , FetchMultipartFile (fetchMultipartFileBytes, fetchMultipartFileMimeType, fetchMultipartFileName)
+  , FetchOptions (fetchEncodedParams, fetchFailOnStatusCode, fetchFormData, fetchHeaders, fetchIgnoreHTTPSErrors, fetchMaxRedirects, fetchMaxRetries, fetchMethod, fetchMultipart, fetchPostData, fetchQueryParams, fetchTimeout, fetchUrl)
   , FetchPostData (FetchPostBytes, FetchPostJson, FetchPostText)
   , FetchQueryParam (fetchQueryParamName, fetchQueryParamValue)
   , defaultFetchOptions
@@ -90,15 +92,19 @@ import Playwright.MethodName
   )
 import Playwright.Protocol
   ( APIRequestContextDisposeResult
-  , APIRequestContextFetchParams (aPIRequestContextFetchParamsEncodedParams, aPIRequestContextFetchParamsFailOnStatusCode, aPIRequestContextFetchParamsFormData, aPIRequestContextFetchParamsHeaders, aPIRequestContextFetchParamsIgnoreHTTPSErrors, aPIRequestContextFetchParamsJsonData, aPIRequestContextFetchParamsMaxRedirects, aPIRequestContextFetchParamsMaxRetries, aPIRequestContextFetchParamsMethod, aPIRequestContextFetchParamsParams, aPIRequestContextFetchParamsPostData)
+  , APIRequestContextFetchParams (aPIRequestContextFetchParamsEncodedParams, aPIRequestContextFetchParamsFailOnStatusCode, aPIRequestContextFetchParamsFormData, aPIRequestContextFetchParamsHeaders, aPIRequestContextFetchParamsIgnoreHTTPSErrors, aPIRequestContextFetchParamsJsonData, aPIRequestContextFetchParamsMaxRedirects, aPIRequestContextFetchParamsMaxRetries, aPIRequestContextFetchParamsMethod, aPIRequestContextFetchParamsMultipartData, aPIRequestContextFetchParamsParams, aPIRequestContextFetchParamsPostData)
   , APIRequestContextFetchResult (aPIRequestContextFetchResultResponse)
   , APIRequestContextStorageStateResult
   , BrowserContextInitializer (browserContextInitializerRequestContext)
   , ChannelType (ChannelTypeBrowserContext)
+  , FormField (formFieldFile, formFieldValue)
+  , FormFieldFile (formFieldFileMimeType)
   , NameValue
   , mkAPIRequestContextDisposeParams
   , mkAPIRequestContextFetchParams
   , mkAPIRequestContextStorageStateParams
+  , mkFormField
+  , mkFormFieldFile
   , mkNameValue
   )
 import Playwright.RemoteObject
@@ -250,6 +256,7 @@ sendFetch ctx url method headers post opts = do
         , aPIRequestContextFetchParamsMaxRedirects = fetchMaxRedirects opts
         , aPIRequestContextFetchParamsMaxRetries = fetchMaxRetries opts
         , aPIRequestContextFetchParamsMethod = fmap httpMethodToText method
+        , aPIRequestContextFetchParamsMultipartData = fmap (fmap toFormField) (fetchMultipart opts)
         , aPIRequestContextFetchParamsParams = fmap (fmap queryNameValue) (fetchQueryParams opts)
         , aPIRequestContextFetchParamsPostData = fmap protocolBinaryFromByteString (postBodyBytes post)
         }
@@ -312,6 +319,24 @@ queryNameValue param =
 formNameValue :: FetchFormField -> NameValue
 formNameValue field =
   mkNameValue (fetchFormFieldName field) (fetchFormFieldValue field)
+
+toFormField :: FetchMultipartField -> FormField
+toFormField field =
+  case field of
+    FetchMultipartField name value ->
+      (mkFormField name) {formFieldValue = Just value}
+    FetchMultipartFileField name file ->
+      (mkFormField name)
+        { formFieldFile =
+            Just
+              ( ( mkFormFieldFile
+                    (protocolBinaryFromByteString (fetchMultipartFileBytes file))
+                    (fetchMultipartFileName file)
+                )
+                  { formFieldFileMimeType = fetchMultipartFileMimeType file
+                  }
+              )
+        }
 
 apiRequestStorageState :: APIRequestContext -> IO StorageState
 apiRequestStorageState ctx = do

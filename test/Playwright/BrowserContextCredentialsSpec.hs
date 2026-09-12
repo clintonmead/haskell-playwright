@@ -22,7 +22,7 @@ import Network.Wai.Handler.Warp
   ( withApplication
   )
 import Playwright
-  ( HttpCredentials (HttpCredentials, httpCredentialsOrigin, httpCredentialsPassword, httpCredentialsUsername)
+  ( HttpCredentials (HttpCredentials, httpCredentialsOrigin, httpCredentialsPassword, httpCredentialsSend, httpCredentialsUsername)
   , HttpPassword (HttpPassword)
   , HttpStatus (httpStatusToInt)
   , HttpUsername (HttpUsername)
@@ -75,6 +75,7 @@ tests =
                 { httpCredentialsUsername = HttpUsername "user"
                 , httpCredentialsPassword = HttpPassword "pass"
                 , httpCredentialsOrigin = Nothing
+                , httpCredentialsSend = Nothing
                 }
             second <- reload page
             assertEqual "authorized" 200 =<< statusCode second
@@ -99,6 +100,7 @@ tests =
                       { httpCredentialsUsername = HttpUsername "foo"
                       , httpCredentialsPassword = HttpPassword "bar"
                       , httpCredentialsOrigin = Nothing
+                      , httpCredentialsSend = Nothing
                       }
               }
             $ \_ page -> do
@@ -116,6 +118,7 @@ validCredentials =
     { httpCredentialsUsername = HttpUsername "user"
     , httpCredentialsPassword = HttpPassword "pass"
     , httpCredentialsOrigin = Nothing
+    , httpCredentialsSend = Nothing
     }
 
 statusCode :: Maybe Response -> IO Int

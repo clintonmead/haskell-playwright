@@ -20,9 +20,12 @@ import Playwright.Geolocation
   , Longitude (longitudeToScientific)
   )
 import Playwright.HttpCredentials
-  ( HttpCredentials (httpCredentialsOrigin, httpCredentialsPassword, httpCredentialsUsername)
+  ( HttpCredentials (httpCredentialsOrigin, httpCredentialsPassword, httpCredentialsSend, httpCredentialsUsername)
   , HttpPassword (httpPasswordToText)
   , HttpUsername (httpUsernameToText)
+  )
+import Playwright.HttpCredentialsSend
+  ( HttpCredentialsSend (HttpCredentialsSendAlways, HttpCredentialsSendUnauthorized)
   )
 import Playwright.HttpHeader
   ( HttpHeader
@@ -39,7 +42,8 @@ import Playwright.Protocol
   , BrowserNewContextParamsAcceptDownloads (BrowserNewContextParamsAcceptDownloadsAccept, BrowserNewContextParamsAcceptDownloadsDeny)
   , BrowserNewContextParamsColorScheme (BrowserNewContextParamsColorSchemeDark, BrowserNewContextParamsColorSchemeLight, BrowserNewContextParamsColorSchemeNoOverride, BrowserNewContextParamsColorSchemeNoPreference)
   , BrowserNewContextParamsGeolocation (browserNewContextParamsGeolocationAccuracy)
-  , BrowserNewContextParamsHttpCredentials (browserNewContextParamsHttpCredentialsOrigin)
+  , BrowserNewContextParamsHttpCredentials (browserNewContextParamsHttpCredentialsOrigin, browserNewContextParamsHttpCredentialsSend)
+  , BrowserNewContextParamsHttpCredentialsSend (BrowserNewContextParamsHttpCredentialsSendAlways, BrowserNewContextParamsHttpCredentialsSendUnauthorized)
   , BrowserNewContextParamsViewport
   , mkBrowserNewContextParams
   , mkBrowserNewContextParamsGeolocation
@@ -179,7 +183,17 @@ toProtocolCredentials creds =
   )
     { browserNewContextParamsHttpCredentialsOrigin =
         fmap urlToText (httpCredentialsOrigin creds)
+    , browserNewContextParamsHttpCredentialsSend =
+        fmap toProtocolCredentialsSend (httpCredentialsSend creds)
     }
+
+toProtocolCredentialsSend :: HttpCredentialsSend -> BrowserNewContextParamsHttpCredentialsSend
+toProtocolCredentialsSend send =
+  case send of
+    HttpCredentialsSendAlways ->
+      BrowserNewContextParamsHttpCredentialsSendAlways
+    HttpCredentialsSendUnauthorized ->
+      BrowserNewContextParamsHttpCredentialsSendUnauthorized
 
 toProtocolViewport :: ViewportSize -> BrowserNewContextParamsViewport
 toProtocolViewport size =
