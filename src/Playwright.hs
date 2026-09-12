@@ -8,6 +8,9 @@ module Playwright
   , BoundingBox (..)
   , BindingName (..)
   , CheckOptions (..)
+  , ClockMillis (..)
+  , ClockTicks (..)
+  , ClockTime (..)
   , ColorScheme (..)
   , ConsoleMessage (..)
   , ConsoleType (..)
@@ -125,6 +128,15 @@ module Playwright
   , clearPermissions
   , click
   , clickHandle
+  , clockFastForward
+  , clockInstall
+  , clockInstallAt
+  , clockMillisFromInt
+  , clockPauseAt
+  , clockResume
+  , clockRunFor
+  , clockSetFixedTime
+  , clockSetSystemTime
   , closeBrowser
   , closeContext
   , closePage
@@ -425,6 +437,20 @@ import Playwright.BrowserType
 import Playwright.CheckOptions
   ( CheckOptions (CheckOptions, checkOptionsForce, checkOptionsTimeout, checkOptionsTrial)
   , defaultCheckOptions
+  )
+import Playwright.Clock
+  ( ClockMillis (ClockMillis, clockMillisToScientific)
+  , ClockTicks (ClockTicksMillis, ClockTicksString)
+  , ClockTime (ClockTimeMillis, ClockTimeString)
+  , clockFastForward
+  , clockInstall
+  , clockInstallAt
+  , clockMillisFromInt
+  , clockPauseAt
+  , clockResume
+  , clockRunFor
+  , clockSetFixedTime
+  , clockSetSystemTime
   )
 import Playwright.ColorScheme
   ( ColorScheme (ColorSchemeDark, ColorSchemeLight, ColorSchemeNoOverride, ColorSchemeNoPreference)

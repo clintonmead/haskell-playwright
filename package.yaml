@@ -70,6 +70,7 @@ tests:
       - hedgehog
       - http-types
       - playwright
+      - stm
       - tasty
       - tasty-hedgehog
       - tasty-hunit

@@ -30,6 +30,7 @@ library
       Playwright.BrowserType
       Playwright.Channel
       Playwright.CheckOptions
+      Playwright.Clock
       Playwright.ColorScheme
       Playwright.Connection
       Playwright.ConsoleMessage
@@ -210,6 +211,7 @@ test-suite playwright-test
       Playwright.PageBasicSpec
       Playwright.PageCheckSpec
       Playwright.PageClickSpec
+      Playwright.PageClockSpec
       Playwright.PageDialogSpec
       Playwright.PageDispatchEventSpec
       Playwright.PageDragSpec
@@ -273,6 +275,7 @@ test-suite playwright-test
     , hedgehog
     , http-types
     , playwright
+    , stm
     , tasty
     , tasty-hedgehog
     , tasty-hunit

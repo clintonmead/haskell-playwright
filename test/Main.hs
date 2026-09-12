@@ -49,6 +49,7 @@ import Playwright.PageAddScriptTagSpec qualified as PageAddScriptTagSpec
 import Playwright.PageAddStyleTagSpec qualified as PageAddStyleTagSpec
 import Playwright.PageBasicSpec qualified as PageBasicSpec
 import Playwright.PageCheckSpec qualified as PageCheckSpec
+import Playwright.PageClockSpec qualified as PageClockSpec
 import Playwright.PageClickSpec qualified as PageClickSpec
 import Playwright.PageDispatchEventSpec qualified as PageDispatchEventSpec
 import Playwright.PageDialogSpec qualified as PageDialogSpec
@@ -157,6 +158,7 @@ main =
         , PageAddStyleTagSpec.tests
         , PageBasicSpec.tests
         , PageCheckSpec.tests
+        , PageClockSpec.tests
         , PageClickSpec.tests
         , PageDispatchEventSpec.tests
         , PageDialogSpec.tests
