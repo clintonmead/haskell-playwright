@@ -77,6 +77,10 @@ Read [LLMs Will Cheese Your Types: Fighting Back in Haskell](https://blog.jle.im
 
 Ideally, we want all the tests the official Playwright tests have. We'll naturally need to convert these to Haskell.
 
+### Test reliability
+
+Do not put artificial delays in tests, particularly when those artificial delays are not in the official Playwright tests. That could result in flaky tests and unexpected runtime failures.
+
 ## Implementation process
 
 ### Go for it
