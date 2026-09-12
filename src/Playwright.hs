@@ -383,12 +383,14 @@ module Playwright
   , requestIsNavigation
   , requestMethod
   , requestPostData
+  , requestPostDataJSON
   , requestRedirectedFrom
   , requestRedirectedTo
   , requestResourceType
   , requestResponse
   , requestSizes
   , requestUrl
+  , requests
   , requestsEqual
   , responseFrame
   , responseFinished
@@ -1011,6 +1013,7 @@ import Playwright.Page.Network
   , onRequestFailed
   , onRequestFinished
   , onResponse
+  , requests
   , responseFinished
   )
 import Playwright.PageError
@@ -1039,6 +1042,7 @@ import Playwright.Request
   , requestIsNavigation
   , requestMethod
   , requestPostData
+  , requestPostDataJSON
   , requestRedirectedFrom
   , requestRedirectedTo
   , requestResourceType

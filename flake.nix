@@ -35,6 +35,9 @@
             export STACK_IN_NIX_SHELL=1
             exec ${pkgs.lib.getExe pkgs.stack} --system-ghc --no-install-ghc --skip-ghc-check "$@"
           '';
+          playwrightTest = pkgs.writeShellScriptBin "playwright-test" (
+            builtins.readFile ./scripts/playwright-test
+          );
         in
         {
           default = pkgs.mkShell {
@@ -43,6 +46,7 @@
               cabalWrapped
               hpkgs.hpack
               stackWrapped
+              playwrightTest
               pkgs.nodejs
               pkgs.playwright-driver
               pkgs.playwright-driver.browsers

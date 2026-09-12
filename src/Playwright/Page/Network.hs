@@ -3,6 +3,7 @@ module Playwright.Page.Network
   , onRequestFailed
   , onRequestFinished
   , onResponse
+  , requests
   , responseFinished
   ) where
 
@@ -11,6 +12,7 @@ import Control.Exception
   )
 import Playwright.Channel
   ( Channel (channelConnection, channelGuid)
+  , send
   )
 import Playwright.Connection
   ( registerEventHandler
@@ -35,6 +37,8 @@ import Playwright.Protocol
   , BrowserContextRequestFinishedEvent (browserContextRequestFinishedEventPage, browserContextRequestFinishedEventRequest)
   , BrowserContextResponseEvent (browserContextResponseEventPage, browserContextResponseEventResponse)
   , BrowserContextUpdateSubscriptionParamsEvent (BrowserContextUpdateSubscriptionParamsEventRequest, BrowserContextUpdateSubscriptionParamsEventRequestFailed, BrowserContextUpdateSubscriptionParamsEventRequestFinished, BrowserContextUpdateSubscriptionParamsEventResponse)
+  , PageRequestsResult (pageRequestsResultRequests)
+  , mkPageRequestsParams
   )
 import Playwright.Request
   ( Request (requestChannel)
@@ -93,6 +97,19 @@ onRequestFinished page run = do
       event <- either throwIO pure (fromJsonValue params)
       whenForPage page (browserContextRequestFinishedEventPage event) $
         run (requestFromRef (channelConnection (pageContextChannel page)) (browserContextRequestFinishedEventRequest event))
+
+requests :: Page -> IO [Request]
+requests page = do
+  result <-
+    send
+      (pageChannel page)
+      (MethodName "requests")
+      mkPageRequestsParams
+  pure
+    ( fmap
+        (requestFromRef (channelConnection (pageChannel page)))
+        (pageRequestsResultRequests result)
+    )
 
 responseFinished :: Response -> IO ()
 responseFinished response = do

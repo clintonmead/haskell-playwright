@@ -25,6 +25,9 @@ import Data.Aeson
   ( FromJSON
   , ToJSON
   )
+import Data.Maybe
+  ( fromMaybe
+  )
 import Data.Text
   ( Text
   )
@@ -54,7 +57,8 @@ import Playwright.Json.Decode
   ( fromJsonValue
   )
 import Playwright.LoadState
-  ( toLifecycle
+  ( defaultNavigationLoadState
+  , toLifecycle
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -178,7 +182,7 @@ gotoFrame frame url opts = do
       frame
       "goto"
       (mkFrameGotoParams timeout resolved)
-        { frameGotoParamsWaitUntil = fmap toLifecycle (gotoOptionsWaitUntil opts)
+        { frameGotoParamsWaitUntil = Just (toLifecycle (fromMaybe defaultNavigationLoadState (gotoOptionsWaitUntil opts)))
         , frameGotoParamsReferer = gotoOptionsReferer opts
         }
   case frameGotoResultResponse result of

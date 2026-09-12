@@ -7,6 +7,7 @@ module Playwright.Request
   , requestIsNavigation
   , requestMethod
   , requestPostData
+  , requestPostDataJSON
   , requestRedirectedFrom
   , requestRedirectedTo
   , requestResourceType
@@ -19,12 +20,19 @@ module Playwright.Request
 import Control.Exception
   ( throwIO
   )
+import Data.Aeson
+  ( Value
+  , eitherDecodeStrict
+  )
 import Data.ByteString
   ( ByteString
   )
 import Data.Maybe
   ( listToMaybe
   , mapMaybe
+  )
+import Data.Text.Encoding
+  ( decodeUtf8
   )
 import Playwright.Channel
   ( Channel (Channel, channelConnection, channelGuid)
@@ -162,6 +170,22 @@ requestPostData request = do
       pure (Just bytes)
     Nothing ->
       fmap (fmap protocolBinaryToByteString . requestInitializerPostData) (requestInitializer request)
+
+requestPostDataJSON :: Request -> IO (Maybe Value)
+requestPostDataJSON request = do
+  payload <- requestPostData request
+  case payload of
+    Nothing ->
+      pure Nothing
+    Just bytes ->
+      case eitherDecodeStrict bytes of
+        Right value ->
+          pure (Just value)
+        Left _ ->
+          throwIO
+            ( DecodeFailure
+                ("POST data is not a valid JSON object: " <> decodeUtf8 bytes)
+            )
 
 requestHeaders :: Request -> IO [HttpHeader]
 requestHeaders request = do

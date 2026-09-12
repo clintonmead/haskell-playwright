@@ -1,5 +1,6 @@
 module Playwright.LoadState
   ( LoadState (..)
+  , defaultNavigationLoadState
   , toLifecycle
   ) where
 
@@ -24,6 +25,10 @@ data LoadState
   | LoadStateCommit
   deriving stock (Eq, Ord, Show)
   deriving (FromJSON, ToJSON) via (Autodocodec LoadState)
+
+defaultNavigationLoadState :: LoadState
+defaultNavigationLoadState =
+  LoadStateLoad
 
 toLifecycle :: LoadState -> LifecycleEvent
 toLifecycle state =

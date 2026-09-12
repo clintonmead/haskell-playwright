@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+# Quiet Playwright Haskell tests. Full-suite runs shard across processes
+# (each with Tasty --num-threads=1) because concurrent waitForProcess in one
+# RTS races on SIGCHLD. Extra args skip sharding and go to Tasty.
+set -eu
+
+hpack --force
+
+jobs="${PLAYWRIGHT_TEST_JOBS:-}"
+if [ -z "$jobs" ]; then
+  cpus="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)"
+  jobs=$((cpus / 2))
+  if [ "$jobs" -lt 1 ]; then
+    jobs=1
+  fi
+  if [ "$jobs" -gt 8 ]; then
+    jobs=8
+  fi
+fi
+
+cabal build playwright-test
+bin="$(cabal list-bin playwright:test:playwright-test)"
+
+filter_noise() {
+  grep -v 'Skipping host requirements validation' | grep -vE '^All [0-9]+ tests passed' || true
+}
+
+ensure_matches() {
+  listed="$("$bin" --list-tests "$@" 2>/dev/null || true)"
+  if [ -z "$listed" ]; then
+    echo "playwright-test: pattern matched no tests: $*" >&2
+    exit 1
+  fi
+}
+
+run_one() {
+  ensure_matches "$@"
+  set +e
+  output="$("$bin" --hide-successes --hide-progress --color=never --num-threads=1 "$@" 2>&1)"
+  status=$?
+  set -e
+  printf '%s\n' "$output" | filter_noise
+  return "$status"
+}
+
+if [ "$#" -gt 0 ] || [ "$jobs" -eq 1 ]; then
+  run_one "$@"
+  exit $?
+fi
+
+list="$("$bin" --list-tests)"
+if [ -z "$list" ]; then
+  echo "playwright-test: no tests listed" >&2
+  exit 1
+fi
+
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+groups="$(printf '%s\n' "$list" | awk -F. 'NF >= 2 { print $2 }' | sort -u)"
+group_count="$(printf '%s\n' "$groups" | grep -c . || true)"
+if [ "$group_count" -lt 1 ]; then
+  echo "playwright-test: failed to parse test groups" >&2
+  exit 1
+fi
+if [ "$jobs" -gt "$group_count" ]; then
+  jobs="$group_count"
+fi
+
+index=0
+while IFS= read -r group; do
+  [ -n "$group" ] || continue
+  shard=$((index % jobs))
+  printf '%s\n' "$group" >> "$tmp/groups.$shard"
+  index=$((index + 1))
+done <<< "$groups"
+
+for shard in $(seq 0 $((jobs - 1))); do
+  (
+    pattern=""
+    while IFS= read -r group; do
+      if [ -z "$pattern" ]; then
+        pattern="\$2 == \"$group\""
+      else
+        pattern="$pattern || \$2 == \"$group\""
+      fi
+    done < "$tmp/groups.$shard"
+    set +e
+    output="$("$bin" --hide-successes --hide-progress --color=never --num-threads=1 -p "$pattern" 2>&1)"
+    status=$?
+    set -e
+    filtered="$(printf '%s\n' "$output" | filter_noise)"
+    if [ "$status" != "0" ] || [ -n "$filtered" ]; then
+      {
+        echo "=== shard $((shard + 1))/$jobs ==="
+        printf '%s\n' "$filtered"
+      } > "$tmp/out.$shard"
+    else
+      : > "$tmp/out.$shard"
+    fi
+    echo "$status" > "$tmp/exit.$shard"
+  ) &
+done
+wait
+
+fail=0
+for shard in $(seq 0 $((jobs - 1))); do
+  if [ -s "$tmp/out.$shard" ]; then
+    cat "$tmp/out.$shard"
+  fi
+  if [ "$(cat "$tmp/exit.$shard")" != "0" ]; then
+    fail=1
+  fi
+done
+
+exit "$fail"

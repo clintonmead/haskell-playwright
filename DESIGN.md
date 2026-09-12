@@ -106,9 +106,9 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - `deriving via Autodocodec` needs the `Autodocodec` constructor in scope (`import Autodocodec (Autodocodec (Autodocodec), ...)`).
 - Transparent newtypes that appear in Autodocodec fields also `deriving newtype HasCodec`.
 - Protocol floats that are not timeouts are `Scientific` (Autodocodec has no `HasCodec Double`).
-- Tests run with `NumThreads 1`: concurrent `waitForProcess` races on SIGCHLD.
+- Each Tasty process uses `--num-threads=1`: concurrent `waitForProcess` in one RTS races on SIGCHLD. `playwright-test` still parallelizes by sharding spec groups across processes (default `nproc/2`, cap 8, override `PLAYWRIGHT_TEST_JOBS`). Extra Tasty args disable sharding. From a Nix shell: `playwright-test -p/page-goto/`. Do not pass `-p` directly to `nix develop` (`-p` is a Nix flag); use `nix develop --command bash -c 'playwright-test -p/page-goto/'`.
 - Local packages are built with `-O0` (`optimization: False` in `cabal.project`, `$locals` / local `ghc-options` in Stack). Snapshot/Hackage dependencies stay optimized.
-- Cabal `verbose: 0` plus the flake `cabal` wrapper (`-v0`) and Stack `cabal-verbosity: 0` keep successful builds quiet; GHC errors and test output still show.
+- Cabal `verbose: 0` plus the flake `cabal` wrapper (`-v0`) and Stack `cabal-verbosity: 0` keep successful builds quiet; GHC errors and test output still show. In the Nix shell, `playwright-test` (see `scripts/playwright-test`) builds once, runs the Tasty binary with `--hide-successes --hide-progress`, strips the driver's host-requirements skip line, and only prints shard output when something failed. Extra args go to Tasty (`playwright-test -p/page-goto/`).
 - Locator `evaluate` is `Frame.evalOnSelector` with `strict: true`. Page `evaluate` is `Frame.evaluateExpression` with `isFunction: true`.
 - `Frame.navigated` updates the stored initializer URL and name so `page.url` and `frame.name` stay live.
 - `getByRole`/`getByText`/`getByLabel`/`getByTestId` are client-side `internal:` selectors, matching Playwright's locatorUtils.
@@ -149,7 +149,7 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - `evaluateHandleExpression` is `evaluateExpressionHandle` with `isFunction: false` (raw expressions such as `'12'`).
 - `Frame.frameElement` returns the iframe/frame `ElementHandle`. Detached frames fail with `Frame has been detached.`
 - `page.pdf` is Chromium `Page.pdf` and returns PDF bytes. `PdfOptions` currently maps `tagged` and `outline`.
-- `gotoOptionsWaitUntil` is `LoadState`, mapped onto protocol `LifecycleEvent` in `Frame.goto`.
+- `goto` always sends `waitUntil` (default `load`), matching the JS client.
 - `responseFrame` is `request.frame` of the response's request.
 - Page `onLoad` listens for the main frame `loadstate` add=`load` event. Official page-event-load uses a 1000ms `waitForTimeout` after goto to check the handler did not double-fire.
 - ElementHandle `$eval` / `$$eval` are `evalOnSelector` / `evalOnSelectorAll` with `isFunction: true`. Page `$eval` and ElementHandle `$eval` omit `strict` (first match), matching the JS client; locator `evaluate` still sends `strict: true`.
@@ -162,3 +162,5 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - `Request.sizes` loads `Request.response` then calls protocol `Response.sizes`. Missing response: `Unable to fetch sizes for failed request`. Warp chunked responses inflate Chromium `encodedDataLength`; tests that assert exact `responseBodySize` set `Content-Length` (Node's `res.end` does this). Official `empty.html` is 0 bytes.
 - `requestRedirectedFrom` is `RequestInitializer.redirectedFrom`. `requestRedirectedTo` is the Request whose initializer points at this one (the JS client stores `_redirectedTo` when that object is created).
 - `waitForRequestFailed` / `waitForRequestFinished` subscribe to the matching BrowserContext events. `onRequest` / `onResponse` / `onRequestFailed` / `onRequestFinished` do the same and filter by the event's page. `requestFailure` is the `failureText` from `requestFailed`. `responseFinished` STM-waits until that request has `requestFinished` or `requestFailed` (navigation requests are always reported, so goto's response settles without an extra subscription).
+- `page.requests` is protocol `Page.requests` (the driver keeps the last 100).
+- `requestPostDataJSON` parses `requestPostData` with Aeson; missing body is `Nothing`, invalid JSON is `DecodeFailure` (`POST data is not a valid JSON object: …`).

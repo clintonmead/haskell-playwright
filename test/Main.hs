@@ -74,6 +74,7 @@ import Playwright.PageEventConsoleSpec qualified as PageEventConsoleSpec
 import Playwright.PageEventLoadSpec qualified as PageEventLoadSpec
 import Playwright.PageEventNetworkSpec qualified as PageEventNetworkSpec
 import Playwright.PageEventPopupSpec qualified as PageEventPopupSpec
+import Playwright.PageEventRequestSpec qualified as PageEventRequestSpec
 import Playwright.PageEvaluateSpec qualified as PageEvaluateSpec
 import Playwright.PageEvaluateHandleSpec qualified as PageEvaluateHandleSpec
 import Playwright.PageEmulateMediaSpec qualified as PageEmulateMediaSpec
@@ -88,6 +89,7 @@ import Playwright.PageKeyboardSpec qualified as PageKeyboardSpec
 import Playwright.PageLocalStorageSpec qualified as PageLocalStorageSpec
 import Playwright.PageMouseSpec qualified as PageMouseSpec
 import Playwright.PageNetworkIdleSpec qualified as PageNetworkIdleSpec
+import Playwright.PageNetworkPostDataSpec qualified as PageNetworkPostDataSpec
 import Playwright.PageNetworkRequestSpec qualified as PageNetworkRequestSpec
 import Playwright.PageNetworkResponseSpec qualified as PageNetworkResponseSpec
 import Playwright.PageNetworkSizesSpec qualified as PageNetworkSizesSpec
@@ -209,6 +211,7 @@ main =
         , PageEventNetworkSpec.tests
         , PageEventPageErrorSpec.tests
         , PageEventPopupSpec.tests
+        , PageEventRequestSpec.tests
         , PageEvaluateSpec.tests
         , PageEvaluateHandleSpec.tests
         , PageExposeFunctionSpec.tests
@@ -221,6 +224,7 @@ main =
         , PageLocalStorageSpec.tests
         , PageMouseSpec.tests
         , PageNetworkIdleSpec.tests
+        , PageNetworkPostDataSpec.tests
         , PageNetworkRequestSpec.tests
         , PageNetworkResponseSpec.tests
         , PageNetworkSizesSpec.tests

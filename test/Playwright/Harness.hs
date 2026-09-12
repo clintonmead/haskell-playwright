@@ -9,6 +9,7 @@ module Playwright.Harness
   , withAssetsContextWith
   , withAssetsPrefix
   , withAssetsWith
+  , testAssetsDir
   , withChromiumBrowser
   , withChromiumContext
   , withChromiumContextWith
@@ -145,6 +146,10 @@ readTestAsset :: FilePath -> IO ByteString
 readTestAsset relativePath = do
   dir <- requireAssets
   ByteString.readFile (dir <> "/" <> relativePath)
+
+testAssetsDir :: IO FilePath
+testAssetsDir =
+  requireAssets
 
 requireAssets :: IO FilePath
 requireAssets = do

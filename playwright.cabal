@@ -252,6 +252,7 @@ test-suite playwright-test
       Playwright.PageEventNetworkSpec
       Playwright.PageEventPageErrorSpec
       Playwright.PageEventPopupSpec
+      Playwright.PageEventRequestSpec
       Playwright.PageExposeFunctionSpec
       Playwright.PageFileChooserSpec
       Playwright.PageFillSpec
@@ -262,6 +263,7 @@ test-suite playwright-test
       Playwright.PageLocalStorageSpec
       Playwright.PageMouseSpec
       Playwright.PageNetworkIdleSpec
+      Playwright.PageNetworkPostDataSpec
       Playwright.PageNetworkRequestSpec
       Playwright.PageNetworkResponseSpec
       Playwright.PageNetworkSizesSpec
