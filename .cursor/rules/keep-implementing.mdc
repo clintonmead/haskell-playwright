@@ -1,0 +1,14 @@
+---
+description: Keep implementing the full Playwright API until it is done
+alwaysApply: true
+---
+
+# Do not stop for progress updates
+
+Keep implementing the full Playwright Haskell API and official test suite until that work is complete.
+
+Stop only to ask a concrete question or for guidance. Do not pause to narrate progress, recap batches, or wait for confirmation.
+
+After a green commit-sized batch, commit (DESIGN.md allows this) and immediately start the next batch.
+
+Read `DESIGN.md` and follow it. Do not add artificial test delays unless the official Playwright test has the same wait.

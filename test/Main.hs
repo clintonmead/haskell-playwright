@@ -32,6 +32,7 @@ import Playwright.ElementHandleSelectTextSpec qualified as ElementHandleSelectTe
 import Playwright.ElementHandleTypeSpec qualified as ElementHandleTypeSpec
 import Playwright.ElementHandleWaitForElementStateSpec qualified as ElementHandleWaitForElementStateSpec
 import Playwright.FrameEvaluateSpec qualified as FrameEvaluateSpec
+import Playwright.FrameFrameElementSpec qualified as FrameFrameElementSpec
 import Playwright.FrameHierarchySpec qualified as FrameHierarchySpec
 import Playwright.GeolocationSpec qualified as GeolocationSpec
 import Playwright.IntegrationSpec qualified as IntegrationSpec
@@ -39,6 +40,7 @@ import Playwright.JsHandleAsElementSpec qualified as JsHandleAsElementSpec
 import Playwright.JsHandleEvaluateSpec qualified as JsHandleEvaluateSpec
 import Playwright.JsHandleJsonValueSpec qualified as JsHandleJsonValueSpec
 import Playwright.JsHandlePropertiesSpec qualified as JsHandlePropertiesSpec
+import Playwright.JsHandleToStringSpec qualified as JsHandleToStringSpec
 import Playwright.LocatorClickSpec qualified as LocatorClickSpec
 import Playwright.LocatorElementHandleSpec qualified as LocatorElementHandleSpec
 import Playwright.LocatorEvaluateSpec qualified as LocatorEvaluateSpec
@@ -75,6 +77,7 @@ import Playwright.PageLocalStorageSpec qualified as PageLocalStorageSpec
 import Playwright.PageMouseSpec qualified as PageMouseSpec
 import Playwright.PageNetworkRequestSpec qualified as PageNetworkRequestSpec
 import Playwright.PageNetworkResponseSpec qualified as PageNetworkResponseSpec
+import Playwright.PagePdfSpec qualified as PagePdfSpec
 import Playwright.PageRequestAbortSpec qualified as PageRequestAbortSpec
 import Playwright.PageRequestContinueSpec qualified as PageRequestContinueSpec
 import Playwright.PageRequestFallbackSpec qualified as PageRequestFallbackSpec
@@ -97,6 +100,7 @@ import Playwright.PageWaitForUrlSpec qualified as PageWaitForUrlSpec
 import Playwright.PermissionsSpec qualified as PermissionsSpec
 import Playwright.QuerySelectorSpec qualified as QuerySelectorSpec
 import Playwright.SelectorsGetBySpec qualified as SelectorsGetBySpec
+import Playwright.TapSpec qualified as TapSpec
 import Playwright.TransportSpec qualified as TransportSpec
 import Playwright.WheelSpec qualified as WheelSpec
 import Playwright.WorkersSpec qualified as WorkersSpec
@@ -146,6 +150,7 @@ main =
         , ElementHandleTypeSpec.tests
         , ElementHandleWaitForElementStateSpec.tests
         , FrameEvaluateSpec.tests
+        , FrameFrameElementSpec.tests
         , FrameHierarchySpec.tests
         , GeolocationSpec.tests
         , IntegrationSpec.tests
@@ -153,6 +158,7 @@ main =
         , JsHandleEvaluateSpec.tests
         , JsHandleJsonValueSpec.tests
         , JsHandlePropertiesSpec.tests
+        , JsHandleToStringSpec.tests
         , LocatorSpec.tests
         , LocatorClickSpec.tests
         , LocatorElementHandleSpec.tests
@@ -189,6 +195,7 @@ main =
         , PageMouseSpec.tests
         , PageNetworkRequestSpec.tests
         , PageNetworkResponseSpec.tests
+        , PagePdfSpec.tests
         , PageRequestAbortSpec.tests
         , PageRequestContinueSpec.tests
         , PageRequestFallbackSpec.tests
@@ -211,6 +218,7 @@ main =
         , PermissionsSpec.tests
         , QuerySelectorSpec.tests
         , SelectorsGetBySpec.tests
+        , TapSpec.tests
         , WheelSpec.tests
         , WorkersSpec.tests
         ]

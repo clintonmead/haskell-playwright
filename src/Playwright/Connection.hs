@@ -19,6 +19,7 @@ module Playwright.Connection
   , writeRequestOverrides
   , lookupContextBaseUrl
   , writeContextBaseUrl
+  , waitUntilRemote
   ) where
 
 import Autodocodec
@@ -122,6 +123,7 @@ import Playwright.Protocol
   , FrameInitializer (frameInitializerLoadStates, frameInitializerUrl)
   , FrameLoadstateEvent (frameLoadstateEventAdd, frameLoadstateEventRemove)
   , FrameNavigatedEvent (frameNavigatedEventName, frameNavigatedEventUrl)
+  , JSHandlePreviewUpdatedEvent (jSHandlePreviewUpdatedEventPreview)
   , LifecycleEvent
   )
 import Playwright.RemoteObject
@@ -381,6 +383,8 @@ handleEvent conn guid method params = do
       applyNavigated conn guid params
     MethodName "loadstate" ->
       applyLoadstate conn guid params
+    MethodName "previewUpdated" ->
+      applyPreviewUpdated conn guid params
     MethodName "close" ->
       atomically (modifyTVar' (connectionClosedGuids conn) (Set.insert guid))
     _ ->
@@ -529,6 +533,21 @@ waitUntilUrl :: Connection -> Guid -> (Url -> Bool) -> IO ()
 waitUntilUrl conn guid predicate =
   atomically (waitUntilUrlSTM conn guid predicate)
 
+waitUntilRemote :: Connection -> Guid -> (RemoteObject -> STM a) -> IO a
+waitUntilRemote conn guid useObject =
+  atomically $ do
+    closed <- readTVar (connectionClosed conn)
+    case closed of
+      Just err ->
+        throwSTM err
+      Nothing -> do
+        objects <- readTVar (connectionObjects conn)
+        case Map.lookup guid objects of
+          Nothing ->
+            retry
+          Just obj ->
+            useObject obj
+
 waitUntilUrlSTM :: Connection -> Guid -> (Url -> Bool) -> STM ()
 waitUntilUrlSTM conn guid predicate = do
   closed <- readTVar (connectionClosed conn)
@@ -601,6 +620,27 @@ applyNavigated conn guid params = do
       Map.adjust
         (setInitializerNavigation (frameNavigatedEventName event) (frameNavigatedEventUrl event))
         guid
+
+applyPreviewUpdated :: Connection -> Guid -> Value -> IO ()
+applyPreviewUpdated conn guid params = do
+  event <- either throwIO pure (fromJsonValue params)
+  atomically $
+    modifyTVar' (connectionObjects conn) $
+      Map.adjust
+        (setInitializerPreview (jSHandlePreviewUpdatedEventPreview event))
+        guid
+
+setInitializerPreview :: Text.Text -> RemoteObject -> RemoteObject
+setInitializerPreview preview obj =
+  obj {remoteInitializer = patchPreview preview (remoteInitializer obj)}
+
+patchPreview :: Text.Text -> Value -> Value
+patchPreview preview value =
+  case value of
+    Object keys ->
+      Object (KeyMap.insert (Key.fromText "preview") (toJSON preview) keys)
+    _ ->
+      value
 
 setInitializerNavigation :: Text.Text -> Url -> RemoteObject -> RemoteObject
 setInitializerNavigation name url obj =

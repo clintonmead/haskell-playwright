@@ -6,6 +6,8 @@ module Playwright.Page
   , content
   , goto
   , locator
+  , pdf
+  , pdfWith
   , screenshot
   , setContent
   , title
@@ -191,6 +193,8 @@ import Playwright.Protocol
   , PageGoBackResult (pageGoBackResultResponse)
   , PageGoForwardResult (pageGoForwardResultResponse)
   , PageInitializer (pageInitializerMainFrame, pageInitializerOpener)
+  , PagePdfParams (pagePdfParamsOutline, pagePdfParamsTagged)
+  , PagePdfResult (pagePdfResultPdf)
   , PageReloadResult (pageReloadResultResponse)
   , PageRequestGCResult
   , PageScreenshotParams (pageScreenshotParamsFullPage)
@@ -205,6 +209,7 @@ import Playwright.Protocol
   , mkPageCloseParams
   , mkPageGoBackParams
   , mkPageGoForwardParams
+  , mkPagePdfParams
   , mkPageReloadParams
   , mkPageRequestGCParams
   , mkPageScreenshotParams
@@ -231,6 +236,10 @@ import Playwright.ScriptTag
   )
 import Playwright.StyleTag
   ( StyleTag (styleTagContent, styleTagUrl)
+  )
+import Playwright.PdfOptions
+  ( PdfOptions (pdfOptionsOutline, pdfOptionsTagged)
+  , defaultPdfOptions
   )
 import Playwright.ScreenshotOptions
   ( ScreenshotOptions (screenshotOptionsFullPage, screenshotOptionsTimeout)
@@ -367,6 +376,22 @@ screenshot page opts = do
         { pageScreenshotParamsFullPage = screenshotOptionsFullPage opts
         }
   pure (protocolBinaryToByteString (pageScreenshotResultBinary result))
+
+pdf :: Page -> IO ByteString
+pdf page =
+  pdfWith page defaultPdfOptions
+
+pdfWith :: Page -> PdfOptions -> IO ByteString
+pdfWith page opts = do
+  result <-
+    send
+      (pageChannel page)
+      (MethodName "pdf")
+      mkPagePdfParams
+        { pagePdfParamsOutline = pdfOptionsOutline opts
+        , pagePdfParamsTagged = pdfOptionsTagged opts
+        }
+  pure (protocolBinaryToByteString (pagePdfResultPdf result))
 
 locator :: Page -> Selector -> Locator
 locator page selector =

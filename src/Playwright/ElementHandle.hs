@@ -2,6 +2,7 @@ module Playwright.ElementHandle
   ( ElementHandle (..)
   , boundingBox
   , clickHandle
+  , tapHandle
   , elementArgument
   , contentFrameHandle
   , ownerFrameHandle
@@ -78,6 +79,7 @@ import Playwright.Protocol
   , ElementHandleSetInputFilesParams (elementHandleSetInputFilesParamsPayloads)
   , ElementHandleSetInputFilesParamsPayloads
   , ElementHandleSetInputFilesResult
+  , ElementHandleTapResult
   , ElementHandleTextContentResult (elementHandleTextContentResultValue)
   , ElementHandleTypeResult
   , ElementHandleWaitForElementStateParamsState (ElementHandleWaitForElementStateParamsStateDisabled, ElementHandleWaitForElementStateParamsStateEditable, ElementHandleWaitForElementStateParamsStateEnabled, ElementHandleWaitForElementStateParamsStateHidden, ElementHandleWaitForElementStateParamsStateStable, ElementHandleWaitForElementStateParamsStateVisible)
@@ -95,6 +97,7 @@ import Playwright.Protocol
   , mkElementHandleSelectTextParams
   , mkElementHandleSetInputFilesParams
   , mkElementHandleSetInputFilesParamsPayloads
+  , mkElementHandleTapParams
   , mkElementHandleTextContentParams
   , mkElementHandleTypeParams
   , mkElementHandleWaitForElementStateParams
@@ -128,6 +131,12 @@ clickHandle :: ElementHandle -> IO ()
 clickHandle handle = do
   _ :: ElementHandleClickResult <-
     handleSend handle "click" (mkElementHandleClickParams defaultTimeout)
+  pure ()
+
+tapHandle :: ElementHandle -> IO ()
+tapHandle handle = do
+  _ :: ElementHandleTapResult <-
+    handleSend handle "tap" (mkElementHandleTapParams defaultTimeout)
   pure ()
 
 boundingBox :: ElementHandle -> IO (Maybe BoundingBox)

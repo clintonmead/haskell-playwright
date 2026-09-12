@@ -1,5 +1,6 @@
 module Playwright.Frame.Inspect
-  ( getAttributeFrame
+  ( frameElement
+  , getAttributeFrame
   , innerHtmlFrame
   , innerTextFrame
   , inputValueFrame
@@ -34,7 +35,8 @@ import Playwright.Frame
   , frameSend
   )
 import Playwright.Protocol
-  ( FrameGetAttributeParams (frameGetAttributeParamsStrict)
+  ( FrameFrameElementResult (frameFrameElementResultElement)
+  , FrameGetAttributeParams (frameGetAttributeParamsStrict)
   , FrameGetAttributeResult (frameGetAttributeResultValue)
   , FrameInnerHTMLParams (frameInnerHTMLParamsStrict)
   , FrameInnerHTMLResult (frameInnerHTMLResultValue)
@@ -60,6 +62,7 @@ import Playwright.Protocol
   , FrameQuerySelectorResult (frameQuerySelectorResultElement)
   , FrameTextContentParams (frameTextContentParamsStrict)
   , FrameTextContentResult (frameTextContentResultValue)
+  , mkFrameFrameElementParams
   , mkFrameGetAttributeParams
   , mkFrameInnerHTMLParams
   , mkFrameInnerTextParams
@@ -81,6 +84,15 @@ import Playwright.Selector
 import Playwright.Timeout
   ( Timeout
   )
+
+frameElement :: Frame -> IO ElementHandle
+frameElement frame = do
+  result <- frameSend frame "frameElement" mkFrameFrameElementParams
+  pure
+    ( elementHandleFromRef
+        (channelConnection (frameChannel frame))
+        (frameFrameElementResultElement result)
+    )
 
 queryWithTimeout ::
   (ToJSON params, FromJSON result) =>

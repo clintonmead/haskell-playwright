@@ -6,11 +6,15 @@ module Playwright.Evaluate
   , evaluateNumberWith
   , evaluateNumbersWith
   , evaluateHandle
+  , evaluateHandleExpression
+  , evaluateHandleOnElement
   , evaluateHandleOnFrame
   , evaluateHandleWith
   , evaluateOnElement
+  , evaluateOnElementBoolWith
   , evaluateOnElementNumber
   , evaluateOnElementText
+  , evaluateOnElementWith
   , evaluateOnFrame
   , evaluateOnFrameText
   , evaluateOnHandle
@@ -70,9 +74,12 @@ import Playwright.Page
 import Playwright.Protocol
   ( FrameEvaluateExpressionHandleParams (frameEvaluateExpressionHandleParamsIsFunction)
   , FrameEvaluateExpressionHandleResult (frameEvaluateExpressionHandleResultHandle)
+  , JSHandleEvaluateExpressionHandleParams (jSHandleEvaluateExpressionHandleParamsIsFunction)
+  , JSHandleEvaluateExpressionHandleResult (jSHandleEvaluateExpressionHandleResultHandle)
   , JSHandleEvaluateExpressionParams (jSHandleEvaluateExpressionParamsIsFunction)
   , JSHandleEvaluateExpressionResult (jSHandleEvaluateExpressionResultValue)
   , mkFrameEvaluateExpressionHandleParams
+  , mkJSHandleEvaluateExpressionHandleParams
   , mkJSHandleEvaluateExpressionParams
   )
 import Playwright.SerializedArgument
@@ -98,6 +105,10 @@ evaluateHandle :: Page -> Text -> IO JsHandle
 evaluateHandle page =
   evaluateHandleOnFrame (pageMainFrame page)
 
+evaluateHandleExpression :: Page -> Text -> IO JsHandle
+evaluateHandleExpression page expression =
+  evaluateHandleOnFrameIsFunction (pageMainFrame page) expression undefinedArgument False
+
 evaluateHandleWith :: Page -> Text -> SerializedArgument -> IO JsHandle
 evaluateHandleWith page =
   evaluateHandleOnFrameWith (pageMainFrame page)
@@ -107,18 +118,37 @@ evaluateHandleOnFrame frame expression =
   evaluateHandleOnFrameWith frame expression undefinedArgument
 
 evaluateHandleOnFrameWith :: Frame -> Text -> SerializedArgument -> IO JsHandle
-evaluateHandleOnFrameWith frame expression arg = do
+evaluateHandleOnFrameWith frame expression arg =
+  evaluateHandleOnFrameIsFunction frame expression arg True
+
+evaluateHandleOnFrameIsFunction :: Frame -> Text -> SerializedArgument -> Bool -> IO JsHandle
+evaluateHandleOnFrameIsFunction frame expression arg isFunction = do
   result <-
     frameSend
       frame
       "evaluateExpressionHandle"
       (mkFrameEvaluateExpressionHandleParams arg expression)
-        { frameEvaluateExpressionHandleParamsIsFunction = Just True
+        { frameEvaluateExpressionHandleParamsIsFunction = Just isFunction
         }
   pure
     ( jsHandleFromRef
         (channelConnection (frameChannel frame))
         (frameEvaluateExpressionHandleResultHandle result)
+    )
+
+evaluateHandleOnElement :: ElementHandle -> Text -> IO JsHandle
+evaluateHandleOnElement handle expression = do
+  result <-
+    send
+      (elementHandleChannel handle)
+      (MethodName "evaluateExpressionHandle")
+      (mkJSHandleEvaluateExpressionHandleParams undefinedArgument expression)
+        { jSHandleEvaluateExpressionHandleParamsIsFunction = Just True
+        }
+  pure
+    ( jsHandleFromRef
+        (channelConnection (elementHandleChannel handle))
+        (jSHandleEvaluateExpressionHandleResultHandle result)
     )
 
 evaluateOnFrame :: Frame -> Text -> IO SerializedValue
@@ -130,15 +160,23 @@ evaluateOnFrameText frame expression =
   requireText =<< evaluateOnFrame frame expression
 
 evaluateOnElement :: ElementHandle -> Text -> IO SerializedValue
-evaluateOnElement handle expression = do
+evaluateOnElement handle expression =
+  evaluateOnElementWith handle expression undefinedArgument
+
+evaluateOnElementWith :: ElementHandle -> Text -> SerializedArgument -> IO SerializedValue
+evaluateOnElementWith handle expression arg = do
   result <-
     send
       (elementHandleChannel handle)
       (MethodName "evaluateExpression")
-      (mkJSHandleEvaluateExpressionParams undefinedArgument expression)
+      (mkJSHandleEvaluateExpressionParams arg expression)
         { jSHandleEvaluateExpressionParamsIsFunction = Just True
         }
   pure (jSHandleEvaluateExpressionResultValue result)
+
+evaluateOnElementBoolWith :: ElementHandle -> Text -> SerializedArgument -> IO Bool
+evaluateOnElementBoolWith handle expression arg =
+  requireBool =<< evaluateOnElementWith handle expression arg
 
 evaluateOnElementText :: ElementHandle -> Text -> IO Text
 evaluateOnElementText handle expression =

@@ -145,4 +145,8 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - `storageState` / `setStorageState` are BrowserContext protocol methods. Create-time `NewContextOptions` `storageState` maps onto `BrowserNewContextParams.storageState`. IndexedDB and WebAuthn credentials are not in the Haskell `StorageState` type yet.
 - `NewContextOptions` also maps `hasTouch`, `isMobile`, and `noDefaultViewport`.
 - Page `download` events are not behind `updateSubscription`. `waitForDownload` waits on the page guid; `downloadPath` is Artifact `pathAfterFinished`. `acceptDownloads` is `Accept`/`Deny` on `NewContextOptions`.
-- `page.isClosed` reads the connection's closed-guid set (patched on Page `close` events). `waitForClose` waits for that Page-channel event. `closePage` ignores a subsequent `TargetClosedError` so close is idempotent. `opener` returns `Nothing` when the opening page is already closed or disposed. `requestGC` and `bringToFront` are Page protocol methods. ElementHandle `waitForElementState` takes a typed `ElementState` (`visible`/`hidden`/`stable`/`enabled`/`disabled`/`editable`).
+- `JSHandle.toString` is the stored initializer `preview`. `previewUpdated` patches that field like `Frame.navigated` patches URL. `waitUntilJsHandlePreview` STM-retries until the preview matches (document.body's HTML preview arrives asynchronously).
+- `evaluateHandleExpression` is `evaluateExpressionHandle` with `isFunction: false` (raw expressions such as `'12'`).
+- `Frame.frameElement` returns the iframe/frame `ElementHandle`. Detached frames fail with `Frame has been detached.`
+- `page.pdf` is Chromium `Page.pdf` and returns PDF bytes. `PdfOptions` currently maps `tagged` and `outline`.
+- Locator/`ElementHandle` `tap` is the Frame/ElementHandle `tap` mixin and needs `hasTouch: true` on the context.

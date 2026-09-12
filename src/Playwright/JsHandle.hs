@@ -5,15 +5,24 @@ module Playwright.JsHandle
   , getPropertyList
   , jsHandleArgument
   , jsHandleFromRef
+  , jsHandleToString
   , jsonValue
   , jsonValueNumber
   , jsonValueSpecial
   , jsonValueText
   , jsonValueTexts
+  , waitUntilJsHandlePreview
   ) where
 
+import Control.Concurrent.STM
+  ( retry
+  , throwSTM
+  )
 import Control.Exception
   ( throwIO
+  )
+import Control.Monad
+  ( unless
   )
 import Data.Text
   ( Text
@@ -26,6 +35,7 @@ import Playwright.Channel
 import Playwright.Connection
   ( Connection
   , lookupObject
+  , waitUntilRemote
   )
 import Playwright.ElementHandle
   ( ElementHandle (ElementHandle)
@@ -36,11 +46,15 @@ import Playwright.Error
 import Playwright.Json.ChannelRef
   ( ChannelRef (ChannelRef, channelRefGuid)
   )
+import Playwright.Json.Decode
+  ( fromJsonValue
+  )
 import Playwright.MethodName
   ( MethodName (MethodName)
   )
 import Playwright.Protocol
   ( ChannelType (ChannelTypeElementHandle)
+  , JSHandleInitializer (jSHandleInitializerPreview)
   , JSHandleGetPropertyListResult (jSHandleGetPropertyListResultProperties)
   , JSHandleGetPropertyListResultProperties (jSHandleGetPropertyListResultPropertiesName, jSHandleGetPropertyListResultPropertiesValue)
   , JSHandleGetPropertyResult (jSHandleGetPropertyResultHandle)
@@ -53,7 +67,7 @@ import Playwright.PropertyName
   ( PropertyName (PropertyName, propertyNameToText)
   )
 import Playwright.RemoteObject
-  ( RemoteObject (remoteType)
+  ( RemoteObject (remoteInitializer, remoteType)
   )
 import Playwright.SerializedArgument
   ( SerializedArgument
@@ -78,6 +92,27 @@ jsHandleFromRef conn ref =
 jsHandleArgument :: JsHandle -> SerializedArgument
 jsHandleArgument handle =
   channelArgument (ChannelRef (channelGuid (jsHandleChannel handle)))
+
+jsHandleToString :: JsHandle -> IO Text
+jsHandleToString handle = do
+  obj <-
+    lookupObject
+      (channelConnection (jsHandleChannel handle))
+      (channelGuid (jsHandleChannel handle))
+  initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
+  pure (jSHandleInitializerPreview initializer)
+
+waitUntilJsHandlePreview :: JsHandle -> (Text -> Bool) -> IO Text
+waitUntilJsHandlePreview handle predicate =
+  waitUntilRemote
+    (channelConnection (jsHandleChannel handle))
+    (channelGuid (jsHandleChannel handle))
+    $ \obj -> do
+      initializer <- either throwSTM pure (fromJsonValue (remoteInitializer obj))
+      let
+        preview = jSHandleInitializerPreview initializer
+      unless (predicate preview) retry
+      pure preview
 
 asElement :: JsHandle -> IO (Maybe ElementHandle)
 asElement handle = do

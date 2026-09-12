@@ -91,6 +91,7 @@ library
       Playwright.NewContextOptions
       Playwright.Page
       Playwright.PageError
+      Playwright.PdfOptions
       Playwright.PermissionName
       Playwright.Point
       Playwright.PropertyName
@@ -196,6 +197,7 @@ test-suite playwright-test
       Playwright.ElementHandleTypeSpec
       Playwright.ElementHandleWaitForElementStateSpec
       Playwright.FrameEvaluateSpec
+      Playwright.FrameFrameElementSpec
       Playwright.FrameHierarchySpec
       Playwright.GeolocationSpec
       Playwright.Harness
@@ -204,6 +206,7 @@ test-suite playwright-test
       Playwright.JsHandleEvaluateSpec
       Playwright.JsHandleJsonValueSpec
       Playwright.JsHandlePropertiesSpec
+      Playwright.JsHandleToStringSpec
       Playwright.LocatorClickSpec
       Playwright.LocatorElementHandleSpec
       Playwright.LocatorEvaluateSpec
@@ -240,6 +243,7 @@ test-suite playwright-test
       Playwright.PageMouseSpec
       Playwright.PageNetworkRequestSpec
       Playwright.PageNetworkResponseSpec
+      Playwright.PagePdfSpec
       Playwright.PageRequestAbortSpec
       Playwright.PageRequestContinueSpec
       Playwright.PageRequestFallbackSpec
@@ -262,6 +266,7 @@ test-suite playwright-test
       Playwright.PermissionsSpec
       Playwright.QuerySelectorSpec
       Playwright.SelectorsGetBySpec
+      Playwright.TapSpec
       Playwright.TransportSpec
       Playwright.WheelSpec
       Playwright.WorkersSpec

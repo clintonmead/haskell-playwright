@@ -68,6 +68,7 @@ module Playwright
   , OriginStorageState (..)
   , Page (..)
   , PageError (..)
+  , PdfOptions (..)
   , PermissionName (..)
   , Playwright (..)
   , Point (..)
@@ -173,6 +174,7 @@ module Playwright
   , defaultGotoOptions
   , defaultLaunchOptions
   , defaultNewContextOptions
+  , defaultPdfOptions
   , defaultRouteOptions
   , defaultScreenshotOptions
   , defaultTimeout
@@ -196,14 +198,18 @@ module Playwright
   , evaluateBool
   , evaluateBoolWith
   , evaluateHandle
+  , evaluateHandleExpression
+  , evaluateHandleOnElement
   , evaluateHandleOnFrame
   , evaluateHandleWith
   , evaluateNumber
   , evaluateNumberWith
   , evaluateNumbersWith
   , evaluateOnElement
+  , evaluateOnElementBoolWith
   , evaluateOnElementNumber
   , evaluateOnElementText
+  , evaluateOnElementWith
   , evaluateOnFrame
   , evaluateOnFrameText
   , evaluateOnHandle
@@ -231,6 +237,7 @@ module Playwright
   , first
   , focus
   , frameByName
+  , frameElement
   , frames
   , framesEqual
   , fulfillRoute
@@ -264,6 +271,7 @@ module Playwright
   , isHidden
   , isVisible
   , jsHandleArgument
+  , jsHandleToString
   , jsonValue
   , jsonValueNumber
   , jsonValueSpecial
@@ -304,6 +312,8 @@ module Playwright
   , pageErrors
   , pageFromRef
   , pagesEqual
+  , pdf
+  , pdfWith
   , press
   , querySelector
   , querySelectorStrict
@@ -354,6 +364,8 @@ module Playwright
   , storageRemoveItem
   , storageSetItem
   , storageState
+  , tap
+  , tapHandle
   , textArgument
   , textContent
   , textContentHandle
@@ -385,6 +397,7 @@ module Playwright
   , waitForNavigationWith
   , waitForPageError
   , waitForPopup
+  , waitUntilJsHandlePreview
   , waitForRequest
   , waitForRequestWith
   , waitForResponse
@@ -559,6 +572,7 @@ import Playwright.ElementHandle
   , selectText
   , selectTextWith
   , setInputFilesHandle
+  , tapHandle
   , textContentHandle
   , typeHandle
   , waitForElementState
@@ -577,14 +591,18 @@ import Playwright.Evaluate
   , evaluateBool
   , evaluateBoolWith
   , evaluateHandle
+  , evaluateHandleExpression
+  , evaluateHandleOnElement
   , evaluateHandleOnFrame
   , evaluateHandleWith
   , evaluateNumber
   , evaluateNumberWith
   , evaluateNumbersWith
   , evaluateOnElement
+  , evaluateOnElementBoolWith
   , evaluateOnElementNumber
   , evaluateOnElementText
+  , evaluateOnElementWith
   , evaluateOnFrame
   , evaluateOnFrameText
   , evaluateOnHandle
@@ -621,6 +639,9 @@ import Playwright.Frame
   , currentName
   , currentUrl
   , framesEqual
+  )
+import Playwright.Frame.Inspect
+  ( frameElement
   )
 import Playwright.FulfillOptions
   ( ContentType (ContentType, contentTypeToText)
@@ -681,11 +702,13 @@ import Playwright.JsHandle
   , getProperty
   , getPropertyList
   , jsHandleArgument
+  , jsHandleToString
   , jsonValue
   , jsonValueNumber
   , jsonValueSpecial
   , jsonValueText
   , jsonValueTexts
+  , waitUntilJsHandlePreview
   )
 import Playwright.Key
   ( Key (Key, keyToText)
@@ -741,6 +764,7 @@ import Playwright.Locator
   , selectOption
   , setChecked
   , setInputFiles
+  , tap
   , textContent
   , typeText
   , uncheck
@@ -785,6 +809,8 @@ import Playwright.Page
   , opener
   , pageFromRef
   , pagesEqual
+  , pdf
+  , pdfWith
   , querySelector
   , querySelectorStrict
   , reload
@@ -821,6 +847,10 @@ import Playwright.PageError
   , clearPageErrors
   , pageErrors
   , waitForPageError
+  )
+import Playwright.PdfOptions
+  ( PdfOptions (PdfOptions, pdfOptionsOutline, pdfOptionsTagged)
+  , defaultPdfOptions
   )
 import Playwright.PermissionName
   ( PermissionName (PermissionName, permissionNameToText)

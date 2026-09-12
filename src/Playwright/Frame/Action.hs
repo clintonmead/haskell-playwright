@@ -8,6 +8,7 @@ module Playwright.Frame.Action
   , hoverFrame
   , pressFrame
   , selectOptionFrame
+  , tapFrame
   , typeTextFrame
   , uncheckFrame
   , dragAndDropFrame
@@ -65,6 +66,8 @@ import Playwright.Protocol
   , FrameSetInputFilesParams (frameSetInputFilesParamsPayloads, frameSetInputFilesParamsStrict)
   , FrameSetInputFilesParamsPayloads
   , FrameSetInputFilesResult
+  , FrameTapParams (frameTapParamsStrict)
+  , FrameTapResult
   , FrameTypeParams (frameTypeParamsStrict)
   , FrameTypeResult
   , FrameUncheckParams (frameUncheckParamsForce, frameUncheckParamsStrict, frameUncheckParamsTrial)
@@ -82,6 +85,7 @@ import Playwright.Protocol
   , mkFrameSelectOptionParamsOptions
   , mkFrameSetInputFilesParams
   , mkFrameSetInputFilesParamsPayloads
+  , mkFrameTapParams
   , mkFrameTypeParams
   , mkFrameUncheckParams
   )
@@ -172,6 +176,15 @@ hoverFrame frame selector timeout =
     "hover"
     (mkFrameHoverParams selector timeout)
       { frameHoverParamsStrict = Just True
+      }
+
+tapFrame :: Frame -> Selector -> Timeout -> IO ()
+tapFrame frame selector timeout =
+  frameSend_ @FrameTapResult
+    frame
+    "tap"
+    (mkFrameTapParams selector timeout)
+      { frameTapParamsStrict = Just True
       }
 
 pressFrame :: Frame -> Selector -> Key -> Timeout -> IO ()

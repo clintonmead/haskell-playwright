@@ -36,6 +36,7 @@ module Playwright.Locator
   , selectOption
   , setChecked
   , setInputFiles
+  , tap
   , textContent
   , typeText
   , uncheck
@@ -79,6 +80,7 @@ import Playwright.Frame.Action
   , hoverFrame
   , pressFrame
   , selectOptionFrame
+  , tapFrame
   , typeTextFrame
   , uncheckFrame
   )
@@ -235,6 +237,10 @@ focus loc =
 hover :: Locator -> IO ()
 hover loc =
   hoverFrame (locatorFrame loc) (locatorSelector loc) defaultTimeout
+
+tap :: Locator -> IO ()
+tap loc =
+  tapFrame (locatorFrame loc) (locatorSelector loc) defaultTimeout
 
 press :: Locator -> Key -> IO ()
 press loc key =
