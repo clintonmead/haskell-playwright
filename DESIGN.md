@@ -129,7 +129,7 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 
 ## Notes
 
-- Driver handshake sends `sdkLanguage: javascript` (`PW_LANG_NAME=javascript`) until the protocol grows a Haskell language tag.
+- Driver handshake sends `sdkLanguage: javascript` (`PW_LANG_NAME=javascript`) until the protocol grows a Haskell language tag. The driver process also gets `PWTEST_UNDER_TEST=1` so injected highlight UI uses an open shadow root, matching official Playwright tests.
 - Chromium on NixOS needs `chromiumSandbox = false` at launch.
 - Page navigation and title are Frame protocol methods; the public Page API delegates to `mainFrame`.
 - `Browser.newPage` is a client helper (new context + new page), not a protocol method.

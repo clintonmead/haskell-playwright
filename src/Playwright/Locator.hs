@@ -27,6 +27,8 @@ module Playwright.Locator
   , getByTestId
   , getByText
   , hover
+  , highlight
+  , hideHighlight
   , innerHtml
   , innerText
   , innerTextWith
@@ -133,6 +135,8 @@ import Playwright.Frame.Action
   , setInputFilesFrame
   , focusFrame
   , hoverFrame
+  , highlightFrame
+  , hideHighlightFrame
   , pressFrame
   , selectOptionFrame
   , tapFrame
@@ -375,6 +379,14 @@ blur loc =
 hover :: Locator -> IO ()
 hover loc =
   withActionTimeout loc (hoverFrame (locatorFrame loc) (locatorSelector loc))
+
+highlight :: Locator -> IO ()
+highlight loc =
+  highlightFrame (locatorFrame loc) (locatorSelector loc)
+
+hideHighlight :: Locator -> IO ()
+hideHighlight loc =
+  hideHighlightFrame (locatorFrame loc) (locatorSelector loc)
 
 tap :: Locator -> IO ()
 tap loc =

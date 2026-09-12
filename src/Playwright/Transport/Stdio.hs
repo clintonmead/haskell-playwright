@@ -70,7 +70,12 @@ withStdioTransport paths action = do
     env' :: [(String, String)]
     env' =
       ("PW_LANG_NAME", "javascript")
-        : filter (\(key, _) -> key /= "PW_LANG_NAME") env
+        : ("PWTEST_UNDER_TEST", "1")
+        : filter
+          ( \(key, _) ->
+              key /= "PW_LANG_NAME" && key /= "PWTEST_UNDER_TEST"
+          )
+          env
     config =
       setEnv env'
         $ setStdin createPipe

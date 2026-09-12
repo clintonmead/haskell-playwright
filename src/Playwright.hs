@@ -310,6 +310,8 @@ module Playwright
   , grantPermissions
   , grantPermissionsFor
   , hover
+  , highlight
+  , hideHighlight
   , hoverHandle
   , httpStatusOk
   , initializePlaywright
@@ -937,6 +939,8 @@ import Playwright.Locator
   , focus
   , getAttribute
   , hover
+  , highlight
+  , hideHighlight
   , innerHtml
   , innerText
   , innerTextWith

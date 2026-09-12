@@ -25,7 +25,6 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 - page-leaks (JS `toImpl` / leakedJSHandles)
 - page-listeners (JS `removeAllListeners` wait/ignoreErrors)
 - page-request-intercept
-- locator-highlight
 
 ## Ported `tests/page` with remaining cases
 

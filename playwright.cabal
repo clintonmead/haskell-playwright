@@ -235,6 +235,7 @@ test-suite playwright-test
       Playwright.LocatorElementHandleSpec
       Playwright.LocatorEvaluateSpec
       Playwright.LocatorFrameSpec
+      Playwright.LocatorHighlightSpec
       Playwright.LocatorIsVisibleSpec
       Playwright.LocatorListSpec
       Playwright.LocatorMisc2Spec

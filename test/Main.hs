@@ -54,6 +54,7 @@ import Playwright.LocatorConvenienceSpec qualified as LocatorConvenienceSpec
 import Playwright.LocatorElementHandleSpec qualified as LocatorElementHandleSpec
 import Playwright.LocatorEvaluateSpec qualified as LocatorEvaluateSpec
 import Playwright.LocatorFrameSpec qualified as LocatorFrameSpec
+import Playwright.LocatorHighlightSpec qualified as LocatorHighlightSpec
 import Playwright.LocatorIsVisibleSpec qualified as LocatorIsVisibleSpec
 import Playwright.LocatorListSpec qualified as LocatorListSpec
 import Playwright.LocatorMiscSpec qualified as LocatorMiscSpec
@@ -206,6 +207,7 @@ main =
         , LocatorElementHandleSpec.tests
         , LocatorEvaluateSpec.tests
         , LocatorFrameSpec.tests
+        , LocatorHighlightSpec.tests
         , LocatorIsVisibleSpec.tests
         , LocatorListSpec.tests
         , LocatorMiscSpec.tests

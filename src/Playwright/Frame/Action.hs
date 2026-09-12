@@ -8,6 +8,8 @@ module Playwright.Frame.Action
   , fillFrame
   , focusFrame
   , hoverFrame
+  , highlightFrame
+  , hideHighlightFrame
   , pressFrame
   , selectOptionFrame
   , tapFrame
@@ -93,6 +95,8 @@ import Playwright.Protocol
   , FrameFocusResult
   , FrameHoverParams (frameHoverParamsStrict)
   , FrameHoverResult
+  , FrameHighlightResult
+  , FrameHideHighlightResult
   , FramePressParams (framePressParamsStrict)
   , FramePressResult
   , FrameSelectOptionParams (frameSelectOptionParamsOptions, frameSelectOptionParamsStrict)
@@ -119,6 +123,8 @@ import Playwright.Protocol
   , mkFrameFillParams
   , mkFrameFocusParams
   , mkFrameHoverParams
+  , mkFrameHighlightParams
+  , mkFrameHideHighlightParams
   , mkFramePressParams
   , mkFrameSelectOptionParams
   , mkFrameSelectOptionParamsOptions
@@ -240,6 +246,20 @@ hoverFrame frame selector timeout =
     (mkFrameHoverParams selector timeout)
       { frameHoverParamsStrict = Just True
       }
+
+highlightFrame :: Frame -> Selector -> IO ()
+highlightFrame frame selector =
+  frameSend_ @FrameHighlightResult
+    frame
+    "highlight"
+    (mkFrameHighlightParams selector)
+
+hideHighlightFrame :: Frame -> Selector -> IO ()
+hideHighlightFrame frame selector =
+  frameSend_ @FrameHideHighlightResult
+    frame
+    "hideHighlight"
+    (mkFrameHideHighlightParams selector)
 
 tapFrame :: Frame -> Selector -> Timeout -> IO ()
 tapFrame frame selector timeout =
