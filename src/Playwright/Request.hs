@@ -7,7 +7,10 @@ module Playwright.Request
   , requestMethod
   , requestPostData
   , requestResourceType
+  , requestRedirectedFrom
+  , requestRedirectedTo
   , requestResponseRef
+  , requestSizes
   , requestUrl
   ) where
 
@@ -17,13 +20,19 @@ import Control.Exception
 import Data.ByteString
   ( ByteString
   )
+import Data.Maybe
+  ( listToMaybe
+  , mapMaybe
+  )
 import Playwright.Channel
   ( Channel (Channel, channelConnection, channelGuid)
   , RequestTag
+  , ResponseTag
   , send
   )
 import Playwright.Connection
   ( Connection
+  , guidsOfType
   , lookupObject
   , lookupRequestOverrides
   )
@@ -35,8 +44,11 @@ import Playwright.HttpHeader
 import Playwright.HttpMethod
   ( HttpMethod (HttpMethod)
   )
+import Playwright.Error
+  ( PlaywrightError (DecodeFailure)
+  )
 import Playwright.Json.ChannelRef
-  ( ChannelRef (channelRefGuid)
+  ( ChannelRef (ChannelRef, channelRefGuid)
   )
 import Playwright.Json.Decode
   ( fromJsonValue
@@ -47,14 +59,23 @@ import Playwright.Json.ProtocolBinary
 import Playwright.MethodName
   ( MethodName (MethodName)
   )
+import Playwright.NetworkSizes
+  ( BodySize (BodySize)
+  , HeadersSize (HeadersSize)
+  , NetworkSizes (NetworkSizes)
+  )
 import Playwright.Protocol
-  ( NameValue (nameValueName, nameValueValue)
-  , RequestInitializer (requestInitializerFrame, requestInitializerHeaders, requestInitializerIsNavigationRequest, requestInitializerMethod, requestInitializerPostData, requestInitializerResourceType, requestInitializerUrl)
+  ( ChannelType (ChannelTypeRequest)
+  , NameValue (nameValueName, nameValueValue)
+  , RequestInitializer (requestInitializerFrame, requestInitializerHeaders, requestInitializerIsNavigationRequest, requestInitializerMethod, requestInitializerPostData, requestInitializerRedirectedFrom, requestInitializerResourceType, requestInitializerUrl)
   , RequestResponseResult (requestResponseResultResponse)
+  , RequestSizes (requestSizesRequestBodySize, requestSizesRequestHeadersSize, requestSizesResponseBodySize, requestSizesResponseHeadersSize)
+  , ResponseSizesResult (responseSizesResultSizes)
   , mkRequestResponseParams
+  , mkResponseSizesParams
   )
 import Playwright.RemoteObject
-  ( RemoteObject (remoteInitializer)
+  ( RemoteObject (remoteGuid, remoteInitializer)
   )
 import Playwright.RequestOverrides
   ( RequestOverrides (requestOverrideHeaders, requestOverrideMethod, requestOverridePostData, requestOverrideUrl)
@@ -133,6 +154,37 @@ requestFrameRef :: Request -> IO (Maybe ChannelRef)
 requestFrameRef request =
   requestInitializerFrame <$> requestInitializer request
 
+requestRedirectedFrom :: Request -> IO (Maybe Request)
+requestRedirectedFrom request = do
+  initializer <- requestInitializer request
+  pure
+    ( fmap
+        (requestFromRef (channelConnection (requestChannel request)))
+        (requestInitializerRedirectedFrom initializer)
+    )
+
+requestRedirectedTo :: Request -> IO (Maybe Request)
+requestRedirectedTo request = do
+  let
+    conn = channelConnection (requestChannel request)
+    fromGuid = channelGuid (requestChannel request)
+  objects <- traverse (lookupObject conn) =<< guidsOfType conn ChannelTypeRequest
+  pure
+    ( listToMaybe
+        ( mapMaybe
+            ( \obj ->
+                case fromJsonValue (remoteInitializer obj) of
+                  Right initializer
+                    | Just ref <- requestInitializerRedirectedFrom initializer
+                    , channelRefGuid ref == fromGuid ->
+                        Just (requestFromRef conn (ChannelRef (remoteGuid obj)))
+                  _ ->
+                    Nothing
+            )
+            objects
+        )
+    )
+
 requestResponseRef :: Request -> IO (Maybe ChannelRef)
 requestResponseRef request = do
   result <-
@@ -141,6 +193,29 @@ requestResponseRef request = do
       (MethodName "response")
       mkRequestResponseParams
   pure (requestResponseResultResponse result)
+
+requestSizes :: Request -> IO NetworkSizes
+requestSizes request = do
+  responseRef <- requestResponseRef request
+  case responseRef of
+    Nothing ->
+      throwIO (DecodeFailure "Unable to fetch sizes for failed request")
+    Just ref -> do
+      let conn = channelConnection (requestChannel request)
+      result <-
+        send
+          (Channel conn (channelRefGuid ref) :: Channel ResponseTag)
+          (MethodName "sizes")
+          mkResponseSizesParams
+      let
+        sizes = responseSizesResultSizes result
+      pure
+        ( NetworkSizes
+            (BodySize (requestSizesRequestBodySize sizes))
+            (HeadersSize (requestSizesRequestHeadersSize sizes))
+            (BodySize (requestSizesResponseBodySize sizes))
+            (HeadersSize (requestSizesResponseHeadersSize sizes))
+        )
 
 fromNameValue :: NameValue -> HttpHeader
 fromNameValue header =

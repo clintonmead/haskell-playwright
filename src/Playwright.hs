@@ -7,6 +7,7 @@ module Playwright
   , AcceptDownloads (..)
   , AriaRole (..)
   , BoundingBox (..)
+  , BodySize (..)
   , BindingName (..)
   , CheckOptions (..)
   , ClockMillis (..)
@@ -47,6 +48,7 @@ module Playwright
   , GotoOptions (..)
   , HeaderName (..)
   , HeaderValue (..)
+  , HeadersSize (..)
   , HttpCredentials (..)
   , HttpHeader (..)
   , HttpMethod (..)
@@ -65,6 +67,7 @@ module Playwright
   , Longitude (..)
   , MediaType (..)
   , NewContextOptions (..)
+  , NetworkSizes (..)
   , OriginStorageState (..)
   , Page (..)
   , PageError (..)
@@ -374,7 +377,11 @@ module Playwright
   , requestIsNavigation
   , requestMethod
   , requestPostData
+  , requestRedirectedFrom
+  , requestRedirectedTo
   , requestResourceType
+  , requestResponse
+  , requestSizes
   , requestUrl
   , responseFrame
   , responseHeaders
@@ -460,6 +467,8 @@ module Playwright
   , waitForPopup
   , waitUntilJsHandlePreview
   , waitForRequest
+  , waitForRequestFailed
+  , waitForRequestFailedWith
   , waitForRequestWith
   , waitForResponse
   , waitForResponseWith
@@ -904,6 +913,11 @@ import Playwright.NewContextOptions
   ( NewContextOptions (NewContextOptions, newContextAcceptDownloads, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextGeolocation, newContextHasTouch, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextIsMobile, newContextJavaScriptEnabled, newContextLocale, newContextNoDefaultViewport, newContextOffline, newContextPermissions, newContextStorageState, newContextTimezoneId, newContextUserAgent, newContextViewport)
   , defaultNewContextOptions
   )
+import Playwright.NetworkSizes
+  ( BodySize (BodySize, bodySizeToInt)
+  , HeadersSize (HeadersSize, headersSizeToInt)
+  , NetworkSizes (NetworkSizes, networkRequestBodySize, networkRequestHeadersSize, networkResponseBodySize, networkResponseHeadersSize)
+  )
 import Playwright.Page
   ( Page (Page, pageChannel, pageContextChannel, pageMainFrame)
   , addInitScript
@@ -955,6 +969,8 @@ import Playwright.Page
   , waitForNavigationWith
   , waitForPopup
   , waitForRequest
+  , waitForRequestFailed
+  , waitForRequestFailedWith
   , waitForRequestWith
   , waitForResponse
   , waitForResponseWith
@@ -1005,7 +1021,10 @@ import Playwright.Request
   , requestIsNavigation
   , requestMethod
   , requestPostData
+  , requestRedirectedFrom
+  , requestRedirectedTo
   , requestResourceType
+  , requestSizes
   , requestUrl
   )
 import Playwright.RequestFrame
@@ -1019,6 +1038,7 @@ import Playwright.Response
   ( Response (Response, responseChannel)
   , responseHeaders
   , responseOk
+  , requestResponse
   , responseRequest
   , responseStatus
   , responseStatusText

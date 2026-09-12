@@ -89,6 +89,7 @@ import Playwright.PageMouseSpec qualified as PageMouseSpec
 import Playwright.PageNetworkIdleSpec qualified as PageNetworkIdleSpec
 import Playwright.PageNetworkRequestSpec qualified as PageNetworkRequestSpec
 import Playwright.PageNetworkResponseSpec qualified as PageNetworkResponseSpec
+import Playwright.PageNetworkSizesSpec qualified as PageNetworkSizesSpec
 import Playwright.PagePdfSpec qualified as PagePdfSpec
 import Playwright.PageRequestAbortSpec qualified as PageRequestAbortSpec
 import Playwright.PageRequestContinueSpec qualified as PageRequestContinueSpec
@@ -220,6 +221,7 @@ main =
         , PageNetworkIdleSpec.tests
         , PageNetworkRequestSpec.tests
         , PageNetworkResponseSpec.tests
+        , PageNetworkSizesSpec.tests
         , PagePdfSpec.tests
         , PageRequestAbortSpec.tests
         , PageRequestContinueSpec.tests

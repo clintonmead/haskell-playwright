@@ -53,6 +53,8 @@ module Playwright.Page
   , waitForResponse
   , waitForResponseWith
   , waitForRequest
+  , waitForRequestFailed
+  , waitForRequestFailedWith
   , waitForRequestWith
   , waitForSelectorStrict
   , armPopup
@@ -189,8 +191,9 @@ import Playwright.Protocol
   , BrowserContextDialogEvent (browserContextDialogEventDialog)
   , BrowserContextPageEvent (browserContextPageEventPage)
   , BrowserContextRequestEvent (browserContextRequestEventRequest)
+  , BrowserContextRequestFailedEvent (browserContextRequestFailedEventRequest)
   , BrowserContextResponseEvent (browserContextResponseEventResponse)
-  , BrowserContextUpdateSubscriptionParamsEvent (BrowserContextUpdateSubscriptionParamsEventConsole, BrowserContextUpdateSubscriptionParamsEventDialog, BrowserContextUpdateSubscriptionParamsEventRequest, BrowserContextUpdateSubscriptionParamsEventResponse)
+  , BrowserContextUpdateSubscriptionParamsEvent (BrowserContextUpdateSubscriptionParamsEventConsole, BrowserContextUpdateSubscriptionParamsEventDialog, BrowserContextUpdateSubscriptionParamsEventRequest, BrowserContextUpdateSubscriptionParamsEventRequestFailed, BrowserContextUpdateSubscriptionParamsEventResponse)
   , BrowserContextUpdateSubscriptionResult
   , FrameAddScriptTagParams (frameAddScriptTagParamsContent, frameAddScriptTagParamsType, frameAddScriptTagParamsUrl)
   , FrameAddScriptTagResult (frameAddScriptTagResultElement)
@@ -769,6 +772,27 @@ waitForRequestWith page glob timeout =
       if matchesUrlGlob glob current
         then pure request
         else collectRequest
+
+waitForRequestFailed :: Page -> IO Request
+waitForRequestFailed page = do
+  timeout <- pageActionTimeout page
+  waitForRequestFailedWith page timeout
+
+waitForRequestFailedWith :: Page -> Timeout -> IO Request
+waitForRequestFailedWith page timeout =
+  waitWithTimeout timeout $ do
+    subscribeContext page BrowserContextUpdateSubscriptionParamsEventRequestFailed
+    params <-
+      waitForChannelEvent
+        (channelConnection (pageContextChannel page))
+        (channelGuid (pageContextChannel page))
+        (MethodName "requestFailed")
+    event <- either throwIO pure (fromJsonValue params)
+    pure
+      ( requestFromRef
+          (channelConnection (pageContextChannel page))
+          (browserContextRequestFailedEventRequest event)
+      )
 
 waitForPopup :: Page -> IO Page
 waitForPopup page = do

@@ -90,6 +90,7 @@ library
       Playwright.MediaType
       Playwright.MethodName
       Playwright.Mouse
+      Playwright.NetworkSizes
       Playwright.NewContextOptions
       Playwright.Page
       Playwright.Page.Query
@@ -260,6 +261,7 @@ test-suite playwright-test
       Playwright.PageNetworkIdleSpec
       Playwright.PageNetworkRequestSpec
       Playwright.PageNetworkResponseSpec
+      Playwright.PageNetworkSizesSpec
       Playwright.PagePdfSpec
       Playwright.PageRequestAbortSpec
       Playwright.PageRequestContinueSpec
@@ -315,4 +317,5 @@ test-suite playwright-test
     , wai
     , wai-app-static
     , warp
+    , zlib
   default-language: GHC2021

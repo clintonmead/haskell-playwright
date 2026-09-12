@@ -8,6 +8,7 @@ module Playwright.Response
   , responseStatusText
   , responseText
   , responseUrl
+  , requestResponse
   ) where
 
 import Control.Exception
@@ -59,8 +60,9 @@ import Playwright.RemoteObject
   ( RemoteObject (remoteInitializer)
   )
 import Playwright.Request
-  ( Request
+  ( Request (requestChannel)
   , requestFromRef
+  , requestResponseRef
   )
 import Playwright.Url
   ( Url
@@ -87,6 +89,11 @@ responseRequest :: Response -> IO Request
 responseRequest response = do
   initializer <- responseInitializer response
   pure (requestFromRef (channelConnection (responseChannel response)) (responseInitializerRequest initializer))
+
+requestResponse :: Request -> IO (Maybe Response)
+requestResponse request = do
+  ref <- requestResponseRef request
+  pure (fmap (responseFromRef (channelConnection (requestChannel request))) ref)
 
 responseStatus :: Response -> IO HttpStatus
 responseStatus response =
