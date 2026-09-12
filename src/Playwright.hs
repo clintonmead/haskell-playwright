@@ -252,6 +252,7 @@ module Playwright
   , goBack
   , goForward
   , goto
+  , gotoFrame
   , grantPermissions
   , grantPermissionsFor
   , hover
@@ -306,6 +307,7 @@ module Playwright
   , objectNumberArgument
   , objectSpecialArgument
   , objectTextArgument
+  , onLoad
   , opener
   , ownerFrameHandle
   , pageContext
@@ -326,6 +328,7 @@ module Playwright
   , requestPostData
   , requestResourceType
   , requestUrl
+  , responseFrame
   , responseHeaders
   , responseOk
   , responseRequest
@@ -337,6 +340,7 @@ module Playwright
   , routeRequest
   , routeWith
   , screenshot
+  , screenshotHandle
   , scrollIntoViewIfNeeded
   , scrollIntoViewIfNeededWith
   , selectOption
@@ -569,6 +573,7 @@ import Playwright.ElementHandle
   , ownerFrameHandle
   , scrollIntoViewIfNeeded
   , scrollIntoViewIfNeededWith
+  , screenshotHandle
   , selectText
   , selectTextWith
   , setInputFilesHandle
@@ -639,6 +644,7 @@ import Playwright.Frame
   , currentName
   , currentUrl
   , framesEqual
+  , gotoFrame
   )
 import Playwright.Frame.Inspect
   ( frameElement
@@ -806,6 +812,7 @@ import Playwright.Page
   , goto
   , isClosed
   , locator
+  , onLoad
   , opener
   , pageFromRef
   , pagesEqual
@@ -872,6 +879,7 @@ import Playwright.Request
   )
 import Playwright.RequestFrame
   ( requestFrame
+  , responseFrame
   )
 import Playwright.ResourceType
   ( ResourceType (ResourceType, resourceTypeToText)

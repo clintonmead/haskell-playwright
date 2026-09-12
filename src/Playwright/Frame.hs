@@ -47,6 +47,9 @@ import Playwright.Json.ChannelRef
 import Playwright.Json.Decode
   ( fromJsonValue
   )
+import Playwright.LoadState
+  ( toLifecycle
+  )
 import Playwright.MethodName
   ( MethodName (MethodName)
   )
@@ -164,7 +167,7 @@ gotoFrame frame url opts = do
       frame
       "goto"
       (mkFrameGotoParams (gotoOptionsTimeout opts) resolved)
-        { frameGotoParamsWaitUntil = gotoOptionsWaitUntil opts
+        { frameGotoParamsWaitUntil = fmap toLifecycle (gotoOptionsWaitUntil opts)
         , frameGotoParamsReferer = gotoOptionsReferer opts
         }
   case frameGotoResultResponse result of

@@ -192,12 +192,14 @@ test-suite playwright-test
       Playwright.ElementHandleConvenienceSpec
       Playwright.ElementHandleOwnerFrameSpec
       Playwright.ElementHandlePressSpec
+      Playwright.ElementHandleScreenshotSpec
       Playwright.ElementHandleScrollIntoViewSpec
       Playwright.ElementHandleSelectTextSpec
       Playwright.ElementHandleTypeSpec
       Playwright.ElementHandleWaitForElementStateSpec
       Playwright.FrameEvaluateSpec
       Playwright.FrameFrameElementSpec
+      Playwright.FrameGotoSpec
       Playwright.FrameHierarchySpec
       Playwright.GeolocationSpec
       Playwright.Harness
@@ -230,6 +232,7 @@ test-suite playwright-test
       Playwright.PageEvaluateHandleSpec
       Playwright.PageEvaluateSpec
       Playwright.PageEventConsoleSpec
+      Playwright.PageEventLoadSpec
       Playwright.PageEventPageErrorSpec
       Playwright.PageEventPopupSpec
       Playwright.PageExposeFunctionSpec
@@ -241,6 +244,7 @@ test-suite playwright-test
       Playwright.PageKeyboardSpec
       Playwright.PageLocalStorageSpec
       Playwright.PageMouseSpec
+      Playwright.PageNetworkIdleSpec
       Playwright.PageNetworkRequestSpec
       Playwright.PageNetworkResponseSpec
       Playwright.PagePdfSpec

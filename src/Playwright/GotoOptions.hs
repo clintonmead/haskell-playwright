@@ -15,8 +15,8 @@ import Data.Aeson
   ( FromJSON
   , ToJSON
   )
-import Playwright.Protocol
-  ( LifecycleEvent
+import Playwright.LoadState
+  ( LoadState
   )
 import Playwright.Timeout
   ( Timeout
@@ -28,7 +28,7 @@ import Playwright.Url
 
 data GotoOptions = GotoOptions
   { gotoOptionsTimeout :: Timeout
-  , gotoOptionsWaitUntil :: Maybe LifecycleEvent
+  , gotoOptionsWaitUntil :: Maybe LoadState
   , gotoOptionsReferer :: Maybe Url
   }
   deriving stock (Eq, Show)

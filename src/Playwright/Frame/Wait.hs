@@ -24,7 +24,8 @@ import Playwright.JsHandle
   , jsHandleFromRef
   )
 import Playwright.LoadState
-  ( LoadState (LoadStateCommit, LoadStateDomContentLoaded, LoadStateLoad, LoadStateNetworkIdle)
+  ( LoadState
+  , toLifecycle
   )
 import Playwright.Protocol
   ( FrameWaitForFunctionParams (frameWaitForFunctionParamsIsFunction)
@@ -33,7 +34,6 @@ import Playwright.Protocol
   , FrameWaitForSelectorParamsState (FrameWaitForSelectorParamsStateAttached, FrameWaitForSelectorParamsStateDetached, FrameWaitForSelectorParamsStateHidden, FrameWaitForSelectorParamsStateVisible)
   , FrameWaitForSelectorResult
   , FrameWaitForTimeoutResult
-  , LifecycleEvent (LifecycleEventCommit, LifecycleEventDomcontentloaded, LifecycleEventLoad, LifecycleEventNetworkidle)
   , mkFrameWaitForFunctionParams
   , mkFrameWaitForSelectorParams
   , mkFrameWaitForTimeoutParams
@@ -92,18 +92,6 @@ waitForLoadStateFrame frame state =
     (channelConnection (frameChannel frame))
     (channelGuid (frameChannel frame))
     (toLifecycle state)
-
-toLifecycle :: LoadState -> LifecycleEvent
-toLifecycle state =
-  case state of
-    LoadStateLoad ->
-      LifecycleEventLoad
-    LoadStateDomContentLoaded ->
-      LifecycleEventDomcontentloaded
-    LoadStateNetworkIdle ->
-      LifecycleEventNetworkidle
-    LoadStateCommit ->
-      LifecycleEventCommit
 
 toProtocolState :: WaitForState -> FrameWaitForSelectorParamsState
 toProtocolState state =

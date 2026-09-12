@@ -13,6 +13,7 @@ module Playwright.ElementHandle
   , inputValueHandle
   , scrollIntoViewIfNeeded
   , scrollIntoViewIfNeededWith
+  , screenshotHandle
   , selectText
   , selectTextWith
   , setInputFilesHandle
@@ -25,6 +26,9 @@ module Playwright.ElementHandle
 import Data.Aeson
   ( FromJSON
   , ToJSON
+  )
+import Data.ByteString
+  ( ByteString
   )
 import Data.Text
   ( Text
@@ -61,6 +65,7 @@ import Playwright.Json.ChannelRef
   )
 import Playwright.Json.ProtocolBinary
   ( protocolBinaryFromByteString
+  , protocolBinaryToByteString
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -74,6 +79,7 @@ import Playwright.Protocol
   , ElementHandleInnerTextResult (elementHandleInnerTextResultValue)
   , ElementHandleInputValueResult (elementHandleInputValueResultValue)
   , ElementHandleOwnerFrameResult (elementHandleOwnerFrameResultFrame)
+  , ElementHandleScreenshotResult (elementHandleScreenshotResultBinary)
   , ElementHandleScrollIntoViewIfNeededResult
   , ElementHandleSelectTextResult
   , ElementHandleSetInputFilesParams (elementHandleSetInputFilesParamsPayloads)
@@ -93,6 +99,7 @@ import Playwright.Protocol
   , mkElementHandleInnerTextParams
   , mkElementHandleInputValueParams
   , mkElementHandleOwnerFrameParams
+  , mkElementHandleScreenshotParams
   , mkElementHandleScrollIntoViewIfNeededParams
   , mkElementHandleSelectTextParams
   , mkElementHandleSetInputFilesParams
@@ -138,6 +145,11 @@ tapHandle handle = do
   _ :: ElementHandleTapResult <-
     handleSend handle "tap" (mkElementHandleTapParams defaultTimeout)
   pure ()
+
+screenshotHandle :: ElementHandle -> IO ByteString
+screenshotHandle handle = do
+  result <- handleSend handle "screenshot" (mkElementHandleScreenshotParams defaultTimeout)
+  pure (protocolBinaryToByteString (elementHandleScreenshotResultBinary result))
 
 boundingBox :: ElementHandle -> IO (Maybe BoundingBox)
 boundingBox handle = do

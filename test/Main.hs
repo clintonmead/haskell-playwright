@@ -28,11 +28,13 @@ import Playwright.ElementHandleConvenienceSpec qualified as ElementHandleConveni
 import Playwright.ElementHandleOwnerFrameSpec qualified as ElementHandleOwnerFrameSpec
 import Playwright.ElementHandlePressSpec qualified as ElementHandlePressSpec
 import Playwright.ElementHandleScrollIntoViewSpec qualified as ElementHandleScrollIntoViewSpec
+import Playwright.ElementHandleScreenshotSpec qualified as ElementHandleScreenshotSpec
 import Playwright.ElementHandleSelectTextSpec qualified as ElementHandleSelectTextSpec
 import Playwright.ElementHandleTypeSpec qualified as ElementHandleTypeSpec
 import Playwright.ElementHandleWaitForElementStateSpec qualified as ElementHandleWaitForElementStateSpec
 import Playwright.FrameEvaluateSpec qualified as FrameEvaluateSpec
 import Playwright.FrameFrameElementSpec qualified as FrameFrameElementSpec
+import Playwright.FrameGotoSpec qualified as FrameGotoSpec
 import Playwright.FrameHierarchySpec qualified as FrameHierarchySpec
 import Playwright.GeolocationSpec qualified as GeolocationSpec
 import Playwright.IntegrationSpec qualified as IntegrationSpec
@@ -61,6 +63,7 @@ import Playwright.PageDispatchEventSpec qualified as PageDispatchEventSpec
 import Playwright.PageDialogSpec qualified as PageDialogSpec
 import Playwright.PageDragSpec qualified as PageDragSpec
 import Playwright.PageEventConsoleSpec qualified as PageEventConsoleSpec
+import Playwright.PageEventLoadSpec qualified as PageEventLoadSpec
 import Playwright.PageEventPopupSpec qualified as PageEventPopupSpec
 import Playwright.PageEvaluateSpec qualified as PageEvaluateSpec
 import Playwright.PageEvaluateHandleSpec qualified as PageEvaluateHandleSpec
@@ -75,6 +78,7 @@ import Playwright.PageHistorySpec qualified as PageHistorySpec
 import Playwright.PageKeyboardSpec qualified as PageKeyboardSpec
 import Playwright.PageLocalStorageSpec qualified as PageLocalStorageSpec
 import Playwright.PageMouseSpec qualified as PageMouseSpec
+import Playwright.PageNetworkIdleSpec qualified as PageNetworkIdleSpec
 import Playwright.PageNetworkRequestSpec qualified as PageNetworkRequestSpec
 import Playwright.PageNetworkResponseSpec qualified as PageNetworkResponseSpec
 import Playwright.PagePdfSpec qualified as PagePdfSpec
@@ -146,11 +150,13 @@ main =
         , ElementHandleOwnerFrameSpec.tests
         , ElementHandlePressSpec.tests
         , ElementHandleScrollIntoViewSpec.tests
+        , ElementHandleScreenshotSpec.tests
         , ElementHandleSelectTextSpec.tests
         , ElementHandleTypeSpec.tests
         , ElementHandleWaitForElementStateSpec.tests
         , FrameEvaluateSpec.tests
         , FrameFrameElementSpec.tests
+        , FrameGotoSpec.tests
         , FrameHierarchySpec.tests
         , GeolocationSpec.tests
         , IntegrationSpec.tests
@@ -180,6 +186,7 @@ main =
         , PageDragSpec.tests
         , PageEmulateMediaSpec.tests
         , PageEventConsoleSpec.tests
+        , PageEventLoadSpec.tests
         , PageEventPageErrorSpec.tests
         , PageEventPopupSpec.tests
         , PageEvaluateSpec.tests
@@ -193,6 +200,7 @@ main =
         , PageKeyboardSpec.tests
         , PageLocalStorageSpec.tests
         , PageMouseSpec.tests
+        , PageNetworkIdleSpec.tests
         , PageNetworkRequestSpec.tests
         , PageNetworkResponseSpec.tests
         , PagePdfSpec.tests

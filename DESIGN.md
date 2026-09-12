@@ -149,4 +149,7 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - `evaluateHandleExpression` is `evaluateExpressionHandle` with `isFunction: false` (raw expressions such as `'12'`).
 - `Frame.frameElement` returns the iframe/frame `ElementHandle`. Detached frames fail with `Frame has been detached.`
 - `page.pdf` is Chromium `Page.pdf` and returns PDF bytes. `PdfOptions` currently maps `tagged` and `outline`.
-- Locator/`ElementHandle` `tap` is the Frame/ElementHandle `tap` mixin and needs `hasTouch: true` on the context.
+- `gotoOptionsWaitUntil` is `LoadState`, mapped onto protocol `LifecycleEvent` in `Frame.goto`.
+- `responseFrame` is `request.frame` of the response's request.
+- Page `onLoad` listens for the main frame `loadstate` add=`load` event. Official page-event-load uses a 1000ms `waitForTimeout` after goto to check the handler did not double-fire.
+- ElementHandle `screenshot` is `ElementHandle.screenshot` with the default timeout.

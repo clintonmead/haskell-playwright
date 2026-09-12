@@ -53,6 +53,7 @@ module Playwright.Page
   , opener
   , pagesEqual
   , waitForPopup
+  , onLoad
   ) where
 
 import Control.Concurrent
@@ -91,6 +92,7 @@ import Playwright.Channel
 import Playwright.Connection
   ( closedGuids
   , lookupObject
+  , registerEventHandler
   , registerEventWaiter
   , waitForChannelEvent
   , waitForFutureChannelEvent
@@ -185,8 +187,10 @@ import Playwright.Protocol
   , FrameAddScriptTagResult (frameAddScriptTagResultElement)
   , FrameAddStyleTagParams (frameAddStyleTagParamsContent, frameAddStyleTagParamsUrl)
   , FrameAddStyleTagResult (frameAddStyleTagResultElement)
+  , FrameLoadstateEvent (frameLoadstateEventAdd)
   , FrameNavigatedEvent (frameNavigatedEventNewDocument, frameNavigatedEventUrl)
   , FrameNavigatedEventNewDocument (frameNavigatedEventNewDocumentRequest)
+  , LifecycleEvent (LifecycleEventLoad)
   , PageAddInitScriptResult
   , PageBringToFrontResult
   , PageCloseResult
@@ -494,6 +498,20 @@ setExtraHTTPHeaders page headers = do
 waitForLoadState :: Page -> LoadState -> IO ()
 waitForLoadState page =
   waitForLoadStateFrame (pageMainFrame page)
+
+onLoad :: Page -> IO () -> IO ()
+onLoad page run =
+  registerEventHandler
+    (channelConnection (pageChannel page))
+    (channelGuid (frameChannel (pageMainFrame page)))
+    (MethodName "loadstate")
+    $ \params -> do
+      event <- either throwIO pure (fromJsonValue params)
+      case frameLoadstateEventAdd event of
+        Just LifecycleEventLoad ->
+          run
+        _ ->
+          pure ()
 
 waitForTimeout :: Page -> Timeout -> IO ()
 waitForTimeout page =
