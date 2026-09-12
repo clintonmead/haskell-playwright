@@ -79,9 +79,9 @@ Ideally, we want all the tests the official Playwright tests have. We'll natural
 
 ## Implementation process
 
-### Getting there slowly
+### Go for it
 
-Playwright is a big project. Perhaps get a minimum viable product working first, that is well tested, and then add more features gradually.
+You've already a good amount of progress now. Continue to completely implement the Playwright API and all tests that the official Playwright tests have. Only stop if you have a question or need to ask me for guidance.
 
 ### You can make commits
 
