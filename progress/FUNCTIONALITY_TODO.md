@@ -28,7 +28,7 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 - page-request-intercept
 - interception
 - retarget
-- selectors-css, selectors-text, selectors-role, selectors-register, selectors-misc, selectors-frame
+- selectors-text, selectors-role, selectors-register, selectors-misc, selectors-frame
 - locator-highlight
 
 ## Ported `tests/page` with remaining cases

@@ -300,6 +300,7 @@ test-suite playwright-test
       Playwright.PageWaitForUrlSpec
       Playwright.PermissionsSpec
       Playwright.QuerySelectorSpec
+      Playwright.SelectorsCssSpec
       Playwright.SelectorsGetBySpec
       Playwright.TapSpec
       Playwright.TransportSpec

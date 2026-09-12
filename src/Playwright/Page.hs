@@ -27,6 +27,7 @@ module Playwright.Page
   , reload
   , requestGC
   , querySelector
+  , querySelectorAll
   , querySelectorStrict
   , setViewportSize
   , frameByName
@@ -138,7 +139,8 @@ import Playwright.Frame
   , titleFrame
   )
 import Playwright.Frame.Inspect
-  ( querySelectorFrame
+  ( querySelectorAllFrame
+  , querySelectorFrame
   )
 import Playwright.Frame.Wait
   ( waitForFunctionFrame
@@ -538,6 +540,10 @@ reload page = do
 querySelector :: Page -> Selector -> IO (Maybe ElementHandle)
 querySelector page selector =
   querySelectorFrame (pageMainFrame page) selector Nothing
+
+querySelectorAll :: Page -> Selector -> IO [ElementHandle]
+querySelectorAll page selector =
+  querySelectorAllFrame (pageMainFrame page) selector
 
 querySelectorStrict :: Page -> Selector -> IO (Maybe ElementHandle)
 querySelectorStrict page selector =

@@ -148,7 +148,7 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - Mouse coordinates are `CssPixel` (`Scientific` on the wire). Protocol methods are `mouseClick` / `mouseMove` / `mouseDown` / `mouseUp` / `mouseWheel`.
 - Protocol JSON field `source` is `Selector` only for drag-and-drop; init-script `source` is `Text`.
 - `Frame.loadstate` events patch the stored initializer `loadStates` so `waitForLoadState` can STM-retry until the lifecycle is present.
-- `page.$` is `querySelector` with `strict: false`; locator `elementHandle` waits attached then queries with `strict: true`.
+- `page.$` is `querySelector` with `strict: false`; locator `elementHandle` waits attached then queries with `strict: true`. `page.$$` is `querySelectorAll`. `evalOnSelectorBool` is `$eval` decoded as `Bool`.
 - Frame objects are created under BrowserContext on the wire. `childFrames` uses `FrameInitializer.parentFrame`, not the transport parent guid.
 - ElementHandle `evaluateExpression` is the JSHandle mixin method on the same channel.
 - Console and dialog events are BrowserContext protocol events; Page waits subscribe via `updateSubscription` then STM-wait on the context guid.
@@ -183,7 +183,7 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - `page.pdf` is Chromium `Page.pdf` and returns PDF bytes. `PdfOptions` currently maps `tagged` and `outline`.
 - `goto` always sends `waitUntil` (default `load`), matching the JS client.
 - Locator `dropOnto` is Frame `drop` with in-memory `payloads` and clipboard-like `data`. Haskell uses `dropOnto` because Prelude `drop` is already taken. Host `localPaths` are not sent yet.
-- Locator `clickWith` maps `force`, `noWaitAfter`, `position`, and `timeout` onto `Frame.click`. `clickHandleWith` maps the same fields onto ElementHandle `click`. Position uses generated `mkPoint` (x then y). Official Chromium `display:contents` + `position` is still a Playwright fixme (`DOM.getBoxModel`). `waitForFrameNavigated` / `armFrameNavigated` wait for the next main-frame `navigated` event without waiting for load (JS `waitForEvent('framenavigated')`). `waitForLoadEvent` / `armLoadEvent` wait for main-frame `loadstate` add=`load` without consuming buffered events (`registerFutureEventWaiter`). `waitForFrameDetached` is Page `frameDetached`.
+- `page.$$` is `querySelectorAll` (`Frame.querySelectorAll` on the main frame). `evalOnSelectorBool` is `$eval` decoded as `Bool`. `waitForFrameNavigated` / `armFrameNavigated` wait for the next main-frame `navigated` event without waiting for load (JS `waitForEvent('framenavigated')`). `waitForLoadEvent` / `armLoadEvent` wait for main-frame `loadstate` add=`load` without consuming buffered events (`registerFutureEventWaiter`). `waitForFrameDetached` is Page `frameDetached`.
 - `responseFrame` is `request.frame` of the response's request.
 - Page `onLoad` listens for the main frame `loadstate` add=`load` event. Official page-event-load uses a 1000ms `waitForTimeout` after goto to check the handler did not double-fire.
 - ElementHandle `$eval` / `$$eval` are `evalOnSelector` / `evalOnSelectorAll` with `isFunction: true`. Page `$eval` and ElementHandle `$eval` omit `strict` (first match), matching the JS client; locator `evaluate` still sends `strict: true`.

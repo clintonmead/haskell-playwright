@@ -123,6 +123,7 @@ import Playwright.PageWaitForSelectorSpec qualified as PageWaitForSelectorSpec
 import Playwright.PageWaitForUrlSpec qualified as PageWaitForUrlSpec
 import Playwright.PermissionsSpec qualified as PermissionsSpec
 import Playwright.QuerySelectorSpec qualified as QuerySelectorSpec
+import Playwright.SelectorsCssSpec qualified as SelectorsCssSpec
 import Playwright.SelectorsGetBySpec qualified as SelectorsGetBySpec
 import Playwright.TapSpec qualified as TapSpec
 import Playwright.TransportSpec qualified as TransportSpec
@@ -268,6 +269,7 @@ main =
         , PageWaitForUrlSpec.tests
         , PermissionsSpec.tests
         , QuerySelectorSpec.tests
+        , SelectorsCssSpec.tests
         , SelectorsGetBySpec.tests
         , TapSpec.tests
         , WheelSpec.tests

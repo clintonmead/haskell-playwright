@@ -227,6 +227,7 @@ module Playwright
   , evalOnSelectorAllNumber
   , evalOnSelectorAllTexts
   , evalOnSelectorAllWith
+  , evalOnSelectorBool
   , evalOnSelectorHandle
   , evalOnSelectorHandleText
   , evalOnSelector
@@ -385,6 +386,7 @@ module Playwright
   , press
   , pressSequentially
   , querySelector
+  , querySelectorAll
   , querySelectorAllHandle
   , querySelectorHandle
   , querySelectorStrict
@@ -728,6 +730,7 @@ import Playwright.Evaluate
   , evalOnSelectorAllNumber
   , evalOnSelectorAllTexts
   , evalOnSelectorAllWith
+  , evalOnSelectorBool
   , evalOnSelectorHandle
   , evalOnSelectorHandleText
   , evalOnSelector
@@ -994,6 +997,7 @@ import Playwright.Page
   , pdf
   , pdfWith
   , querySelector
+  , querySelectorAll
   , querySelectorStrict
   , reload
   , requestGC

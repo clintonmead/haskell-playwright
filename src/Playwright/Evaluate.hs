@@ -44,6 +44,7 @@ module Playwright.Evaluate
   , evalOnSelectorAllNumber
   , evalOnSelectorAllTexts
   , evalOnSelectorAllWith
+  , evalOnSelectorBool
   , evalOnSelectorHandle
   , evalOnSelectorHandleText
   , evalOnSelectorText
@@ -319,6 +320,10 @@ evalOnSelectorText page selector expression =
 evalOnSelectorTextWith :: Page -> Selector -> Text -> SerializedArgument -> IO Text
 evalOnSelectorTextWith page selector expression arg =
   requireText =<< evalOnSelectorWith page selector expression arg
+
+evalOnSelectorBool :: Page -> Selector -> Text -> IO Bool
+evalOnSelectorBool page selector expression =
+  requireBool =<< evalOnSelector page selector expression
 
 evalOnSelectorAll :: Page -> Selector -> Text -> IO SerializedValue
 evalOnSelectorAll page selector expression =
