@@ -12,7 +12,7 @@ Next work: remaining `tests/page` specs that do not need `expect` matchers, then
 - Regex URL matches for routes.
 - IndexedDB and WebAuthn credentials on `StorageState`.
 - `unrouteAll` `wait` / `ignoreErrors`.
-- Tracing, HAR, video, screencast, WebSocket routing, global `APIRequest.newContext` fetch (page/context `request` fetch used by intercept is ported).
+- Tracing, HAR, video, screencast, WebSocket routing, global `APIRequest.newContext` fetch. Context `request` covers the first `browsercontext-fetch` slice (get/fetch, hang-up, redirects, Set-Cookie, timeout, dispose, failOnStatusCode, method post bodies).
 
 ## Assertions
 
@@ -45,7 +45,7 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 
 ## `tests/library` with no or thin coverage
 
-Most of `tests/library` is still open, including: browser / browserType launch-server/connect, default browser context, proxy, HAR, tracing, video, webauthn, fetch, popup, crash, headful, launcher, unroute-behavior, beforeunload, capabilities, channels, client-certificates, and the rest of the 100 library specs.
+Most of `tests/library` is still open, including: browser / browserType launch-server/connect, default browser context, proxy, HAR, tracing, video, webauthn, remaining `browsercontext-fetch` (params, compression, HTTPS, DNS `__testHookLookup` cookies, multipart, connectOverCDP, …), popup, crash, headful, launcher, unroute-behavior, beforeunload, capabilities, channels, client-certificates, and the rest of the 100 library specs.
 
 ## Other official trees (later)
 

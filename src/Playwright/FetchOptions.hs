@@ -33,7 +33,8 @@ data FetchPostData
   deriving stock (Eq, Show)
 
 data FetchOptions = FetchOptions
-  { fetchHeaders :: Maybe [HttpHeader]
+  { fetchFailOnStatusCode :: Maybe Bool
+  , fetchHeaders :: Maybe [HttpHeader]
   , fetchMaxRedirects :: Maybe Int
   , fetchMethod :: Maybe HttpMethod
   , fetchPostData :: Maybe FetchPostData
@@ -45,7 +46,8 @@ data FetchOptions = FetchOptions
 defaultFetchOptions :: FetchOptions
 defaultFetchOptions =
   FetchOptions
-    { fetchHeaders = Nothing
+    { fetchFailOnStatusCode = Nothing
+    , fetchHeaders = Nothing
     , fetchMaxRedirects = Nothing
     , fetchMethod = Nothing
     , fetchPostData = Nothing

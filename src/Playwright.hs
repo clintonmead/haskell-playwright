@@ -133,8 +133,10 @@ module Playwright
   , allLocators
   , allTextContents
   , apiResponseBody
+  , apiResponseDispose
   , apiResponseHeaders
   , apiResponseHeadersArray
+  , apiResponseJson
   , apiResponseOk
   , apiResponseStatus
   , apiResponseStatusText
@@ -296,12 +298,22 @@ module Playwright
   , exposeFunction
   , fallbackRoute
   , fallbackRouteWith
-  , fetchGet
-  , fetchGetWith
-  , fetchRequest
-  , fetchRequestWith
+  , fetchDelete
+  , fetchDeleteWith
   , fetchFromUrl
   , fetchFromUrlWith
+  , fetchGet
+  , fetchGetWith
+  , fetchHead
+  , fetchHeadWith
+  , fetchPatch
+  , fetchPatchWith
+  , fetchPost
+  , fetchPostWith
+  , fetchPut
+  , fetchPutWith
+  , fetchRequest
+  , fetchRequestWith
   , fill
   , fillHandle
   , filterVisible
@@ -567,18 +579,30 @@ import Playwright.AcceptDownloads
   )
 import Playwright.APIRequestContext
   ( APIRequestContext
-  , fetchGet
-  , fetchGetWith
-  , fetchRequest
-  , fetchRequestWith
+  , fetchDelete
+  , fetchDeleteWith
   , fetchFromUrl
   , fetchFromUrlWith
+  , fetchGet
+  , fetchGetWith
+  , fetchHead
+  , fetchHeadWith
+  , fetchPatch
+  , fetchPatchWith
+  , fetchPost
+  , fetchPostWith
+  , fetchPut
+  , fetchPutWith
+  , fetchRequest
+  , fetchRequestWith
   )
 import Playwright.APIResponse
   ( APIResponse
   , apiResponseBody
+  , apiResponseDispose
   , apiResponseHeaders
   , apiResponseHeadersArray
+  , apiResponseJson
   , apiResponseOk
   , apiResponseStatus
   , apiResponseStatusText
@@ -843,7 +867,7 @@ import Playwright.Expose
   , exposeFunction
   )
 import Playwright.FetchOptions
-  ( FetchOptions (FetchOptions, fetchHeaders, fetchMaxRedirects, fetchMethod, fetchPostData, fetchTimeout, fetchUrl)
+  ( FetchOptions (FetchOptions, fetchFailOnStatusCode, fetchHeaders, fetchMaxRedirects, fetchMethod, fetchPostData, fetchTimeout, fetchUrl)
   , FetchPostData (FetchPostBytes, FetchPostJson, FetchPostText)
   , defaultFetchOptions
   )

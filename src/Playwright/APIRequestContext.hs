@@ -1,12 +1,22 @@
 module Playwright.APIRequestContext
   ( APIRequestContext (..)
   , apiRequestContextFor
-  , fetchGet
-  , fetchGetWith
-  , fetchRequest
-  , fetchRequestWith
+  , fetchDelete
+  , fetchDeleteWith
   , fetchFromUrl
   , fetchFromUrlWith
+  , fetchGet
+  , fetchGetWith
+  , fetchHead
+  , fetchHeadWith
+  , fetchPatch
+  , fetchPatchWith
+  , fetchPost
+  , fetchPostWith
+  , fetchPut
+  , fetchPutWith
+  , fetchRequest
+  , fetchRequestWith
   ) where
 
 import Control.Exception
@@ -48,7 +58,7 @@ import Playwright.Error
   ( PlaywrightError (DecodeFailure)
   )
 import Playwright.FetchOptions
-  ( FetchOptions (fetchHeaders, fetchMaxRedirects, fetchMethod, fetchPostData, fetchTimeout, fetchUrl)
+  ( FetchOptions (fetchFailOnStatusCode, fetchHeaders, fetchMaxRedirects, fetchMethod, fetchPostData, fetchTimeout, fetchUrl)
   , FetchPostData (FetchPostBytes, FetchPostJson, FetchPostText)
   , defaultFetchOptions
   )
@@ -75,7 +85,7 @@ import Playwright.MethodName
   ( MethodName (MethodName)
   )
 import Playwright.Protocol
-  ( APIRequestContextFetchParams (aPIRequestContextFetchParamsHeaders, aPIRequestContextFetchParamsJsonData, aPIRequestContextFetchParamsMaxRedirects, aPIRequestContextFetchParamsMethod, aPIRequestContextFetchParamsPostData)
+  ( APIRequestContextFetchParams (aPIRequestContextFetchParamsFailOnStatusCode, aPIRequestContextFetchParamsHeaders, aPIRequestContextFetchParamsJsonData, aPIRequestContextFetchParamsMaxRedirects, aPIRequestContextFetchParamsMethod, aPIRequestContextFetchParamsPostData)
   , APIRequestContextFetchResult (aPIRequestContextFetchResultResponse)
   , BrowserContextInitializer (browserContextInitializerRequestContext)
   , ChannelType (ChannelTypeBrowserContext)
@@ -134,7 +144,7 @@ fetchRequestWith ctx request opts = do
   method <- maybe (requestMethod request) pure (fetchMethod opts)
   headers <- maybe (requestHeaders request) pure (fetchHeaders opts)
   post <- resolveRequestPost (fetchPostData opts) request
-  sendFetch ctx url (Just method) (Just headers) post (fetchMaxRedirects opts) (fetchTimeout opts)
+  sendFetch ctx url (Just method) (Just headers) post opts
 
 fetchFromUrl :: APIRequestContext -> Url -> IO APIResponse
 fetchFromUrl ctx url =
@@ -148,8 +158,7 @@ fetchFromUrlWith ctx url opts =
     (fetchMethod opts)
     (fetchHeaders opts)
     (postFromOverlay (fetchPostData opts))
-    (fetchMaxRedirects opts)
-    (fetchTimeout opts)
+    opts
 
 fetchGet :: APIRequestContext -> Url -> IO APIResponse
 fetchGet ctx url =
@@ -157,7 +166,51 @@ fetchGet ctx url =
 
 fetchGetWith :: APIRequestContext -> Url -> FetchOptions -> IO APIResponse
 fetchGetWith ctx url opts =
-  fetchFromUrlWith ctx url opts {fetchMethod = Just (HttpMethod "GET")}
+  fetchFromUrlWith ctx url (withFetchMethod "GET" opts)
+
+fetchDelete :: APIRequestContext -> Url -> IO APIResponse
+fetchDelete ctx url =
+  fetchDeleteWith ctx url defaultFetchOptions
+
+fetchDeleteWith :: APIRequestContext -> Url -> FetchOptions -> IO APIResponse
+fetchDeleteWith ctx url opts =
+  fetchFromUrlWith ctx url (withFetchMethod "DELETE" opts)
+
+fetchHead :: APIRequestContext -> Url -> IO APIResponse
+fetchHead ctx url =
+  fetchHeadWith ctx url defaultFetchOptions
+
+fetchHeadWith :: APIRequestContext -> Url -> FetchOptions -> IO APIResponse
+fetchHeadWith ctx url opts =
+  fetchFromUrlWith ctx url (withFetchMethod "HEAD" opts)
+
+fetchPatch :: APIRequestContext -> Url -> IO APIResponse
+fetchPatch ctx url =
+  fetchPatchWith ctx url defaultFetchOptions
+
+fetchPatchWith :: APIRequestContext -> Url -> FetchOptions -> IO APIResponse
+fetchPatchWith ctx url opts =
+  fetchFromUrlWith ctx url (withFetchMethod "PATCH" opts)
+
+fetchPost :: APIRequestContext -> Url -> IO APIResponse
+fetchPost ctx url =
+  fetchPostWith ctx url defaultFetchOptions
+
+fetchPostWith :: APIRequestContext -> Url -> FetchOptions -> IO APIResponse
+fetchPostWith ctx url opts =
+  fetchFromUrlWith ctx url (withFetchMethod "POST" opts)
+
+fetchPut :: APIRequestContext -> Url -> IO APIResponse
+fetchPut ctx url =
+  fetchPutWith ctx url defaultFetchOptions
+
+fetchPutWith :: APIRequestContext -> Url -> FetchOptions -> IO APIResponse
+fetchPutWith ctx url opts =
+  fetchFromUrlWith ctx url (withFetchMethod "PUT" opts)
+
+withFetchMethod :: Text -> FetchOptions -> FetchOptions
+withFetchMethod name opts =
+  opts {fetchMethod = Just (HttpMethod name)}
 
 sendFetch ::
   APIRequestContext ->
@@ -165,19 +218,19 @@ sendFetch ::
   Maybe HttpMethod ->
   Maybe [HttpHeader] ->
   PostBody ->
-  Maybe Int ->
-  Maybe Timeout ->
+  FetchOptions ->
   IO APIResponse
-sendFetch ctx url method headers post maxRedirects timeoutOverride = do
-  timeout <- resolveFetchTimeout ctx timeoutOverride
+sendFetch ctx url method headers post opts = do
+  timeout <- resolveFetchTimeout ctx (fetchTimeout opts)
   result <-
     send
       (apiRequestContextChannel ctx)
       (MethodName "fetch")
       (mkAPIRequestContextFetchParams timeout url)
-        { aPIRequestContextFetchParamsHeaders = fmap (fmap toNameValue) headers
+        { aPIRequestContextFetchParamsFailOnStatusCode = fetchFailOnStatusCode opts
+        , aPIRequestContextFetchParamsHeaders = fmap (fmap toNameValue) headers
         , aPIRequestContextFetchParamsJsonData = postBodyJson post
-        , aPIRequestContextFetchParamsMaxRedirects = maxRedirects
+        , aPIRequestContextFetchParamsMaxRedirects = fetchMaxRedirects opts
         , aPIRequestContextFetchParamsMethod = fmap httpMethodToText method
         , aPIRequestContextFetchParamsPostData = fmap protocolBinaryFromByteString (postBodyBytes post)
         }

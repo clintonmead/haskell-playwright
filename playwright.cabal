@@ -192,6 +192,7 @@ test-suite playwright-test
       Playwright.BrowserContextCredentialsSpec
       Playwright.BrowserContextCspSpec
       Playwright.BrowserContextExposeFunctionSpec
+      Playwright.BrowserContextFetchSpec
       Playwright.BrowserContextJavaScriptSpec
       Playwright.BrowserContextLocaleSpec
       Playwright.BrowserContextOfflineSpec

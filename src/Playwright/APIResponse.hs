@@ -1,9 +1,11 @@
 module Playwright.APIResponse
   ( APIResponse (..)
   , apiResponseBody
+  , apiResponseDispose
   , apiResponseFetchUid
   , apiResponseHeaders
   , apiResponseHeadersArray
+  , apiResponseJson
   , apiResponseOk
   , apiResponseStatus
   , apiResponseStatusText
@@ -14,11 +16,16 @@ module Playwright.APIResponse
 import Control.Exception
   ( throwIO
   )
+import Data.Aeson
+  ( Value
+  , eitherDecodeStrict
+  )
 import Data.ByteString
   ( ByteString
   )
 import Data.Text
   ( Text
+  , pack
   , toLower
   )
 import Data.Text.Encoding
@@ -48,9 +55,11 @@ import Playwright.MethodName
   ( MethodName (MethodName)
   )
 import Playwright.Protocol qualified as Protocol
-  ( APIRequestContextFetchResponseBodyResult (aPIRequestContextFetchResponseBodyResultBinary)
+  ( APIRequestContextDisposeAPIResponseResult
+  , APIRequestContextFetchResponseBodyResult (aPIRequestContextFetchResponseBodyResultBinary)
   , APIResponse (aPIResponseFetchUid, aPIResponseHeaders, aPIResponseStatus, aPIResponseStatusText, aPIResponseUrl)
   , NameValue (nameValueName, nameValueValue)
+  , mkAPIRequestContextDisposeAPIResponseParams
   , mkAPIRequestContextFetchResponseBodyParams
   )
 import Playwright.Url
@@ -106,6 +115,24 @@ apiResponseBody response = do
 apiResponseText :: APIResponse -> IO Text
 apiResponseText response =
   decodeUtf8 <$> apiResponseBody response
+
+apiResponseJson :: APIResponse -> IO Value
+apiResponseJson response = do
+  bytes <- apiResponseBody response
+  case eitherDecodeStrict bytes of
+    Left err ->
+      throwIO (DecodeFailure (pack err))
+    Right value ->
+      pure value
+
+apiResponseDispose :: APIResponse -> IO ()
+apiResponseDispose response = do
+  _ :: Protocol.APIRequestContextDisposeAPIResponseResult <-
+    send
+      (apiResponseChannel response)
+      (MethodName "disposeAPIResponse")
+      (Protocol.mkAPIRequestContextDisposeAPIResponseParams (apiResponseFetchUid response))
+  pure ()
 
 fromNameValue :: Protocol.NameValue -> HttpHeader
 fromNameValue header =
