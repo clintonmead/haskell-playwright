@@ -18,6 +18,10 @@ You are going to make Haskell bindings to [Playwright](https://github.com/micros
 
 We don't just want to wrap and call Typescript code. The [protocol files may be handy](https://github.com/microsoft/playwright/tree/main/packages/protocol/spec).
 
+### Local upstream code access
+
+I've cloned the repository and you can locally access the upstream Typescript code for [Playwright](https://github.com/microsoft/playwright) code at `upstream-typescript-playwright` in a gitignored subdir in this repository.
+
 ## Code design
 
 ### Don't copy paste code
