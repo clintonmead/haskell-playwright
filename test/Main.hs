@@ -62,6 +62,8 @@ import Playwright.LocatorSpec qualified as LocatorSpec
 import Playwright.PageAddInitScriptSpec qualified as PageAddInitScriptSpec
 import Playwright.PageAddScriptTagSpec qualified as PageAddScriptTagSpec
 import Playwright.PageAddStyleTagSpec qualified as PageAddStyleTagSpec
+import Playwright.PageAutowaitingBasicSpec qualified as PageAutowaitingBasicSpec
+import Playwright.PageAutowaitingNoHangSpec qualified as PageAutowaitingNoHangSpec
 import Playwright.PageBasicSpec qualified as PageBasicSpec
 import Playwright.PageCheckSpec qualified as PageCheckSpec
 import Playwright.PageClockSpec qualified as PageClockSpec
@@ -197,6 +199,8 @@ main =
         , PageAddInitScriptSpec.tests
         , PageAddScriptTagSpec.tests
         , PageAddStyleTagSpec.tests
+        , PageAutowaitingBasicSpec.tests
+        , PageAutowaitingNoHangSpec.tests
         , PageBasicSpec.tests
         , PageCheckSpec.tests
         , PageClockSpec.tests

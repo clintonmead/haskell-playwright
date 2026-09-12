@@ -10,6 +10,7 @@ module Playwright
   , BodySize (..)
   , BindingName (..)
   , CheckOptions (..)
+  , ClickOptions (..)
   , ClockMillis (..)
   , ClockTicks (..)
   , ClockTime (..)
@@ -122,6 +123,9 @@ module Playwright
   , armDialog
   , armDownload
   , armFileChooser
+  , armFrameDetached
+  , armFrameNavigated
+  , armLoadEvent
   , armPopup
   , asElement
   , boolArgument
@@ -147,6 +151,7 @@ module Playwright
   , clearPermissions
   , click
   , clickHandle
+  , clickWith
   , clockFastForward
   , clockInstall
   , clockInstallAt
@@ -177,6 +182,7 @@ module Playwright
   , currentUrl
   , dblclick
   , defaultCheckOptions
+  , defaultClickOptions
   , defaultContinueOptions
   , defaultEmulateMedia
   , defaultFulfillOptions
@@ -470,9 +476,12 @@ module Playwright
   , waitForFileChooserWith
   , waitForFunction
   , waitForFunctionWith
+  , waitForLoadEvent
   , waitForLoadState
   , waitForNavigation
   , waitForNavigationWith
+  , waitForFrameNavigated
+  , waitForFrameDetached
   , waitForPageError
   , waitForPopup
   , waitUntilJsHandlePreview
@@ -566,6 +575,10 @@ import Playwright.BrowserType
 import Playwright.CheckOptions
   ( CheckOptions (CheckOptions, checkOptionsForce, checkOptionsTimeout, checkOptionsTrial)
   , defaultCheckOptions
+  )
+import Playwright.ClickOptions
+  ( ClickOptions (ClickOptions, clickOptionsNoWaitAfter, clickOptionsTimeout)
+  , defaultClickOptions
   )
 import Playwright.Clock
   ( ClockMillis (ClockMillis, clockMillisToScientific)
@@ -868,6 +881,7 @@ import Playwright.Locator
   , childLocator
   , clear
   , click
+  , clickWith
   , describeLocator
   , dblclick
   , dispatchEvent
@@ -936,6 +950,9 @@ import Playwright.Page
   , addStyleTag
   , armConsole
   , armDialog
+  , armFrameDetached
+  , armFrameNavigated
+  , armLoadEvent
   , armPopup
   , bringToFront
   , closePage
@@ -975,9 +992,12 @@ import Playwright.Page
   , waitForDialog
   , waitForFunction
   , waitForFunctionWith
+  , waitForLoadEvent
   , waitForLoadState
   , waitForNavigation
   , waitForNavigationWith
+  , waitForFrameNavigated
+  , waitForFrameDetached
   , waitForPopup
   , waitForRequest
   , waitForRequestFailed

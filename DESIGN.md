@@ -77,6 +77,26 @@ Read [LLMs Will Cheese Your Types: Fighting Back in Haskell](https://blog.jle.im
 
 Ideally, we want all the tests the official Playwright tests have. We'll naturally need to convert these to Haskell.
 
+### Selecting tests
+
+Tasty already filters tests with `-p` / `--pattern` (the same idea as Hspec `--match`). Use that after changing a spec; do not run the full suite after every edit.
+
+In the Nix shell, extra `playwright-test` arguments are passed through to Tasty and skip process sharding:
+
+```
+playwright-test -p /page-goto/
+playwright-test -p '/page-goto/&&/should work/'
+playwright-test --list-tests
+```
+
+Do not pass `-p` directly to `nix develop` (`-p` is a Nix flag):
+
+```
+nix develop --command bash -c 'playwright-test -p /page-goto/'
+```
+
+`TASTY_PATTERN` is Tasty's own environment-variable form of the same filter. Full-suite `playwright-test` (no extra args) is for a green commit.
+
 ### Test reliability
 
 Do not put artificial delays in tests, particularly when those artificial delays are not in the official Playwright tests. That could result in flaky tests and unexpected runtime failures.
@@ -97,7 +117,7 @@ Make commits to git at appropriate milestones.
 
 ### Script things you run regularly
 
-If you have non-trivial commands you run regularly, ensure they are scripted, either in `/scripts` in in `flake.nix`. This is so humans can easily reproduce your build and test runs. 
+If you have non-trivial commands you run regularly, ensure they are scripted, either in `/scripts` or in `flake.nix`. This is so humans can easily reproduce your build and test runs. 
 
 ### Update your progress regularly
 
@@ -118,7 +138,7 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - `deriving via Autodocodec` needs the `Autodocodec` constructor in scope (`import Autodocodec (Autodocodec (Autodocodec), ...)`).
 - Transparent newtypes that appear in Autodocodec fields also `deriving newtype HasCodec`.
 - Protocol floats that are not timeouts are `Scientific` (Autodocodec has no `HasCodec Double`).
-- Each Tasty process uses `--num-threads=1`: concurrent `waitForProcess` in one RTS races on SIGCHLD. `playwright-test` still parallelizes by sharding spec groups across processes (default `nproc/2`, cap 8, override `PLAYWRIGHT_TEST_JOBS`). Extra Tasty args disable sharding. From a Nix shell: `playwright-test -p/page-goto/`. Do not pass `-p` directly to `nix develop` (`-p` is a Nix flag); use `nix develop --command bash -c 'playwright-test -p/page-goto/'`.
+- Each Tasty process uses `--num-threads=1`: concurrent `waitForProcess` in one RTS races on SIGCHLD. Full-suite `playwright-test` shards spec groups across processes (default `nproc/2`, cap 8, override `PLAYWRIGHT_TEST_JOBS`). Individual runs use Tasty `-p` (see Testing).
 - Local packages are built with `-O0` (`optimization: False` in `cabal.project`, `$locals` / local `ghc-options` in Stack). Snapshot/Hackage dependencies stay optimized.
 - Cabal `verbose: 0` plus the flake `cabal` wrapper (`-v0`) and Stack `cabal-verbosity: 0` keep successful builds quiet; GHC errors and test output still show. In the Nix shell, `playwright-test` (see `scripts/playwright-test`) builds once, runs the Tasty binary with `--hide-successes --hide-progress`, strips the driver's host-requirements skip line, and only prints shard output when something failed. Extra args go to Tasty (`playwright-test -p/page-goto/`).
 - Locator `evaluate` is `Frame.evalOnSelector` with `strict: true`. Page `evaluate` is `Frame.evaluateExpression` with `isFunction: true`.
@@ -162,6 +182,7 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - `Frame.frameElement` returns the iframe/frame `ElementHandle`. Detached frames fail with `Frame has been detached.`
 - `page.pdf` is Chromium `Page.pdf` and returns PDF bytes. `PdfOptions` currently maps `tagged` and `outline`.
 - `goto` always sends `waitUntil` (default `load`), matching the JS client.
+- Locator `clickWith` maps `noWaitAfter` onto `Frame.click`. `waitForFrameNavigated` / `armFrameNavigated` wait for the next main-frame `navigated` event without waiting for load (JS `waitForEvent('framenavigated')`). `waitForLoadEvent` / `armLoadEvent` wait for main-frame `loadstate` add=`load` without consuming buffered events (`registerFutureEventWaiter`). `waitForFrameDetached` is Page `frameDetached`.
 - `responseFrame` is `request.frame` of the response's request.
 - Page `onLoad` listens for the main frame `loadstate` add=`load` event. Official page-event-load uses a 1000ms `waitForTimeout` after goto to check the handler did not double-fire.
 - ElementHandle `$eval` / `$$eval` are `evalOnSelector` / `evalOnSelectorAll` with `isFunction: true`. Page `$eval` and ElementHandle `$eval` omit `strict` (first match), matching the JS client; locator `evaluate` still sends `strict: true`.

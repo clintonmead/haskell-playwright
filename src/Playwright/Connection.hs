@@ -8,6 +8,7 @@ module Playwright.Connection
   , registerEventWaiter
   , waitForChannelEvent
   , waitForFutureChannelEvent
+  , registerFutureEventWaiter
   , waitForLifecycle
   , waitUntilUrl
   , closedGuids
@@ -622,11 +623,16 @@ waitForChannelEvent conn guid method = do
   box <- registerEventWaiter conn guid method
   atomically (takeTMVar box)
 
-waitForFutureChannelEvent :: Connection -> Guid -> MethodName -> IO Value
-waitForFutureChannelEvent conn guid method = do
+registerFutureEventWaiter :: Connection -> Guid -> MethodName -> IO (TMVar Value)
+registerFutureEventWaiter conn guid method = do
   box <- newEmptyTMVarIO
   atomically $
     modifyTVar' (connectionEventWaiters conn) (EventWaiter guid method box :)
+  pure box
+
+waitForFutureChannelEvent :: Connection -> Guid -> MethodName -> IO Value
+waitForFutureChannelEvent conn guid method = do
+  box <- registerFutureEventWaiter conn guid method
   atomically (takeTMVar box)
 
 waitUntilUrl :: Connection -> Guid -> (Url -> Bool) -> IO ()

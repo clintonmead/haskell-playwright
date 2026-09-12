@@ -42,6 +42,12 @@ module Playwright.Page
   , waitForLoadState
   , waitForNavigation
   , waitForNavigationWith
+  , waitForFrameNavigated
+  , armFrameNavigated
+  , waitForFrameDetached
+  , armFrameDetached
+  , waitForLoadEvent
+  , armLoadEvent
   , waitForTimeout
   , waitForURL
   , waitForURLWith
@@ -103,6 +109,7 @@ import Playwright.Connection
   , lookupTimeoutDefaults
   , registerEventHandler
   , registerEventWaiter
+  , registerFutureEventWaiter
   , registerMainFramePage
   , setTimeoutDefault
   , setTimeoutNavigation
@@ -209,6 +216,7 @@ import Playwright.Protocol
   , PageAddInitScriptResult
   , PageBringToFrontResult
   , PageCloseResult
+  , PageFrameDetachedEvent (pageFrameDetachedEventFrame)
   , PageGoBackResult (pageGoBackResultResponse)
   , PageGoForwardResult (pageGoForwardResultResponse)
   , PageInitializer (pageInitializerMainFrame, pageInitializerOpener)
@@ -606,6 +614,29 @@ onLoad page run =
         _ ->
           pure ()
 
+waitForLoadEvent :: Page -> IO ()
+waitForLoadEvent page = do
+  timeout <- pageNavigationTimeout page
+  takeLoad <- armLoadEvent page
+  waitWithTimeout timeout takeLoad
+
+armLoadEvent :: Page -> IO (IO ())
+armLoadEvent page = do
+  box <-
+    registerFutureEventWaiter
+      (channelConnection (pageChannel page))
+      (channelGuid (frameChannel (pageMainFrame page)))
+      (MethodName "loadstate")
+  pure $ do
+    params <- atomically (takeTMVar box)
+    event <- either throwIO pure (fromJsonValue params)
+    case frameLoadstateEventAdd event of
+      Just LifecycleEventLoad ->
+        pure ()
+      _ -> do
+        takeLoad <- armLoadEvent page
+        takeLoad
+
 waitForTimeout :: Page -> Timeout -> IO ()
 waitForTimeout page =
   waitForTimeoutFrame (pageMainFrame page)
@@ -660,6 +691,39 @@ waitForNavigation :: Page -> IO (Maybe Response)
 waitForNavigation page = do
   timeout <- pageNavigationTimeout page
   waitForNavigationWith page timeout Nothing
+
+waitForFrameNavigated :: Page -> IO ()
+waitForFrameNavigated page = do
+  timeout <- pageNavigationTimeout page
+  takeNavigated <- armFrameNavigated page
+  waitWithTimeout timeout takeNavigated
+
+armFrameNavigated :: Page -> IO (IO ())
+armFrameNavigated page = do
+  let
+    conn = channelConnection (pageChannel page)
+    frameGuid = channelGuid (frameChannel (pageMainFrame page))
+  box <- registerFutureEventWaiter conn frameGuid (MethodName "navigated")
+  pure $ do
+    _ <- atomically (takeTMVar box)
+    pure ()
+
+waitForFrameDetached :: Page -> IO Frame
+waitForFrameDetached page = do
+  timeout <- pageNavigationTimeout page
+  takeFrame <- armFrameDetached page
+  waitWithTimeout timeout takeFrame
+
+armFrameDetached :: Page -> IO (IO Frame)
+armFrameDetached page = do
+  let
+    conn = channelConnection (pageChannel page)
+    guid = channelGuid (pageChannel page)
+  box <- registerFutureEventWaiter conn guid (MethodName "frameDetached")
+  pure $ do
+    params <- atomically (takeTMVar box)
+    event <- either throwIO pure (fromJsonValue params)
+    frameFromRef conn (pageFrameDetachedEventFrame event)
 
 waitForNavigationWith :: Page -> Timeout -> Maybe UrlGlob -> IO (Maybe Response)
 waitForNavigationWith page timeout glob =

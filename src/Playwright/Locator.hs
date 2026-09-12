@@ -9,6 +9,7 @@ module Playwright.Locator
   , childFrameLocator
   , clear
   , click
+  , clickWith
   , describeLocator
   , dblclick
   , dispatchEvent
@@ -91,6 +92,9 @@ import Playwright.CheckOptions
   ( CheckOptions (checkOptionsTimeout)
   , defaultCheckOptions
   )
+import Playwright.ClickOptions
+  ( ClickOptions (clickOptionsNoWaitAfter, clickOptionsTimeout)
+  )
 import Playwright.DomEventType
   ( DomEventType
   )
@@ -116,6 +120,7 @@ import Playwright.Frame.Action
   ( blurFrame
   , checkFrame
   , clickFrame
+  , clickFrameWith
   , dblclickFrame
   , dispatchEventFrame
   , dragAndDropFrame
@@ -285,6 +290,20 @@ withActionTimeout loc action = do
 click :: Locator -> IO ()
 click loc =
   withActionTimeout loc (clickFrame (locatorFrame loc) (locatorSelector loc))
+
+clickWith :: Locator -> ClickOptions -> IO ()
+clickWith loc opts = do
+  timeout <-
+    case clickOptionsTimeout opts of
+      Just value ->
+        pure value
+      Nothing ->
+        locatorActionTimeout loc
+  clickFrameWith
+    (locatorFrame loc)
+    (locatorSelector loc)
+    timeout
+    (clickOptionsNoWaitAfter opts)
 
 dblclick :: Locator -> IO ()
 dblclick loc =

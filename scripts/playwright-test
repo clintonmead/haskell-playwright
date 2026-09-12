@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
-# Quiet Playwright Haskell tests. Full-suite runs shard across processes
-# (each with Tasty --num-threads=1) because concurrent waitForProcess in one
-# RTS races on SIGCHLD. Extra args skip sharding and go to Tasty.
+# Quiet Playwright Haskell tests.
+#
+# Individual tests use Tasty's built-in -p/--pattern (same role as Hspec
+# --match). Extra args skip sharding and are passed to the Tasty binary:
+#   playwright-test -p /page-goto/
+#   playwright-test -p '/page-goto/&&/should work/'
+#   playwright-test --list-tests
+# TASTY_PATTERN is also honored (Tasty reads it itself).
+#
+# Full-suite runs (no extra args) shard across processes, each with
+# --num-threads=1, because concurrent waitForProcess in one RTS races on
+# SIGCHLD.
 set -eu
 
 hpack --force
@@ -43,7 +52,21 @@ run_one() {
   return "$status"
 }
 
-if [ "$#" -gt 0 ] || [ "$jobs" -eq 1 ]; then
+pass_through=0
+for arg in "$@"; do
+  case "$arg" in
+    --help|-h|--list-tests)
+      pass_through=1
+      ;;
+  esac
+done
+
+if [ "$pass_through" -eq 1 ]; then
+  "$bin" --hide-successes --hide-progress --color=never --num-threads=1 "$@"
+  exit $?
+fi
+
+if [ "$#" -gt 0 ] || [ "$jobs" -eq 1 ] || [ -n "${TASTY_PATTERN:-}" ]; then
   run_one "$@"
   exit $?
 fi

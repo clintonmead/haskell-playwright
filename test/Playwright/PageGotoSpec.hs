@@ -6,7 +6,8 @@ import Control.Concurrent
   ( threadDelay
   )
 import Control.Concurrent.Async
-  ( wait
+  ( async
+  , wait
   , withAsync
   )
 import Control.Concurrent.MVar
@@ -20,6 +21,7 @@ import Control.Exception
   )
 import Control.Monad
   ( forever
+  , void
   )
 import Data.ByteString.Lazy
   ( ByteString
@@ -27,6 +29,7 @@ import Data.ByteString.Lazy
 import Data.ByteString.Lazy qualified as LBS
 import Data.IORef
   ( IORef
+  , atomicModifyIORef'
   , modifyIORef'
   , newIORef
   , readIORef
@@ -53,12 +56,14 @@ import Network.HTTP.Types
   , status204
   , status302
   , status404
+  , status500
   )
 import Network.Wai
   ( Application
   , pathInfo
   , requestHeaders
   , responseLBS
+  , responseRaw
   )
 import Network.Wai qualified as Wai
 import Network.Wai.Application.Static
@@ -75,15 +80,17 @@ import Playwright
   , HeaderValue (HeaderValue)
   , HttpHeader (HttpHeader)
   , HttpStatus (httpStatusToInt)
-  , LoadState (LoadStateCommit, LoadStateDomContentLoaded, LoadStateLoad)
+  , LoadState (LoadStateCommit, LoadStateDomContentLoaded, LoadStateLoad, LoadStateNetworkIdle)
   , Page
   , Request
   , Response
   , Timeout
   , UrlGlob (UrlGlob)
+  , armFrameDetached
   , continueRoute
   , defaultGotoOptions
   , evaluate
+  , evaluateTexts
   , frames
   , framesEqual
   , goto
@@ -95,6 +102,7 @@ import Playwright
   , onRequestFinished
   , onResponse
   , pageContext
+  , querySelector
   , requestFailure
   , requestFrame
   , requestRedirectedFrom
@@ -107,6 +115,7 @@ import Playwright
   , responseStatus
   , responseUrl
   , route
+  , selectorFromText
   , setContextDefaultNavigationTimeout
   , setContextDefaultTimeout
   , setDefaultNavigationTimeout
@@ -116,6 +125,7 @@ import Playwright
   , url
   , urlFromText
   , urlToText
+  , waitForTimeout
   )
 import Playwright.Harness
   ( assertProtocolContains
@@ -126,6 +136,8 @@ import Playwright.Harness
   )
 import Test.Tasty
   ( TestTree
+  , localOption
+  , mkTimeout
   , testGroup
   )
 import Test.Tasty.HUnit
@@ -223,6 +235,8 @@ tests =
               assertFailure "missing request frame"
             Just actual ->
               assertEqual "request frame" True (framesEqual actual (mainFrame page))
+    , testCase "should work with cross-process that fails before committing" $
+        failBeforeCommit
     , testCase "should work with Cross-Origin-Opener-Policy" $
         coopTest False
     , testCase "should work with Cross-Origin-Opener-Policy and interception" $
@@ -491,6 +505,39 @@ tests =
           pure ()
     , testCase "should return when navigation is committed if commit is specified" $
         commitNavigation
+    , testCase "should properly wait for load" $
+        loadEventOrder
+    , testCase "should return url with basic auth info" $
+        withAssets $ \prefix page -> do
+          let authed = "http://admin:admin@" <> Text.drop 7 prefix <> "/empty.html"
+          _ <- goto page (urlFromText authed) defaultGotoOptions
+          assertEqual "url" authed . urlToText =<< url page
+    , testCase "should not throw if networkidle is passed" $
+        withAssets $ \prefix page -> do
+          _ <-
+            goto
+              page
+              (urlFromText (prefix <> "/empty.html"))
+              defaultGotoOptions {gotoOptionsWaitUntil = Just LoadStateNetworkIdle}
+          pure ()
+    , localOption (mkTimeout 30000000) $
+        testCase "should not resolve goto upon window.stop()" $
+          windowStopGoto
+    , localOption (mkTimeout 30000000) $
+        testCase "should return from goto if new navigation is started" $
+          gotoInterruptedBySecond
+    , localOption (mkTimeout 30000000) $
+        testCase "should wait for load when iframe attaches and detaches" $
+          iframeAttachDetach
+    , localOption (mkTimeout 30000000) $
+        testCase "should fail when replaced by another navigation" $
+          replacedByAnotherNavigation
+    , localOption (mkTimeout 30000000) $
+        testCase "js redirect overrides url bar navigation" $
+          jsRedirectUrlBar
+    , localOption (mkTimeout 30000000) $
+        testCase "should succeed on url bar navigation when there is pending navigation" $
+          urlBarDuringPending
     ]
 
 requireMs :: Double -> IO Timeout
@@ -845,3 +892,316 @@ rtcApp request respond =
         )
     _ ->
       respond (responseLBS status404 [] "")
+
+loadEventOrder :: IO ()
+loadEventOrder = do
+  assets <- testAssetsDir
+  let
+    static = staticApp (defaultFileServerSettings assets)
+    app request respond =
+      case pathInfo request of
+        ["slow.js"] -> do
+          threadDelay 100000
+          respond
+            ( responseLBS
+                status200
+                [(hContentType, "application/javascript")]
+                "window.results.push('slow module');export const foo = 'slow';"
+            )
+        _ ->
+          static request respond
+  withGotoServer app $ \prefix page -> do
+    _ <- goto page (urlFromText (prefix <> "/load-event/load-event.html")) defaultGotoOptions
+    results <- evaluateTexts page "() => window.results"
+    assertEqual
+      "order"
+      [ "script tag after after module"
+      , "slow module"
+      , "module"
+      , "DOMContentLoaded"
+      , "load"
+      ]
+      results
+
+failBeforeCommit :: IO ()
+failBeforeCommit = do
+  assets <- testAssetsDir
+  let
+    static = staticApp (defaultFileServerSettings assets)
+    app :: Application
+    app request respond =
+      case pathInfo request of
+        ["empty.html"] ->
+          respond (responseRaw (\_ _ -> pure ()) (responseLBS status500 [] ""))
+        _ ->
+          static request respond
+  withGotoServer app $ \prefix page -> do
+    response <-
+      goto page (urlFromText (crossProcess prefix <> "/title.html")) defaultGotoOptions
+    case response of
+      Nothing ->
+        assertFailure "missing response"
+      Just value ->
+        responseFinished value
+    result <-
+      try (goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions) ::
+        IO (Either SomeException (Maybe Response))
+    case result of
+      Left _ ->
+        pure ()
+      Right _ ->
+        assertFailure "expected navigation error"
+
+windowStopGoto :: IO ()
+windowStopGoto = do
+  assets <- testAssetsDir
+  started <- newEmptyMVar
+  release <- newEmptyMVar
+  done <- newIORef False
+  let
+    static = staticApp (defaultFileServerSettings assets)
+    app :: Application
+    app request respond =
+      case pathInfo request of
+        ["module.js"] -> do
+          putMVar started ()
+          takeMVar release
+          respond
+            ( responseLBS
+                status200
+                [(hContentType, "application/javascript")]
+                ""
+            )
+        _ ->
+          static request respond
+  withGotoServer app $ \prefix page -> do
+    timeout <- requireMs 1000
+    withAsync
+      ( do
+          result <-
+            try (goto page (urlFromText (prefix <> "/window-stop.html")) defaultGotoOptions) ::
+              IO (Either SomeException (Maybe Response))
+          case result of
+            Left _ ->
+              pure ()
+            Right _ ->
+              writeIORef done True
+      )
+      $ \_ -> do
+        takeMVar started
+        assertEqual "before end" False =<< readIORef done
+        waitForTimeout page timeout
+        putMVar release ()
+        waitForTimeout page timeout
+        assertEqual "after end" False =<< readIORef done
+
+gotoInterruptedBySecond :: IO ()
+gotoInterruptedBySecond = do
+  assets <- testAssetsDir
+  finished <- newIORef False
+  let
+    static = staticApp (defaultFileServerSettings assets)
+    app :: Application
+    app request respond =
+      case pathInfo request of
+        ["slow.js"] ->
+          forever (threadDelay 1000000)
+        _ ->
+          static request respond
+  withGotoServer app $ \prefix page -> do
+    withAsync
+      ( do
+          response <-
+            goto
+              page
+              (urlFromText (prefix <> "/load-event/load-event.html"))
+              defaultGotoOptions
+          writeIORef finished True
+          pure response
+      )
+      $ \pending -> do
+        threadDelay 500000
+        assertEqual "still pending" False =<< readIORef finished
+        _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+        first <- wait pending
+        case first of
+          Nothing ->
+            assertFailure "missing first navigation response"
+          Just value ->
+            assertEqual "status" 200 . httpStatusToInt =<< responseStatus value
+
+iframeAttachDetach :: IO ()
+iframeAttachDetach = do
+  let
+    app :: Application
+    app request respond =
+      case pathInfo request of
+        ["empty.html"] ->
+          respond
+            ( responseLBS
+                status200
+                [(hContentType, "text/html")]
+                "<body><script>const iframe = document.createElement('iframe'); iframe.src = './iframe.html'; document.body.appendChild(iframe); setTimeout(() => iframe.remove(), 1000);</script></body>"
+            )
+        ["iframe.html"] ->
+          respond
+            ( responseLBS
+                status200
+                [(hContentType, "text/html")]
+                "<link rel=\"stylesheet\" href=\"./style2.css\">"
+            )
+        ["style2.css"] ->
+          forever (threadDelay 1000000)
+        _ ->
+          respond (responseLBS status404 [] "")
+  withGotoServer app $ \prefix page -> do
+    awaitDetached <- armFrameDetached page
+    withAsync
+      ( goto
+          page
+          (urlFromText (prefix <> "/empty.html"))
+          defaultGotoOptions {gotoOptionsWaitUntil = Just LoadStateLoad}
+      )
+      $ \done -> do
+        _ <- awaitDetached
+        _ <- wait done
+        iframe <- querySelector page (selectorFromText "iframe")
+        case iframe of
+          Nothing ->
+            pure ()
+          Just _ ->
+            assertFailure "expected iframe to be gone"
+
+replacedByAnotherNavigation :: IO ()
+replacedByAnotherNavigation = do
+  assets <- testAssetsDir
+  prefixRef <- newIORef ("" :: Text)
+  pageRef <- newIORef (Nothing :: Maybe Page)
+  another <- newEmptyMVar
+  let
+    static = staticApp (defaultFileServerSettings assets)
+    app :: Application
+    app request respond =
+      case pathInfo request of
+        ["empty.html"] -> do
+          prefix <- readIORef prefixRef
+          maybePage <- readIORef pageRef
+          case maybePage of
+            Nothing ->
+              respond (responseLBS status500 [] "")
+            Just page -> do
+              void $
+                async $
+                  putMVar another
+                    =<< goto
+                      page
+                      (urlFromText (prefix <> "/one-style.html"))
+                      defaultGotoOptions
+              forever (threadDelay 1000000)
+        _ ->
+          static request respond
+  withChromiumPage $ \page ->
+    withApplication (pure app) $ \port -> do
+      let prefix = "http://127.0.0.1:" <> pack (show port)
+      writeIORef prefixRef prefix
+      writeIORef pageRef (Just page)
+      result <-
+        try (goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions) ::
+          IO (Either SomeException (Maybe Response))
+      _ <- takeMVar another
+      case result of
+        Left _ ->
+          pure ()
+        Right _ ->
+          assertFailure "expected replaced navigation to fail"
+
+jsRedirectUrlBar :: IO ()
+jsRedirectUrlBar = do
+  events <- newIORef ([] :: [Text])
+  let
+    record :: Text -> IO ()
+    record label =
+      atomicModifyIORef' events (\xs -> (xs <> [label], ()))
+    app :: Application
+    app request respond =
+      case pathInfo request of
+        ["a"] ->
+          respond
+            ( responseLBS
+                status200
+                [(hContentType, "text/html")]
+                "<body><script>setTimeout(() => { window.location.pathname = '/c'; }, 1000);</script></body>"
+            )
+        ["b"] -> do
+          record "started b"
+          threadDelay 2000000
+          received <- respond (responseLBS status200 [(hContentType, "text/html")] "BBB")
+          record "finished b"
+          pure received
+        ["c"] -> do
+          record "started c"
+          threadDelay 2000000
+          received <- respond (responseLBS status200 [(hContentType, "text/html")] "CCC")
+          record "finished c"
+          pure received
+        _ ->
+          respond (responseLBS status404 [] "")
+  withGotoServer app $ \prefix page -> do
+    _ <- goto page (urlFromText (prefix <> "/a")) defaultGotoOptions
+    result <-
+      try (goto page (urlFromText (prefix <> "/b")) defaultGotoOptions) ::
+        IO (Either SomeException (Maybe Response))
+    recorded <- readIORef events
+    assertEqual "events" ["started b", "finished b"] recorded
+    case result of
+      Left _ ->
+        assertFailure "chromium should keep url-bar navigation"
+      Right _ ->
+        assertEqual "url" (prefix <> "/b") . urlToText =<< url page
+
+urlBarDuringPending :: IO ()
+urlBarDuringPending = do
+  events <- newIORef ([] :: [Text])
+  let
+    record :: Text -> IO ()
+    record label =
+      atomicModifyIORef' events (\xs -> (xs <> [label], ()))
+    app :: Application
+    app request respond =
+      case pathInfo request of
+        ["a"] ->
+          respond
+            ( responseLBS
+                status200
+                [(hContentType, "text/html")]
+                "<body><script>setTimeout(() => { window.location.pathname = '/c'; }, 10);</script></body>"
+            )
+        ["b"] -> do
+          record "started b"
+          threadDelay 2000000
+          received <- respond (responseLBS status200 [(hContentType, "text/html")] "BBB")
+          record "finished b"
+          pure received
+        ["c"] -> do
+          record "started c"
+          threadDelay 2000000
+          received <- respond (responseLBS status200 [(hContentType, "text/html")] "CCC")
+          record "finished c"
+          pure received
+        _ ->
+          respond (responseLBS status404 [] "")
+  withGotoServer app $ \prefix page -> do
+    timeout <- requireMs 1000
+    _ <- goto page (urlFromText (prefix <> "/a")) defaultGotoOptions
+    waitForTimeout page timeout
+    result <-
+      try (goto page (urlFromText (prefix <> "/b")) defaultGotoOptions) ::
+        IO (Either SomeException (Maybe Response))
+    recorded <- readIORef events
+    assertEqual "events" ["started c", "started b", "finished c", "finished b"] recorded
+    case result of
+      Left _ ->
+        assertFailure "expected url-bar navigation to succeed"
+      Right _ ->
+        assertEqual "url" (prefix <> "/b") . urlToText =<< url page
+

@@ -2,6 +2,7 @@ module Playwright.Frame.Action
   ( blurFrame
   , checkFrame
   , clickFrame
+  , clickFrameWith
   , dblclickFrame
   , dispatchEventFrame
   , fillFrame
@@ -47,7 +48,7 @@ import Playwright.Protocol
   , FrameBlurResult
   , FrameCheckParams (frameCheckParamsForce, frameCheckParamsStrict, frameCheckParamsTrial)
   , FrameCheckResult
-  , FrameClickParams (frameClickParamsStrict)
+  , FrameClickParams (frameClickParamsNoWaitAfter, frameClickParamsStrict)
   , FrameClickResult
   , FrameDblclickParams (frameDblclickParamsStrict)
   , FrameDblclickResult
@@ -108,11 +109,16 @@ import Playwright.Timeout
 
 clickFrame :: Frame -> Selector -> Timeout -> IO ()
 clickFrame frame selector timeout =
+  clickFrameWith frame selector timeout Nothing
+
+clickFrameWith :: Frame -> Selector -> Timeout -> Maybe Bool -> IO ()
+clickFrameWith frame selector timeout noWaitAfter =
   frameSend_ @FrameClickResult
     frame
     "click"
     (mkFrameClickParams selector timeout)
       { frameClickParamsStrict = Just True
+      , frameClickParamsNoWaitAfter = noWaitAfter
       }
 
 dblclickFrame :: Frame -> Selector -> Timeout -> IO ()
