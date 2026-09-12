@@ -10,8 +10,6 @@ import Control.Concurrent
   )
 import Control.Concurrent.STM
   ( atomically
-  , modifyTVar'
-  , readTVar
   , retry
   , throwSTM
   )
@@ -37,8 +35,12 @@ import Data.Foldable
   )
 import Data.Set qualified as Set
 import Playwright.Connection.Types
-  ( Connection (connectionClosed, connectionEventHandlers, connectionHandlerQueue, connectionHandlerThreads, connectionPendingHandlers)
-  , EventHandler (EventHandler, eventHandlerGuid, eventHandlerMethod, eventHandlerRun)
+  ( Connection (connectionHandlerQueue)
+  , modifySession
+  , readSession
+  )
+import Playwright.EventHandler
+  ( EventHandler (EventHandler, eventHandlerGuid, eventHandlerMethod, eventHandlerRun)
   )
 import Playwright.Guid
   ( Guid
@@ -46,28 +48,33 @@ import Playwright.Guid
 import Playwright.MethodName
   ( MethodName
   )
+import Playwright.Session
+  ( Session (sessionClosed, sessionEventHandlers, sessionHandlerThreads, sessionPendingHandlers)
+  )
 
 registerEventHandler :: Connection -> Guid -> MethodName -> (Value -> IO ()) -> IO ()
 registerEventHandler conn guid method run =
   atomically $
-    modifyTVar' (connectionEventHandlers conn) (EventHandler guid method run :)
+    modifySession conn $ \session ->
+      session {sessionEventHandlers = EventHandler guid method run : sessionEventHandlers session}
 
 runEventHandlers :: Connection -> Guid -> MethodName -> Value -> IO ()
 runEventHandlers conn guid method params = do
-  handlers <- atomically (readTVar (connectionEventHandlers conn))
+  session <- atomically (readSession conn)
   let
     matching =
       filter
         ( \handler ->
             eventHandlerGuid handler == guid && eventHandlerMethod handler == method
         )
-        handlers
+        (sessionEventHandlers session)
   traverse_ (enqueueHandler conn params) matching
 
 enqueueHandler :: Connection -> Value -> EventHandler -> IO ()
 enqueueHandler conn params handler =
   atomically $ do
-    modifyTVar' (connectionPendingHandlers conn) (+ 1)
+    modifySession conn $ \session ->
+      session {sessionPendingHandlers = sessionPendingHandlers session + 1}
     writeTQueue (connectionHandlerQueue conn) (runQueuedHandler conn params handler)
 
 handlerLoop :: Connection -> IO ()
@@ -79,13 +86,18 @@ handlerLoop conn =
 runQueuedHandler :: Connection -> Value -> EventHandler -> IO ()
 runQueuedHandler conn params handler = do
   tid <- myThreadId
-  atomically (modifyTVar' (connectionHandlerThreads conn) (Set.insert tid))
+  atomically $
+    modifySession conn $ \session ->
+      session {sessionHandlerThreads = Set.insert tid (sessionHandlerThreads session)}
   let
     cleanup :: IO ()
     cleanup =
-      atomically $ do
-        modifyTVar' (connectionHandlerThreads conn) (Set.delete tid)
-        modifyTVar' (connectionPendingHandlers conn) (subtract 1)
+      atomically $
+        modifySession conn $ \session ->
+          session
+            { sessionHandlerThreads = Set.delete tid (sessionHandlerThreads session)
+            , sessionPendingHandlers = sessionPendingHandlers session - 1
+            }
   eventHandlerRun handler params
     `catch` (\(_ :: SomeException) -> pure ())
     `finally` cleanup
@@ -94,12 +106,10 @@ waitForDispatchedHandlers :: Connection -> IO ()
 waitForDispatchedHandlers conn = do
   tid <- myThreadId
   atomically $ do
-    closed <- readTVar (connectionClosed conn)
-    case closed of
+    session <- readSession conn
+    case sessionClosed session of
       Just err ->
         throwSTM err
-      Nothing -> do
-        handlerThreads <- readTVar (connectionHandlerThreads conn)
-        unless (Set.member tid handlerThreads) $ do
-          pending <- readTVar (connectionPendingHandlers conn)
-          when (pending > 0) retry
+      Nothing ->
+        unless (Set.member tid (sessionHandlerThreads session)) $ do
+          when (sessionPendingHandlers session > 0) retry

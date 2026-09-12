@@ -33,10 +33,6 @@ module Playwright.Page.Wait
   , waitForURLWith
   ) where
 
-import Control.Concurrent.STM
-  ( atomically
-  , takeTMVar
-  )
 import Control.Exception
   ( throwIO
   )
@@ -52,6 +48,7 @@ import Playwright.Connection
   , registerFutureEventWaiter
   , waitForChannelEvent
   , waitForFutureChannelEvent
+  , waitForWaiter
   , waitUntilUrl
   )
 import Playwright.ConsoleMessage
@@ -191,13 +188,15 @@ waitForLoadEvent page = do
 
 armLoadEvent :: Page -> IO (IO ())
 armLoadEvent page = do
-  box <-
+  let
+    conn = channelConnection (pageChannel page)
+  waitId <-
     registerFutureEventWaiter
-      (channelConnection (pageChannel page))
+      conn
       (channelGuid (frameChannel (pageMainFrame page)))
       (MethodName "loadstate")
   pure $ do
-    params <- atomically (takeTMVar box)
+    params <- waitForWaiter conn waitId
     event <- either throwIO pure (fromJsonValue params)
     case frameLoadstateEventAdd event of
       Just LifecycleEventLoad ->
@@ -249,9 +248,9 @@ armFrameNavigated page = do
   let
     conn = channelConnection (pageChannel page)
     frameGuid = channelGuid (frameChannel (pageMainFrame page))
-  box <- registerFutureEventWaiter conn frameGuid (MethodName "navigated")
+  waitId <- registerFutureEventWaiter conn frameGuid (MethodName "navigated")
   pure $ do
-    _ <- atomically (takeTMVar box)
+    _ <- waitForWaiter conn waitId
     pure ()
 
 waitForFrameDetached :: Page -> IO Frame
@@ -265,9 +264,9 @@ armFrameDetached page = do
   let
     conn = channelConnection (pageChannel page)
     guid = channelGuid (pageChannel page)
-  box <- registerFutureEventWaiter conn guid (MethodName "frameDetached")
+  waitId <- registerFutureEventWaiter conn guid (MethodName "frameDetached")
   pure $ do
-    params <- atomically (takeTMVar box)
+    params <- waitForWaiter conn waitId
     event <- either throwIO pure (fromJsonValue params)
     frameFromRef conn (pageFrameDetachedEventFrame event)
 
@@ -298,13 +297,15 @@ collectNavigation page glob = do
 armDialog :: Page -> IO (IO Dialog)
 armDialog page = do
   subscribeContext page BrowserContextUpdateSubscriptionParamsEventDialog
-  box <-
+  let
+    conn = channelConnection (pageContextChannel page)
+  waitId <-
     registerEventWaiter
-      (channelConnection (pageContextChannel page))
+      conn
       (channelGuid (pageContextChannel page))
       (MethodName "dialog")
   pure $ do
-    params <- atomically (takeTMVar box)
+    params <- waitForWaiter conn waitId
     event <- either throwIO pure (fromJsonValue params)
     dialogFromRef
       (channelConnection (pageContextChannel page))
@@ -318,13 +319,15 @@ waitForDialog page = do
 armConsole :: Page -> IO (IO ConsoleMessage)
 armConsole page = do
   subscribeContext page BrowserContextUpdateSubscriptionParamsEventConsole
-  box <-
+  let
+    conn = channelConnection (pageContextChannel page)
+  waitId <-
     registerEventWaiter
-      (channelConnection (pageContextChannel page))
+      conn
       (channelGuid (pageContextChannel page))
       (MethodName "console")
   pure $ do
-    params <- atomically (takeTMVar box)
+    params <- waitForWaiter conn waitId
     event <- either throwIO pure (fromJsonValue params :: Either PlaywrightError BrowserContextConsoleEvent)
     consoleMessageFromEvent (channelConnection (pageContextChannel page)) event
 

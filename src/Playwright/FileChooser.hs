@@ -5,10 +5,6 @@ module Playwright.FileChooser
   , waitForFileChooserWith
   ) where
 
-import Control.Concurrent.STM
-  ( atomically
-  , takeTMVar
-  )
 import Control.Exception
   ( throwIO
   )
@@ -18,6 +14,7 @@ import Playwright.Channel
   )
 import Playwright.Connection
   ( registerEventWaiter
+  , waitForWaiter
   )
 import Playwright.ElementHandle
   ( ElementHandle
@@ -71,9 +68,9 @@ armFileChooser page = do
   let
     conn = channelConnection (pageChannel page)
     guid = channelGuid (pageChannel page)
-  box <- registerEventWaiter conn guid (MethodName "fileChooser")
+  waitId <- registerEventWaiter conn guid (MethodName "fileChooser")
   pure $ do
-    params <- atomically (takeTMVar box)
+    params <- waitForWaiter conn waitId
     event <- either throwIO pure (fromJsonValue params)
     pure
       FileChooser

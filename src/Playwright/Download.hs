@@ -9,10 +9,6 @@ module Playwright.Download
   , waitForDownload
   ) where
 
-import Control.Concurrent.STM
-  ( atomically
-  , takeTMVar
-  )
 import Control.Exception
   ( throwIO
   )
@@ -27,6 +23,7 @@ import Playwright.Channel
   )
 import Playwright.Connection
   ( registerEventWaiter
+  , waitForWaiter
   )
 import Playwright.Json.ChannelRef
   ( ChannelRef (channelRefGuid)
@@ -71,9 +68,9 @@ armDownload page = do
   let
     conn = channelConnection (pageChannel page)
     guid = channelGuid (pageChannel page)
-  box <- registerEventWaiter conn guid (MethodName "download")
+  waitId <- registerEventWaiter conn guid (MethodName "download")
   pure $ do
-    params <- atomically (takeTMVar box)
+    params <- waitForWaiter conn waitId
     event <- either throwIO pure (fromJsonValue params)
     pure
       ( Download

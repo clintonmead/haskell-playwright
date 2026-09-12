@@ -10,6 +10,7 @@ module Playwright.Connection
   , waitForFutureChannelEvent
   , waitForFutureChannelEventUnlessClosed
   , registerFutureEventWaiter
+  , waitForWaiter
   , rememberBrowserContext
   , lookupOwnedContextGuids
   , lookupContextBrowserGuid
@@ -48,22 +49,14 @@ module Playwright.Connection
   , locatorHandlerUidsMatching
   ) where
 
-import Control.Concurrent
-  ( ThreadId
-  )
 import Control.Concurrent.Async
   ( withAsync
   )
 import Control.Concurrent.STM
   ( atomically
-  , modifyTVar'
-  , newEmptyTMVarIO
   , newTVarIO
-  , putTMVar
-  , readTVar
-  , takeTMVar
+  , retry
   , throwSTM
-  , writeTVar
   )
 import Control.Concurrent.STM.TQueue
   ( newTQueueIO
@@ -71,6 +64,9 @@ import Control.Concurrent.STM.TQueue
 import Control.Exception
   ( finally
   , throwIO
+  )
+import Control.Monad
+  ( unless
   )
 import Data.Aeson
   ( FromJSON
@@ -93,9 +89,6 @@ import Data.Map.Strict
   ( Map
   )
 import Data.Map.Strict qualified as Map
-import Data.Set
-  ( Set
-  )
 import Data.Set qualified as Set
 import Data.Text
   ( Text
@@ -143,9 +136,12 @@ import Playwright.Connection.Store
   , writeRequestOverrides
   )
 import Playwright.Connection.Types
-  ( Connection (Connection, connectionBrowserContexts, connectionBrowserTypes, connectionCallbacks, connectionClosed, connectionClosedGuids, connectionContextBaseUrls, connectionContextBrowsers, connectionContextsWithOwnerPage, connectionEventBuffer, connectionEventHandlers, connectionEventWaiters, connectionFinishedRequests, connectionHandlerQueue, connectionHandlerThreads, connectionLocatorHandlers, connectionLocatorListening, connectionMainFramePages, connectionNextId, connectionObjects, connectionPagesOwningContext, connectionPendingHandlers, connectionRequestFailures, connectionRequestOverrides, connectionRouteHandlers, connectionRouteListening, connectionSelectorEngines, connectionTimeoutDefaults, connectionTransport)
+  ( Connection (Connection, connectionHandlerQueue, connectionSession, connectionTransport)
   , OutgoingCall (OutgoingCall, outgoingCallGuid, outgoingCallId, outgoingCallMetadata, outgoingCallMethod, outgoingCallParams)
-  , StoredLocatorHandler (StoredLocatorHandler, storedLocatorHandlerFrame, storedLocatorHandlerRun, storedLocatorHandlerSelector, storedLocatorHandlerTimes)
+  , modifySession
+  , readSession
+  , stateSession
+  , withSession
   )
 import Playwright.Connection.Wait
   ( deliverEvent
@@ -155,6 +151,7 @@ import Playwright.Connection.Wait
   , waitForFutureChannelEvent
   , waitForFutureChannelEventUnlessClosed
   , waitForLifecycle
+  , waitForWaiter
   , waitUntilRemote
   , waitUntilRequestSettled
   , waitUntilUrl
@@ -165,7 +162,6 @@ import Playwright.Error
   )
 import Playwright.Guid
   ( Guid
-  , rootGuid
   )
 import Playwright.Incoming
   ( CreateParams (createGuid, createInitializer, createType)
@@ -184,19 +180,24 @@ import Playwright.MethodName
 import Playwright.Protocol
   ( BrowserContextRequestFailedEvent (browserContextRequestFailedEventFailureText, browserContextRequestFailedEventRequest)
   , BrowserContextRequestFinishedEvent (browserContextRequestFinishedEventRequest)
-  , ChannelType (ChannelTypeRoot)
   , FrameInitializer (frameInitializerLoadStates)
   , FrameLoadstateEvent (frameLoadstateEventAdd, frameLoadstateEventRemove)
   , FrameNavigatedEvent (frameNavigatedEventName, frameNavigatedEventUrl)
   , JSHandlePreviewUpdatedEvent (jSHandlePreviewUpdatedEventPreview)
   , LifecycleEvent
-  , SelectorEngine
   )
 import Playwright.RemoteObject
   ( RemoteObject (RemoteObject, remoteGuid, remoteInitializer, remoteParent, remoteType)
   )
 import Playwright.RequestId
-  ( RequestId (RequestId)
+  ( RequestId
+  )
+import Playwright.Session
+  ( Session (sessionBrowserContexts, sessionClosed, sessionClosedGuids, sessionFinishedRequests, sessionNextId, sessionObjects, sessionPending, sessionRequestFailures, sessionResults)
+  , emptySession
+  )
+import Playwright.StoredLocatorHandler
+  ( StoredLocatorHandler (StoredLocatorHandler, storedLocatorHandlerFrame, storedLocatorHandlerRun, storedLocatorHandlerSelector, storedLocatorHandlerTimes)
   )
 import Playwright.Transport
   ( Transport (closeTransport, recvPayload, sendPayload)
@@ -207,78 +208,19 @@ import Playwright.Url
 
 withConnection :: Transport -> (Connection -> IO a) -> IO a
 withConnection transport action = do
-  objects <- newTVarIO (Map.singleton rootGuid rootObject)
-  callbacks <- newTVarIO Map.empty
-  nextId <- newTVarIO (RequestId 1)
-  closed <- newTVarIO Nothing
-  eventWaiters <- newTVarIO []
-  eventBuffer <- newTVarIO Map.empty
-  closedGuidsVar <- newTVarIO Set.empty
-  eventHandlers <- newTVarIO []
-  routeHandlers <- newTVarIO Map.empty
-  routeListening <- newTVarIO Set.empty
-  requestOverrides <- newTVarIO Map.empty
-  contextBaseUrls <- newTVarIO Map.empty
-  browserContexts <- newTVarIO (Map.empty :: Map Guid [Guid])
-  contextBrowsers <- newTVarIO (Map.empty :: Map Guid Guid)
-  pagesOwningContext <- newTVarIO (Set.empty :: Set Guid)
-  contextsWithOwnerPage <- newTVarIO (Set.empty :: Set Guid)
-  browserTypes <- newTVarIO (Map.empty :: Map Guid Guid)
-  selectorEngines <- newTVarIO ([] :: [SelectorEngine])
-  timeoutDefaults <- newTVarIO Map.empty
-  mainFramePages <- newTVarIO Map.empty
-  finishedRequests <- newTVarIO (Set.empty :: Set Guid)
-  requestFailures <- newTVarIO (Map.empty :: Map Guid Text)
-  pendingHandlers <- newTVarIO (0 :: Int)
-  handlerThreads <- newTVarIO (Set.empty :: Set ThreadId)
+  session <- newTVarIO emptySession
   handlerQueue <- newTQueueIO
-  locatorHandlers <- newTVarIO (Map.empty :: Map Guid (Map Int StoredLocatorHandler))
-  locatorListening <- newTVarIO Set.empty
   let
     conn :: Connection
     conn =
       Connection
         { connectionTransport = transport
-        , connectionObjects = objects
-        , connectionCallbacks = callbacks
-        , connectionNextId = nextId
-        , connectionClosed = closed
-        , connectionEventWaiters = eventWaiters
-        , connectionEventBuffer = eventBuffer
-        , connectionClosedGuids = closedGuidsVar
-        , connectionEventHandlers = eventHandlers
-        , connectionRouteHandlers = routeHandlers
-        , connectionRouteListening = routeListening
-        , connectionRequestOverrides = requestOverrides
-        , connectionContextBaseUrls = contextBaseUrls
-        , connectionBrowserContexts = browserContexts
-        , connectionContextBrowsers = contextBrowsers
-        , connectionPagesOwningContext = pagesOwningContext
-        , connectionContextsWithOwnerPage = contextsWithOwnerPage
-        , connectionBrowserTypes = browserTypes
-        , connectionSelectorEngines = selectorEngines
-        , connectionTimeoutDefaults = timeoutDefaults
-        , connectionMainFramePages = mainFramePages
-        , connectionFinishedRequests = finishedRequests
-        , connectionRequestFailures = requestFailures
-        , connectionPendingHandlers = pendingHandlers
-        , connectionHandlerThreads = handlerThreads
+        , connectionSession = session
         , connectionHandlerQueue = handlerQueue
-        , connectionLocatorHandlers = locatorHandlers
-        , connectionLocatorListening = locatorListening
         }
   withAsync (readerLoop conn) $ \_ ->
     withAsync (handlerLoop conn) $ \_ ->
       action conn `finally` closeTransport transport
-
-rootObject :: RemoteObject
-rootObject =
-  RemoteObject
-    { remoteType = ChannelTypeRoot
-    , remoteGuid = rootGuid
-    , remoteParent = rootGuid
-    , remoteInitializer = Aeson.object []
-    }
 
 sendCommand ::
   (ToJSON params, FromJSON result) =>
@@ -288,15 +230,23 @@ sendCommand ::
   params ->
   IO result
 sendCommand conn guid method params = do
-  closed <- atomically (readTVar (connectionClosed conn))
+  closed <- atomically (sessionClosed <$> readSession conn)
   case closed of
     Just err ->
       throwIO err
     Nothing -> do
-      reqId <- nextRequestId conn
-      waiter <- newEmptyTMVarIO
-      atomically $
-        modifyTVar' (connectionCallbacks conn) (Map.insert reqId waiter)
+      reqId <-
+        atomically $
+          stateSession conn $ \session ->
+            let
+              nextId = sessionNextId session
+            in
+              ( nextId
+              , session
+                  { sessionNextId = succ nextId
+                  , sessionPending = Set.insert nextId (sessionPending session)
+                  }
+              )
       let
         outgoing :: OutgoingCall
         outgoing =
@@ -308,7 +258,18 @@ sendCommand conn guid method params = do
             , outgoingCallMetadata = Aeson.object ["internal" Aeson..= False]
             }
       sendPayload (connectionTransport conn) (toStrict (encode outgoing))
-      result <- atomically (takeTMVar waiter)
+      result <-
+        atomically $
+          withSession conn $ \session ->
+            case Map.lookup reqId (sessionResults session) of
+              Just value ->
+                pure (value, session {sessionResults = Map.delete reqId (sessionResults session)})
+              Nothing ->
+                case sessionClosed session of
+                  Just err ->
+                    throwSTM err
+                  Nothing ->
+                    retry
       waitForDispatchedHandlers conn
       case result of
         Left err ->
@@ -319,13 +280,6 @@ sendCommand conn guid method params = do
               throwIO (DecodeFailure (Text.pack err))
             Success decoded ->
               pure decoded
-
-nextRequestId :: Connection -> IO RequestId
-nextRequestId conn =
-  atomically $ do
-    current <- readTVar (connectionNextId conn)
-    writeTVar (connectionNextId conn) (succ current)
-    pure current
 
 readerLoop :: Connection -> IO ()
 readerLoop conn = do
@@ -347,24 +301,32 @@ dispatch conn incoming =
     IncomingResponse reqId result ->
       completeCallback conn reqId result
     IncomingCreate parent params ->
-      atomically $ do
-        modifyTVar' (connectionClosedGuids conn) (Set.delete (createGuid params))
-        modifyTVar' (connectionObjects conn) $
-          Map.insert
-            (createGuid params)
-            RemoteObject
-              { remoteType = createType params
-              , remoteGuid = createGuid params
-              , remoteParent = parent
-              , remoteInitializer = createInitializer params
-              }
+      atomically $
+        modifySession conn $ \session ->
+          session
+            { sessionClosedGuids = Set.delete (createGuid params) (sessionClosedGuids session)
+            , sessionObjects =
+                Map.insert
+                  (createGuid params)
+                  RemoteObject
+                    { remoteType = createType params
+                    , remoteGuid = createGuid params
+                    , remoteParent = parent
+                    , remoteInitializer = createInitializer params
+                    }
+                  (sessionObjects session)
+            }
     IncomingAdopt parent child ->
       atomically $
-        modifyTVar' (connectionObjects conn) $
-          Map.adjust (\obj -> obj {remoteParent = parent}) child
+        modifySession conn $ \session ->
+          session
+            { sessionObjects =
+                Map.adjust (\obj -> obj {remoteParent = parent}) child (sessionObjects session)
+            }
     IncomingDispose guid ->
       atomically $
-        modifyTVar' (connectionObjects conn) (disposeTree guid)
+        modifySession conn $ \session ->
+          session {sessionObjects = disposeTree guid (sessionObjects session)}
     IncomingEvent guid method params ->
       handleEvent conn guid method params
 
@@ -382,9 +344,12 @@ handleEvent conn guid method params = do
     MethodName "requestFinished" ->
       applyRequestFinished conn params
     MethodName "close" ->
-      atomically $ do
-        modifyTVar' (connectionClosedGuids conn) (Set.insert guid)
-        modifyTVar' (connectionBrowserContexts conn) (Map.map (filter (/= guid)))
+      atomically $
+        modifySession conn $ \session ->
+          session
+            { sessionClosedGuids = Set.insert guid (sessionClosedGuids session)
+            , sessionBrowserContexts = Map.map (filter (/= guid)) (sessionBrowserContexts session)
+            }
     _ ->
       pure ()
   deliverEvent conn guid method params
@@ -393,29 +358,34 @@ handleEvent conn guid method params = do
 applyLoadstate :: Connection -> Guid -> Value -> IO ()
 applyLoadstate conn guid params = do
   event <- either throwIO pure (fromJsonValue params)
-  atomically $ do
-    objects <- readTVar (connectionObjects conn)
-    case Map.lookup guid objects of
-      Nothing ->
-        pure ()
-      Just obj ->
-        case fromJsonValue (remoteInitializer obj) of
-          Left err ->
-            throwSTM err
-          Right initializer ->
-            writeTVar (connectionObjects conn) $
-              Map.insert
-                guid
-                obj
-                  { remoteInitializer =
-                      toJSON
-                        ( initializer
-                            { frameInitializerLoadStates =
-                                updateLoadStates event (frameInitializerLoadStates initializer)
+  atomically $
+    withSession conn $ \session ->
+      case Map.lookup guid (sessionObjects session) of
+        Nothing ->
+          pure ((), session)
+        Just obj ->
+          case fromJsonValue (remoteInitializer obj) of
+            Left err ->
+              throwSTM err
+            Right initializer ->
+              pure
+                ( ()
+                , session
+                    { sessionObjects =
+                        Map.insert
+                          guid
+                          obj
+                            { remoteInitializer =
+                                toJSON
+                                  ( initializer
+                                      { frameInitializerLoadStates =
+                                          updateLoadStates event (frameInitializerLoadStates initializer)
+                                      }
+                                  )
                             }
-                        )
-                  }
-                objects
+                          (sessionObjects session)
+                    }
+                )
 
 updateLoadStates :: FrameLoadstateEvent -> [LifecycleEvent] -> [LifecycleEvent]
 updateLoadStates event states =
@@ -440,36 +410,59 @@ applyNavigated :: Connection -> Guid -> Value -> IO ()
 applyNavigated conn guid params = do
   event <- either throwIO pure (fromJsonValue params)
   atomically $
-    modifyTVar' (connectionObjects conn) $
-      Map.adjust
-        (setInitializerNavigation (frameNavigatedEventName event) (frameNavigatedEventUrl event))
-        guid
+    modifySession conn $ \session ->
+      session
+        { sessionObjects =
+            Map.adjust
+              (setInitializerNavigation (frameNavigatedEventName event) (frameNavigatedEventUrl event))
+              guid
+              (sessionObjects session)
+        }
 
 applyPreviewUpdated :: Connection -> Guid -> Value -> IO ()
 applyPreviewUpdated conn guid params = do
   event <- either throwIO pure (fromJsonValue params)
   atomically $
-    modifyTVar' (connectionObjects conn) $
-      Map.adjust
-        (setInitializerPreview (jSHandlePreviewUpdatedEventPreview event))
-        guid
+    modifySession conn $ \session ->
+      session
+        { sessionObjects =
+            Map.adjust
+              (setInitializerPreview (jSHandlePreviewUpdatedEventPreview event))
+              guid
+              (sessionObjects session)
+        }
 
 applyRequestFailed :: Connection -> Value -> IO ()
 applyRequestFailed conn params = do
   event <- either throwIO pure (fromJsonValue params)
-  atomically $ do
-    modifyTVar' (connectionFinishedRequests conn) (Set.insert (channelRefGuid (browserContextRequestFailedEventRequest event)))
-    case browserContextRequestFailedEventFailureText event of
-      Nothing ->
-        pure ()
-      Just text ->
-        modifyTVar' (connectionRequestFailures conn) (Map.insert (channelRefGuid (browserContextRequestFailedEventRequest event)) text)
+  atomically $
+    modifySession conn $ \session ->
+      let
+        requestGuid = channelRefGuid (browserContextRequestFailedEventRequest event)
+        finished = Set.insert requestGuid (sessionFinishedRequests session)
+        failures =
+          case browserContextRequestFailedEventFailureText event of
+            Nothing ->
+              sessionRequestFailures session
+            Just text ->
+              Map.insert requestGuid text (sessionRequestFailures session)
+      in
+        session
+          { sessionFinishedRequests = finished
+          , sessionRequestFailures = failures
+          }
 
 applyRequestFinished :: Connection -> Value -> IO ()
 applyRequestFinished conn params = do
   event <- either throwIO pure (fromJsonValue params)
   atomically $
-    modifyTVar' (connectionFinishedRequests conn) (Set.insert (channelRefGuid (browserContextRequestFinishedEventRequest event)))
+    modifySession conn $ \session ->
+      session
+        { sessionFinishedRequests =
+            Set.insert
+              (channelRefGuid (browserContextRequestFinishedEventRequest event))
+              (sessionFinishedRequests session)
+        }
 
 setInitializerPreview :: Text -> RemoteObject -> RemoteObject
 setInitializerPreview preview obj =
@@ -506,21 +499,29 @@ completeCallback ::
   Either ProtocolFailure Value ->
   IO ()
 completeCallback conn reqId result = do
-  waiter <- atomically $ do
-    callbacks <- readTVar (connectionCallbacks conn)
-    writeTVar (connectionCallbacks conn) (Map.delete reqId callbacks)
-    pure (Map.lookup reqId callbacks)
-  case waiter of
-    Nothing ->
-      throwIO (UnexpectedResponse reqId)
-    Just tmvar ->
-      atomically $
-        putTMVar tmvar $
-          case result of
-            Left failure ->
-              Left (ProtocolRpc failure)
-            Right value ->
-              Right value
+  found <-
+    atomically $
+      withSession conn $ \session ->
+        if Set.member reqId (sessionPending session)
+          then
+            let
+              decoded =
+                case result of
+                  Left failure ->
+                    Left (ProtocolRpc failure)
+                  Right value ->
+                    Right value
+            in
+              pure
+                ( True
+                , session
+                    { sessionPending = Set.delete reqId (sessionPending session)
+                    , sessionResults = Map.insert reqId decoded (sessionResults session)
+                    }
+                )
+          else
+            pure (False, session)
+  unless found (throwIO (UnexpectedResponse reqId))
 
 disposeTree :: Guid -> Map Guid RemoteObject -> Map Guid RemoteObject
 disposeTree guid objects =
@@ -534,10 +535,7 @@ disposeTree guid objects =
     foldr disposeTree withoutSelf children
 
 markClosed :: Connection -> PlaywrightError -> IO ()
-markClosed conn err = do
-  waiters <- atomically $ do
-    writeTVar (connectionClosed conn) (Just err)
-    callbacks <- readTVar (connectionCallbacks conn)
-    writeTVar (connectionCallbacks conn) Map.empty
-    pure (Map.elems callbacks)
-  mapM_ (\waiter -> atomically (putTMVar waiter (Left err))) waiters
+markClosed conn err =
+  atomically $
+    modifySession conn $ \session ->
+      session {sessionClosed = Just err}

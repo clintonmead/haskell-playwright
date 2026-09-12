@@ -36,15 +36,9 @@ module Playwright.Connection.Store
 
 import Control.Concurrent.STM
   ( atomically
-  , modifyTVar'
-  , readTVar
-  , writeTVar
   )
 import Control.Exception
   ( throwIO
-  )
-import Control.Monad
-  ( when
   )
 import Data.Map.Strict qualified as Map
 import Data.Maybe
@@ -58,8 +52,11 @@ import Data.Text
   ( Text
   )
 import Playwright.Connection.Types
-  ( Connection (connectionBrowserContexts, connectionBrowserTypes, connectionClosedGuids, connectionContextBaseUrls, connectionContextBrowsers, connectionContextsWithOwnerPage, connectionLocatorHandlers, connectionLocatorListening, connectionMainFramePages, connectionObjects, connectionPagesOwningContext, connectionRequestFailures, connectionRequestOverrides, connectionRouteHandlers, connectionRouteListening, connectionSelectorEngines, connectionTimeoutDefaults)
-  , StoredLocatorHandler (storedLocatorHandlerFrame, storedLocatorHandlerSelector, storedLocatorHandlerTimes)
+  ( Connection
+  , modifySession
+  , readSession
+  , stateSession
+  , withSession
   )
 import Playwright.Error
   ( PlaywrightError (MissingObject)
@@ -81,6 +78,12 @@ import Playwright.RequestOverrides
   ( RequestOverrides
   , emptyRequestOverrides
   )
+import Playwright.Session
+  ( Session (sessionBrowserContexts, sessionBrowserTypes, sessionClosedGuids, sessionContextBaseUrls, sessionContextBrowsers, sessionContextsWithOwnerPage, sessionLocatorHandlers, sessionLocatorListening, sessionMainFramePages, sessionObjects, sessionPagesOwningContext, sessionRequestFailures, sessionRequestOverrides, sessionRouteHandlers, sessionRouteListening, sessionSelectorEngines, sessionTimeoutDefaults)
+  )
+import Playwright.StoredLocatorHandler
+  ( StoredLocatorHandler (storedLocatorHandlerFrame, storedLocatorHandlerSelector, storedLocatorHandlerTimes)
+  )
 import Playwright.Timeout
   ( Timeout
   )
@@ -97,8 +100,8 @@ import Playwright.UrlGlob
 
 lookupObject :: Connection -> Guid -> IO RemoteObject
 lookupObject conn guid = do
-  objects <- atomically (readTVar (connectionObjects conn))
-  case Map.lookup guid objects of
+  session <- atomically (readSession conn)
+  case Map.lookup guid (sessionObjects session) of
     Nothing ->
       throwIO (MissingObject guid)
     Just obj ->
@@ -106,171 +109,204 @@ lookupObject conn guid = do
 
 guidsOfType :: Connection -> ChannelType -> IO [Guid]
 guidsOfType conn ty = do
-  objects <- atomically (readTVar (connectionObjects conn))
+  session <- atomically (readSession conn)
   pure
     [ remoteGuid obj
-    | obj <- Map.elems objects
+    | obj <- Map.elems (sessionObjects session)
     , remoteType obj == ty
     ]
 
 closedGuids :: Connection -> IO (Set Guid)
 closedGuids conn =
-  atomically (readTVar (connectionClosedGuids conn))
+  atomically (sessionClosedGuids <$> readSession conn)
 
 pushRouteHandler :: Connection -> Guid -> UrlGlob -> (ChannelRef -> IO Bool) -> IO Bool
 pushRouteHandler conn guid glob run =
-  atomically $ do
-    listening <- readTVar (connectionRouteListening conn)
-    let
-      first = Set.notMember guid listening
-    when first (modifyTVar' (connectionRouteListening conn) (Set.insert guid))
-    modifyTVar'
-      (connectionRouteHandlers conn)
-      (Map.insertWith (++) guid [(glob, run)])
-    pure first
+  atomically $
+    stateSession conn $ \session ->
+      let
+        first = Set.notMember guid (sessionRouteListening session)
+        listening =
+          if first
+            then Set.insert guid (sessionRouteListening session)
+            else sessionRouteListening session
+      in
+        ( first
+        , session
+            { sessionRouteListening = listening
+            , sessionRouteHandlers =
+                Map.insertWith (++) guid [(glob, run)] (sessionRouteHandlers session)
+            }
+        )
 
 removeRouteHandlers :: Connection -> Guid -> UrlGlob -> IO ()
 removeRouteHandlers conn guid glob =
   atomically $
-    modifyTVar'
-      (connectionRouteHandlers conn)
-      (Map.adjust (filter (\(existing, _) -> existing /= glob)) guid)
+    modifySession conn $ \session ->
+      session
+        { sessionRouteHandlers =
+            Map.adjust (filter (\(existing, _) -> existing /= glob)) guid (sessionRouteHandlers session)
+        }
 
 clearRouteHandlers :: Connection -> Guid -> IO ()
 clearRouteHandlers conn guid =
   atomically $
-    modifyTVar' (connectionRouteHandlers conn) (Map.delete guid)
+    modifySession conn $ \session ->
+      session {sessionRouteHandlers = Map.delete guid (sessionRouteHandlers session)}
 
 routeHandlersFor :: Connection -> Guid -> IO [(UrlGlob, ChannelRef -> IO Bool)]
 routeHandlersFor conn guid = do
-  handlers <- atomically (readTVar (connectionRouteHandlers conn))
-  pure (Map.findWithDefault [] guid handlers)
+  session <- atomically (readSession conn)
+  pure (Map.findWithDefault [] guid (sessionRouteHandlers session))
 
 lookupRequestOverrides :: Connection -> Guid -> IO RequestOverrides
 lookupRequestOverrides conn guid = do
-  overrides <- atomically (readTVar (connectionRequestOverrides conn))
-  pure (Map.findWithDefault emptyRequestOverrides guid overrides)
+  session <- atomically (readSession conn)
+  pure (Map.findWithDefault emptyRequestOverrides guid (sessionRequestOverrides session))
 
 writeRequestOverrides :: Connection -> Guid -> RequestOverrides -> IO ()
 writeRequestOverrides conn guid overrides =
   atomically $
-    modifyTVar' (connectionRequestOverrides conn) (Map.insert guid overrides)
+    modifySession conn $ \session ->
+      session {sessionRequestOverrides = Map.insert guid overrides (sessionRequestOverrides session)}
 
 lookupContextBaseUrl :: Connection -> Guid -> IO (Maybe Url)
 lookupContextBaseUrl conn guid =
   atomically $
-    Map.lookup guid <$> readTVar (connectionContextBaseUrls conn)
+    Map.lookup guid . sessionContextBaseUrls <$> readSession conn
 
 writeContextBaseUrl :: Connection -> Guid -> Url -> IO ()
 writeContextBaseUrl conn guid url =
   atomically $
-    modifyTVar' (connectionContextBaseUrls conn) (Map.insert guid url)
+    modifySession conn $ \session ->
+      session {sessionContextBaseUrls = Map.insert guid url (sessionContextBaseUrls session)}
 
 rememberBrowserContext :: Connection -> Guid -> Guid -> IO ()
 rememberBrowserContext conn browserGuid contextGuid =
-  atomically $ do
-    modifyTVar' (connectionContextBrowsers conn) (Map.insert contextGuid browserGuid)
-    modifyTVar' (connectionBrowserContexts conn) $
-      Map.insertWith (\new old -> old <> new) browserGuid [contextGuid]
+  atomically $
+    modifySession conn $ \session ->
+      session
+        { sessionContextBrowsers = Map.insert contextGuid browserGuid (sessionContextBrowsers session)
+        , sessionBrowserContexts =
+            Map.insertWith (\new old -> old <> new) browserGuid [contextGuid] (sessionBrowserContexts session)
+        }
 
 lookupOwnedContextGuids :: Connection -> Guid -> IO [Guid]
 lookupOwnedContextGuids conn browserGuid =
   atomically $
-    Map.findWithDefault [] browserGuid <$> readTVar (connectionBrowserContexts conn)
+    Map.findWithDefault [] browserGuid . sessionBrowserContexts <$> readSession conn
 
 lookupContextBrowserGuid :: Connection -> Guid -> IO (Maybe Guid)
 lookupContextBrowserGuid conn contextGuid =
   atomically $
-    Map.lookup contextGuid <$> readTVar (connectionContextBrowsers conn)
+    Map.lookup contextGuid . sessionContextBrowsers <$> readSession conn
 
 markPageOwnsContext :: Connection -> Guid -> IO ()
 markPageOwnsContext conn pageGuid =
   atomically $
-    modifyTVar' (connectionPagesOwningContext conn) (Set.insert pageGuid)
+    modifySession conn $ \session ->
+      session {sessionPagesOwningContext = Set.insert pageGuid (sessionPagesOwningContext session)}
 
 pageOwnsContext :: Connection -> Guid -> IO Bool
 pageOwnsContext conn pageGuid =
   atomically $
-    Set.member pageGuid <$> readTVar (connectionPagesOwningContext conn)
+    Set.member pageGuid . sessionPagesOwningContext <$> readSession conn
 
 markContextHasOwnerPage :: Connection -> Guid -> IO ()
 markContextHasOwnerPage conn contextGuid =
   atomically $
-    modifyTVar' (connectionContextsWithOwnerPage conn) (Set.insert contextGuid)
+    modifySession conn $ \session ->
+      session {sessionContextsWithOwnerPage = Set.insert contextGuid (sessionContextsWithOwnerPage session)}
 
 contextHasOwnerPage :: Connection -> Guid -> IO Bool
 contextHasOwnerPage conn contextGuid =
   atomically $
-    Set.member contextGuid <$> readTVar (connectionContextsWithOwnerPage conn)
+    Set.member contextGuid . sessionContextsWithOwnerPage <$> readSession conn
 
 rememberBrowserType :: Connection -> Guid -> Guid -> IO ()
 rememberBrowserType conn browserGuid browserTypeGuid =
   atomically $
-    modifyTVar' (connectionBrowserTypes conn) (Map.insert browserGuid browserTypeGuid)
+    modifySession conn $ \session ->
+      session {sessionBrowserTypes = Map.insert browserGuid browserTypeGuid (sessionBrowserTypes session)}
 
 lookupBrowserTypeGuid :: Connection -> Guid -> IO (Maybe Guid)
 lookupBrowserTypeGuid conn browserGuid =
   atomically $
-    Map.lookup browserGuid <$> readTVar (connectionBrowserTypes conn)
+    Map.lookup browserGuid . sessionBrowserTypes <$> readSession conn
 
 lookupSelectorEngines :: Connection -> IO [SelectorEngine]
 lookupSelectorEngines conn =
-  atomically (readTVar (connectionSelectorEngines conn))
+  atomically (sessionSelectorEngines <$> readSession conn)
 
 addSelectorEngine :: Connection -> SelectorEngine -> IO ()
 addSelectorEngine conn engine =
   atomically $
-    modifyTVar' (connectionSelectorEngines conn) (++ [engine])
+    modifySession conn $ \session ->
+      session {sessionSelectorEngines = sessionSelectorEngines session ++ [engine]}
 
 markLocatorHandlersListening :: Connection -> Guid -> IO Bool
 markLocatorHandlersListening conn guid =
-  atomically $ do
-    listening <- readTVar (connectionLocatorListening conn)
-    let
-      first = Set.notMember guid listening
-    when first (modifyTVar' (connectionLocatorListening conn) (Set.insert guid))
-    pure first
+  atomically $
+    stateSession conn $ \session ->
+      let
+        first = Set.notMember guid (sessionLocatorListening session)
+      in
+        ( first
+        , if first
+            then session {sessionLocatorListening = Set.insert guid (sessionLocatorListening session)}
+            else session
+        )
 
 putLocatorHandler :: Connection -> Guid -> Int -> StoredLocatorHandler -> IO ()
 putLocatorHandler conn pageGuid uid stored =
   atomically $
-    modifyTVar' (connectionLocatorHandlers conn) (Map.insertWith Map.union pageGuid (Map.singleton uid stored))
+    modifySession conn $ \session ->
+      session
+        { sessionLocatorHandlers =
+            Map.insertWith Map.union pageGuid (Map.singleton uid stored) (sessionLocatorHandlers session)
+        }
 
 beginLocatorHandler :: Connection -> Guid -> Int -> IO (Maybe StoredLocatorHandler, Bool)
 beginLocatorHandler conn pageGuid uid =
-  atomically $ do
-    pages <- readTVar (connectionLocatorHandlers conn)
-    let
-      handlers = Map.findWithDefault Map.empty pageGuid pages
-    case Map.lookup uid handlers of
-      Nothing ->
-        pure (Nothing, False)
-      Just stored ->
-        case storedLocatorHandlerTimes stored of
-          Just 0 ->
-            pure (Nothing, True)
-          Just remaining -> do
-            let
-              next = remaining - 1
-              updated = stored {storedLocatorHandlerTimes = Just next}
-            writeTVar
-              (connectionLocatorHandlers conn)
-              (Map.insert pageGuid (Map.insert uid updated handlers) pages)
-            pure (Just stored, next == 0)
+  atomically $
+    withSession conn $ \session ->
+      let
+        handlers = Map.findWithDefault Map.empty pageGuid (sessionLocatorHandlers session)
+      in
+        case Map.lookup uid handlers of
           Nothing ->
-            pure (Just stored, False)
+            pure ((Nothing, False), session)
+          Just stored ->
+            case storedLocatorHandlerTimes stored of
+              Just 0 ->
+                pure ((Nothing, True), session)
+              Just remaining ->
+                let
+                  next = remaining - 1
+                  updated = stored {storedLocatorHandlerTimes = Just next}
+                in
+                  pure
+                    ( (Just stored, next == 0)
+                    , session
+                        { sessionLocatorHandlers =
+                            Map.insert pageGuid (Map.insert uid updated handlers) (sessionLocatorHandlers session)
+                        }
+                    )
+              Nothing ->
+                pure ((Just stored, False), session)
 
 deleteLocatorHandler :: Connection -> Guid -> Int -> IO ()
 deleteLocatorHandler conn pageGuid uid =
   atomically $
-    modifyTVar' (connectionLocatorHandlers conn) (Map.adjust (Map.delete uid) pageGuid)
+    modifySession conn $ \session ->
+      session {sessionLocatorHandlers = Map.adjust (Map.delete uid) pageGuid (sessionLocatorHandlers session)}
 
 locatorHandlerUidsMatching :: Connection -> Guid -> Text -> Guid -> IO [Int]
 locatorHandlerUidsMatching conn pageGuid selector frameGuid =
   atomically $ do
-    pages <- readTVar (connectionLocatorHandlers conn)
+    session <- readSession conn
     let
-      handlers = Map.findWithDefault Map.empty pageGuid pages
+      handlers = Map.findWithDefault Map.empty pageGuid (sessionLocatorHandlers session)
     pure
       [ uid
       | (uid, stored) <- Map.toList handlers
@@ -281,12 +317,16 @@ locatorHandlerUidsMatching conn pageGuid selector frameGuid =
 lookupTimeoutDefaults :: Connection -> Guid -> IO TimeoutDefaults
 lookupTimeoutDefaults conn guid =
   atomically $
-    Map.findWithDefault emptyTimeoutDefaults guid <$> readTVar (connectionTimeoutDefaults conn)
+    Map.findWithDefault emptyTimeoutDefaults guid . sessionTimeoutDefaults <$> readSession conn
 
 setTimeoutDefault :: Connection -> Guid -> Maybe Timeout -> IO ()
 setTimeoutDefault conn guid value =
   atomically $
-    modifyTVar' (connectionTimeoutDefaults conn) (Map.alter (Just . update . fromMaybe emptyTimeoutDefaults) guid)
+    modifySession conn $ \session ->
+      session
+        { sessionTimeoutDefaults =
+            Map.alter (Just . update . fromMaybe emptyTimeoutDefaults) guid (sessionTimeoutDefaults session)
+        }
   where
     update defaults =
       defaults {timeoutDefaultsTimeout = value}
@@ -294,7 +334,11 @@ setTimeoutDefault conn guid value =
 setTimeoutNavigation :: Connection -> Guid -> Maybe Timeout -> IO ()
 setTimeoutNavigation conn guid value =
   atomically $
-    modifyTVar' (connectionTimeoutDefaults conn) (Map.alter (Just . update . fromMaybe emptyTimeoutDefaults) guid)
+    modifySession conn $ \session ->
+      session
+        { sessionTimeoutDefaults =
+            Map.alter (Just . update . fromMaybe emptyTimeoutDefaults) guid (sessionTimeoutDefaults session)
+        }
   where
     update defaults =
       defaults {timeoutDefaultsNavigation = value}
@@ -302,14 +346,15 @@ setTimeoutNavigation conn guid value =
 registerMainFramePage :: Connection -> Guid -> Guid -> IO ()
 registerMainFramePage conn frameGuid pageGuid =
   atomically $
-    modifyTVar' (connectionMainFramePages conn) (Map.insert frameGuid pageGuid)
+    modifySession conn $ \session ->
+      session {sessionMainFramePages = Map.insert frameGuid pageGuid (sessionMainFramePages session)}
 
 lookupMainFramePage :: Connection -> Guid -> IO (Maybe Guid)
 lookupMainFramePage conn frameGuid =
   atomically $
-    Map.lookup frameGuid <$> readTVar (connectionMainFramePages conn)
+    Map.lookup frameGuid . sessionMainFramePages <$> readSession conn
 
 lookupRequestFailure :: Connection -> Guid -> IO (Maybe Text)
 lookupRequestFailure conn guid =
   atomically $
-    Map.lookup guid <$> readTVar (connectionRequestFailures conn)
+    Map.lookup guid . sessionRequestFailures <$> readSession conn

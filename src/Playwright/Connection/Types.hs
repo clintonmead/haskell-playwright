@@ -1,9 +1,10 @@
 module Playwright.Connection.Types
   ( Connection (..)
-  , EventHandler (..)
-  , EventWaiter (..)
   , OutgoingCall (..)
-  , StoredLocatorHandler (..)
+  , modifySession
+  , readSession
+  , stateSession
+  , withSession
   ) where
 
 import Autodocodec
@@ -13,12 +14,12 @@ import Autodocodec
   , requiredField'
   , (.=)
   )
-import Control.Concurrent
-  ( ThreadId
-  )
 import Control.Concurrent.STM
-  ( TMVar
+  ( STM
   , TVar
+  , modifyTVar'
+  , readTVar
+  , writeTVar
   )
 import Control.Concurrent.STM.TQueue
   ( TQueue
@@ -28,104 +29,46 @@ import Data.Aeson
   , ToJSON
   , Value
   )
-import Data.Map.Strict
-  ( Map
-  )
-import Data.Sequence
-  ( Seq
-  )
-import Data.Set
-  ( Set
-  )
-import Data.Text
-  ( Text
-  )
-import Playwright.Error
-  ( PlaywrightError
-  )
 import Playwright.Guid
   ( Guid
-  )
-import Playwright.Json.ChannelRef
-  ( ChannelRef
   )
 import Playwright.MethodName
   ( MethodName
   )
-import Playwright.Protocol
-  ( SelectorEngine
-  )
-import Playwright.RemoteObject
-  ( RemoteObject
-  )
 import Playwright.RequestId
   ( RequestId
   )
-import Playwright.RequestOverrides
-  ( RequestOverrides
-  )
-import Playwright.TimeoutDefaults
-  ( TimeoutDefaults
+import Playwright.Session
+  ( Session
   )
 import Playwright.Transport
   ( Transport
   )
-import Playwright.Url
-  ( Url
-  )
-import Playwright.UrlGlob
-  ( UrlGlob
-  )
 
 data Connection = Connection
   { connectionTransport :: Transport
-  , connectionObjects :: TVar (Map Guid RemoteObject)
-  , connectionCallbacks :: TVar (Map RequestId (TMVar (Either PlaywrightError Value)))
-  , connectionNextId :: TVar RequestId
-  , connectionClosed :: TVar (Maybe PlaywrightError)
-  , connectionEventWaiters :: TVar [EventWaiter]
-  , connectionEventBuffer :: TVar (Map (Guid, MethodName) (Seq Value))
-  , connectionClosedGuids :: TVar (Set Guid)
-  , connectionEventHandlers :: TVar [EventHandler]
-  , connectionRouteHandlers :: TVar (Map Guid [(UrlGlob, ChannelRef -> IO Bool)])
-  , connectionRouteListening :: TVar (Set Guid)
-  , connectionRequestOverrides :: TVar (Map Guid RequestOverrides)
-  , connectionContextBaseUrls :: TVar (Map Guid Url)
-  , connectionBrowserContexts :: TVar (Map Guid [Guid])
-  , connectionContextBrowsers :: TVar (Map Guid Guid)
-  , connectionPagesOwningContext :: TVar (Set Guid)
-  , connectionContextsWithOwnerPage :: TVar (Set Guid)
-  , connectionBrowserTypes :: TVar (Map Guid Guid)
-  , connectionSelectorEngines :: TVar [SelectorEngine]
-  , connectionTimeoutDefaults :: TVar (Map Guid TimeoutDefaults)
-  , connectionMainFramePages :: TVar (Map Guid Guid)
-  , connectionFinishedRequests :: TVar (Set Guid)
-  , connectionRequestFailures :: TVar (Map Guid Text)
-  , connectionPendingHandlers :: TVar Int
-  , connectionHandlerThreads :: TVar (Set ThreadId)
+  , connectionSession :: TVar Session
   , connectionHandlerQueue :: TQueue (IO ())
-  , connectionLocatorHandlers :: TVar (Map Guid (Map Int StoredLocatorHandler))
-  , connectionLocatorListening :: TVar (Set Guid)
   }
 
-data StoredLocatorHandler = StoredLocatorHandler
-  { storedLocatorHandlerTimes :: Maybe Int
-  , storedLocatorHandlerSelector :: Text
-  , storedLocatorHandlerFrame :: Guid
-  , storedLocatorHandlerRun :: IO ()
-  }
+readSession :: Connection -> STM Session
+readSession conn =
+  readTVar (connectionSession conn)
 
-data EventWaiter = EventWaiter
-  { eventWaiterGuid :: Guid
-  , eventWaiterMethod :: MethodName
-  , eventWaiterBox :: TMVar Value
-  }
+modifySession :: Connection -> (Session -> Session) -> STM ()
+modifySession conn =
+  modifyTVar' (connectionSession conn)
 
-data EventHandler = EventHandler
-  { eventHandlerGuid :: Guid
-  , eventHandlerMethod :: MethodName
-  , eventHandlerRun :: Value -> IO ()
-  }
+withSession :: Connection -> (Session -> STM (a, Session)) -> STM a
+withSession conn use = do
+  session <- readTVar (connectionSession conn)
+  (value, session') <- use session
+  writeTVar (connectionSession conn) $! session'
+  pure value
+
+stateSession :: Connection -> (Session -> (a, Session)) -> STM a
+stateSession conn use =
+  withSession conn (pure . use)
 
 data OutgoingCall = OutgoingCall
   { outgoingCallId :: RequestId

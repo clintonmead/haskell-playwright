@@ -6,6 +6,7 @@ module Playwright.Connection.Wait
   , waitForFutureChannelEvent
   , waitForFutureChannelEventUnlessClosed
   , waitForLifecycle
+  , waitForWaiter
   , waitUntilRemote
   , waitUntilRequestSettled
   , waitUntilUrl
@@ -13,17 +14,9 @@ module Playwright.Connection.Wait
 
 import Control.Concurrent.STM
   ( STM
-  , TMVar
   , atomically
-  , modifyTVar'
-  , newEmptyTMVarIO
-  , putTMVar
-  , readTVar
   , retry
-  , takeTMVar
   , throwSTM
-  , tryReadTMVar
-  , writeTVar
   )
 import Control.Exception
   ( throwIO
@@ -35,18 +28,24 @@ import Control.Monad
 import Data.Aeson
   ( Value
   )
-import Data.Map.Strict qualified as Map
-import Data.Maybe
-  ( isJust
+import Data.List
+  ( find
   )
+import Data.Map.Strict qualified as Map
 import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
 import Playwright.Connection.Types
-  ( Connection (connectionClosed, connectionClosedGuids, connectionEventBuffer, connectionEventWaiters, connectionFinishedRequests, connectionObjects)
-  , EventWaiter (EventWaiter, eventWaiterBox, eventWaiterGuid, eventWaiterMethod)
+  ( Connection
+  , readSession
+  , stateSession
+  , withSession
   )
 import Playwright.Error
-  ( targetClosedError
+  ( PlaywrightError
+  , targetClosedError
+  )
+import Playwright.EventWaiter
+  ( EventWaiter (EventWaiter, eventWaiterValue)
   )
 import Playwright.Guid
   ( Guid
@@ -64,88 +63,165 @@ import Playwright.Protocol
 import Playwright.RemoteObject
   ( RemoteObject (remoteInitializer)
   )
+import Playwright.Session
+  ( Session (sessionClosed, sessionClosedGuids, sessionEventBuffer, sessionEventWaiters, sessionFinishedRequests, sessionNextWaitId, sessionObjects, sessionWaiters)
+  , removeWaiter
+  )
 import Playwright.Url
   ( Url
+  )
+import Playwright.WaitId
+  ( WaitId
   )
 
 deliverEvent :: Connection -> Guid -> MethodName -> Value -> IO ()
 deliverEvent conn guid method params =
-  atomically $ do
-    waiters <- readTVar (connectionEventWaiters conn)
-    case break matches waiters of
-      (before, waiter : after) -> do
-        writeTVar (connectionEventWaiters conn) (before <> after)
-        putTMVar (eventWaiterBox waiter) params
-      (_, []) ->
-        modifyTVar' (connectionEventBuffer conn) $
-          Map.insertWith (flip (<>)) (guid, method) (Seq.singleton params)
+  atomically $
+    stateSession conn $ \session ->
+      case find (waitingFor session) (sessionEventWaiters session) of
+        Just waitId ->
+          case Map.lookup waitId (sessionWaiters session) of
+            Nothing ->
+              bufferEvent session
+            Just waiter ->
+              ( ()
+              , session
+                  { sessionWaiters =
+                      Map.insert waitId waiter {eventWaiterValue = Just params} (sessionWaiters session)
+                  , sessionEventWaiters = filter (/= waitId) (sessionEventWaiters session)
+                  }
+              )
+        Nothing ->
+          bufferEvent session
   where
-    matches waiter =
-      eventWaiterGuid waiter == guid && eventWaiterMethod waiter == method
+    waitingFor session waitId =
+      case Map.lookup waitId (sessionWaiters session) of
+        Just (EventWaiter waiterGuid waiterMethod Nothing) ->
+          waiterGuid == guid && waiterMethod == method
+        _ ->
+          False
+    bufferEvent session =
+      ( ()
+      , session
+          { sessionEventBuffer =
+              Map.insertWith
+                (flip (<>))
+                (guid, method)
+                (Seq.singleton params)
+                (sessionEventBuffer session)
+          }
+      )
 
-registerEventWaiter :: Connection -> Guid -> MethodName -> IO (TMVar Value)
-registerEventWaiter conn guid method = do
-  box <- newEmptyTMVarIO
-  atomically $ do
-    buffer <- readTVar (connectionEventBuffer conn)
-    case Seq.viewl (Map.findWithDefault Seq.empty (guid, method) buffer) of
-      params Seq.:< rest -> do
-        writeTVar (connectionEventBuffer conn) (Map.insert (guid, method) rest buffer)
-        putTMVar box params
-      Seq.EmptyL ->
-        modifyTVar' (connectionEventWaiters conn) (EventWaiter guid method box :)
-  pure box
+registerEventWaiter :: Connection -> Guid -> MethodName -> IO WaitId
+registerEventWaiter conn guid method =
+  atomically $
+    stateSession conn $ \session ->
+      let
+        waitId = sessionNextWaitId session
+        buffer = Map.findWithDefault Seq.empty (guid, method) (sessionEventBuffer session)
+      in
+        case Seq.viewl buffer of
+          params Seq.:< rest ->
+            ( waitId
+            , session
+                { sessionNextWaitId = succ waitId
+                , sessionWaiters =
+                    Map.insert waitId (EventWaiter guid method (Just params)) (sessionWaiters session)
+                , sessionEventBuffer = Map.insert (guid, method) rest (sessionEventBuffer session)
+                }
+            )
+          Seq.EmptyL ->
+            insertWaitingWaiter session waitId guid method
+
+registerFutureEventWaiter :: Connection -> Guid -> MethodName -> IO WaitId
+registerFutureEventWaiter conn guid method =
+  atomically $
+    stateSession conn $ \session ->
+      insertWaitingWaiter session (sessionNextWaitId session) guid method
+
+insertWaitingWaiter :: Session -> WaitId -> Guid -> MethodName -> (WaitId, Session)
+insertWaitingWaiter session waitId guid method =
+  ( waitId
+  , session
+      { sessionNextWaitId = succ waitId
+      , sessionWaiters =
+          Map.insert waitId (EventWaiter guid method Nothing) (sessionWaiters session)
+      , sessionEventWaiters = waitId : sessionEventWaiters session
+      }
+  )
+
+waitForWaiter :: Connection -> WaitId -> IO Value
+waitForWaiter conn waitId = do
+  outcome <-
+    atomically $
+      withSession conn $ \session ->
+        case waiterValue session waitId of
+          Just params ->
+            pure (Right params, removeWaiter waitId session)
+          Nothing ->
+            case sessionClosed session of
+              Just err ->
+                pure (Left err, removeWaiter waitId session)
+              Nothing ->
+                retry
+  throwOutcome outcome
 
 waitForChannelEvent :: Connection -> Guid -> MethodName -> IO Value
 waitForChannelEvent conn guid method = do
-  box <- registerEventWaiter conn guid method
-  atomically (takeTMVar box)
-
-registerFutureEventWaiter :: Connection -> Guid -> MethodName -> IO (TMVar Value)
-registerFutureEventWaiter conn guid method = do
-  box <- newEmptyTMVarIO
-  atomically $
-    modifyTVar' (connectionEventWaiters conn) (EventWaiter guid method box :)
-  pure box
+  waitId <- registerEventWaiter conn guid method
+  waitForWaiter conn waitId
 
 waitForFutureChannelEvent :: Connection -> Guid -> MethodName -> IO Value
 waitForFutureChannelEvent conn guid method = do
-  box <- registerFutureEventWaiter conn guid method
-  atomically (takeTMVar box)
-
-unregisterWaiterSTM :: Connection -> TMVar Value -> STM ()
-unregisterWaiterSTM conn box =
-  modifyTVar' (connectionEventWaiters conn) (filter (\waiter -> eventWaiterBox waiter /= box))
+  waitId <- registerFutureEventWaiter conn guid method
+  waitForWaiter conn waitId
 
 waitForFutureChannelEventUnlessClosed :: Connection -> Guid -> MethodName -> IO Value
 waitForFutureChannelEventUnlessClosed conn guid method = do
-  already <- atomically (Set.member guid <$> readTVar (connectionClosedGuids conn))
+  already <- atomically (Set.member guid . sessionClosedGuids <$> readSession conn)
   when already (throwIO targetClosedError)
-  box <- registerFutureEventWaiter conn guid method
-  closeBox <- registerEventWaiter conn guid (MethodName "close")
-  atomically $ do
-    closedConn <- readTVar (connectionClosed conn)
-    case closedConn of
-      Just err -> do
-        unregisterWaiterSTM conn box
-        unregisterWaiterSTM conn closeBox
-        throwSTM err
-      Nothing -> do
-        closedSet <- readTVar (connectionClosedGuids conn)
-        eventParams <- tryReadTMVar box
-        closeFired <- tryReadTMVar closeBox
-        case eventParams of
-          Just params -> do
-            unregisterWaiterSTM conn box
-            unregisterWaiterSTM conn closeBox
-            pure params
-          Nothing
-            | Set.member guid closedSet || isJust closeFired -> do
-                unregisterWaiterSTM conn box
-                unregisterWaiterSTM conn closeBox
-                throwSTM targetClosedError
-            | otherwise ->
-                retry
+  waitId <- registerFutureEventWaiter conn guid method
+  closeId <- registerEventWaiter conn guid (MethodName "close")
+  outcome <-
+    atomically $
+      withSession conn $ \session ->
+        case sessionClosed session of
+          Just err ->
+            pure (Left err, removeWaiter waitId (removeWaiter closeId session))
+          Nothing ->
+            case waiterValue session waitId of
+              Just params ->
+                pure (Right params, removeWaiter waitId (removeWaiter closeId session))
+              Nothing
+                | Set.member guid (sessionClosedGuids session) || waiterFilled session closeId ->
+                    pure (Left targetClosedError, removeWaiter waitId (removeWaiter closeId session))
+                | otherwise ->
+                    retry
+  throwOutcome outcome
+
+throwOutcome :: Either PlaywrightError a -> IO a
+throwOutcome outcome =
+  case outcome of
+    Left err ->
+      throwIO err
+    Right value ->
+      pure value
+
+waiterValue :: Session -> WaitId -> Maybe Value
+waiterValue session waitId =
+  case Map.lookup waitId (sessionWaiters session) of
+    Just (EventWaiter _ _ (Just params)) ->
+      Just params
+    _ ->
+      Nothing
+
+waiterFilled :: Session -> WaitId -> Bool
+waiterFilled session waitId =
+  case waiterValue session waitId of
+    Just _ ->
+      True
+    Nothing ->
+      False
 
 waitForLifecycle :: Connection -> Guid -> LifecycleEvent -> IO ()
 waitForLifecycle conn guid wanted =
@@ -153,13 +229,12 @@ waitForLifecycle conn guid wanted =
 
 waitForLifecycleSTM :: Connection -> Guid -> LifecycleEvent -> STM ()
 waitForLifecycleSTM conn guid wanted = do
-  closed <- readTVar (connectionClosed conn)
-  case closed of
+  session <- readSession conn
+  case sessionClosed session of
     Just err ->
       throwSTM err
-    Nothing -> do
-      objects <- readTVar (connectionObjects conn)
-      case Map.lookup guid objects of
+    Nothing ->
+      case Map.lookup guid (sessionObjects session) of
         Nothing ->
           retry
         Just obj ->
@@ -176,13 +251,12 @@ waitUntilUrl conn guid predicate =
 waitUntilRemote :: Connection -> Guid -> (RemoteObject -> STM a) -> IO a
 waitUntilRemote conn guid useObject =
   atomically $ do
-    closed <- readTVar (connectionClosed conn)
-    case closed of
+    session <- readSession conn
+    case sessionClosed session of
       Just err ->
         throwSTM err
-      Nothing -> do
-        objects <- readTVar (connectionObjects conn)
-        case Map.lookup guid objects of
+      Nothing ->
+        case Map.lookup guid (sessionObjects session) of
           Nothing ->
             retry
           Just obj ->
@@ -190,13 +264,12 @@ waitUntilRemote conn guid useObject =
 
 waitUntilUrlSTM :: Connection -> Guid -> (Url -> Bool) -> STM ()
 waitUntilUrlSTM conn guid predicate = do
-  closed <- readTVar (connectionClosed conn)
-  case closed of
+  session <- readSession conn
+  case sessionClosed session of
     Just err ->
       throwSTM err
-    Nothing -> do
-      objects <- readTVar (connectionObjects conn)
-      case Map.lookup guid objects of
+    Nothing ->
+      case Map.lookup guid (sessionObjects session) of
         Nothing ->
           retry
         Just obj ->
@@ -209,10 +282,9 @@ waitUntilUrlSTM conn guid predicate = do
 waitUntilRequestSettled :: Connection -> Guid -> IO ()
 waitUntilRequestSettled conn guid =
   atomically $ do
-    closed <- readTVar (connectionClosed conn)
-    case closed of
+    session <- readSession conn
+    case sessionClosed session of
       Just err ->
         throwSTM err
-      Nothing -> do
-        finished <- readTVar (connectionFinishedRequests conn)
-        unless (Set.member guid finished) retry
+      Nothing ->
+        unless (Set.member guid (sessionFinishedRequests session)) retry

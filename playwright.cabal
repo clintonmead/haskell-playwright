@@ -65,6 +65,8 @@ library
       Playwright.EmulateMedia
       Playwright.Error
       Playwright.Evaluate
+      Playwright.EventHandler
+      Playwright.EventWaiter
       Playwright.Exactness
       Playwright.Expose
       Playwright.FetchOptions
@@ -142,10 +144,12 @@ library
       Playwright.SerializedError
       Playwright.SerializedErrorInfo
       Playwright.SerializedValue
+      Playwright.Session
       Playwright.SpecialJsValue
       Playwright.StorageItem
       Playwright.StorageKind
       Playwright.StorageState
+      Playwright.StoredLocatorHandler
       Playwright.StyleTag
       Playwright.Timeout
       Playwright.TimeoutDefaults
@@ -160,6 +164,7 @@ library
       Playwright.UserAgent
       Playwright.ViewportSize
       Playwright.WaitForState
+      Playwright.WaitId
       Playwright.WebStorage
       Playwright.WheelDelta
       Playwright.Worker
