@@ -4,6 +4,8 @@ module Playwright
   , BrowserName (..)
   , BrowserType (..)
   , Accuracy (..)
+  , APIRequestContext
+  , APIResponse
   , AcceptDownloads (..)
   , AddLocatorHandlerOptions (..)
   , AriaRole (..)
@@ -45,6 +47,8 @@ module Playwright
   , EmulateMedia (..)
   , Exactness (..)
   , FileChooser (..)
+  , FetchOptions (..)
+  , FetchPostData (..)
   , Frame (..)
   , FulfillBody (..)
   , FulfillOptions (..)
@@ -128,6 +132,14 @@ module Playwright
   , allInnerTexts
   , allLocators
   , allTextContents
+  , apiResponseBody
+  , apiResponseHeaders
+  , apiResponseHeadersArray
+  , apiResponseOk
+  , apiResponseStatus
+  , apiResponseStatusText
+  , apiResponseText
+  , apiResponseUrl
   , armConsole
   , armDialog
   , armDownload
@@ -179,6 +191,7 @@ module Playwright
   , contextExposeFunction
   , contextFromRef
   , contextPages
+  , contextRequest
   , contextRoute
   , contextRouteWith
   , continueRoute
@@ -196,6 +209,7 @@ module Playwright
   , defaultClickOptions
   , defaultContinueOptions
   , defaultEmulateMedia
+  , defaultFetchOptions
   , defaultFulfillOptions
   , defaultGetByRoleOptions
   , defaultGotoOptions
@@ -282,6 +296,12 @@ module Playwright
   , exposeFunction
   , fallbackRoute
   , fallbackRouteWith
+  , fetchGet
+  , fetchGetWith
+  , fetchRequest
+  , fetchRequestWith
+  , fetchFromUrl
+  , fetchFromUrlWith
   , fill
   , fillHandle
   , filterVisible
@@ -394,6 +414,7 @@ module Playwright
   , pageIsVisible
   , pagesEqual
   , pageTextContent
+  , pageRequest
   , pdf
   , pdfWith
   , press
@@ -433,6 +454,8 @@ module Playwright
   , responseText
   , responseUrl
   , route
+  , routeFetch
+  , routeFetchWith
   , routeRequest
   , routeWith
   , screenshot
@@ -542,6 +565,26 @@ module Playwright
 import Playwright.AcceptDownloads
   ( AcceptDownloads (AcceptDownloadsAccept, AcceptDownloadsDeny)
   )
+import Playwright.APIRequestContext
+  ( APIRequestContext
+  , fetchGet
+  , fetchGetWith
+  , fetchRequest
+  , fetchRequestWith
+  , fetchFromUrl
+  , fetchFromUrlWith
+  )
+import Playwright.APIResponse
+  ( APIResponse
+  , apiResponseBody
+  , apiResponseHeaders
+  , apiResponseHeadersArray
+  , apiResponseOk
+  , apiResponseStatus
+  , apiResponseStatusText
+  , apiResponseText
+  , apiResponseUrl
+  )
 import Playwright.AriaRole
   ( AriaRole (AriaRole, ariaRoleToText)
   )
@@ -574,6 +617,7 @@ import Playwright.BrowserContext
   , cookies
   , cookiesFor
   , contextsEqual
+  , contextRequest
   , grantPermissions
   , grantPermissionsFor
   , newPage
@@ -798,6 +842,11 @@ import Playwright.Expose
   ( contextExposeFunction
   , exposeFunction
   )
+import Playwright.FetchOptions
+  ( FetchOptions (FetchOptions, fetchHeaders, fetchMaxRedirects, fetchMethod, fetchPostData, fetchTimeout, fetchUrl)
+  , FetchPostData (FetchPostBytes, FetchPostJson, FetchPostText)
+  , defaultFetchOptions
+  )
 import Playwright.FileChooser
   ( FileChooser (FileChooser, fileChooserElement, fileChooserMultiple)
   , armFileChooser
@@ -821,7 +870,7 @@ import Playwright.Frame.Wait
 import Playwright.FulfillOptions
   ( ContentType (ContentType, contentTypeToText)
   , FulfillBody (FulfillBytes, FulfillText)
-  , FulfillOptions (FulfillOptions, fulfillBody, fulfillContentType, fulfillHeaders, fulfillStatus)
+  , FulfillOptions (FulfillOptions, fulfillBody, fulfillContentType, fulfillHeaders, fulfillResponse, fulfillStatus)
   , defaultFulfillOptions
   )
 import Playwright.Geolocation
@@ -1027,6 +1076,7 @@ import Playwright.Page
   , onLoad
   , opener
   , pageFromRef
+  , pageRequest
   , pagesEqual
   , pdf
   , pdfWith
@@ -1160,6 +1210,8 @@ import Playwright.Route
   , fallbackRouteWith
   , fulfillRoute
   , route
+  , routeFetch
+  , routeFetchWith
   , routeRequest
   , routeWith
   , unroute

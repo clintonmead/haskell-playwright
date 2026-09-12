@@ -23,6 +23,8 @@ library
       Playwright
       Playwright.AcceptDownloads
       Playwright.AddLocatorHandlerOptions
+      Playwright.APIRequestContext
+      Playwright.APIResponse
       Playwright.AriaRole
       Playwright.BindingName
       Playwright.BoundingBox
@@ -59,6 +61,7 @@ library
       Playwright.Evaluate
       Playwright.Exactness
       Playwright.Expose
+      Playwright.FetchOptions
       Playwright.FileChooser
       Playwright.Frame
       Playwright.Frame.Action
@@ -290,6 +293,7 @@ test-suite playwright-test
       Playwright.PageRequestFallbackSpec
       Playwright.PageRequestFulfillSpec
       Playwright.PageRequestGcSpec
+      Playwright.PageRequestInterceptSpec
       Playwright.PageRouteSpec
       Playwright.PageScreenshotSpec
       Playwright.PageSelectOptionSpec

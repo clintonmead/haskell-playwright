@@ -7,6 +7,8 @@ module Playwright.Route
   , fallbackRouteWith
   , fulfillRoute
   , route
+  , routeFetch
+  , routeFetchWith
   , routeRequest
   , routeWith
   , unroute
@@ -27,8 +29,8 @@ import Control.Concurrent.STM
   , newTVarIO
   , putTMVar
   , readTVar
-  , takeTMVar
   , throwSTM
+  , tryReadTMVar
   , writeTVar
   )
 import Control.Exception
@@ -53,6 +55,16 @@ import Data.Text
 import Data.Text.Encoding
   ( decodeLatin1
   , encodeUtf8
+  )
+import Playwright.APIRequestContext
+  ( apiRequestContextFor
+  , fetchRequestWith
+  )
+import Playwright.APIResponse
+  ( APIResponse
+  , apiResponseFetchUid
+  , apiResponseHeaders
+  , apiResponseStatus
   )
 import Playwright.BrowserContext
   ( BrowserContext (browserContextChannel)
@@ -80,10 +92,14 @@ import Playwright.ContinueOptions
 import Playwright.Error
   ( PlaywrightError (RouteAlreadyHandled)
   )
+import Playwright.FetchOptions
+  ( FetchOptions
+  , defaultFetchOptions
+  )
 import Playwright.FulfillOptions
   ( ContentType (contentTypeToText)
   , FulfillBody (FulfillBytes, FulfillText)
-  , FulfillOptions (fulfillBody, fulfillContentType, fulfillHeaders, fulfillStatus)
+  , FulfillOptions (fulfillBody, fulfillContentType, fulfillHeaders, fulfillResponse, fulfillStatus)
   )
 import Playwright.Guid
   ( Guid
@@ -125,7 +141,7 @@ import Playwright.Protocol
   , RouteAbortResult
   , RouteContinueParams (routeContinueParamsHeaders, routeContinueParamsMethod, routeContinueParamsPostData, routeContinueParamsUrl)
   , RouteContinueResult
-  , RouteFulfillParams (routeFulfillParamsBody, routeFulfillParamsHeaders, routeFulfillParamsIsBase64, routeFulfillParamsStatus)
+  , RouteFulfillParams (routeFulfillParamsBody, routeFulfillParamsFetchResponseUid, routeFulfillParamsHeaders, routeFulfillParamsIsBase64, routeFulfillParamsStatus)
   , RouteFulfillResult
   , RouteInitializer (routeInitializerRequest)
   , mkBrowserContextSetNetworkInterceptionPatternsParams
@@ -216,18 +232,34 @@ fulfillRoute :: Route -> FulfillOptions -> IO ()
 fulfillRoute handled opts = do
   let
     (bodyText, isBase64, byteLength) = encodeFulfillBody (fulfillBody opts)
-    headers = fulfillHeadersWithDefaults opts byteLength
+    fetchUid = fulfillFetchUid opts
+    status = fulfillStatusCode opts
+    headers = fulfillHeadersWithDefaults opts (fulfillBaseHeaders opts) byteLength
   _ :: RouteFulfillResult <-
     send
       (routeChannel handled)
       (MethodName "fulfill")
       mkRouteFulfillParams
         { routeFulfillParamsBody = bodyText
+        , routeFulfillParamsFetchResponseUid = fetchUid
         , routeFulfillParamsHeaders = Just headers
         , routeFulfillParamsIsBase64 = Just isBase64
-        , routeFulfillParamsStatus = Just (maybe 200 httpStatusToInt (fulfillStatus opts))
+        , routeFulfillParamsStatus = Just status
         }
   settleRoute handled True
+
+routeFetch :: Route -> IO APIResponse
+routeFetch handled =
+  routeFetchWith handled defaultFetchOptions
+
+routeFetchWith :: Route -> FetchOptions -> IO APIResponse
+routeFetchWith handled opts = do
+  ctx <-
+    apiRequestContextFor
+      (channelConnection (routeChannel handled))
+      (channelGuid (routeChannel handled))
+  request <- routeRequest handled
+  fetchRequestWith ctx request opts
 
 route :: Page -> UrlGlob -> (Route -> IO ()) -> IO ()
 route page glob =
@@ -264,7 +296,12 @@ installRouteHandler conn guid glob opts handler = do
       then do
         box <- newEmptyTMVarIO
         handler (Route (Channel conn (channelRefGuid ref)) box)
-        atomically (takeTMVar box)
+        outcome <- atomically (tryReadTMVar box)
+        case outcome of
+          Nothing ->
+            pure True
+          Just settled ->
+            pure settled
       else
         pure False
 
@@ -419,9 +456,41 @@ encodeFulfillBody body =
     Just (FulfillBytes bytes) ->
       (Just (decodeLatin1 (encode bytes)), True, ByteString.length bytes)
 
-fulfillHeadersWithDefaults :: FulfillOptions -> Int -> [NameValue]
-fulfillHeadersWithDefaults opts byteLength =
-  fmap toNameValue (withLength (withContentType (fmap lowercaseHeader (fulfillHeaders opts))))
+fulfillFetchUid :: FulfillOptions -> Maybe Text
+fulfillFetchUid opts =
+  case (fulfillBody opts, fulfillResponse opts) of
+    (Nothing, Just response) ->
+      Just (apiResponseFetchUid response)
+    _ ->
+      Nothing
+
+fulfillStatusCode :: FulfillOptions -> Int
+fulfillStatusCode opts =
+  case fulfillStatus opts of
+    Just status ->
+      httpStatusToInt status
+    Nothing ->
+      case fulfillResponse opts of
+        Just response ->
+          httpStatusToInt (apiResponseStatus response)
+        Nothing ->
+          200
+
+fulfillBaseHeaders :: FulfillOptions -> [HttpHeader]
+fulfillBaseHeaders opts =
+  case fulfillHeaders opts of
+    [] ->
+      case fulfillResponse opts of
+        Just response ->
+          apiResponseHeaders response
+        Nothing ->
+          []
+    headers ->
+      headers
+
+fulfillHeadersWithDefaults :: FulfillOptions -> [HttpHeader] -> Int -> [NameValue]
+fulfillHeadersWithDefaults opts baseHeaders byteLength =
+  fmap toNameValue (withLength (withContentType (fmap lowercaseHeader baseHeaders)))
   where
     withContentType headers =
       case fulfillContentType opts of

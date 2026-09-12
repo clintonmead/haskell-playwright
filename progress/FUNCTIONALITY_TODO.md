@@ -12,7 +12,7 @@ Next work: remaining `tests/page` specs that do not need `expect` matchers, then
 - Regex URL matches for routes.
 - IndexedDB and WebAuthn credentials on `StorageState`.
 - `unrouteAll` `wait` / `ignoreErrors`.
-- Tracing, HAR, video, screencast, WebSocket routing, APIRequestContext (`context.request` / global fetch).
+- Tracing, HAR, video, screencast, WebSocket routing, global `APIRequest.newContext` fetch (page/context `request` fetch used by intercept is ported).
 
 ## Assertions
 
@@ -24,7 +24,6 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 - page-evaluate-no-stall (JS `toImpl` / nonStallingRawEvaluate — not a public API)
 - page-leaks (JS `toImpl` / leakedJSHandles)
 - page-listeners (JS `removeAllListeners` wait/ignoreErrors)
-- page-request-intercept
 
 ## Ported `tests/page` with remaining cases
 
@@ -38,6 +37,7 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 - **retarget:** skip Playwright `expect` matchers (`toBeEnabled`, `toHaveValue`, `toHaveText`, `toHaveClass`, …). Core locator/handle/page checks and `waitForElementState` are ported. Official `giveItAChanceToResolve` is `rafraf(page, 5)` (double `requestAnimationFrame`, not a sleep).
 - **interception:** skip Node `iso.globToRegexPattern` / `urlMatches` unit tests, unbalanced-brace glob validation (Haskell `UrlGlob` does not reject `{`), `page.route` with a `vm` RegExp, and blob-URL intercept (official WebKit-only). The `http://localhos**?*oo` case uses `localhost` like other cross-host ports.
 - **page-add-locator-handler:** skip Playwright `expect` (`toBeVisible`, `toHaveScreenshot`). Protocol timeout errors now include the driver call log (so “locator handler has finished…” / intercept messages are visible). Official `window.builtins.setTimeout` is provided via `addInitScript` (test-runner-only on Node).
+- **page-request-intercept:** skip Android loopback rewrite and Firefox-only multipart file upload (`fixme` on Chromium). Protocol fetch timeouts are `Timeout <n>ms exceeded` (JS prefixes `route.fetch:`). Warp static `title.html` is `text/html` (Node test server adds `charset=utf-8`).
 - **page-history:** bfcache, reload during renderer navigation, goBack/goForward during submit, issue 20791, popup reload isolation.
 - **page-event-request:** service worker / intercept-race / Chromium 204 fixme leftovers.
 - **downloads:** saveAs / cancel.

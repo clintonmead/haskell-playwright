@@ -11,6 +11,9 @@ import Data.ByteString
 import Data.Text
   ( Text
   )
+import Playwright.APIResponse
+  ( APIResponse
+  )
 import Playwright.HttpHeader
   ( HttpHeader
   )
@@ -32,9 +35,9 @@ data FulfillOptions = FulfillOptions
   { fulfillBody :: Maybe FulfillBody
   , fulfillContentType :: Maybe ContentType
   , fulfillHeaders :: [HttpHeader]
+  , fulfillResponse :: Maybe APIResponse
   , fulfillStatus :: Maybe HttpStatus
   }
-  deriving stock (Eq, Show)
 
 defaultFulfillOptions :: FulfillOptions
 defaultFulfillOptions =
@@ -42,5 +45,6 @@ defaultFulfillOptions =
     { fulfillBody = Nothing
     , fulfillContentType = Nothing
     , fulfillHeaders = []
+    , fulfillResponse = Nothing
     , fulfillStatus = Nothing
     }

@@ -12,6 +12,7 @@ module Playwright.BrowserContext
   , cookies
   , cookiesFor
   , contextsEqual
+  , contextRequest
   , grantPermissions
   , grantPermissionsFor
   , newPage
@@ -33,6 +34,10 @@ import Control.Exception
 import Data.Set qualified as Set
 import Data.Text
   ( Text
+  )
+import Playwright.APIRequestContext
+  ( APIRequestContext
+  , apiRequestContextFor
   )
 import Playwright.Channel
   ( BrowserContextTag
@@ -188,6 +193,12 @@ closeContext ctx = do
 pageContext :: Page -> BrowserContext
 pageContext page =
   BrowserContext (pageContextChannel page)
+
+contextRequest :: BrowserContext -> IO APIRequestContext
+contextRequest ctx =
+  apiRequestContextFor
+    (channelConnection (browserContextChannel ctx))
+    (channelGuid (browserContextChannel ctx))
 
 setContextDefaultTimeout :: BrowserContext -> Timeout -> IO ()
 setContextDefaultTimeout ctx timeout =

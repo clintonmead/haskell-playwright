@@ -73,6 +73,7 @@ module Playwright.Page
   , onLoad
   , pageActionTimeout
   , pageNavigationTimeout
+  , pageRequest
   , setDefaultTimeout
   , setDefaultNavigationTimeout
   ) where
@@ -97,6 +98,10 @@ import Data.Text
   )
 import Playwright.AriaRole
   ( AriaRole
+  )
+import Playwright.APIRequestContext
+  ( APIRequestContext
+  , apiRequestContextFor
   )
 import Playwright.Channel
   ( BrowserContextTag
@@ -335,6 +340,12 @@ pageActionTimeout page = do
   pageDefaults <- lookupTimeoutDefaults conn (channelGuid (pageChannel page))
   contextDefaults <- lookupTimeoutDefaults conn (channelGuid (pageContextChannel page))
   pure (resolveActionTimeout pageDefaults contextDefaults)
+
+pageRequest :: Page -> IO APIRequestContext
+pageRequest page =
+  apiRequestContextFor
+    (channelConnection (pageChannel page))
+    (channelGuid (pageContextChannel page))
 
 pageNavigationTimeout :: Page -> IO Timeout
 pageNavigationTimeout page = do
