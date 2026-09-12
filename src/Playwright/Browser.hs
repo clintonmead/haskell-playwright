@@ -24,6 +24,7 @@ import Playwright.Channel
   )
 import Playwright.Connection
   ( Connection
+  , lookupSelectorEngines
   , writeContextBaseUrl
   )
 import Playwright.Json.ChannelRef
@@ -42,6 +43,7 @@ import Playwright.Page
   )
 import Playwright.Protocol
   ( BrowserCloseResult
+  , BrowserNewContextParams (browserNewContextParamsSelectorEngines)
   , BrowserNewContextResult (browserNewContextResultContext)
   , mkBrowserCloseParams
   )
@@ -66,13 +68,23 @@ newContext browser =
 
 newContextWith :: Browser -> NewContextOptions -> IO BrowserContext
 newContextWith browser opts = do
+  let
+    conn = channelConnection (browserChannel browser)
+  engines <- lookupSelectorEngines conn
   result <-
     send
       (browserChannel browser)
       (MethodName "newContext")
-      (toBrowserNewContextParams opts)
+      ( (toBrowserNewContextParams opts)
+          { browserNewContextParamsSelectorEngines =
+              case engines of
+                [] ->
+                  Nothing
+                _ ->
+                  Just engines
+          }
+      )
   let
-    conn = channelConnection (browserChannel browser)
     ref = browserNewContextResultContext result
   case newContextBaseURL opts of
     Nothing ->

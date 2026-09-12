@@ -28,6 +28,8 @@ module Playwright.Connection
   , setTimeoutDefault
   , setTimeoutNavigation
   , waitUntilRemote
+  , lookupSelectorEngines
+  , addSelectorEngine
   ) where
 
 import Autodocodec
@@ -143,6 +145,7 @@ import Playwright.Protocol
   , FrameNavigatedEvent (frameNavigatedEventName, frameNavigatedEventUrl)
   , JSHandlePreviewUpdatedEvent (jSHandlePreviewUpdatedEventPreview)
   , LifecycleEvent
+  , SelectorEngine
   )
 import Playwright.RemoteObject
   ( RemoteObject (RemoteObject, remoteGuid, remoteInitializer, remoteParent, remoteType)
@@ -185,6 +188,7 @@ data Connection = Connection
   , connectionRouteListening :: TVar (Set Guid)
   , connectionRequestOverrides :: TVar (Map Guid RequestOverrides)
   , connectionContextBaseUrls :: TVar (Map Guid Url)
+  , connectionSelectorEngines :: TVar [SelectorEngine]
   , connectionTimeoutDefaults :: TVar (Map Guid TimeoutDefaults)
   , connectionMainFramePages :: TVar (Map Guid Guid)
   , connectionFinishedRequests :: TVar (Set Guid)
@@ -240,6 +244,7 @@ withConnection transport action = do
   routeListening <- newTVarIO Set.empty
   requestOverrides <- newTVarIO Map.empty
   contextBaseUrls <- newTVarIO Map.empty
+  selectorEngines <- newTVarIO ([] :: [SelectorEngine])
   timeoutDefaults <- newTVarIO Map.empty
   mainFramePages <- newTVarIO Map.empty
   finishedRequests <- newTVarIO (Set.empty :: Set Guid)
@@ -264,6 +269,7 @@ withConnection transport action = do
         , connectionRouteListening = routeListening
         , connectionRequestOverrides = requestOverrides
         , connectionContextBaseUrls = contextBaseUrls
+        , connectionSelectorEngines = selectorEngines
         , connectionTimeoutDefaults = timeoutDefaults
         , connectionMainFramePages = mainFramePages
         , connectionFinishedRequests = finishedRequests
@@ -505,6 +511,15 @@ writeContextBaseUrl :: Connection -> Guid -> Url -> IO ()
 writeContextBaseUrl conn guid url =
   atomically $
     modifyTVar' (connectionContextBaseUrls conn) (Map.insert guid url)
+
+lookupSelectorEngines :: Connection -> IO [SelectorEngine]
+lookupSelectorEngines conn =
+  atomically (readTVar (connectionSelectorEngines conn))
+
+addSelectorEngine :: Connection -> SelectorEngine -> IO ()
+addSelectorEngine conn engine =
+  atomically $
+    modifyTVar' (connectionSelectorEngines conn) (++ [engine])
 
 lookupTimeoutDefaults :: Connection -> Guid -> IO TimeoutDefaults
 lookupTimeoutDefaults conn guid =

@@ -105,6 +105,7 @@ library
       Playwright.PropertyName
       Playwright.Protocol
       Playwright.RaceTimeout
+      Playwright.RegisterSelectorOptions
       Playwright.RemoteObject
       Playwright.Request
       Playwright.RequestFailure
@@ -119,6 +120,7 @@ library
       Playwright.ScriptTag
       Playwright.SelectOption
       Playwright.Selector
+      Playwright.Selectors
       Playwright.SerializedArgument
       Playwright.SerializedError
       Playwright.SerializedErrorInfo
@@ -304,6 +306,7 @@ test-suite playwright-test
       Playwright.SelectorsFrameSpec
       Playwright.SelectorsGetBySpec
       Playwright.SelectorsMiscSpec
+      Playwright.SelectorsRegisterSpec
       Playwright.SelectorsRoleSpec
       Playwright.SelectorsTextSpec
       Playwright.TapSpec

@@ -66,6 +66,7 @@ data PlaywrightError
   | EvaluateUnexpected SerializedValue
   | WaitTimeout Timeout
   | RouteAlreadyHandled
+  | SelectorsRegister Text
   deriving stock (Eq, Show)
 
 instance Exception PlaywrightError

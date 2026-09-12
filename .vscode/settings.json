@@ -1,0 +1,4 @@
+{
+  "haskell.manageHLS": "PATH",
+  "haskell.serverExecutablePath": "${workspaceFolder}/scripts/haskell-language-server-wrapper"
+}

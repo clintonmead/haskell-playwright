@@ -28,7 +28,6 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 - page-request-intercept
 - interception
 - retarget
-- selectors-register
 - locator-highlight
 
 ## Ported `tests/page` with remaining cases
@@ -40,7 +39,7 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 - **page-click-timeout-1 / 3 / 4:** skip `__testHookBeforePointerAction` / `__testHookBeforeHitTarget` cases (Node-only internals). Protocol timeout errors are `Timeout <n>ms exceeded` (the JS client wraps call-log text such as “element is not enabled”).
 - **selectors-text:** skip locator `{ hasText }` / regex hasText (no `filterHasText` yet).
 - **selectors-role:** skip `getByRole` regex `name` (locator `role=…[name=/…/]` is covered). Skip `description`.
-- **selectors-misc:** xpath parse errors are protocol `SyntaxError` text (the JS client escapes quotes as `\'`).
+- **selectors-register:** skip official “registered on global” (`require('@playwright/test')` OOP). Haskell `registerSelector` takes engine source `Text` (path test reads `sectionselectorengine.js`).
 - **page-history:** bfcache, reload during renderer navigation, goBack/goForward during submit, issue 20791, popup reload isolation.
 - **page-event-request:** service worker / intercept-race / Chromium 204 fixme leftovers.
 - **downloads:** saveAs / cancel.
@@ -48,7 +47,7 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 
 ## `tests/library` with no or thin coverage
 
-Most of `tests/library` is still open, including: browser / browserType launch-server/connect, default browser context, proxy, HAR, tracing, video, webauthn, fetch, popup, crash, headful, launcher, selectors-register, unroute-behavior, beforeunload, capabilities, channels, client-certificates, and the rest of the 100 library specs.
+Most of `tests/library` is still open, including: browser / browserType launch-server/connect, default browser context, proxy, HAR, tracing, video, webauthn, fetch, popup, crash, headful, launcher, unroute-behavior, beforeunload, capabilities, channels, client-certificates, and the rest of the 100 library specs.
 
 ## Other official trees (later)
 

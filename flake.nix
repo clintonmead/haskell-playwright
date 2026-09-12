@@ -45,6 +45,7 @@
               hpkgs.ghc
               cabalWrapped
               hpkgs.hpack
+              hpkgs.haskell-language-server
               stackWrapped
               playwrightTest
               pkgs.nodejs

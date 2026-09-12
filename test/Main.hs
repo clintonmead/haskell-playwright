@@ -128,6 +128,7 @@ import Playwright.SelectorsFrameSpec qualified as SelectorsFrameSpec
 import Playwright.SelectorsGetBySpec qualified as SelectorsGetBySpec
 import Playwright.SelectorsMiscSpec qualified as SelectorsMiscSpec
 import Playwright.SelectorsRoleSpec qualified as SelectorsRoleSpec
+import Playwright.SelectorsRegisterSpec qualified as SelectorsRegisterSpec
 import Playwright.SelectorsTextSpec qualified as SelectorsTextSpec
 import Playwright.TapSpec qualified as TapSpec
 import Playwright.TransportSpec qualified as TransportSpec
@@ -278,6 +279,7 @@ main =
         , SelectorsGetBySpec.tests
         , SelectorsMiscSpec.tests
         , SelectorsRoleSpec.tests
+        , SelectorsRegisterSpec.tests
         , SelectorsTextSpec.tests
         , TapSpec.tests
         , WheelSpec.tests

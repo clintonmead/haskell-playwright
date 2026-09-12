@@ -7,6 +7,7 @@ module Playwright.Page.Query
   , pageIsDisabled
   , pageIsEditable
   , pageIsEnabled
+  , pageIsVisible
   , pageTextContent
   ) where
 
@@ -22,6 +23,7 @@ import Playwright.Frame.Inspect
   , isDisabledFrame
   , isEditableFrame
   , isEnabledFrame
+  , isVisibleFrame
   , textContentFrame
   )
 import Playwright.Page
@@ -76,3 +78,7 @@ pageIsEditable :: Page -> Selector -> IO Bool
 pageIsEditable page selector = do
   timeout <- pageActionTimeout page
   isEditableFrame (pageMainFrame page) selector timeout
+
+pageIsVisible :: Page -> Selector -> IO Bool
+pageIsVisible page selector =
+  isVisibleFrame (pageMainFrame page) selector

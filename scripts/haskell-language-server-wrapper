@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Run the flake's GHC-matched HLS. Cursor/VS Code should set
+# haskell.serverExecutablePath to this script so the GUI does not need
+# the nix develop PATH.
+set -euo pipefail
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$root"
+exec nix develop "$root" --command -- haskell-language-server-wrapper "$@"

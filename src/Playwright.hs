@@ -81,6 +81,7 @@ module Playwright
   , Playwright (..)
   , Point (..)
   , PropertyName (..)
+  , RegisterSelectorOptions (..)
   , Request (..)
   , RequestFailure (..)
   , ResourceType (..)
@@ -196,6 +197,7 @@ module Playwright
   , defaultLaunchOptions
   , defaultNewContextOptions
   , defaultPdfOptions
+  , defaultRegisterSelectorOptions
   , defaultRouteOptions
   , defaultScreenshotOptions
   , defaultTimeout
@@ -221,6 +223,7 @@ module Playwright
   , emptyStorageState
   , enterFrameSelector
   , evalOnSelectorAll
+  , evalOnSelectorAllBool
   , evalOnSelectorAllHandle
   , evalOnSelectorAllHandleNumber
   , evalOnSelectorAllHandleTexts
@@ -379,6 +382,7 @@ module Playwright
   , pageIsDisabled
   , pageIsEditable
   , pageIsEnabled
+  , pageIsVisible
   , pagesEqual
   , pageTextContent
   , pdf
@@ -391,6 +395,8 @@ module Playwright
   , querySelectorHandle
   , querySelectorStrict
   , reload
+  , registerSelector
+  , registerSelectorWith
   , requestFrame
   , requestFailure
   , requestGC
@@ -724,6 +730,7 @@ import Playwright.Evaluate
   ( allInnerTexts
   , allTextContents
   , evalOnSelectorAll
+  , evalOnSelectorAllBool
   , evalOnSelectorAllHandle
   , evalOnSelectorAllHandleNumber
   , evalOnSelectorAllHandleTexts
@@ -817,6 +824,10 @@ import Playwright.Geolocation
 import Playwright.GetByRoleOptions
   ( GetByRoleOptions (GetByRoleOptions, getByRoleChecked, getByRoleDisabled, getByRoleExact, getByRoleExpanded, getByRoleIncludeHidden, getByRoleLevel, getByRoleName, getByRolePressed, getByRoleSelected)
   , defaultGetByRoleOptions
+  )
+import Playwright.RegisterSelectorOptions
+  ( RegisterSelectorOptions (RegisterSelectorOptions, registerSelectorContentScript)
+  , defaultRegisterSelectorOptions
   )
 import Playwright.GotoOptions
   ( GotoOptions (GotoOptions, gotoOptionsReferer, gotoOptionsTimeout, gotoOptionsWaitUntil)
@@ -1048,6 +1059,7 @@ import Playwright.Page.Query
   , pageIsDisabled
   , pageIsEditable
   , pageIsEnabled
+  , pageIsVisible
   , pageTextContent
   )
 import Playwright.Page.Network
@@ -1153,6 +1165,10 @@ import Playwright.Selector
   , nestedSelector
   , selectorFromText
   , selectorToText
+  )
+import Playwright.Selectors
+  ( registerSelector
+  , registerSelectorWith
   )
 import Playwright.SerializedArgument
   ( boolArgument
