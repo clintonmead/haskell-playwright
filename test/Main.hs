@@ -20,6 +20,7 @@ import Playwright.BrowserContextStorageStateSpec qualified as BrowserContextStor
 import Playwright.BrowserContextTimezoneSpec qualified as BrowserContextTimezoneSpec
 import Playwright.BrowserContextViewportSpec qualified as BrowserContextViewportSpec
 import Playwright.ConnectionSpec qualified as ConnectionSpec
+import Playwright.DownloadSpec qualified as DownloadSpec
 import Playwright.ElementHandleBoundingBoxSpec qualified as ElementHandleBoundingBoxSpec
 import Playwright.ElementHandleClickSpec qualified as ElementHandleClickSpec
 import Playwright.ElementHandleContentFrameSpec qualified as ElementHandleContentFrameSpec
@@ -130,6 +131,7 @@ main =
         , BrowserContextTimezoneSpec.tests
         , BrowserContextViewportSpec.tests
         , ConnectionSpec.tests
+        , DownloadSpec.tests
         , ElementHandleBoundingBoxSpec.tests
         , ElementHandleClickSpec.tests
         , ElementHandleContentFrameSpec.tests

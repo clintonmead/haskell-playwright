@@ -21,6 +21,7 @@ extra-source-files:
 library
   exposed-modules:
       Playwright
+      Playwright.AcceptDownloads
       Playwright.AriaRole
       Playwright.BindingName
       Playwright.BoundingBox
@@ -44,6 +45,7 @@ library
       Playwright.DialogType
       Playwright.Disposable
       Playwright.DomEventType
+      Playwright.Download
       Playwright.Driver
       Playwright.ElementHandle
       Playwright.EmulateMedia
@@ -181,6 +183,7 @@ test-suite playwright-test
       Playwright.BrowserContextTimezoneSpec
       Playwright.BrowserContextViewportSpec
       Playwright.ConnectionSpec
+      Playwright.DownloadSpec
       Playwright.ElementHandleBoundingBoxSpec
       Playwright.ElementHandleClickSpec
       Playwright.ElementHandleContentFrameSpec

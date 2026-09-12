@@ -4,6 +4,7 @@ module Playwright
   , BrowserName (..)
   , BrowserType (..)
   , Accuracy (..)
+  , AcceptDownloads (..)
   , AriaRole (..)
   , BoundingBox (..)
   , BindingName (..)
@@ -31,6 +32,7 @@ module Playwright
   , Dialog (..)
   , DialogType (..)
   , Disposable (..)
+  , Download
   , DomEventType (..)
   , ElementHandle (..)
   , EmulateMedia (..)
@@ -80,6 +82,7 @@ module Playwright
   , SelectOption (..)
   , Selector
   , SpecialJsValue (..)
+  , SuggestedFilename (..)
   , StorageItem (..)
   , StorageKind (..)
   , StorageName (..)
@@ -109,6 +112,7 @@ module Playwright
   , allLocators
   , armConsole
   , armDialog
+  , armDownload
   , armFileChooser
   , armPopup
   , asElement
@@ -173,6 +177,10 @@ module Playwright
   , deviceScaleFactorFromInt
   , dispatchEvent
   , dispose
+  , downloadPath
+  , downloadPage
+  , downloadSuggestedFilename
+  , downloadUrl
   , dragAndDrop
   , dismissDialog
   , elementArgument
@@ -360,6 +368,7 @@ module Playwright
   , waitForConsole
   , waitForContextPage
   , waitForDialog
+  , waitForDownload
   , waitForFileChooser
   , waitForFunction
   , waitForLoadState
@@ -388,6 +397,9 @@ module Playwright
   , workers
   ) where
 
+import Playwright.AcceptDownloads
+  ( AcceptDownloads (AcceptDownloadsAccept, AcceptDownloadsDeny)
+  )
 import Playwright.AriaRole
   ( AriaRole (AriaRole, ariaRoleToText)
   )
@@ -504,6 +516,16 @@ import Playwright.Dialog
   )
 import Playwright.DialogType
   ( DialogType (DialogAlert, DialogBeforeUnload, DialogConfirm, DialogPrompt)
+  )
+import Playwright.Download
+  ( Download
+  , SuggestedFilename (SuggestedFilename, suggestedFilenameToText)
+  , armDownload
+  , downloadPage
+  , downloadPath
+  , downloadSuggestedFilename
+  , downloadUrl
+  , waitForDownload
   )
 import Playwright.Disposable
   ( Disposable (Disposable)
@@ -723,7 +745,7 @@ import Playwright.MediaType
   ( MediaType (MediaNoOverride, MediaPrint, MediaScreen)
   )
 import Playwright.NewContextOptions
-  ( NewContextOptions (NewContextOptions, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextGeolocation, newContextHasTouch, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextIsMobile, newContextJavaScriptEnabled, newContextLocale, newContextNoDefaultViewport, newContextOffline, newContextPermissions, newContextStorageState, newContextTimezoneId, newContextUserAgent, newContextViewport)
+  ( NewContextOptions (NewContextOptions, newContextAcceptDownloads, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextGeolocation, newContextHasTouch, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextIsMobile, newContextJavaScriptEnabled, newContextLocale, newContextNoDefaultViewport, newContextOffline, newContextPermissions, newContextStorageState, newContextTimezoneId, newContextUserAgent, newContextViewport)
   , defaultNewContextOptions
   )
 import Playwright.Page

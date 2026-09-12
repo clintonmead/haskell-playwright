@@ -4,6 +4,9 @@ module Playwright.NewContextOptions
   , toBrowserNewContextParams
   ) where
 
+import Playwright.AcceptDownloads
+  ( AcceptDownloads (AcceptDownloadsAccept, AcceptDownloadsDeny)
+  )
 import Playwright.ColorScheme
   ( ColorScheme (ColorSchemeDark, ColorSchemeLight, ColorSchemeNoOverride, ColorSchemeNoPreference)
   )
@@ -32,7 +35,8 @@ import Playwright.PermissionName
   ( PermissionName (permissionNameToText)
   )
 import Playwright.Protocol
-  ( BrowserNewContextParams (browserNewContextParamsBaseURL, browserNewContextParamsBypassCSP, browserNewContextParamsColorScheme, browserNewContextParamsDeviceScaleFactor, browserNewContextParamsExtraHTTPHeaders, browserNewContextParamsGeolocation, browserNewContextParamsHasTouch, browserNewContextParamsHttpCredentials, browserNewContextParamsIgnoreHTTPSErrors, browserNewContextParamsIsMobile, browserNewContextParamsJavaScriptEnabled, browserNewContextParamsLocale, browserNewContextParamsNoDefaultViewport, browserNewContextParamsOffline, browserNewContextParamsPermissions, browserNewContextParamsStorageState, browserNewContextParamsTimezoneId, browserNewContextParamsUserAgent, browserNewContextParamsViewport)
+  ( BrowserNewContextParams (browserNewContextParamsAcceptDownloads, browserNewContextParamsBaseURL, browserNewContextParamsBypassCSP, browserNewContextParamsColorScheme, browserNewContextParamsDeviceScaleFactor, browserNewContextParamsExtraHTTPHeaders, browserNewContextParamsGeolocation, browserNewContextParamsHasTouch, browserNewContextParamsHttpCredentials, browserNewContextParamsIgnoreHTTPSErrors, browserNewContextParamsIsMobile, browserNewContextParamsJavaScriptEnabled, browserNewContextParamsLocale, browserNewContextParamsNoDefaultViewport, browserNewContextParamsOffline, browserNewContextParamsPermissions, browserNewContextParamsStorageState, browserNewContextParamsTimezoneId, browserNewContextParamsUserAgent, browserNewContextParamsViewport)
+  , BrowserNewContextParamsAcceptDownloads (BrowserNewContextParamsAcceptDownloadsAccept, BrowserNewContextParamsAcceptDownloadsDeny)
   , BrowserNewContextParamsColorScheme (BrowserNewContextParamsColorSchemeDark, BrowserNewContextParamsColorSchemeLight, BrowserNewContextParamsColorSchemeNoOverride, BrowserNewContextParamsColorSchemeNoPreference)
   , BrowserNewContextParamsGeolocation (browserNewContextParamsGeolocationAccuracy)
   , BrowserNewContextParamsHttpCredentials (browserNewContextParamsHttpCredentialsOrigin)
@@ -63,7 +67,8 @@ import Playwright.ViewportSize
   )
 
 data NewContextOptions = NewContextOptions
-  { newContextBaseURL :: Maybe Url
+  { newContextAcceptDownloads :: Maybe AcceptDownloads
+  , newContextBaseURL :: Maybe Url
   , newContextBypassCSP :: Maybe Bool
   , newContextColorScheme :: Maybe ColorScheme
   , newContextDeviceScaleFactor :: Maybe DeviceScaleFactor
@@ -88,7 +93,8 @@ data NewContextOptions = NewContextOptions
 defaultNewContextOptions :: NewContextOptions
 defaultNewContextOptions =
     NewContextOptions
-    { newContextBaseURL = Nothing
+    { newContextAcceptDownloads = Nothing
+    , newContextBaseURL = Nothing
     , newContextBypassCSP = Nothing
     , newContextColorScheme = Nothing
     , newContextDeviceScaleFactor = Nothing
@@ -112,7 +118,8 @@ defaultNewContextOptions =
 toBrowserNewContextParams :: NewContextOptions -> BrowserNewContextParams
 toBrowserNewContextParams opts =
   mkBrowserNewContextParams
-    { browserNewContextParamsBaseURL = newContextBaseURL opts
+    { browserNewContextParamsAcceptDownloads = fmap toProtocolAcceptDownloads (newContextAcceptDownloads opts)
+    , browserNewContextParamsBaseURL = newContextBaseURL opts
     , browserNewContextParamsBypassCSP = newContextBypassCSP opts
     , browserNewContextParamsColorScheme = fmap toProtocolColor (newContextColorScheme opts)
     , browserNewContextParamsDeviceScaleFactor =
@@ -145,6 +152,14 @@ toProtocolColor scheme =
       BrowserNewContextParamsColorSchemeNoPreference
     ColorSchemeNoOverride ->
       BrowserNewContextParamsColorSchemeNoOverride
+
+toProtocolAcceptDownloads :: AcceptDownloads -> BrowserNewContextParamsAcceptDownloads
+toProtocolAcceptDownloads mode =
+  case mode of
+    AcceptDownloadsAccept ->
+      BrowserNewContextParamsAcceptDownloadsAccept
+    AcceptDownloadsDeny ->
+      BrowserNewContextParamsAcceptDownloadsDeny
 
 toProtocolGeolocation :: Geolocation -> BrowserNewContextParamsGeolocation
 toProtocolGeolocation location =

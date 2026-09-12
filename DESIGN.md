@@ -144,3 +144,4 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - `page.clock.*` is a client helper on the BrowserContext channel (`clockInstall`, `clockPauseAt`, `clockRunFor`, `clockFastForward`, `clockResume`, `clockSetFixedTime`, `clockSetSystemTime`). Times/ticks are `timeNumber`/`ticksNumber` (`Scientific`) or `timeString`/`ticksString`.
 - `storageState` / `setStorageState` are BrowserContext protocol methods. Create-time `NewContextOptions` `storageState` maps onto `BrowserNewContextParams.storageState`. IndexedDB and WebAuthn credentials are not in the Haskell `StorageState` type yet.
 - `NewContextOptions` also maps `hasTouch`, `isMobile`, and `noDefaultViewport`.
+- Page `download` events are not behind `updateSubscription`. `waitForDownload` waits on the page guid; `downloadPath` is Artifact `pathAfterFinished`. `acceptDownloads` is `Accept`/`Deny` on `NewContextOptions`.
