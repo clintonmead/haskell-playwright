@@ -23,8 +23,8 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 - page-add-locator-handler
 - page-click-during-navigation (JS `__testHookAfterStable` only)
 - page-evaluate-no-stall (JS `toImpl` / nonStallingRawEvaluate — not a public API)
-- page-leaks, page-listeners
-- page-navigation
+- page-leaks (JS `toImpl` / leakedJSHandles)
+- page-listeners (JS `removeAllListeners` wait/ignoreErrors)
 - page-request-intercept
 - interception
 - retarget

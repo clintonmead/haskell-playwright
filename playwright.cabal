@@ -271,6 +271,7 @@ test-suite playwright-test
       Playwright.PageKeyboardSpec
       Playwright.PageLocalStorageSpec
       Playwright.PageMouseSpec
+      Playwright.PageNavigationSpec
       Playwright.PageNetworkIdleSpec
       Playwright.PageNetworkPostDataSpec
       Playwright.PageNetworkRequestSpec
