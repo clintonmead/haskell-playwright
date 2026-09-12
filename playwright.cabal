@@ -22,6 +22,7 @@ library
   exposed-modules:
       Playwright
       Playwright.AcceptDownloads
+      Playwright.AddLocatorHandlerOptions
       Playwright.AriaRole
       Playwright.BindingName
       Playwright.BoundingBox
@@ -89,6 +90,7 @@ library
       Playwright.LoadState
       Playwright.Locale
       Playwright.Locator
+      Playwright.LocatorHandler
       Playwright.MediaType
       Playwright.MethodName
       Playwright.MimeType
@@ -240,6 +242,7 @@ test-suite playwright-test
       Playwright.LocatorQuerySpec
       Playwright.LocatorSpec
       Playwright.PageAddInitScriptSpec
+      Playwright.PageAddLocatorHandlerSpec
       Playwright.PageAddScriptTagSpec
       Playwright.PageAddStyleTagSpec
       Playwright.PageAutowaitingBasicSpec

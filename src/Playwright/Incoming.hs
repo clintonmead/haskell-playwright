@@ -31,7 +31,7 @@ import Data.Text
 import Data.Text qualified as Text
 import Playwright.Error
   ( PlaywrightError (DecodeFailure)
-  , ProtocolFailure
+  , ProtocolFailure (protocolFailureMessage)
   )
 import Playwright.Guid
   ( Guid
@@ -83,6 +83,7 @@ data WireMessage = WireMessage
   , wireParams :: Maybe Value
   , wireResult :: Maybe Value
   , wireError :: Maybe Value
+  , wireLog :: Maybe [Text]
   }
   deriving stock (Eq, Show)
   deriving (FromJSON, ToJSON) via (Autodocodec WireMessage)
@@ -97,6 +98,7 @@ instance HasCodec WireMessage where
         <*> optionalField' "params" .= wireParams
         <*> optionalField' "result" .= wireResult
         <*> optionalField' "error" .= wireError
+        <*> optionalField' "log" .= wireLog
 
 parseIncoming :: ByteString -> Either PlaywrightError Incoming
 parseIncoming bytes =
@@ -112,7 +114,7 @@ interpretWire wire =
     Just reqId ->
       case wireError wire of
         Just errValue ->
-          IncomingResponse reqId . Left <$> parseFailure errValue
+          IncomingResponse reqId . Left <$> parseFailure errValue (wireLog wire)
         Nothing ->
           Right (IncomingResponse reqId (Right (fromMaybe emptyObject (wireResult wire))))
     Nothing ->
@@ -145,17 +147,38 @@ parseAdoptGuid params =
       ChannelRef guid <- fromJsonValue value
       Right guid
 
-parseFailure :: Value -> Either PlaywrightError ProtocolFailure
-parseFailure value =
+parseFailure :: Value -> Maybe [Text] -> Either PlaywrightError ProtocolFailure
+parseFailure value callLog =
   case fromJsonValue value of
     Right failure ->
-      Right failure
+      Right (withCallLog failure callLog)
     Left _ ->
       case nestedError value of
         Just inner ->
-          fromJsonValue inner
+          fmap (`withCallLog` callLog) (fromJsonValue inner)
         Nothing ->
           Left (DecodeFailure "invalid protocol error")
+
+withCallLog :: ProtocolFailure -> Maybe [Text] -> ProtocolFailure
+withCallLog failure callLog =
+  case meaningfulLog callLog of
+    [] ->
+      failure
+    logLines ->
+      failure
+        { protocolFailureMessage =
+            protocolFailureMessage failure
+              <> "\nCall log:\n"
+              <> Text.unlines logLines
+        }
+
+meaningfulLog :: Maybe [Text] -> [Text]
+meaningfulLog callLog =
+  case callLog of
+    Nothing ->
+      []
+    Just logLines ->
+      filter (not . Text.null) logLines
 
 nestedError :: Value -> Maybe Value
 nestedError value =

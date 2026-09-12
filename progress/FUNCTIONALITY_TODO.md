@@ -20,7 +20,6 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 
 ## `tests/page` with no Haskell spec yet
 
-- page-add-locator-handler
 - page-click-during-navigation (JS `__testHookAfterStable` only)
 - page-evaluate-no-stall (JS `toImpl` / nonStallingRawEvaluate — not a public API)
 - page-leaks (JS `toImpl` / leakedJSHandles)
@@ -39,6 +38,7 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 - **selectors-role:** skip `getByRole` regex `name` (locator `role=…[name=/…/]` is covered). Skip `description`.
 - **retarget:** skip Playwright `expect` matchers (`toBeEnabled`, `toHaveValue`, `toHaveText`, `toHaveClass`, …). Core locator/handle/page checks and `waitForElementState` are ported. Official `giveItAChanceToResolve` is `rafraf(page, 5)` (double `requestAnimationFrame`, not a sleep).
 - **interception:** skip Node `iso.globToRegexPattern` / `urlMatches` unit tests, unbalanced-brace glob validation (Haskell `UrlGlob` does not reject `{`), `page.route` with a `vm` RegExp, and blob-URL intercept (official WebKit-only). The `http://localhos**?*oo` case uses `localhost` like other cross-host ports.
+- **page-add-locator-handler:** skip Playwright `expect` (`toBeVisible`, `toHaveScreenshot`). Protocol timeout errors now include the driver call log (so “locator handler has finished…” / intercept messages are visible). Official `window.builtins.setTimeout` is provided via `addInitScript` (test-runner-only on Node).
 - **page-history:** bfcache, reload during renderer navigation, goBack/goForward during submit, issue 20791, popup reload isolation.
 - **page-event-request:** service worker / intercept-race / Chromium 204 fixme leftovers.
 - **downloads:** saveAs / cancel.

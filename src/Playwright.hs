@@ -5,6 +5,7 @@ module Playwright
   , BrowserType (..)
   , Accuracy (..)
   , AcceptDownloads (..)
+  , AddLocatorHandlerOptions (..)
   , AriaRole (..)
   , BoundingBox (..)
   , BodySize (..)
@@ -68,6 +69,7 @@ module Playwright
   , LoadState (..)
   , Locale (..)
   , Locator (..)
+  , LocatorHandlerTimes (..)
   , Longitude (..)
   , MediaType (..)
   , MimeType (..)
@@ -119,6 +121,8 @@ module Playwright
   , addContextInitScript
   , addCookies
   , addInitScript
+  , addLocatorHandler
+  , addLocatorHandlerWith
   , addScriptTag
   , addStyleTag
   , allInnerTexts
@@ -187,6 +191,7 @@ module Playwright
   , currentName
   , currentUrl
   , dblclick
+  , defaultAddLocatorHandlerOptions
   , defaultCheckOptions
   , defaultClickOptions
   , defaultContinueOptions
@@ -397,6 +402,7 @@ module Playwright
   , querySelectorHandle
   , querySelectorStrict
   , reload
+  , removeLocatorHandler
   , registerSelector
   , registerSelectorWith
   , requestFrame
@@ -828,6 +834,11 @@ import Playwright.GetByRoleOptions
   ( GetByRoleOptions (GetByRoleOptions, getByRoleChecked, getByRoleDisabled, getByRoleExact, getByRoleExpanded, getByRoleIncludeHidden, getByRoleLevel, getByRoleName, getByRolePressed, getByRoleSelected)
   , defaultGetByRoleOptions
   )
+import Playwright.AddLocatorHandlerOptions
+  ( AddLocatorHandlerOptions (AddLocatorHandlerOptions, addLocatorHandlerNoWaitAfter, addLocatorHandlerTimes)
+  , LocatorHandlerTimes (LocatorHandlerTimes, locatorHandlerTimesToInt)
+  , defaultAddLocatorHandlerOptions
+  )
 import Playwright.RegisterSelectorOptions
   ( RegisterSelectorOptions (RegisterSelectorOptions, registerSelectorContentScript)
   , defaultRegisterSelectorOptions
@@ -955,6 +966,11 @@ import Playwright.Locator
   , uncheckWith
   , waitFor
   , waitForWith
+  )
+import Playwright.LocatorHandler
+  ( addLocatorHandler
+  , addLocatorHandlerWith
+  , removeLocatorHandler
   )
 import Playwright.Mouse
   ( mouseClick

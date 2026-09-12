@@ -67,6 +67,7 @@ data PlaywrightError
   | WaitTimeout Timeout
   | RouteAlreadyHandled
   | SelectorsRegister Text
+  | LocatorNotMainFrame
   deriving stock (Eq, Show)
 
 instance Exception PlaywrightError

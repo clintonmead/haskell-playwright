@@ -30,6 +30,12 @@ module Playwright.Connection
   , waitUntilRemote
   , lookupSelectorEngines
   , addSelectorEngine
+  , StoredLocatorHandler (..)
+  , markLocatorHandlersListening
+  , putLocatorHandler
+  , beginLocatorHandler
+  , deleteLocatorHandler
+  , locatorHandlerUidsMatching
   ) where
 
 import Autodocodec
@@ -113,6 +119,9 @@ import Data.Sequence
   ( Seq
   )
 import Data.Sequence qualified as Seq
+import Data.Text
+  ( Text
+  )
 import Data.Text qualified as Text
 import Playwright.Error
   ( PlaywrightError (ConnectionClosed, DecodeFailure, MissingObject, ProtocolRpc, UnexpectedResponse)
@@ -196,6 +205,15 @@ data Connection = Connection
   , connectionPendingHandlers :: TVar Int
   , connectionHandlerThreads :: TVar (Set ThreadId)
   , connectionHandlerQueue :: TQueue (IO ())
+  , connectionLocatorHandlers :: TVar (Map Guid (Map Int StoredLocatorHandler))
+  , connectionLocatorListening :: TVar (Set Guid)
+  }
+
+data StoredLocatorHandler = StoredLocatorHandler
+  { storedLocatorHandlerTimes :: Maybe Int
+  , storedLocatorHandlerSelector :: Text
+  , storedLocatorHandlerFrame :: Guid
+  , storedLocatorHandlerRun :: IO ()
   }
 
 data EventWaiter = EventWaiter
@@ -252,6 +270,8 @@ withConnection transport action = do
   pendingHandlers <- newTVarIO (0 :: Int)
   handlerThreads <- newTVarIO (Set.empty :: Set ThreadId)
   handlerQueue <- newTQueueIO
+  locatorHandlers <- newTVarIO (Map.empty :: Map Guid (Map Int StoredLocatorHandler))
+  locatorListening <- newTVarIO Set.empty
   let
     conn :: Connection
     conn =
@@ -277,6 +297,8 @@ withConnection transport action = do
         , connectionPendingHandlers = pendingHandlers
         , connectionHandlerThreads = handlerThreads
         , connectionHandlerQueue = handlerQueue
+        , connectionLocatorHandlers = locatorHandlers
+        , connectionLocatorListening = locatorListening
         }
   withAsync (readerLoop conn) $ \_ ->
     withAsync (handlerLoop conn) $ \_ ->
@@ -520,6 +542,62 @@ addSelectorEngine :: Connection -> SelectorEngine -> IO ()
 addSelectorEngine conn engine =
   atomically $
     modifyTVar' (connectionSelectorEngines conn) (++ [engine])
+
+markLocatorHandlersListening :: Connection -> Guid -> IO Bool
+markLocatorHandlersListening conn guid =
+  atomically $ do
+    listening <- readTVar (connectionLocatorListening conn)
+    let
+      first = Set.notMember guid listening
+    when first (modifyTVar' (connectionLocatorListening conn) (Set.insert guid))
+    pure first
+
+putLocatorHandler :: Connection -> Guid -> Int -> StoredLocatorHandler -> IO ()
+putLocatorHandler conn pageGuid uid stored =
+  atomically $
+    modifyTVar' (connectionLocatorHandlers conn) (Map.insertWith Map.union pageGuid (Map.singleton uid stored))
+
+beginLocatorHandler :: Connection -> Guid -> Int -> IO (Maybe StoredLocatorHandler, Bool)
+beginLocatorHandler conn pageGuid uid =
+  atomically $ do
+    pages <- readTVar (connectionLocatorHandlers conn)
+    let
+      handlers = Map.findWithDefault Map.empty pageGuid pages
+    case Map.lookup uid handlers of
+      Nothing ->
+        pure (Nothing, False)
+      Just stored ->
+        case storedLocatorHandlerTimes stored of
+          Just 0 ->
+            pure (Nothing, True)
+          Just remaining -> do
+            let
+              next = remaining - 1
+              updated = stored {storedLocatorHandlerTimes = Just next}
+            writeTVar
+              (connectionLocatorHandlers conn)
+              (Map.insert pageGuid (Map.insert uid updated handlers) pages)
+            pure (Just stored, next == 0)
+          Nothing ->
+            pure (Just stored, False)
+
+deleteLocatorHandler :: Connection -> Guid -> Int -> IO ()
+deleteLocatorHandler conn pageGuid uid =
+  atomically $
+    modifyTVar' (connectionLocatorHandlers conn) (Map.adjust (Map.delete uid) pageGuid)
+
+locatorHandlerUidsMatching :: Connection -> Guid -> Text -> Guid -> IO [Int]
+locatorHandlerUidsMatching conn pageGuid selector frameGuid =
+  atomically $ do
+    pages <- readTVar (connectionLocatorHandlers conn)
+    let
+      handlers = Map.findWithDefault Map.empty pageGuid pages
+    pure
+      [ uid
+      | (uid, stored) <- Map.toList handlers
+      , storedLocatorHandlerSelector stored == selector
+      , storedLocatorHandlerFrame stored == frameGuid
+      ]
 
 lookupTimeoutDefaults :: Connection -> Guid -> IO TimeoutDefaults
 lookupTimeoutDefaults conn guid =
