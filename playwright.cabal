@@ -129,6 +129,7 @@ library
       Playwright.ResourceType
       Playwright.Response
       Playwright.Route
+      Playwright.Route.Intercept
       Playwright.RouteOptions
       Playwright.ScreenshotOptions
       Playwright.ScriptTag
