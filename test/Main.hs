@@ -19,6 +19,7 @@ import Playwright.BrowserContextRouteSpec qualified as BrowserContextRouteSpec
 import Playwright.BrowserContextSetExtraHTTPHeadersSpec qualified as BrowserContextSetExtraHTTPHeadersSpec
 import Playwright.BrowserContextStorageStateSpec qualified as BrowserContextStorageStateSpec
 import Playwright.BrowserContextTimezoneSpec qualified as BrowserContextTimezoneSpec
+import Playwright.BrowserContextUserAgentSpec qualified as BrowserContextUserAgentSpec
 import Playwright.BrowserContextViewportSpec qualified as BrowserContextViewportSpec
 import Playwright.ConnectionSpec qualified as ConnectionSpec
 import Playwright.DownloadSpec qualified as DownloadSpec
@@ -175,6 +176,7 @@ main =
         , BrowserContextSetExtraHTTPHeadersSpec.tests
         , BrowserContextStorageStateSpec.tests
         , BrowserContextTimezoneSpec.tests
+        , BrowserContextUserAgentSpec.tests
         , BrowserContextViewportSpec.tests
         , ConnectionSpec.tests
         , DownloadSpec.tests
