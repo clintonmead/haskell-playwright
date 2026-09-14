@@ -249,6 +249,7 @@ test-suite playwright-test
       Playwright.ConnectionSpec
       Playwright.DefaultBrowserContext1Spec
       Playwright.DefaultBrowserContext2Spec
+      Playwright.DownloadsPathSpec
       Playwright.DownloadSpec
       Playwright.ElementHandleBoundingBoxSpec
       Playwright.ElementHandleClickSpec
@@ -375,6 +376,7 @@ test-suite playwright-test
       Playwright.SharedWorkerSpec
       Playwright.TapSpec
       Playwright.TransportSpec
+      Playwright.UnrouteBehaviorSpec
       Playwright.WheelSpec
       Playwright.WorkersSpec
       Paths_playwright

@@ -1,0 +1,168 @@
+module Playwright.UnrouteBehaviorSpec
+  ( tests
+  ) where
+
+import Control.Concurrent.STM
+  ( atomically
+  , retry
+  )
+import Control.Monad.IO.Class
+  ( liftIO
+  )
+import Data.Text
+  ( Text
+  )
+import Playwright
+  ( Page
+  , Playwright
+  , Response
+  , Route
+  , UrlGlob (UrlGlob)
+  , abortRoute
+  , closeContext
+  , closePage
+  , contextRoute
+  , continueRoute
+  , defaultFulfillOptions
+  , defaultGotoOptions
+  , defaultNewContextOptions
+  , fallbackRoute
+  , fulfillRoute
+  , goto
+  , responseOk
+  , route
+  , unrouteAll
+  , unrouteContextAll
+  , urlFromText
+  )
+import Playwright.Error
+  ( PlaywrightError
+  )
+import Playwright.Harness
+  ( withAssets
+  , withAssetsContextWith
+  , assertEqual
+  , assertFailure
+  )
+import Test.Tasty
+  ( TestTree
+  , testGroup
+  )
+import Test.Tasty.HUnit
+  ( testCase
+  )
+import UnliftIO.Async
+  ( async
+  )
+import UnliftIO.Concurrent
+  ( threadDelay
+  )
+import UnliftIO.Exception
+  ( try
+  )
+import UnliftIO.IORef
+  ( newIORef
+  , readIORef
+  , writeIORef
+  )
+import UnliftIO.MVar
+  ( newEmptyMVar
+  , putMVar
+  , takeMVar
+  )
+
+tests :: TestTree
+tests =
+  testGroup
+    "unroute-behavior"
+    [ testCase "context.unrouteAll removes all handlers" $
+        withAssetsContextWith defaultNewContextOptions $ \prefix ctx page -> do
+          contextRoute ctx (UrlGlob "**/*") abortRoute
+          contextRoute ctx (UrlGlob "**/empty.html") abortRoute
+          unrouteContextAll ctx
+          response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          case response of
+            Nothing ->
+              assertFailure "missing response"
+            Just value ->
+              assertEqual "ok" True =<< responseOk value
+    , testCase "page.unrouteAll removes all routes" $
+        withAssets $ \prefix page -> do
+          route page (UrlGlob "**/*") abortRoute
+          route page (UrlGlob "**/empty.html") abortRoute
+          unrouteAll page
+          response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          case response of
+            Nothing ->
+              assertFailure "missing response"
+            Just value ->
+              assertEqual "ok" True =<< responseOk value
+    , testCase "page.close should not wait for active route handlers on the owning context" $
+        withAssetsContextWith defaultNewContextOptions $ \prefix ctx page -> do
+          arrived <- newEmptyMVar
+          contextRoute ctx (UrlGlob "**/*") $ \_handled -> do
+            putMVar arrived ()
+            hangForever
+          route page (UrlGlob "**/*") fallbackRoute
+          ignoreGoto page (prefix <> "/empty.html")
+          takeMVar arrived
+          closePage page
+    , testCase "context.close should not wait for active route handlers on the owned pages" $
+        withAssetsContextWith defaultNewContextOptions $ \prefix ctx page -> do
+          arrived <- newEmptyMVar
+          route page (UrlGlob "**/*") $ \_handled -> do
+            putMVar arrived ()
+            hangForever
+          route page (UrlGlob "**/*") fallbackRoute
+          ignoreGoto page (prefix <> "/empty.html")
+          takeMVar arrived
+          closeContext ctx
+    , testCase "page.close does not wait for active route handlers" $
+        withAssets $ \prefix page -> do
+          secondCalled <- newIORef False
+          route page (UrlGlob "**/*") $ \_handled ->
+            writeIORef secondCalled True
+          arrived <- newEmptyMVar
+          route page (UrlGlob "**/*") $ \_handled -> do
+            putMVar arrived ()
+            hangForever
+          ignoreGoto page (prefix <> "/empty.html")
+          takeMVar arrived
+          closePage page
+          liftIO (threadDelay 500000)
+          assertEqual "second handler" False =<< readIORef secondCalled
+    , testCase "route.continue should not throw if page has been closed" $
+        withHeldRoute $ \page handled -> do
+          closePage page
+          continueRoute handled
+    , testCase "route.fallback should not throw if page has been closed" $
+        withHeldRoute $ \page handled -> do
+          closePage page
+          fallbackRoute handled
+    , testCase "route.fulfill should not throw if page has been closed" $
+        withHeldRoute $ \page handled -> do
+          closePage page
+          fulfillRoute handled defaultFulfillOptions
+    ]
+
+withHeldRoute :: (Page -> Route -> Playwright ()) -> IO ()
+withHeldRoute action =
+  withAssets $ \prefix page -> do
+    arrived <- newEmptyMVar
+    route page (UrlGlob "**/*") $ \handled ->
+      putMVar arrived handled
+    ignoreGoto page (prefix <> "/empty.html")
+    handled <- takeMVar arrived
+    action page handled
+
+ignoreGoto :: Page -> Text -> Playwright ()
+ignoreGoto page target = do
+  _ <-
+    async $ do
+      _ <- try (goto page (urlFromText target) defaultGotoOptions) :: Playwright (Either PlaywrightError (Maybe Response))
+      pure ()
+  pure ()
+
+hangForever :: Playwright ()
+hangForever =
+  liftIO (atomically retry)

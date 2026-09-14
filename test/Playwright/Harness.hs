@@ -21,6 +21,8 @@ module Playwright.Harness
   , withLocalApp
   , withPersistentContext
   , withPersistentContextWith
+  , withPersistentLaunchWith
+  , withPersistentUserDataLaunchWith
   , withPersistentUserDataWith
   ) where
 
@@ -139,20 +141,28 @@ withChromiumContext =
   withChromiumContextWith defaultNewContextOptions
 
 withPersistentContextWith :: NewContextOptions -> (BrowserContext -> Page -> Playwright a) -> IO a
-withPersistentContextWith opts action = do
+withPersistentContextWith =
+  withPersistentLaunchWith defaultLaunchOptions
+
+withPersistentLaunchWith :: LaunchOptions -> NewContextOptions -> (BrowserContext -> Page -> Playwright a) -> IO a
+withPersistentLaunchWith launchOpts opts action = do
   _ <- requireNonEmptyEnv "PLAYWRIGHT_BROWSERS_PATH"
   withSystemTempDirectory "pw-user-data" $ \userDataDir ->
-    runPlaywright (withPersistentUserDataWith userDataDir opts action)
+    runPlaywright (withPersistentUserDataLaunchWith userDataDir launchOpts opts action)
 
 withPersistentContext :: (BrowserContext -> Page -> Playwright a) -> IO a
 withPersistentContext =
   withPersistentContextWith defaultNewContextOptions
 
 withPersistentUserDataWith :: FilePath -> NewContextOptions -> (BrowserContext -> Page -> Playwright a) -> Playwright a
-withPersistentUserDataWith userDataDir opts action = do
+withPersistentUserDataWith userDataDir =
+  withPersistentUserDataLaunchWith userDataDir defaultLaunchOptions
+
+withPersistentUserDataLaunchWith :: FilePath -> LaunchOptions -> NewContextOptions -> (BrowserContext -> Page -> Playwright a) -> Playwright a
+withPersistentUserDataLaunchWith userDataDir launchOpts opts action = do
   browserType <- chromium
   bracket
-    (launchPersistentContext browserType userDataDir defaultLaunchOptions opts)
+    (launchPersistentContext browserType userDataDir launchOpts opts)
     closeContext
     ( \ctx -> do
         page <- requirePersistentPage ctx

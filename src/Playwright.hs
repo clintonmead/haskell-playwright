@@ -1088,7 +1088,7 @@ import Playwright.Keyboard
   , keyboardUp
   )
 import Playwright.LaunchOptions
-  ( LaunchOptions (LaunchOptions, launchOptionsChromiumSandbox, launchOptionsHeadless, launchOptionsProxy, launchOptionsSlowMo, launchOptionsTimeout)
+  ( LaunchOptions (LaunchOptions, launchOptionsChromiumSandbox, launchOptionsDownloadsPath, launchOptionsHeadless, launchOptionsProxy, launchOptionsSlowMo, launchOptionsTimeout)
   , defaultLaunchOptions
   )
 import Playwright.LoadState

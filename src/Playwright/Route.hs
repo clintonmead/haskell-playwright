@@ -26,6 +26,10 @@ import Control.Concurrent.STM
 import Control.Monad.IO.Class
   ( liftIO
   )
+import UnliftIO.Exception
+  ( throwIO
+  , try
+  )
 import Data.ByteString.Base64
   ( encode
   )
@@ -64,7 +68,8 @@ import Playwright.ContinueOptions
   , defaultContinueOptions
   )
 import Playwright.Error
-  ( PlaywrightError (RouteAlreadyHandled)
+  ( PlaywrightError (MissingObject, RouteAlreadyHandled)
+  , ignoreTargetClosed
   )
 import Playwright.FetchOptions
   ( FetchOptions
@@ -117,6 +122,7 @@ import Playwright.Request
   )
 import Playwright.RequestOverrides
   ( RequestOverrides (requestOverrideHeaders, requestOverrideMethod, requestOverridePostData, requestOverrideUrl)
+  , emptyRequestOverrides
   , overlayContinueOptions
   )
 
@@ -141,8 +147,7 @@ continueRoute handled =
 
 continueRouteWith :: Route -> ContinueOptions -> Playwright ()
 continueRouteWith handled opts = do
-  request <- routeRequest handled
-  overrides <- applyContinueOverrides request opts
+  overrides <- continueOverrides handled opts
   sendContinue (routeChannel handled) False overrides
   settleRoute handled True
 
@@ -152,9 +157,19 @@ fallbackRoute handled =
 
 fallbackRouteWith :: Route -> ContinueOptions -> Playwright ()
 fallbackRouteWith handled opts = do
-  request <- routeRequest handled
-  _ <- applyContinueOverrides request opts
+  _ <- continueOverrides handled opts
   settleRoute handled False
+
+continueOverrides :: Route -> ContinueOptions -> Playwright RequestOverrides
+continueOverrides handled opts = do
+  result <- try (routeRequest handled)
+  case result of
+    Left (MissingObject _) ->
+      pure emptyRequestOverrides
+    Left err ->
+      throwIO err
+    Right request ->
+      applyContinueOverrides request opts
 
 applyContinueOverrides :: Request -> ContinueOptions -> Playwright RequestOverrides
 applyContinueOverrides request opts = do
@@ -168,8 +183,10 @@ applyContinueOverrides request opts = do
 
 abortRoute :: Route -> Playwright ()
 abortRoute handled = do
-  _ :: RouteAbortResult <-
-    send (routeChannel handled) (MethodName "abort") mkRouteAbortParams
+  ignoreTargetClosed $ do
+    _ :: RouteAbortResult <-
+      send (routeChannel handled) (MethodName "abort") mkRouteAbortParams
+    pure ()
   settleRoute handled True
 
 fulfillRoute :: Route -> FulfillOptions -> Playwright ()
@@ -179,17 +196,19 @@ fulfillRoute handled opts = do
     fetchUid = fulfillFetchUid opts
     status = fulfillStatusCode opts
     headers = fulfillHeadersWithDefaults opts (fulfillBaseHeaders opts) byteLength
-  _ :: RouteFulfillResult <-
-    send
-      (routeChannel handled)
-      (MethodName "fulfill")
-      mkRouteFulfillParams
-        { routeFulfillParamsBody = bodyText
-        , routeFulfillParamsFetchResponseUid = fetchUid
-        , routeFulfillParamsHeaders = Just headers
-        , routeFulfillParamsIsBase64 = Just isBase64
-        , routeFulfillParamsStatus = Just status
-        }
+  ignoreTargetClosed $ do
+    _ :: RouteFulfillResult <-
+      send
+        (routeChannel handled)
+        (MethodName "fulfill")
+        mkRouteFulfillParams
+          { routeFulfillParamsBody = bodyText
+          , routeFulfillParamsFetchResponseUid = fetchUid
+          , routeFulfillParamsHeaders = Just headers
+          , routeFulfillParamsIsBase64 = Just isBase64
+          , routeFulfillParamsStatus = Just status
+          }
+    pure ()
   settleRoute handled True
 
 routeFetch :: Route -> Playwright APIResponse
@@ -214,18 +233,19 @@ settleRoute handled settled =
       else throwSTM RouteAlreadyHandled
 
 sendContinue :: Channel RouteTag -> Bool -> RequestOverrides -> Playwright ()
-sendContinue chan isFallback overrides = do
-  _ :: RouteContinueResult <-
-    send
-      chan
-      (MethodName "continue")
-      (mkRouteContinueParams isFallback)
-        { routeContinueParamsHeaders = fmap (fmap toNameValue) (requestOverrideHeaders overrides)
-        , routeContinueParamsMethod = fmap httpMethodToText (requestOverrideMethod overrides)
-        , routeContinueParamsPostData = fmap protocolBinaryFromByteString (requestOverridePostData overrides)
-        , routeContinueParamsUrl = requestOverrideUrl overrides
-        }
-  pure ()
+sendContinue chan isFallback overrides =
+  ignoreTargetClosed $ do
+    _ :: RouteContinueResult <-
+      send
+        chan
+        (MethodName "continue")
+        (mkRouteContinueParams isFallback)
+          { routeContinueParamsHeaders = fmap (fmap toNameValue) (requestOverrideHeaders overrides)
+          , routeContinueParamsMethod = fmap httpMethodToText (requestOverrideMethod overrides)
+          , routeContinueParamsPostData = fmap protocolBinaryFromByteString (requestOverridePostData overrides)
+          , routeContinueParamsUrl = requestOverrideUrl overrides
+          }
+    pure ()
 
 encodeFulfillBody :: Maybe FulfillBody -> (Maybe Text, Bool, Int)
 encodeFulfillBody body =

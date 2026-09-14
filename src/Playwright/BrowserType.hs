@@ -53,7 +53,7 @@ import Playwright.Json.Decode
   ( throwDecode
   )
 import Playwright.LaunchOptions
-  ( LaunchOptions
+  ( LaunchOptions (launchOptionsDownloadsPath)
   )
 import Playwright.LaunchPersistent
   ( toLaunchPersistentParams
@@ -92,11 +92,12 @@ browserTypeFromRef ref = do
 
 launch :: BrowserType -> LaunchOptions -> Playwright Browser
 launch browserType opts = do
+  resolved <- liftIO (resolveLaunchDownloads opts)
   result <-
     send
       (browserTypeChannel browserType)
       (MethodName "launch")
-      opts
+      resolved
   browser <-
     browserFromRef
       (browserTypeLaunchResultBrowser result)
@@ -109,12 +110,13 @@ launchPersistentContext :: BrowserType -> FilePath -> LaunchOptions -> NewContex
 launchPersistentContext browserType userDataDir launchOpts ctxOpts = do
   validateNewContextOptions ctxOpts
   absUserDataDir <- liftIO (makeAbsolute userDataDir)
+  resolvedLaunch <- liftIO (resolveLaunchDownloads launchOpts)
   engines <- lookupSelectorEngines
   result <-
     send
       (browserTypeChannel browserType)
       (MethodName "launchPersistentContext")
-      (toLaunchPersistentParams absUserDataDir launchOpts ctxOpts engines)
+      (toLaunchPersistentParams absUserDataDir resolvedLaunch ctxOpts engines)
   browser <-
     browserFromRef
       (browserTypeLaunchPersistentContextResultBrowser result)
@@ -150,3 +152,12 @@ browserBrowserType browser = do
 withBrowser :: BrowserType -> LaunchOptions -> (Browser -> Playwright a) -> Playwright a
 withBrowser browserType opts =
   bracket (launch browserType opts) closeBrowser
+
+resolveLaunchDownloads :: LaunchOptions -> IO LaunchOptions
+resolveLaunchDownloads opts =
+  case launchOptionsDownloadsPath opts of
+    Nothing ->
+      pure opts
+    Just path -> do
+      absPath <- makeAbsolute path
+      pure opts {launchOptionsDownloadsPath = Just absPath}

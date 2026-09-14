@@ -39,6 +39,7 @@ import Playwright.ConnectionSpec qualified as ConnectionSpec
 import Playwright.DefaultBrowserContext1Spec qualified as DefaultBrowserContext1Spec
 import Playwright.DefaultBrowserContext2Spec qualified as DefaultBrowserContext2Spec
 import Playwright.DownloadSpec qualified as DownloadSpec
+import Playwright.DownloadsPathSpec qualified as DownloadsPathSpec
 import Playwright.EmulationFocusSpec qualified as EmulationFocusSpec
 import Playwright.ElementHandleBoundingBoxSpec qualified as ElementHandleBoundingBoxSpec
 import Playwright.ElementHandleClickSpec qualified as ElementHandleClickSpec
@@ -163,6 +164,7 @@ import Playwright.SelectorsTextSpec qualified as SelectorsTextSpec
 import Playwright.SharedWorkerSpec qualified as SharedWorkerSpec
 import Playwright.TapSpec qualified as TapSpec
 import Playwright.TransportSpec qualified as TransportSpec
+import Playwright.UnrouteBehaviorSpec qualified as UnrouteBehaviorSpec
 import Playwright.WheelSpec qualified as WheelSpec
 import Playwright.WorkersSpec qualified as WorkersSpec
 import Test.Tasty
@@ -213,6 +215,7 @@ main =
         , DefaultBrowserContext1Spec.tests
         , DefaultBrowserContext2Spec.tests
         , DownloadSpec.tests
+        , DownloadsPathSpec.tests
         , EmulationFocusSpec.tests
         , ElementHandleBoundingBoxSpec.tests
         , ElementHandleClickSpec.tests
@@ -339,6 +342,7 @@ main =
         , SelectorsTextSpec.tests
         , SharedWorkerSpec.tests
         , TapSpec.tests
+        , UnrouteBehaviorSpec.tests
         , WheelSpec.tests
         , WorkersSpec.tests
         ]

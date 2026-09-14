@@ -46,7 +46,7 @@ import Playwright.Guid
   ( Guid
   )
 import Playwright.MethodName
-  ( MethodName
+  ( MethodName (MethodName)
   )
 import Playwright.Session
   ( Session (sessionClosed, sessionEventHandlers, sessionHandlerThreads, sessionPendingHandlers)
@@ -73,9 +73,14 @@ runEventHandlers conn guid method params = do
 enqueueHandler :: Connection -> Value -> EventHandler -> IO ()
 enqueueHandler conn params handler =
   atomically $ do
-    modifySession conn $ \session ->
-      session {sessionPendingHandlers = sessionPendingHandlers session + 1}
+    when (countsForSend handler) $
+      modifySession conn $ \session ->
+        session {sessionPendingHandlers = sessionPendingHandlers session + 1}
     writeTQueue (connectionHandlerQueue conn) (runQueuedHandler conn params handler)
+
+countsForSend :: EventHandler -> Bool
+countsForSend handler =
+  eventHandlerMethod handler /= MethodName "route"
 
 handlerLoop :: Connection -> IO ()
 handlerLoop conn =
@@ -96,7 +101,10 @@ runQueuedHandler conn params handler = do
         modifySession conn $ \session ->
           session
             { sessionHandlerThreads = Set.delete tid (sessionHandlerThreads session)
-            , sessionPendingHandlers = sessionPendingHandlers session - 1
+            , sessionPendingHandlers =
+                if countsForSend handler
+                  then sessionPendingHandlers session - 1
+                  else sessionPendingHandlers session
             }
   eventHandlerRun handler params
     `catch` (\(_ :: SomeException) -> pure ())
