@@ -31,6 +31,8 @@ library
       Playwright.BoundingBox
       Playwright.Browser
       Playwright.BrowserContext
+      Playwright.BrowserContext.Network
+      Playwright.BrowserContext.Wait
       Playwright.BrowserName
       Playwright.BrowserType
       Playwright.Channel
@@ -108,6 +110,7 @@ library
       Playwright.MimeType
       Playwright.Monad
       Playwright.Mouse
+      Playwright.MouseButton
       Playwright.NetworkSizes
       Playwright.NewContextOptions
       Playwright.NewRequestOptions
@@ -130,6 +133,7 @@ library
       Playwright.RequestFrame
       Playwright.RequestId
       Playwright.RequestOverrides
+      Playwright.ResourceTiming
       Playwright.ResourceType
       Playwright.Response
       Playwright.Route
@@ -145,6 +149,7 @@ library
       Playwright.SerializedError
       Playwright.SerializedErrorInfo
       Playwright.SerializedValue
+      Playwright.ServiceWorkersPolicy
       Playwright.Session
       Playwright.SpecialJsValue
       Playwright.StorageItem
@@ -206,6 +211,7 @@ test-suite playwright-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      Playwright.BeforeunloadSpec
       Playwright.BrowserContextAddCookiesSpec
       Playwright.BrowserContextAddInitScriptSpec
       Playwright.BrowserContextBaseUrlSpec
@@ -214,22 +220,29 @@ test-suite playwright-test
       Playwright.BrowserContextCookiesSpec
       Playwright.BrowserContextCredentialsSpec
       Playwright.BrowserContextCspSpec
+      Playwright.BrowserContextDeviceSpec
+      Playwright.BrowserContextDsfSpec
+      Playwright.BrowserContextEventsSpec
       Playwright.BrowserContextExposeFunctionSpec
       Playwright.BrowserContextFetchSpec
       Playwright.BrowserContextJavaScriptSpec
       Playwright.BrowserContextLocaleSpec
+      Playwright.BrowserContextNetworkEventSpec
       Playwright.BrowserContextOfflineSpec
       Playwright.BrowserContextPageEventSpec
       Playwright.BrowserContextPagesSpec
       Playwright.BrowserContextRouteSpec
+      Playwright.BrowserContextServiceWorkerPolicySpec
       Playwright.BrowserContextSetExtraHTTPHeadersSpec
       Playwright.BrowserContextStorageStateSpec
       Playwright.BrowserContextStrictSpec
       Playwright.BrowserContextTimezoneSpec
       Playwright.BrowserContextUserAgentSpec
+      Playwright.BrowserContextViewportMobileSpec
       Playwright.BrowserContextViewportSpec
       Playwright.BrowserSpec
       Playwright.BrowserTypeBasicSpec
+      Playwright.CapabilitiesSpec
       Playwright.ConnectionSpec
       Playwright.DownloadSpec
       Playwright.ElementHandleBoundingBoxSpec
@@ -246,6 +259,7 @@ test-suite playwright-test
       Playwright.ElementHandleSelectTextSpec
       Playwright.ElementHandleTypeSpec
       Playwright.ElementHandleWaitForElementStateSpec
+      Playwright.EmulationFocusSpec
       Playwright.EvalOnSelectorAllSpec
       Playwright.EvalOnSelectorSpec
       Playwright.FrameEvaluateSpec
@@ -297,6 +311,7 @@ test-suite playwright-test
       Playwright.PageEvaluateHandleSpec
       Playwright.PageEvaluateSpec
       Playwright.PageEventConsoleSpec
+      Playwright.PageEventCrashSpec
       Playwright.PageEventLoadSpec
       Playwright.PageEventNetworkSpec
       Playwright.PageEventPageErrorSpec
@@ -340,7 +355,9 @@ test-suite playwright-test
       Playwright.PageWaitForSelectorSpec
       Playwright.PageWaitForUrlSpec
       Playwright.PermissionsSpec
+      Playwright.PopupSpec
       Playwright.QuerySelectorSpec
+      Playwright.ResourceTimingSpec
       Playwright.RetargetSpec
       Playwright.SelectorsCssSpec
       Playwright.SelectorsFrameSpec
@@ -349,6 +366,7 @@ test-suite playwright-test
       Playwright.SelectorsRegisterSpec
       Playwright.SelectorsRoleSpec
       Playwright.SelectorsTextSpec
+      Playwright.SharedWorkerSpec
       Playwright.TapSpec
       Playwright.TransportSpec
       Playwright.WheelSpec

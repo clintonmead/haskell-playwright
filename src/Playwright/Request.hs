@@ -13,6 +13,7 @@ module Playwright.Request
   , requestResourceType
   , requestResponseRef
   , requestSizes
+  , requestTiming
   , requestUrl
   , requestsEqual
   ) where
@@ -31,11 +32,15 @@ import Data.ByteString
   ( ByteString
   )
 import Data.Maybe
-  ( listToMaybe
+  ( fromMaybe
+  , listToMaybe
   , mapMaybe
   )
 import Data.Text.Encoding
   ( decodeUtf8
+  )
+import Data.Scientific
+  ( Scientific
   )
 import Playwright.Channel
   ( Channel (Channel, channelGuid)
@@ -46,6 +51,7 @@ import Playwright.Channel
 import Playwright.Connection
   ( guidsOfType
   , lookupObject
+  , lookupRequestEndTiming
   , lookupRequestFailure
   , lookupRequestOverrides
   )
@@ -65,6 +71,7 @@ import Playwright.Json.ChannelRef
   )
 import Playwright.Json.Decode
   ( fromJsonValue
+  , throwDecode
   )
 import Playwright.Json.ProtocolBinary
   ( protocolBinaryToByteString
@@ -83,9 +90,21 @@ import Playwright.Protocol
   , RequestInitializer (requestInitializerFrame, requestInitializerHeaders, requestInitializerIsNavigationRequest, requestInitializerMethod, requestInitializerPostData, requestInitializerRedirectedFrom, requestInitializerResourceType, requestInitializerUrl)
   , RequestResponseResult (requestResponseResultResponse)
   , RequestSizes (requestSizesRequestBodySize, requestSizesRequestHeadersSize, requestSizesResponseBodySize, requestSizesResponseHeadersSize)
+  , ResponseInitializer (responseInitializerTiming)
   , ResponseSizesResult (responseSizesResultSizes)
   , mkRequestResponseParams
   , mkResponseSizesParams
+  )
+import Playwright.Protocol qualified as Protocol
+  ( ResourceTiming
+  , resourceTimingConnectEnd
+  , resourceTimingConnectStart
+  , resourceTimingDomainLookupEnd
+  , resourceTimingDomainLookupStart
+  , resourceTimingRequestStart
+  , resourceTimingResponseStart
+  , resourceTimingSecureConnectionStart
+  , resourceTimingStartTime
   )
 import Playwright.RemoteObject
   ( RemoteObject (remoteGuid, remoteInitializer)
@@ -95,6 +114,9 @@ import Playwright.RequestFailure
   )
 import Playwright.RequestOverrides
   ( RequestOverrides (requestOverrideHeaders, requestOverrideMethod, requestOverridePostData, requestOverrideUrl)
+  )
+import Playwright.ResourceTiming
+  ( ResourceTiming (ResourceTiming, resourceTimingConnectEnd, resourceTimingConnectStart, resourceTimingDomainLookupEnd, resourceTimingDomainLookupStart, resourceTimingRequestStart, resourceTimingResponseEnd, resourceTimingResponseStart, resourceTimingSecureConnectionStart, resourceTimingStartTime)
   )
 import Playwright.ResourceType
   ( ResourceType (ResourceType)
@@ -118,7 +140,7 @@ requestsEqual left right =
 requestInitializer :: Request -> Playwright RequestInitializer
 requestInitializer request = do
   obj <- lookupObject (channelGuid (requestChannel request))
-  either throwIO pure (fromJsonValue (remoteInitializer obj))
+  throwDecode (remoteInitializer obj)
 
 requestOverrides :: Request -> Playwright RequestOverrides
 requestOverrides request =
@@ -260,6 +282,62 @@ requestSizes request = do
             (BodySize (requestSizesResponseBodySize sizes))
             (HeadersSize (requestSizesResponseHeadersSize sizes))
         )
+
+requestTiming :: Request -> Playwright ResourceTiming
+requestTiming request = do
+  responseRef <- requestResponseRef request
+  base <-
+    case responseRef of
+      Nothing ->
+        pure emptyTiming
+      Just ref -> do
+        obj <- lookupObject (channelRefGuid ref)
+        initializer <- throwDecode (remoteInitializer obj)
+        pure (fromProtocolTiming (responseInitializerTiming initializer))
+  endTiming <- lookupRequestEndTiming (channelGuid (requestChannel request))
+  pure (applyResponseEnd base (fromMaybe unsetTiming endTiming))
+
+fromProtocolTiming :: Protocol.ResourceTiming -> ResourceTiming
+fromProtocolTiming timing =
+  ResourceTiming
+    { resourceTimingStartTime = Protocol.resourceTimingStartTime timing
+    , resourceTimingDomainLookupStart = Protocol.resourceTimingDomainLookupStart timing
+    , resourceTimingDomainLookupEnd = Protocol.resourceTimingDomainLookupEnd timing
+    , resourceTimingConnectStart = Protocol.resourceTimingConnectStart timing
+    , resourceTimingSecureConnectionStart = Protocol.resourceTimingSecureConnectionStart timing
+    , resourceTimingConnectEnd = Protocol.resourceTimingConnectEnd timing
+    , resourceTimingRequestStart = Protocol.resourceTimingRequestStart timing
+    , resourceTimingResponseStart = Protocol.resourceTimingResponseStart timing
+    , resourceTimingResponseEnd = unsetTiming
+    }
+
+applyResponseEnd :: ResourceTiming -> Scientific -> ResourceTiming
+applyResponseEnd timing end =
+  timing
+    { resourceTimingResponseEnd = end
+    , resourceTimingResponseStart =
+        if resourceTimingResponseStart timing == unsetTiming
+          then end
+          else resourceTimingResponseStart timing
+    }
+
+emptyTiming :: ResourceTiming
+emptyTiming =
+  ResourceTiming
+    { resourceTimingStartTime = 0
+    , resourceTimingDomainLookupStart = unsetTiming
+    , resourceTimingDomainLookupEnd = unsetTiming
+    , resourceTimingConnectStart = unsetTiming
+    , resourceTimingSecureConnectionStart = unsetTiming
+    , resourceTimingConnectEnd = unsetTiming
+    , resourceTimingRequestStart = unsetTiming
+    , resourceTimingResponseStart = unsetTiming
+    , resourceTimingResponseEnd = unsetTiming
+    }
+
+unsetTiming :: Scientific
+unsetTiming =
+  -1
 
 fromNameValue :: NameValue -> HttpHeader
 fromNameValue header =

@@ -28,9 +28,6 @@ import Control.Monad
 import Data.Aeson
   ( Value
   )
-import Data.List
-  ( find
-  )
 import Data.Map.Strict qualified as Map
 import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
@@ -51,7 +48,7 @@ import Playwright.Guid
   ( Guid
   )
 import Playwright.Json.Decode
-  ( fromJsonValue
+  ( throwDecode
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -78,21 +75,16 @@ deliverEvent :: Connection -> Guid -> MethodName -> Value -> IO ()
 deliverEvent conn guid method params =
   atomically $
     stateSession conn $ \session ->
-      case find (waitingFor session) (sessionEventWaiters session) of
-        Just waitId ->
-          case Map.lookup waitId (sessionWaiters session) of
-            Nothing ->
-              bufferEvent session
-            Just waiter ->
-              ( ()
-              , session
-                  { sessionWaiters =
-                      Map.insert waitId waiter {eventWaiterValue = Just params} (sessionWaiters session)
-                  , sessionEventWaiters = filter (/= waitId) (sessionEventWaiters session)
-                  }
-              )
-        Nothing ->
+      case filter (waitingFor session) (sessionEventWaiters session) of
+        [] ->
           bufferEvent session
+        waitIds ->
+          ( ()
+          , session
+              { sessionWaiters = foldl' (fillWaiter params) (sessionWaiters session) waitIds
+              , sessionEventWaiters = filter (`notElem` waitIds) (sessionEventWaiters session)
+              }
+          )
   where
     waitingFor session waitId =
       case Map.lookup waitId (sessionWaiters session) of
@@ -111,6 +103,13 @@ deliverEvent conn guid method params =
                 (sessionEventBuffer session)
           }
       )
+    fillWaiter :: Value -> Map.Map WaitId EventWaiter -> WaitId -> Map.Map WaitId EventWaiter
+    fillWaiter value waiters waitId =
+      case Map.lookup waitId waiters of
+        Nothing ->
+          waiters
+        Just waiter ->
+          Map.insert waitId waiter {eventWaiterValue = Just value} waiters
 
 registerEventWaiter :: Connection -> Guid -> MethodName -> IO WaitId
 registerEventWaiter conn guid method =
@@ -237,12 +236,9 @@ waitForLifecycleSTM conn guid wanted = do
       case Map.lookup guid (sessionObjects session) of
         Nothing ->
           retry
-        Just obj ->
-          case fromJsonValue (remoteInitializer obj) of
-            Left err ->
-              throwSTM err
-            Right initializer ->
-              unless (wanted `elem` frameInitializerLoadStates initializer) retry
+        Just obj -> do
+          initializer <- throwDecode (remoteInitializer obj)
+          unless (wanted `elem` frameInitializerLoadStates initializer) retry
 
 waitUntilUrl :: Connection -> Guid -> (Url -> Bool) -> IO ()
 waitUntilUrl conn guid predicate =
@@ -272,12 +268,9 @@ waitUntilUrlSTM conn guid predicate = do
       case Map.lookup guid (sessionObjects session) of
         Nothing ->
           retry
-        Just obj ->
-          case fromJsonValue (remoteInitializer obj) of
-            Left err ->
-              throwSTM err
-            Right initializer ->
-              unless (predicate (frameInitializerUrl initializer)) retry
+        Just obj -> do
+          initializer <- throwDecode (remoteInitializer obj)
+          unless (predicate (frameInitializerUrl initializer)) retry
 
 waitUntilRequestSettled :: Connection -> Guid -> IO ()
 waitUntilRequestSettled conn guid =

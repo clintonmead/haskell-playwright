@@ -10,9 +10,6 @@ module Playwright.Page.Network
 import Playwright.Monad
   ( Playwright
   )
-import UnliftIO.Exception
-  ( throwIO
-  )
 import Playwright.Channel
   ( Channel (channelGuid)
   , send
@@ -25,7 +22,7 @@ import Playwright.Json.ChannelRef
   ( ChannelRef (channelRefGuid)
   )
 import Playwright.Json.Decode
-  ( fromJsonValue
+  ( throwDecode
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -60,7 +57,7 @@ onRequest page run = do
     (channelGuid (pageContextChannel page))
     (MethodName "request")
     $ \params -> do
-      event <- either throwIO pure (fromJsonValue params)
+      event <- throwDecode params
       whenForPage page (browserContextRequestEventPage event) $
         run (requestFromRef (browserContextRequestEventRequest event))
 
@@ -71,7 +68,7 @@ onResponse page run = do
     (channelGuid (pageContextChannel page))
     (MethodName "response")
     $ \params -> do
-      event <- either throwIO pure (fromJsonValue params)
+      event <- throwDecode params
       whenForPage page (browserContextResponseEventPage event) $
         run (responseFromRef (browserContextResponseEventResponse event))
 
@@ -82,7 +79,7 @@ onRequestFailed page run = do
     (channelGuid (pageContextChannel page))
     (MethodName "requestFailed")
     $ \params -> do
-      event <- either throwIO pure (fromJsonValue params)
+      event <- throwDecode params
       whenForPage page (browserContextRequestFailedEventPage event) $
         run (requestFromRef (browserContextRequestFailedEventRequest event))
 
@@ -93,7 +90,7 @@ onRequestFinished page run = do
     (channelGuid (pageContextChannel page))
     (MethodName "requestFinished")
     $ \params -> do
-      event <- either throwIO pure (fromJsonValue params)
+      event <- throwDecode params
       whenForPage page (browserContextRequestFinishedEventPage event) $
         run (requestFromRef (browserContextRequestFinishedEventRequest event))
 

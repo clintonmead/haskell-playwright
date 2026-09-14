@@ -52,7 +52,7 @@ import Playwright.Json.ChannelRef
   ( ChannelRef (ChannelRef, channelRefGuid)
   )
 import Playwright.Json.Decode
-  ( fromJsonValue
+  ( throwDecode
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -94,9 +94,6 @@ import Playwright.RouteOptions
 import Playwright.UrlGlob
   ( UrlGlob (urlGlobToText)
   , matchesUrlGlob
-  )
-import UnliftIO.Exception
-  ( throwIO
   )
 
 route :: Page -> UrlGlob -> (Route -> Playwright ()) -> Playwright ()
@@ -178,7 +175,7 @@ unrouteContextAll ctx = do
 
 dispatchPageRoute :: Page -> Value -> Playwright ()
 dispatchPageRoute page params = do
-  event <- either throwIO pure (fromJsonValue params)
+  event <- throwDecode params
   let
     chan :: Channel RouteTag
     chan = Channel (channelRefGuid (pageRouteEventRoute event))
@@ -189,7 +186,7 @@ dispatchPageRoute page params = do
 
 dispatchContextRoute :: BrowserContext -> Value -> Playwright ()
 dispatchContextRoute ctx params = do
-  event <- either throwIO pure (fromJsonValue params)
+  event <- throwDecode params
   let
     chan :: Channel RouteTag
     chan = Channel (channelRefGuid (browserContextRouteEventRoute event))

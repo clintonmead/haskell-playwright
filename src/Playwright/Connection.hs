@@ -34,6 +34,7 @@ module Playwright.Connection
   , lookupTimeoutDefaults
   , lookupMainFramePage
   , registerMainFramePage
+  , lookupRequestEndTiming
   , lookupRequestFailure
   , waitUntilRequestSettled
   , setTimeoutDefault
@@ -79,11 +80,9 @@ import Control.Monad.IO.Class
   )
 import Data.Aeson
   ( FromJSON
-  , Result (Error, Success)
   , ToJSON (toJSON)
   , Value (Object)
   , encode
-  , fromJSON
   )
 import Data.Aeson.Key qualified as Key
 import Data.Aeson.KeyMap qualified as KeyMap
@@ -98,6 +97,9 @@ import Data.Map.Strict
   ( Map
   )
 import Data.Map.Strict qualified as Map
+import Data.Scientific
+  ( Scientific
+  )
 import Data.Set
   ( Set
   )
@@ -105,7 +107,6 @@ import Data.Set qualified as Set
 import Data.Text
   ( Text
   )
-import Data.Text qualified as Text
 import Playwright.Connection.Handlers
   ( handlerLoop
   , runEventHandlers
@@ -141,7 +142,7 @@ import Playwright.Json.ChannelRef
   ( ChannelRef (channelRefGuid)
   )
 import Playwright.Json.Decode
-  ( fromJsonValue
+  ( throwDecode
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -152,8 +153,8 @@ import Playwright.Monad
   , runPlaywrightWith
   )
 import Playwright.Protocol
-  ( BrowserContextRequestFailedEvent (browserContextRequestFailedEventFailureText, browserContextRequestFailedEventRequest)
-  , BrowserContextRequestFinishedEvent (browserContextRequestFinishedEventRequest)
+  ( BrowserContextRequestFailedEvent (browserContextRequestFailedEventFailureText, browserContextRequestFailedEventRequest, browserContextRequestFailedEventResponseEndTiming)
+  , BrowserContextRequestFinishedEvent (browserContextRequestFinishedEventRequest, browserContextRequestFinishedEventResponseEndTiming)
   , ChannelType
   , FrameInitializer (frameInitializerLoadStates)
   , FrameLoadstateEvent (frameLoadstateEventAdd, frameLoadstateEventRemove)
@@ -172,7 +173,7 @@ import Playwright.RequestOverrides
   ( RequestOverrides
   )
 import Playwright.Session
-  ( Session (sessionBrowserContexts, sessionChromiumGuid, sessionClosed, sessionClosedGuids, sessionFinishedRequests, sessionFirefoxGuid, sessionNextId, sessionObjects, sessionPending, sessionPlaywrightGuid, sessionRequestFailures, sessionResults, sessionWebkitGuid)
+  ( Session (sessionBrowserContexts, sessionChromiumGuid, sessionClosed, sessionClosedGuids, sessionFinishedRequests, sessionFirefoxGuid, sessionNextId, sessionObjects, sessionPending, sessionPlaywrightGuid, sessionRequestEndTiming, sessionRequestFailures, sessionResults, sessionWebkitGuid)
   , emptySession
   )
 import Playwright.StoredLocatorHandler
@@ -360,6 +361,10 @@ lookupRequestFailure :: Guid -> Playwright (Maybe Text)
 lookupRequestFailure guid =
   inConnection (`Store.lookupRequestFailure` guid)
 
+lookupRequestEndTiming :: Guid -> Playwright (Maybe Scientific)
+lookupRequestEndTiming guid =
+  inConnection (`Store.lookupRequestEndTiming` guid)
+
 registerEventWaiter :: Guid -> MethodName -> Playwright WaitId
 registerEventWaiter guid method =
   inConnection $ \conn -> Wait.registerEventWaiter conn guid method
@@ -497,11 +502,7 @@ sendCommandIO conn guid method params = do
         Left err ->
           throwIO err
         Right value ->
-          case fromJSON value of
-            Error err ->
-              throwIO (DecodeFailure (Text.pack err))
-            Success decoded ->
-              pure decoded
+          throwDecode value
 
 readerLoop :: Connection -> IO ()
 readerLoop conn = do
@@ -579,35 +580,32 @@ handleEvent conn guid method params = do
 
 applyLoadstate :: Connection -> Guid -> Value -> IO ()
 applyLoadstate conn guid params = do
-  event <- either throwIO pure (fromJsonValue params)
+  event <- throwDecode params
   atomically $
     withSession conn $ \session ->
       case Map.lookup guid (sessionObjects session) of
         Nothing ->
           pure ((), session)
-        Just obj ->
-          case fromJsonValue (remoteInitializer obj) of
-            Left err ->
-              throwSTM err
-            Right initializer ->
-              pure
-                ( ()
-                , session
-                    { sessionObjects =
-                        Map.insert
-                          guid
-                          obj
-                            { remoteInitializer =
-                                toJSON
-                                  ( initializer
-                                      { frameInitializerLoadStates =
-                                          updateLoadStates event (frameInitializerLoadStates initializer)
-                                      }
-                                  )
-                            }
-                          (sessionObjects session)
-                    }
-                )
+        Just obj -> do
+          initializer <- throwDecode (remoteInitializer obj)
+          pure
+            ( ()
+            , session
+                { sessionObjects =
+                    Map.insert
+                      guid
+                      obj
+                        { remoteInitializer =
+                            toJSON
+                              ( initializer
+                                  { frameInitializerLoadStates =
+                                      updateLoadStates event (frameInitializerLoadStates initializer)
+                                  }
+                              )
+                        }
+                      (sessionObjects session)
+                }
+            )
 
 updateLoadStates :: FrameLoadstateEvent -> [LifecycleEvent] -> [LifecycleEvent]
 updateLoadStates event states =
@@ -630,7 +628,7 @@ updateLoadStates event states =
 
 applyNavigated :: Connection -> Guid -> Value -> IO ()
 applyNavigated conn guid params = do
-  event <- either throwIO pure (fromJsonValue params)
+  event <- throwDecode params
   atomically $
     modifySession conn $ \session ->
       session
@@ -643,7 +641,7 @@ applyNavigated conn guid params = do
 
 applyPreviewUpdated :: Connection -> Guid -> Value -> IO ()
 applyPreviewUpdated conn guid params = do
-  event <- either throwIO pure (fromJsonValue params)
+  event <- throwDecode params
   atomically $
     modifySession conn $ \session ->
       session
@@ -656,7 +654,7 @@ applyPreviewUpdated conn guid params = do
 
 applyRequestFailed :: Connection -> Value -> IO ()
 applyRequestFailed conn params = do
-  event <- either throwIO pure (fromJsonValue params)
+  event <- throwDecode params
   atomically $
     modifySession conn $ \session ->
       let
@@ -668,23 +666,35 @@ applyRequestFailed conn params = do
               sessionRequestFailures session
             Just text ->
               Map.insert requestGuid text (sessionRequestFailures session)
+        endTiming =
+          Map.insert
+            requestGuid
+            (browserContextRequestFailedEventResponseEndTiming event)
+            (sessionRequestEndTiming session)
       in
         session
           { sessionFinishedRequests = finished
+          , sessionRequestEndTiming = endTiming
           , sessionRequestFailures = failures
           }
 
 applyRequestFinished :: Connection -> Value -> IO ()
 applyRequestFinished conn params = do
-  event <- either throwIO pure (fromJsonValue params)
+  event <- throwDecode params
   atomically $
     modifySession conn $ \session ->
-      session
-        { sessionFinishedRequests =
-            Set.insert
-              (channelRefGuid (browserContextRequestFinishedEventRequest event))
-              (sessionFinishedRequests session)
-        }
+      let
+        requestGuid = channelRefGuid (browserContextRequestFinishedEventRequest event)
+      in
+        session
+          { sessionFinishedRequests =
+              Set.insert requestGuid (sessionFinishedRequests session)
+          , sessionRequestEndTiming =
+              Map.insert
+                requestGuid
+                (browserContextRequestFinishedEventResponseEndTiming event)
+                (sessionRequestEndTiming session)
+          }
 
 setInitializerPreview :: Text -> RemoteObject -> RemoteObject
 setInitializerPreview preview obj =

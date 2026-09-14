@@ -25,9 +25,6 @@ import Playwright.Connection
 import Playwright.Driver
   ( findDriver
   )
-import Playwright.Error
-  ( PlaywrightError
-  )
 import Playwright.Guid
   ( rootGuid
   )
@@ -35,7 +32,7 @@ import Playwright.Json.ChannelRef
   ( ChannelRef (ChannelRef, channelRefGuid)
   )
 import Playwright.Json.Decode
-  ( fromJsonValue
+  ( throwDecode
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -55,9 +52,6 @@ import Playwright.RemoteObject
   )
 import Playwright.Transport.Stdio
   ( withStdioTransport
-  )
-import UnliftIO.Exception
-  ( throwIO
   )
 
 runPlaywright :: Playwright a -> IO a
@@ -80,7 +74,7 @@ initializePlaywright = do
     pwRef :: ChannelRef
     pwRef = rootInitializeResultPlaywright result
   obj <- lookupObject (channelRefGuid pwRef)
-  initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj) :: Either PlaywrightError PlaywrightInitializer)
+  initializer <- throwDecode (remoteInitializer obj)
   chromiumType <- browserTypeFromRef (playwrightInitializerChromium initializer)
   firefoxType <- browserTypeFromRef (playwrightInitializerFirefox initializer)
   webkitType <- browserTypeFromRef (playwrightInitializerWebkit initializer)

@@ -19,6 +19,9 @@ import Data.Set
   ( Set
   )
 import Data.Set qualified as Set
+import Data.Scientific
+  ( Scientific
+  )
 import Data.Text
   ( Text
   )
@@ -95,6 +98,7 @@ data Session = Session
   , sessionTimeoutDefaults :: Map Guid TimeoutDefaults
   , sessionMainFramePages :: Map Guid Guid
   , sessionFinishedRequests :: Set Guid
+  , sessionRequestEndTiming :: Map Guid Scientific
   , sessionRequestFailures :: Map Guid Text
   , sessionPendingHandlers :: Int
   , sessionHandlerThreads :: Set ThreadId
@@ -133,6 +137,7 @@ emptySession =
     , sessionTimeoutDefaults = Map.empty
     , sessionMainFramePages = Map.empty
     , sessionFinishedRequests = Set.empty
+    , sessionRequestEndTiming = Map.empty
     , sessionRequestFailures = Map.empty
     , sessionPendingHandlers = 0
     , sessionHandlerThreads = Set.empty

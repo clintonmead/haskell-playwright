@@ -3,6 +3,7 @@ module Playwright.Dialog
   , acceptDialog
   , acceptDialogWith
   , dialogFromRef
+  , dialogsEqual
   , dismissDialog
   ) where
 
@@ -16,7 +17,8 @@ import Data.Text
   ( Text
   )
 import Playwright.Channel
-  ( Channel (Channel)
+  ( BrowserContextTag
+  , Channel (Channel, channelGuid)
   , DialogTag
   , send
   )
@@ -33,8 +35,12 @@ import Playwright.Error
 import Playwright.Json.ChannelRef
   ( ChannelRef (channelRefGuid)
   )
+import Playwright.Page
+  ( Page
+  , pageFromRef
+  )
 import Playwright.Json.Decode
-  ( fromJsonValue
+  ( throwDecode
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -43,12 +49,12 @@ import Playwright.Protocol
   ( DialogAcceptParams (dialogAcceptParamsPromptText)
   , DialogAcceptResult
   , DialogDismissResult
-  , DialogInitializer (dialogInitializerDefaultValue, dialogInitializerMessage, dialogInitializerType)
+  , DialogInitializer (dialogInitializerDefaultValue, dialogInitializerMessage, dialogInitializerPage, dialogInitializerType)
   , mkDialogAcceptParams
   , mkDialogDismissParams
   )
 import Playwright.RemoteObject
-  ( RemoteObject (remoteInitializer)
+  ( RemoteObject (remoteInitializer, remoteParent)
   )
 
 data Dialog = Dialog
@@ -56,25 +62,41 @@ data Dialog = Dialog
   , dialogType :: DialogType
   , dialogMessage :: Text
   , dialogDefaultValue :: Text
+  , dialogPage :: Maybe Page
   }
 
 dialogFromRef :: ChannelRef -> Playwright Dialog
 dialogFromRef ref = do
   obj <- lookupObject (channelRefGuid ref)
-  initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
+  initializer <- throwDecode (remoteInitializer obj)
   kind <-
     case dialogTypeFromText (dialogInitializerType initializer) of
       Just parsed ->
         pure parsed
       Nothing ->
         throwIO (DecodeFailure ("unknown dialog type: " <> dialogInitializerType initializer))
+  matchedPage <-
+    case dialogInitializerPage initializer of
+      Nothing ->
+        pure Nothing
+      Just pageRef ->
+        Just <$> pageFromRef (contextChannel obj) pageRef
   pure
     Dialog
       { dialogChannel = Channel (channelRefGuid ref)
       , dialogType = kind
       , dialogMessage = dialogInitializerMessage initializer
       , dialogDefaultValue = dialogInitializerDefaultValue initializer
+      , dialogPage = matchedPage
       }
+
+contextChannel :: RemoteObject -> Channel BrowserContextTag
+contextChannel obj =
+  Channel (remoteParent obj)
+
+dialogsEqual :: Dialog -> Dialog -> Bool
+dialogsEqual left right =
+  channelGuid (dialogChannel left) == channelGuid (dialogChannel right)
 
 acceptDialog :: Dialog -> Playwright ()
 acceptDialog dialog =

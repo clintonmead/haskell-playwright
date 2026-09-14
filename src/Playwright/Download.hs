@@ -12,9 +12,6 @@ module Playwright.Download
 import Playwright.Monad
   ( Playwright
   )
-import UnliftIO.Exception
-  ( throwIO
-  )
 import Data.Text
   ( Text
   , unpack
@@ -32,7 +29,7 @@ import Playwright.Json.ChannelRef
   ( ChannelRef (channelRefGuid)
   )
 import Playwright.Json.Decode
-  ( fromJsonValue
+  ( throwDecode
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -73,7 +70,7 @@ armDownload page = do
   waitId <- registerEventWaiter guid (MethodName "download")
   pure $ do
     params <- waitForWaiter waitId
-    event <- either throwIO pure (fromJsonValue params)
+    event <- throwDecode params
     pure
       ( Download
           { downloadPage = page

@@ -44,7 +44,7 @@ import Playwright.Frame
   , framesEqual
   )
 import Playwright.Json.Decode
-  ( fromJsonValue
+  ( throwDecode
   )
 import Playwright.Locator
   ( Locator (locatorFrame, locatorSelector)
@@ -146,7 +146,7 @@ dispatchLocatorHandler page params = do
     void $
       forkIO $
         runPlaywrightWith conn $ do
-          event <- either throwIO pure (fromJsonValue params :: Either PlaywrightError PageLocatorHandlerTriggeredEvent)
+          event <- throwDecode params
           let
             uid = pageLocatorHandlerTriggeredEventUid event
             pageGuid = channelGuid (pageChannel page)

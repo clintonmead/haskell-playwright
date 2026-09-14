@@ -8,9 +8,6 @@ module Playwright.FileChooser
 import Playwright.Monad
   ( Playwright
   )
-import UnliftIO.Exception
-  ( throwIO
-  )
 import Playwright.Channel
   ( Channel (channelGuid)
   , send
@@ -24,7 +21,7 @@ import Playwright.ElementHandle
   , elementHandleFromRef
   )
 import Playwright.Json.Decode
-  ( fromJsonValue
+  ( throwDecode
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -49,6 +46,7 @@ import Playwright.Protocol
 data FileChooser = FileChooser
   { fileChooserElement :: ElementHandle
   , fileChooserMultiple :: Bool
+  , fileChooserPage :: Page
   }
 
 waitForFileChooser :: Page -> Playwright FileChooser
@@ -73,9 +71,10 @@ armFileChooser page = do
   waitId <- registerEventWaiter guid (MethodName "fileChooser")
   pure $ do
     params <- waitForWaiter waitId
-    event <- either throwIO pure (fromJsonValue params)
+    event <- throwDecode params
     pure
       FileChooser
         { fileChooserElement = elementHandleFromRef (pageFileChooserEventElement event)
         , fileChooserMultiple = pageFileChooserEventIsMultiple event
+        , fileChooserPage = page
         }

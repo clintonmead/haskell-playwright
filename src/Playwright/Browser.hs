@@ -63,7 +63,7 @@ import Playwright.Json.ChannelRef
   ( ChannelRef (ChannelRef, channelRefGuid)
   )
 import Playwright.Json.Decode
-  ( fromJsonValue
+  ( throwDecode
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -103,7 +103,7 @@ browsersEqual left right =
 browserVersion :: Browser -> Playwright Text
 browserVersion browser = do
   obj <- lookupObject (channelGuid (browserChannel browser))
-  initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
+  initializer <- throwDecode (remoteInitializer obj)
   pure (browserInitializerVersion initializer)
 
 onBrowserContext :: Browser -> (BrowserContext -> Playwright ()) -> Playwright ()
@@ -112,7 +112,7 @@ onBrowserContext browser run =
     (channelGuid (browserChannel browser))
     (MethodName "context")
     ( \params -> do
-        event <- either throwIO pure (fromJsonValue params)
+        event <- throwDecode params
         ctx <-
           contextFromRef
             (browserContextEventContext event)

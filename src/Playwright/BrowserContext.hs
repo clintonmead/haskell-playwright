@@ -106,7 +106,7 @@ import Playwright.Json.ChannelRef
   ( ChannelRef (ChannelRef, channelRefGuid)
   )
 import Playwright.Json.Decode
-  ( fromJsonValue
+  ( throwDecode
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -160,6 +160,9 @@ import Playwright.Protocol
   , mkBrowserContextSetStorageStateParams
   , mkBrowserContextStorageStateParams
   )
+import Playwright.RaceTimeout
+  ( waitWithTimeout
+  )
 import Playwright.RemoteObject
   ( RemoteObject (remoteGuid, remoteParent, remoteType)
   )
@@ -170,6 +173,7 @@ import Playwright.StorageState
   )
 import Playwright.Timeout
   ( Timeout
+  , defaultTimeout
   )
 import Playwright.Url
   ( Url
@@ -262,7 +266,7 @@ onContextPage ctx run =
     (channelGuid (browserContextChannel ctx))
     (MethodName "page")
     ( \params -> do
-        event <- either throwIO pure (fromJsonValue params)
+        event <- throwDecode params
         page <- pageFromRef (browserContextChannel ctx) (browserContextPageEventPage event)
         run page
     )
@@ -297,13 +301,14 @@ contextPages ctx = do
     )
 
 waitForContextPage :: BrowserContext -> Playwright Page
-waitForContextPage ctx = do
-  params <-
-    waitForFutureChannelEventUnlessClosed
-      (channelGuid (browserContextChannel ctx))
-      (MethodName "page")
-  event <- either throwIO pure (fromJsonValue params)
-  pageFromRef (browserContextChannel ctx) (browserContextPageEventPage event)
+waitForContextPage ctx =
+  waitWithTimeout defaultTimeout $ do
+    params <-
+      waitForFutureChannelEventUnlessClosed
+        (channelGuid (browserContextChannel ctx))
+        (MethodName "page")
+    event <- throwDecode params
+    pageFromRef (browserContextChannel ctx) (browserContextPageEventPage event)
 
 addCookies :: BrowserContext -> [CookieToSet] -> Playwright ()
 addCookies ctx cookiesToSet = do

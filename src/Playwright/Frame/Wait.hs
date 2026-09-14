@@ -10,6 +10,9 @@ module Playwright.Frame.Wait
 import Playwright.Monad
   ( Playwright
   )
+import Data.Scientific
+  ( Scientific
+  )
 import Data.Text
   ( Text
   )
@@ -37,7 +40,7 @@ import Playwright.LoadState
   , toLifecycle
   )
 import Playwright.Protocol
-  ( FrameWaitForFunctionParams (frameWaitForFunctionParamsIsFunction)
+  ( FrameWaitForFunctionParams (frameWaitForFunctionParamsIsFunction, frameWaitForFunctionParamsPollingInterval)
   , FrameWaitForFunctionResult (frameWaitForFunctionResultHandle)
   , FrameWaitForSelectorParams (frameWaitForSelectorParamsOmitReturnValue, frameWaitForSelectorParamsState, frameWaitForSelectorParamsStrict)
   , FrameWaitForSelectorParamsState (FrameWaitForSelectorParamsStateAttached, FrameWaitForSelectorParamsStateDetached, FrameWaitForSelectorParamsStateHidden, FrameWaitForSelectorParamsStateVisible)
@@ -102,14 +105,15 @@ waitForTimeoutFrame frame timeout =
     "waitForTimeout"
     (mkFrameWaitForTimeoutParams timeout)
 
-waitForFunctionFrame :: Frame -> Text -> SerializedArgument -> Timeout -> Playwright JsHandle
-waitForFunctionFrame frame expression arg timeout = do
+waitForFunctionFrame :: Frame -> Text -> SerializedArgument -> Timeout -> Maybe Scientific -> Playwright JsHandle
+waitForFunctionFrame frame expression arg timeout polling = do
   result <-
     frameSend
       frame
       "waitForFunction"
       (mkFrameWaitForFunctionParams arg expression timeout)
         { frameWaitForFunctionParamsIsFunction = Just True
+        , frameWaitForFunctionParamsPollingInterval = polling
         }
   pure
     ( jsHandleFromRef

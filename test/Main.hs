@@ -2,6 +2,7 @@ module Main
   ( main
   ) where
 
+import Playwright.BeforeunloadSpec qualified as BeforeunloadSpec
 import Playwright.BrowserSpec qualified as BrowserSpec
 import Playwright.BrowserContextAddCookiesSpec qualified as BrowserContextAddCookiesSpec
 import Playwright.BrowserContextAddInitScriptSpec qualified as BrowserContextAddInitScriptSpec
@@ -11,23 +12,31 @@ import Playwright.BrowserContextClearCookiesSpec qualified as BrowserContextClea
 import Playwright.BrowserContextCookiesSpec qualified as BrowserContextCookiesSpec
 import Playwright.BrowserContextCredentialsSpec qualified as BrowserContextCredentialsSpec
 import Playwright.BrowserContextCspSpec qualified as BrowserContextCspSpec
+import Playwright.BrowserContextDeviceSpec qualified as BrowserContextDeviceSpec
+import Playwright.BrowserContextDsfSpec qualified as BrowserContextDsfSpec
+import Playwright.BrowserContextEventsSpec qualified as BrowserContextEventsSpec
 import Playwright.BrowserContextExposeFunctionSpec qualified as BrowserContextExposeFunctionSpec
 import Playwright.BrowserContextFetchSpec qualified as BrowserContextFetchSpec
 import Playwright.BrowserContextJavaScriptSpec qualified as BrowserContextJavaScriptSpec
 import Playwright.BrowserContextLocaleSpec qualified as BrowserContextLocaleSpec
+import Playwright.BrowserContextNetworkEventSpec qualified as BrowserContextNetworkEventSpec
 import Playwright.BrowserContextOfflineSpec qualified as BrowserContextOfflineSpec
 import Playwright.BrowserContextPageEventSpec qualified as BrowserContextPageEventSpec
 import Playwright.BrowserContextPagesSpec qualified as BrowserContextPagesSpec
 import Playwright.BrowserContextRouteSpec qualified as BrowserContextRouteSpec
+import Playwright.BrowserContextServiceWorkerPolicySpec qualified as BrowserContextServiceWorkerPolicySpec
 import Playwright.BrowserContextSetExtraHTTPHeadersSpec qualified as BrowserContextSetExtraHTTPHeadersSpec
 import Playwright.BrowserContextStorageStateSpec qualified as BrowserContextStorageStateSpec
 import Playwright.BrowserContextStrictSpec qualified as BrowserContextStrictSpec
 import Playwright.BrowserContextTimezoneSpec qualified as BrowserContextTimezoneSpec
 import Playwright.BrowserContextUserAgentSpec qualified as BrowserContextUserAgentSpec
+import Playwright.BrowserContextViewportMobileSpec qualified as BrowserContextViewportMobileSpec
 import Playwright.BrowserContextViewportSpec qualified as BrowserContextViewportSpec
 import Playwright.BrowserTypeBasicSpec qualified as BrowserTypeBasicSpec
+import Playwright.CapabilitiesSpec qualified as CapabilitiesSpec
 import Playwright.ConnectionSpec qualified as ConnectionSpec
 import Playwright.DownloadSpec qualified as DownloadSpec
+import Playwright.EmulationFocusSpec qualified as EmulationFocusSpec
 import Playwright.ElementHandleBoundingBoxSpec qualified as ElementHandleBoundingBoxSpec
 import Playwright.ElementHandleClickSpec qualified as ElementHandleClickSpec
 import Playwright.ElementHandleContentFrameSpec qualified as ElementHandleContentFrameSpec
@@ -89,6 +98,7 @@ import Playwright.PageDialogSpec qualified as PageDialogSpec
 import Playwright.PageDragSpec qualified as PageDragSpec
 import Playwright.PageDropSpec qualified as PageDropSpec
 import Playwright.PageEventConsoleSpec qualified as PageEventConsoleSpec
+import Playwright.PageEventCrashSpec qualified as PageEventCrashSpec
 import Playwright.PageEventLoadSpec qualified as PageEventLoadSpec
 import Playwright.PageEventNetworkSpec qualified as PageEventNetworkSpec
 import Playwright.PageEventPopupSpec qualified as PageEventPopupSpec
@@ -135,8 +145,10 @@ import Playwright.PageWaitForSelector2Spec qualified as PageWaitForSelector2Spec
 import Playwright.PageWaitForSelectorSpec qualified as PageWaitForSelectorSpec
 import Playwright.PageWaitForUrlSpec qualified as PageWaitForUrlSpec
 import Playwright.PermissionsSpec qualified as PermissionsSpec
+import Playwright.PopupSpec qualified as PopupSpec
 import Playwright.QuerySelectorSpec qualified as QuerySelectorSpec
 import Playwright.RetargetSpec qualified as RetargetSpec
+import Playwright.ResourceTimingSpec qualified as ResourceTimingSpec
 import Playwright.SelectorsCssSpec qualified as SelectorsCssSpec
 import Playwright.SelectorsFrameSpec qualified as SelectorsFrameSpec
 import Playwright.SelectorsGetBySpec qualified as SelectorsGetBySpec
@@ -144,6 +156,7 @@ import Playwright.SelectorsMiscSpec qualified as SelectorsMiscSpec
 import Playwright.SelectorsRoleSpec qualified as SelectorsRoleSpec
 import Playwright.SelectorsRegisterSpec qualified as SelectorsRegisterSpec
 import Playwright.SelectorsTextSpec qualified as SelectorsTextSpec
+import Playwright.SharedWorkerSpec qualified as SharedWorkerSpec
 import Playwright.TapSpec qualified as TapSpec
 import Playwright.TransportSpec qualified as TransportSpec
 import Playwright.WheelSpec qualified as WheelSpec
@@ -159,6 +172,7 @@ main =
     testGroup
       "playwright"
         [ TransportSpec.tests
+        , BeforeunloadSpec.tests
         , BrowserSpec.tests
         , BrowserContextAddCookiesSpec.tests
         , BrowserContextAddInitScriptSpec.tests
@@ -168,23 +182,31 @@ main =
         , BrowserContextCookiesSpec.tests
         , BrowserContextCredentialsSpec.tests
         , BrowserContextCspSpec.tests
+        , BrowserContextDeviceSpec.tests
+        , BrowserContextDsfSpec.tests
+        , BrowserContextEventsSpec.tests
         , BrowserContextExposeFunctionSpec.tests
         , BrowserContextFetchSpec.tests
         , BrowserContextJavaScriptSpec.tests
         , BrowserContextLocaleSpec.tests
+        , BrowserContextNetworkEventSpec.tests
         , BrowserContextOfflineSpec.tests
         , BrowserContextPageEventSpec.tests
         , BrowserContextPagesSpec.tests
         , BrowserContextRouteSpec.tests
+        , BrowserContextServiceWorkerPolicySpec.tests
         , BrowserContextSetExtraHTTPHeadersSpec.tests
         , BrowserContextStorageStateSpec.tests
         , BrowserContextStrictSpec.tests
         , BrowserContextTimezoneSpec.tests
         , BrowserContextUserAgentSpec.tests
+        , BrowserContextViewportMobileSpec.tests
         , BrowserContextViewportSpec.tests
         , BrowserTypeBasicSpec.tests
+        , CapabilitiesSpec.tests
         , ConnectionSpec.tests
         , DownloadSpec.tests
+        , EmulationFocusSpec.tests
         , ElementHandleBoundingBoxSpec.tests
         , ElementHandleClickSpec.tests
         , ElementHandleContentFrameSpec.tests
@@ -250,6 +272,7 @@ main =
         , PageDropSpec.tests
         , PageEmulateMediaSpec.tests
         , PageEventConsoleSpec.tests
+        , PageEventCrashSpec.tests
         , PageEventLoadSpec.tests
         , PageEventNetworkSpec.tests
         , PageEventPageErrorSpec.tests
@@ -295,8 +318,10 @@ main =
         , PageWaitForSelectorSpec.tests
         , PageWaitForUrlSpec.tests
         , PermissionsSpec.tests
+        , PopupSpec.tests
         , QuerySelectorSpec.tests
         , RetargetSpec.tests
+        , ResourceTimingSpec.tests
         , SelectorsCssSpec.tests
         , SelectorsFrameSpec.tests
         , SelectorsGetBySpec.tests
@@ -304,6 +329,7 @@ main =
         , SelectorsRoleSpec.tests
         , SelectorsRegisterSpec.tests
         , SelectorsTextSpec.tests
+        , SharedWorkerSpec.tests
         , TapSpec.tests
         , WheelSpec.tests
         , WorkersSpec.tests

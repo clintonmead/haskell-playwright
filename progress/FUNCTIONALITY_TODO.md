@@ -40,12 +40,13 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 - **page-request-intercept:** skip Android loopback rewrite and Firefox-only multipart file upload (`fixme` on Chromium). Protocol fetch timeouts are `Timeout <n>ms exceeded` (JS prefixes `route.fetch:`). Warp static `title.html` is `text/html` (Node test server adds `charset=utf-8`).
 - **page-history:** bfcache, reload during renderer navigation, goBack/goForward during submit, issue 20791, popup reload isolation.
 - **page-event-request:** service worker / intercept-race / Chromium 204 fixme leftovers.
+- **page-event-crash:** `chrome://crash` `goto` is fired in the background; awaiting it can hang the driver.
 - **downloads:** saveAs / cancel.
 - **page-pdf:** remaining `PdfOptions` (format, margin, …).
 
 ## `tests/library` with no or thin coverage
 
-Most of `tests/library` is still open, including: browserType launch-server/connect, default browser context, proxy, HAR, tracing, video, webauthn, leftover `browsercontext-fetch` (HTTPS, DNS `__testHookLookup`, brotli, connectOverCDP), popup, crash, headful, launcher, unroute-behavior, beforeunload, capabilities, channels, client-certificates, and the rest of the 100 library specs. `browser` is ported (skip Node-only `__testHookBeforeSetStorageState` / `toImpl`). `browsertype-basic` is ported (skip non-Chromium CDP). `browsercontext-clearcookies` is ported (skip partitioned CHIPS / HTTPS). `browsercontext-basic` is ported (skip Chromium-fixme `onLine` across navigations, and `_channel.defaultUserAgentForTest`).
+Most of `tests/library` is still open, including: browserType launch-server/connect, default browser context, proxy, HAR, tracing, video, webauthn, leftover `browsercontext-fetch` (HTTPS, DNS `__testHookLookup`, brotli, connectOverCDP), headful, launcher, unroute-behavior, channels, client-certificates, and the rest of the 100 library specs. `browser` is ported (skip Node-only `__testHookBeforeSetStorageState` / `toImpl`). `browsertype-basic` is ported (skip non-Chromium CDP). `browsercontext-clearcookies` is ported (skip partitioned CHIPS / HTTPS). `browsercontext-basic` is ported (skip Chromium-fixme `onLine` across navigations, and `_channel.defaultUserAgentForTest`). `popup` is ported (click-to-close can still surface protocol `TargetClosedError`; the JS client often swallows that. Skip `exposeBinding` + `source.page.isClosed()` until bindings carry a page). `capabilities` is ported (skip HTTPS SharedArrayBuffer, WebSocket server cases, video/audio/`file:` range requests, `showDirectoryPicker`, and avif — `rgb.avif` is not in the 1.61.1 asset tree). `resource-timing` is ported (skip SSL). `page-event-crash` is ported. `shared-worker` and `beforeunload` are ported.
 
 ## Other official trees (later)
 

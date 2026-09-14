@@ -9,9 +9,6 @@ module Playwright.PageError
 import Playwright.Monad
   ( Playwright
   )
-import UnliftIO.Exception
-  ( throwIO
-  )
 import Data.Text
   ( Text
   , pack
@@ -27,7 +24,7 @@ import Playwright.Json.ChannelRef
   ( ChannelRef (channelRefGuid)
   )
 import Playwright.Json.Decode
-  ( fromJsonValue
+  ( throwDecode
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -68,7 +65,7 @@ waitForPageError page = do
   let
     contextGuid = channelGuid (pageContextChannel page)
   params <- waitForChannelEvent contextGuid (MethodName "pageError")
-  event <- either throwIO pure (fromJsonValue params)
+  event <- throwDecode params
   if channelRefGuid (browserContextPageErrorEventPage event) == channelGuid (pageChannel page)
     then pure (pageErrorFromSerialized (browserContextPageErrorEventError event))
     else waitForPageError page

@@ -14,9 +14,6 @@ module Playwright.Response
 import Playwright.Monad
   ( Playwright
   )
-import UnliftIO.Exception
-  ( throwIO
-  )
 import Data.Text
   ( Text
   )
@@ -44,7 +41,7 @@ import Playwright.Json.ChannelRef
   ( ChannelRef (channelRefGuid)
   )
 import Playwright.Json.Decode
-  ( fromJsonValue
+  ( throwDecode
   )
 import Playwright.Json.ProtocolBinary
   ( protocolBinaryToByteString
@@ -81,7 +78,7 @@ responseFromRef ref =
 responseInitializer :: Response -> Playwright ResponseInitializer
 responseInitializer response = do
   obj <- lookupObject (channelGuid (responseChannel response))
-  either throwIO pure (fromJsonValue (remoteInitializer obj))
+  throwDecode (remoteInitializer obj)
 
 responseUrl :: Response -> Playwright Url
 responseUrl response =

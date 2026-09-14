@@ -83,6 +83,7 @@ module Playwright
   , Longitude (..)
   , MediaType (..)
   , MimeType (..)
+  , MouseButton (..)
   , NewContextOptions (..)
   , NewRequestOptions (..)
   , NetworkSizes (..)
@@ -98,6 +99,7 @@ module Playwright
   , Request (..)
   , RequestFailure (..)
   , RemoteAddr (..)
+  , ResourceTiming (..)
   , ResourceType (..)
   , Response (..)
   , Route
@@ -108,6 +110,7 @@ module Playwright
   , SecurityDetails (..)
   , SelectOption (..)
   , Selector
+  , ServiceWorkersPolicy (..)
   , SpecialJsValue (..)
   , SuggestedFilename (..)
   , StorageItem (..)
@@ -206,6 +209,7 @@ module Playwright
   , closeContext
   , closeContextWith
   , closePage
+  , closePageWith
   , content
   , contentFrameHandle
   , contextExposeFunction
@@ -222,6 +226,7 @@ module Playwright
   , cookies
   , cookiesFor
   , contextsEqual
+  , cssPixelFromDouble
   , cssPixelFromInt
   , currentName
   , currentUrl
@@ -256,6 +261,7 @@ module Playwright
   , dragAndDrop
   , dropOnto
   , dismissDialog
+  , dialogsEqual
   , elementArgument
   , elementHandle
   , elementHandles
@@ -304,6 +310,7 @@ module Playwright
   , evaluateOnHandleExpression
   , evaluateOnHandleExpressionNumbers
   , evaluateOnHandleNumbers
+  , evaluateOnHandleText
   , evaluateOnLocator
   , evaluateOnLocatorAllTexts
   , evaluateOnLocatorBool
@@ -390,6 +397,7 @@ module Playwright
   , jsHandleArgument
   , jsHandleToString
   , jsonValue
+  , jsonValueBool
   , jsonValueNumber
   , jsonValueSpecial
   , jsonValueText
@@ -415,9 +423,14 @@ module Playwright
   , mainFrame
   , milliseconds
   , mouseClick
+  , mouseClickWith
+  , mouseDblclick
   , mouseDown
+  , mouseDownWith
   , mouseMove
+  , mouseMoveWith
   , mouseUp
+  , mouseUpWith
   , mouseWheel
   , nestedSelector
   , newBrowserPage
@@ -435,8 +448,14 @@ module Playwright
   , objectTextArgument
   , onLoad
   , onBrowserContext
+  , onConsole
   , onContextPage
+  , onContextRequest
+  , onContextRequestFailed
+  , onContextRequestFinished
+  , onContextResponse
   , onPageClose
+  , onPageCrash
   , onRequest
   , onRequestFailed
   , onRequestFinished
@@ -487,6 +506,7 @@ module Playwright
   , requestResourceType
   , requestResponse
   , requestSizes
+  , requestTiming
   , requestUrl
   , requests
   , requestsEqual
@@ -551,6 +571,7 @@ module Playwright
   , uncheck
   , uncheckHandle
   , uncheckWith
+  , undefinedArgument
   , unroute
   , unrouteAll
   , unrouteContext
@@ -562,7 +583,11 @@ module Playwright
   , waitForClose
   , waitForConsole
   , waitForContextClose
+  , waitForContextConsole
+  , waitForContextDialog
   , waitForContextPage
+  , waitForContextRequestFinished
+  , waitForCrash
   , waitForDialog
   , waitForDownload
   , waitForElementState
@@ -570,7 +595,10 @@ module Playwright
   , waitForFileChooser
   , waitForFileChooserWith
   , waitForFunction
+  , waitForFunctionOnFrame
+  , waitForFunctionPolling
   , waitForFunctionWith
+  , waitForFunctionWithArg
   , waitForLoadEvent
   , waitForLoadState
   , waitForNavigation
@@ -752,7 +780,7 @@ import Playwright.ColorScheme
   ( ColorScheme (ColorSchemeDark, ColorSchemeLight, ColorSchemeNoOverride, ColorSchemeNoPreference)
   )
 import Playwright.ConsoleMessage
-  ( ConsoleMessage (ConsoleMessage, consoleMessageArgs, consoleMessageText, consoleMessageType)
+  ( ConsoleMessage (ConsoleMessage, consoleMessageArgs, consoleMessagePage, consoleMessageText, consoleMessageType)
   )
 import Playwright.ConsoleType
   ( ConsoleType (ConsoleAssert, ConsoleClear, ConsoleCount, ConsoleDebug, ConsoleDir, ConsoleDirXml, ConsoleError, ConsoleInfo, ConsoleLog, ConsoleProfile, ConsoleProfileEnd, ConsoleTable, ConsoleTimeEnd, ConsoleTrace, ConsoleVerbose, ConsoleWarning)
@@ -780,6 +808,7 @@ import Playwright.CookieSameSite
   )
 import Playwright.CssPixel
   ( CssPixel (CssPixel, cssPixelToScientific)
+  , cssPixelFromDouble
   , cssPixelFromInt
   )
 import Playwright.DeviceScaleFactor
@@ -787,9 +816,10 @@ import Playwright.DeviceScaleFactor
   , deviceScaleFactorFromInt
   )
 import Playwright.Dialog
-  ( Dialog (Dialog, dialogChannel, dialogDefaultValue, dialogMessage, dialogType)
+  ( Dialog (Dialog, dialogChannel, dialogDefaultValue, dialogMessage, dialogPage, dialogType)
   , acceptDialog
   , acceptDialogWith
+  , dialogsEqual
   , dismissDialog
   )
 import Playwright.DialogType
@@ -909,6 +939,7 @@ import Playwright.Evaluate
   , evaluateOnHandleExpression
   , evaluateOnHandleExpressionNumbers
   , evaluateOnHandleNumbers
+  , evaluateOnHandleText
   , evaluateOnLocator
   , evaluateOnLocatorAllTexts
   , evaluateOnLocatorBool
@@ -939,7 +970,7 @@ import Playwright.FetchOptions
   , defaultFetchOptions
   )
 import Playwright.FileChooser
-  ( FileChooser (FileChooser, fileChooserElement, fileChooserMultiple)
+  ( FileChooser (FileChooser, fileChooserElement, fileChooserMultiple, fileChooserPage)
   , armFileChooser
   , waitForFileChooser
   , waitForFileChooserWith
@@ -1035,6 +1066,7 @@ import Playwright.JsHandle
   , jsHandleArgument
   , jsHandleToString
   , jsonValue
+  , jsonValueBool
   , jsonValueNumber
   , jsonValueSpecial
   , jsonValueText
@@ -1125,10 +1157,18 @@ import Playwright.LocatorHandler
   )
 import Playwright.Mouse
   ( mouseClick
+  , mouseClickWith
+  , mouseDblclick
   , mouseDown
+  , mouseDownWith
   , mouseMove
+  , mouseMoveWith
   , mouseUp
+  , mouseUpWith
   , mouseWheel
+  )
+import Playwright.MouseButton
+  ( MouseButton (MouseButtonLeft, MouseButtonMiddle, MouseButtonRight)
   )
 import Playwright.MediaType
   ( MediaType (MediaNoOverride, MediaPrint, MediaScreen)
@@ -1137,7 +1177,7 @@ import Playwright.MimeType
   ( MimeType (MimeType, mimeTypeToText)
   )
 import Playwright.NewContextOptions
-  ( NewContextOptions (NewContextOptions, newContextAcceptDownloads, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextGeolocation, newContextHasTouch, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextIsMobile, newContextJavaScriptEnabled, newContextLocale, newContextNoDefaultViewport, newContextOffline, newContextPermissions, newContextStorageState, newContextStrictSelectors, newContextTimezoneId, newContextUserAgent, newContextViewport)
+  ( NewContextOptions (NewContextOptions, newContextAcceptDownloads, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextGeolocation, newContextHasTouch, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextIsMobile, newContextJavaScriptEnabled, newContextLocale, newContextNoDefaultViewport, newContextOffline, newContextPermissions, newContextScreen, newContextServiceWorkers, newContextStorageState, newContextStrictSelectors, newContextTimezoneId, newContextUserAgent, newContextViewport)
   , defaultNewContextOptions
   )
 import Playwright.NewRequestOptions
@@ -1156,6 +1196,7 @@ import Playwright.Page
   , addStyleTag
   , bringToFront
   , closePage
+  , closePageWith
   , content
   , getByLabel
   , getByRole
@@ -1189,7 +1230,9 @@ import Playwright.Page
   , title
   , url
   , waitForClose
+  , waitForCrash
   , onPageClose
+  , onPageCrash
   , frameByName
   , frames
   , mainFrame
@@ -1202,10 +1245,14 @@ import Playwright.Page.Wait
   , armLoadEvent
   , armPopup
   , onLoad
+  , onConsole
   , waitForConsole
   , waitForDialog
   , waitForFunction
+  , waitForFunctionOnFrame
+  , waitForFunctionPolling
   , waitForFunctionWith
+  , waitForFunctionWithArg
   , waitForLoadEvent
   , waitForLoadState
   , waitForNavigation
@@ -1251,6 +1298,17 @@ import Playwright.Page.Network
   , requests
   , responseFinished
   )
+import Playwright.BrowserContext.Network
+  ( onContextRequest
+  , onContextRequestFailed
+  , onContextRequestFinished
+  , onContextResponse
+  , waitForContextRequestFinished
+  )
+import Playwright.BrowserContext.Wait
+  ( waitForContextConsole
+  , waitForContextDialog
+  )
 import Playwright.PageError
   ( PageError (PageError, pageErrorMessage, pageErrorName, pageErrorStack)
   , clearPageErrors
@@ -1282,6 +1340,7 @@ import Playwright.Request
   , requestRedirectedTo
   , requestResourceType
   , requestSizes
+  , requestTiming
   , requestUrl
   , requestsEqual
   )
@@ -1291,6 +1350,9 @@ import Playwright.RequestFailure
 import Playwright.RequestFrame
   ( requestFrame
   , responseFrame
+  )
+import Playwright.ResourceTiming
+  ( ResourceTiming (ResourceTiming, resourceTimingConnectEnd, resourceTimingConnectStart, resourceTimingDomainLookupEnd, resourceTimingDomainLookupStart, resourceTimingRequestStart, resourceTimingResponseEnd, resourceTimingResponseStart, resourceTimingSecureConnectionStart, resourceTimingStartTime)
   )
 import Playwright.ResourceType
   ( ResourceType (ResourceType, resourceTypeToText)
@@ -1358,6 +1420,9 @@ import Playwright.Selectors
   ( registerSelector
   , registerSelectorWith
   )
+import Playwright.ServiceWorkersPolicy
+  ( ServiceWorkersPolicy (ServiceWorkersAllow, ServiceWorkersBlock)
+  )
 import Playwright.SerializedArgument
   ( boolArgument
   , channelArgument
@@ -1368,6 +1433,7 @@ import Playwright.SerializedArgument
   , objectTextArgument
   , specialArgument
   , textArgument
+  , undefinedArgument
   )
 import Playwright.SpecialJsValue
   ( SpecialJsValue (SpecialInfinity, SpecialNaN, SpecialNegInfinity, SpecialNegZero, SpecialNull, SpecialUndefined)

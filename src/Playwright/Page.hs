@@ -36,7 +36,10 @@ module Playwright.Page
   , addStyleTag
   , setExtraHTTPHeaders
   , waitForClose
+  , waitForCrash
   , onPageClose
+  , onPageCrash
+  , closePageWith
   , opener
   , pagesEqual
   , subscribeContext
@@ -135,7 +138,7 @@ import Playwright.Json.ChannelRef
   ( ChannelRef (channelRefGuid)
   )
 import Playwright.Json.Decode
-  ( fromJsonValue
+  ( throwDecode
   )
 import Playwright.Json.ProtocolBinary
   ( protocolBinaryToByteString
@@ -145,6 +148,9 @@ import Playwright.Locator
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
+  )
+import Playwright.RaceTimeout
+  ( waitWithTimeout
   )
 import Playwright.Protocol
   ( BrowserContextCloseResult
@@ -157,6 +163,7 @@ import Playwright.Protocol
   , PageAddInitScriptResult
   , PageBringToFrontResult
   , PageCloseResult
+  , PageRunBeforeUnloadResult
   , PageGoBackResult (pageGoBackResultResponse)
   , PageGoForwardResult (pageGoForwardResultResponse)
   , PageInitializer (pageInitializerMainFrame, pageInitializerOpener)
@@ -175,6 +182,7 @@ import Playwright.Protocol
   , mkPageAddInitScriptParams
   , mkPageBringToFrontParams
   , mkPageCloseParams
+  , mkPageRunBeforeUnloadParams
   , mkPageGoBackParams
   , mkPageGoForwardParams
   , mkPagePdfParams
@@ -235,7 +243,7 @@ data Page = Page
 pageFromRef :: Channel BrowserContextTag -> ChannelRef -> Playwright Page
 pageFromRef contextChannel ref = do
   obj <- lookupObject (channelRefGuid ref)
-  initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
+  initializer <- throwDecode (remoteInitializer obj)
   resolvedMainFrame <- frameFromRef (pageInitializerMainFrame initializer)
   let
     pageGuid = channelRefGuid ref
@@ -277,7 +285,11 @@ setDefaultNavigationTimeout page timeout =
     (Just timeout)
 
 closePage :: Page -> Playwright ()
-closePage page = do
+closePage page =
+  closePageWith page False
+
+closePageWith :: Page -> Bool -> Playwright ()
+closePageWith page runUnload = do
   ownsContext <- pageOwnsContext (channelGuid (pageChannel page))
   if ownsContext
     then
@@ -286,10 +298,16 @@ closePage page = do
           send (pageContextChannel page) (MethodName "close") mkBrowserContextCloseParams
         pure ()
     else
-      ignoreTargetClosed $ do
-        _ :: PageCloseResult <-
-          send (pageChannel page) (MethodName "close") mkPageCloseParams
-        pure ()
+      if runUnload
+        then do
+          _ :: PageRunBeforeUnloadResult <-
+            send (pageChannel page) (MethodName "runBeforeUnload") mkPageRunBeforeUnloadParams
+          pure ()
+        else
+          ignoreTargetClosed $ do
+            _ :: PageCloseResult <-
+              send (pageChannel page) (MethodName "close") mkPageCloseParams
+            pure ()
 
 isClosed :: Page -> Playwright Bool
 isClosed page = do
@@ -302,17 +320,36 @@ waitForClose page = do
   if already
     then pure ()
     else do
-      _ <-
-        waitForChannelEvent
-          (channelGuid (pageChannel page))
-          (MethodName "close")
-      pure ()
+      timeout <- pageActionTimeout page
+      waitWithTimeout timeout $ do
+        _ <-
+          waitForChannelEvent
+            (channelGuid (pageChannel page))
+            (MethodName "close")
+        pure ()
 
 onPageClose :: Page -> Playwright () -> Playwright ()
 onPageClose page run =
   registerEventHandler
     (channelGuid (pageChannel page))
     (MethodName "close")
+    (\_ -> run)
+
+waitForCrash :: Page -> Playwright ()
+waitForCrash page = do
+  timeout <- pageActionTimeout page
+  waitWithTimeout timeout $ do
+    _ <-
+      waitForChannelEvent
+        (channelGuid (pageChannel page))
+        (MethodName "crash")
+    pure ()
+
+onPageCrash :: Page -> Playwright () -> Playwright ()
+onPageCrash page run =
+  registerEventHandler
+    (channelGuid (pageChannel page))
+    (MethodName "crash")
     (\_ -> run)
 
 bringToFront :: Page -> Playwright ()
@@ -546,7 +583,7 @@ subscribeContext page event = do
 opener :: Page -> Playwright (Maybe Page)
 opener page = do
   obj <- lookupObject (channelGuid (pageChannel page))
-  initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
+  initializer <- throwDecode (remoteInitializer obj)
   case pageInitializerOpener initializer of
     Nothing ->
       pure Nothing

@@ -1,7 +1,12 @@
 module Playwright.Json.Decode
   ( fromJsonValue
+  , throwDecode
   ) where
 
+import Control.Monad.Catch
+  ( MonadThrow
+  , throwM
+  )
 import Data.Aeson
   ( FromJSON
   , Result (Error, Success)
@@ -20,3 +25,7 @@ fromJsonValue value =
       Left (DecodeFailure (Text.pack err))
     Success decoded ->
       Right decoded
+
+throwDecode :: (MonadThrow m, FromJSON a) => Value -> m a
+throwDecode value =
+  either throwM pure (fromJsonValue value)

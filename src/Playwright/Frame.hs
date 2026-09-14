@@ -21,9 +21,6 @@ module Playwright.Frame
 import Playwright.Monad
   ( Playwright
   )
-import UnliftIO.Exception
-  ( throwIO
-  )
 import Data.Aeson
   ( FromJSON
   , ToJSON
@@ -56,7 +53,7 @@ import Playwright.Json.ChannelRef
   ( ChannelRef (ChannelRef, channelRefGuid)
   )
 import Playwright.Json.Decode
-  ( fromJsonValue
+  ( throwDecode
   )
 import Playwright.LoadState
   ( defaultNavigationLoadState
@@ -125,7 +122,7 @@ data Frame = Frame
 frameFromRef :: ChannelRef -> Playwright Frame
 frameFromRef ref = do
   obj <- lookupObject (channelRefGuid ref)
-  initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
+  initializer <- throwDecode (remoteInitializer obj)
   pure
     Frame
       { frameChannel = Channel (channelRefGuid ref)
@@ -146,7 +143,7 @@ currentName frame = do
 frameInitializer :: Frame -> Playwright FrameInitializer
 frameInitializer frame = do
   obj <- lookupObject (channelGuid (frameChannel frame))
-  either throwIO pure (fromJsonValue (remoteInitializer obj))
+  throwDecode (remoteInitializer obj)
 
 childFrames :: Frame -> Playwright [Frame]
 childFrames frame = do

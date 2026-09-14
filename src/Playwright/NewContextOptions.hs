@@ -38,17 +38,23 @@ import Playwright.PermissionName
   ( PermissionName (permissionNameToText)
   )
 import Playwright.Protocol
-  ( BrowserNewContextParams (browserNewContextParamsAcceptDownloads, browserNewContextParamsBaseURL, browserNewContextParamsBypassCSP, browserNewContextParamsColorScheme, browserNewContextParamsDeviceScaleFactor, browserNewContextParamsExtraHTTPHeaders, browserNewContextParamsGeolocation, browserNewContextParamsHasTouch, browserNewContextParamsHttpCredentials, browserNewContextParamsIgnoreHTTPSErrors, browserNewContextParamsIsMobile, browserNewContextParamsJavaScriptEnabled, browserNewContextParamsLocale, browserNewContextParamsNoDefaultViewport, browserNewContextParamsOffline, browserNewContextParamsPermissions, browserNewContextParamsStorageState, browserNewContextParamsStrictSelectors, browserNewContextParamsTimezoneId, browserNewContextParamsUserAgent, browserNewContextParamsViewport)
+  ( BrowserNewContextParams (browserNewContextParamsAcceptDownloads, browserNewContextParamsBaseURL, browserNewContextParamsBypassCSP, browserNewContextParamsColorScheme, browserNewContextParamsDeviceScaleFactor, browserNewContextParamsExtraHTTPHeaders, browserNewContextParamsGeolocation, browserNewContextParamsHasTouch, browserNewContextParamsHttpCredentials, browserNewContextParamsIgnoreHTTPSErrors, browserNewContextParamsIsMobile, browserNewContextParamsJavaScriptEnabled, browserNewContextParamsLocale, browserNewContextParamsNoDefaultViewport, browserNewContextParamsOffline, browserNewContextParamsPermissions, browserNewContextParamsScreen, browserNewContextParamsServiceWorkers, browserNewContextParamsStorageState, browserNewContextParamsStrictSelectors, browserNewContextParamsTimezoneId, browserNewContextParamsUserAgent, browserNewContextParamsViewport)
   , BrowserNewContextParamsAcceptDownloads (BrowserNewContextParamsAcceptDownloadsAccept, BrowserNewContextParamsAcceptDownloadsDeny)
   , BrowserNewContextParamsColorScheme (BrowserNewContextParamsColorSchemeDark, BrowserNewContextParamsColorSchemeLight, BrowserNewContextParamsColorSchemeNoOverride, BrowserNewContextParamsColorSchemeNoPreference)
   , BrowserNewContextParamsGeolocation (browserNewContextParamsGeolocationAccuracy)
   , BrowserNewContextParamsHttpCredentials (browserNewContextParamsHttpCredentialsOrigin, browserNewContextParamsHttpCredentialsSend)
   , BrowserNewContextParamsHttpCredentialsSend (BrowserNewContextParamsHttpCredentialsSendAlways, BrowserNewContextParamsHttpCredentialsSendUnauthorized)
+  , BrowserNewContextParamsScreen
+  , BrowserNewContextParamsServiceWorkers (BrowserNewContextParamsServiceWorkersAllow, BrowserNewContextParamsServiceWorkersBlock)
   , BrowserNewContextParamsViewport
   , mkBrowserNewContextParams
   , mkBrowserNewContextParamsGeolocation
   , mkBrowserNewContextParamsHttpCredentials
+  , mkBrowserNewContextParamsScreen
   , mkBrowserNewContextParamsViewport
+  )
+import Playwright.ServiceWorkersPolicy
+  ( ServiceWorkersPolicy (ServiceWorkersAllow, ServiceWorkersBlock)
   )
 import Playwright.StorageState
   ( StorageState
@@ -87,6 +93,8 @@ data NewContextOptions = NewContextOptions
   , newContextNoDefaultViewport :: Maybe Bool
   , newContextOffline :: Maybe Bool
   , newContextPermissions :: Maybe [PermissionName]
+  , newContextScreen :: Maybe ViewportSize
+  , newContextServiceWorkers :: Maybe ServiceWorkersPolicy
   , newContextStorageState :: Maybe StorageState
   , newContextStrictSelectors :: Maybe Bool
   , newContextTimezoneId :: Maybe TimezoneId
@@ -114,6 +122,8 @@ defaultNewContextOptions =
     , newContextNoDefaultViewport = Nothing
     , newContextOffline = Nothing
     , newContextPermissions = Nothing
+    , newContextScreen = Nothing
+    , newContextServiceWorkers = Nothing
     , newContextStorageState = Nothing
     , newContextStrictSelectors = Nothing
     , newContextTimezoneId = Nothing
@@ -141,6 +151,8 @@ toBrowserNewContextParams opts =
     , browserNewContextParamsNoDefaultViewport = newContextNoDefaultViewport opts
     , browserNewContextParamsOffline = newContextOffline opts
     , browserNewContextParamsPermissions = fmap (fmap permissionNameToText) (newContextPermissions opts)
+    , browserNewContextParamsScreen = fmap toProtocolScreen (newContextScreen opts)
+    , browserNewContextParamsServiceWorkers = fmap toProtocolServiceWorkers (newContextServiceWorkers opts)
     , browserNewContextParamsStorageState = fmap toNewContextStorageState (newContextStorageState opts)
     , browserNewContextParamsStrictSelectors = newContextStrictSelectors opts
     , browserNewContextParamsTimezoneId = fmap timezoneIdToText (newContextTimezoneId opts)
@@ -203,3 +215,17 @@ toProtocolViewport size =
   mkBrowserNewContextParamsViewport
     (viewportHeightToInt (viewportHeight size))
     (viewportWidthToInt (viewportWidth size))
+
+toProtocolScreen :: ViewportSize -> BrowserNewContextParamsScreen
+toProtocolScreen size =
+  mkBrowserNewContextParamsScreen
+    (viewportHeightToInt (viewportHeight size))
+    (viewportWidthToInt (viewportWidth size))
+
+toProtocolServiceWorkers :: ServiceWorkersPolicy -> BrowserNewContextParamsServiceWorkers
+toProtocolServiceWorkers policy =
+  case policy of
+    ServiceWorkersAllow ->
+      BrowserNewContextParamsServiceWorkersAllow
+    ServiceWorkersBlock ->
+      BrowserNewContextParamsServiceWorkersBlock

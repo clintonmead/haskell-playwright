@@ -13,6 +13,7 @@ module Playwright.Connection.Store
   , lookupMainFramePage
   , lookupObject
   , lookupOwnedContextGuids
+  , lookupRequestEndTiming
   , lookupRequestFailure
   , lookupRequestOverrides
   , lookupSelectorEngines
@@ -48,6 +49,9 @@ import Data.Set
   ( Set
   )
 import Data.Set qualified as Set
+import Data.Scientific
+  ( Scientific
+  )
 import Data.Text
   ( Text
   )
@@ -79,7 +83,7 @@ import Playwright.RequestOverrides
   , emptyRequestOverrides
   )
 import Playwright.Session
-  ( Session (sessionBrowserContexts, sessionBrowserTypes, sessionClosedGuids, sessionContextBaseUrls, sessionContextBrowsers, sessionContextsWithOwnerPage, sessionLocatorHandlers, sessionLocatorListening, sessionMainFramePages, sessionObjects, sessionPagesOwningContext, sessionRequestFailures, sessionRequestOverrides, sessionRouteHandlers, sessionRouteListening, sessionSelectorEngines, sessionTimeoutDefaults)
+  ( Session (sessionBrowserContexts, sessionBrowserTypes, sessionClosedGuids, sessionContextBaseUrls, sessionContextBrowsers, sessionContextsWithOwnerPage, sessionLocatorHandlers, sessionLocatorListening, sessionMainFramePages, sessionObjects, sessionPagesOwningContext, sessionRequestEndTiming, sessionRequestFailures, sessionRequestOverrides, sessionRouteHandlers, sessionRouteListening, sessionSelectorEngines, sessionTimeoutDefaults)
   )
 import Playwright.StoredLocatorHandler
   ( StoredLocatorHandler (storedLocatorHandlerFrame, storedLocatorHandlerSelector, storedLocatorHandlerTimes)
@@ -358,3 +362,8 @@ lookupRequestFailure :: Connection -> Guid -> IO (Maybe Text)
 lookupRequestFailure conn guid =
   atomically $
     Map.lookup guid . sessionRequestFailures <$> readSession conn
+
+lookupRequestEndTiming :: Connection -> Guid -> IO (Maybe Scientific)
+lookupRequestEndTiming conn guid =
+  atomically $
+    Map.lookup guid . sessionRequestEndTiming <$> readSession conn

@@ -7,6 +7,7 @@ module Playwright.JsHandle
   , jsHandleFromRef
   , jsHandleToString
   , jsonValue
+  , jsonValueBool
   , jsonValueNumber
   , jsonValueSpecial
   , jsonValueText
@@ -19,7 +20,6 @@ import Playwright.Monad
   )
 import Control.Concurrent.STM
   ( retry
-  , throwSTM
   )
 import UnliftIO.Exception
   ( throwIO
@@ -49,7 +49,7 @@ import Playwright.Json.ChannelRef
   ( ChannelRef (ChannelRef, channelRefGuid)
   )
 import Playwright.Json.Decode
-  ( fromJsonValue
+  ( throwDecode
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -76,7 +76,7 @@ import Playwright.SerializedArgument
   , channelArgument
   )
 import Playwright.SerializedValue
-  ( SerializedPayload (PayloadArray, PayloadNumber, PayloadSpecial, PayloadString)
+  ( SerializedPayload (PayloadArray, PayloadBool, PayloadNumber, PayloadSpecial, PayloadString)
   , SerializedValue (SerializedNode)
   )
 import Playwright.SpecialJsValue
@@ -100,7 +100,7 @@ jsHandleToString handle = do
   obj <-
     lookupObject
       (channelGuid (jsHandleChannel handle))
-  initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
+  initializer <- throwDecode (remoteInitializer obj)
   pure (jSHandleInitializerPreview initializer)
 
 waitUntilJsHandlePreview :: JsHandle -> (Text -> Bool) -> Playwright Text
@@ -108,7 +108,7 @@ waitUntilJsHandlePreview handle predicate =
   waitUntilRemote
     (channelGuid (jsHandleChannel handle))
     $ \obj -> do
-      initializer <- either throwSTM pure (fromJsonValue (remoteInitializer obj))
+      initializer <- throwDecode (remoteInitializer obj)
       let
         preview = jSHandleInitializerPreview initializer
       unless (predicate preview) retry
@@ -133,6 +133,15 @@ jsonValue handle = do
       (MethodName "jsonValue")
       mkJSHandleJsonValueParams
   pure (jSHandleJsonValueResultValue result)
+
+jsonValueBool :: JsHandle -> Playwright Bool
+jsonValueBool handle = do
+  value <- jsonValue handle
+  case value of
+    SerializedNode (PayloadBool flag) _ ->
+      pure flag
+    _ ->
+      throwIO (EvaluateUnexpected value)
 
 jsonValueNumber :: JsHandle -> Playwright Double
 jsonValueNumber handle = do

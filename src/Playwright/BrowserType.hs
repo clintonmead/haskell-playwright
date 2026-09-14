@@ -12,7 +12,6 @@ import Playwright.Monad
   )
 import UnliftIO.Exception
   ( bracket
-  , throwIO
   )
 import Data.Text
   ( Text
@@ -36,7 +35,7 @@ import Playwright.Json.ChannelRef
   ( ChannelRef (ChannelRef, channelRefGuid)
   )
 import Playwright.Json.Decode
-  ( fromJsonValue
+  ( throwDecode
   )
 import Playwright.LaunchOptions
   ( LaunchOptions
@@ -61,7 +60,7 @@ data BrowserType = BrowserType
 browserTypeFromRef :: ChannelRef -> Playwright BrowserType
 browserTypeFromRef ref = do
   obj <- lookupObject (channelRefGuid ref)
-  initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
+  initializer <- throwDecode (remoteInitializer obj)
   pure
     BrowserType
       { browserTypeChannel = Channel (channelRefGuid ref)

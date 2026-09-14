@@ -32,7 +32,7 @@ import Playwright.Json.ChannelRef
   ( ChannelRef (channelRefGuid)
   )
 import Playwright.Json.Decode
-  ( fromJsonValue
+  ( throwDecode
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -74,7 +74,6 @@ import Playwright.SerializedValue
 import UnliftIO.Exception
   ( SomeException
   , displayException
-  , throwIO
   , try
   )
 
@@ -110,7 +109,7 @@ handlePageBindingCall ::
   Value ->
   Playwright ()
 handlePageBindingCall name handler params = do
-  event <- either throwIO pure (fromJsonValue params)
+  event <- throwDecode params
   handleNamedBinding name handler (pageBindingCallEventBinding event)
 
 handleContextBindingCall ::
@@ -119,7 +118,7 @@ handleContextBindingCall ::
   Value ->
   Playwright ()
 handleContextBindingCall name handler params = do
-  event <- either throwIO pure (fromJsonValue params)
+  event <- throwDecode params
   handleNamedBinding name handler (browserContextBindingCallEventBinding event)
 
 handleNamedBinding ::
@@ -131,7 +130,7 @@ handleNamedBinding name handler bindingRef = do
   let
     call = Channel (channelRefGuid bindingRef) :: Channel BindingCallTag
   obj <- lookupObject (channelRefGuid bindingRef)
-  initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
+  initializer <- throwDecode (remoteInitializer obj)
   if bindingCallInitializerName initializer == bindingNameToText name
     then do
       outcome <- try (handler (bindingCallInitializerArgs initializer))

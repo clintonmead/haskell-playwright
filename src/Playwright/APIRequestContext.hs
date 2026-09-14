@@ -85,7 +85,7 @@ import Playwright.Json.ChannelRef
   ( ChannelRef (channelRefGuid)
   )
 import Playwright.Json.Decode
-  ( fromJsonValue
+  ( throwDecode
   )
 import Playwright.Json.ProtocolBinary
   ( protocolBinaryFromByteString
@@ -149,7 +149,7 @@ apiRequestContextFor :: Guid -> Playwright APIRequestContext
 apiRequestContextFor guid = do
   contextGuid <- findBrowserContextGuid guid
   obj <- lookupObject contextGuid
-  initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
+  initializer <- throwDecode (remoteInitializer obj)
   pure
     APIRequestContext
       { apiRequestContextChannel =

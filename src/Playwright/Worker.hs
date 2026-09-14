@@ -39,7 +39,7 @@ import Playwright.Json.ChannelRef
   ( ChannelRef (channelRefGuid)
   )
 import Playwright.Json.Decode
-  ( fromJsonValue
+  ( throwDecode
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -80,7 +80,7 @@ workerFromRef ref =
 workerUrl :: Worker -> Playwright Url
 workerUrl worker = do
   obj <- lookupObject (channelGuid (workerChannel worker))
-  initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
+  initializer <- throwDecode (remoteInitializer obj)
   pure (workerInitializerUrl initializer)
 
 waitForWorker :: Page -> Playwright Worker
@@ -89,7 +89,7 @@ waitForWorker page = do
     waitForChannelEvent
       (channelGuid (pageChannel page))
       (MethodName "worker")
-  event <- either throwIO pure (fromJsonValue params)
+  event <- throwDecode params
   pure (workerFromRef (pageWorkerEventWorker event))
 
 workers :: Page -> Playwright [Worker]

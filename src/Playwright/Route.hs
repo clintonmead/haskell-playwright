@@ -26,9 +26,6 @@ import Control.Concurrent.STM
 import Control.Monad.IO.Class
   ( liftIO
   )
-import UnliftIO.Exception
-  ( throwIO
-  )
 import Data.ByteString.Base64
   ( encode
   )
@@ -90,7 +87,7 @@ import Playwright.HttpStatus
   ( HttpStatus (httpStatusToInt)
   )
 import Playwright.Json.Decode
-  ( fromJsonValue
+  ( throwDecode
   )
 import Playwright.Json.ProtocolBinary
   ( protocolBinaryFromByteString
@@ -135,7 +132,7 @@ routeRequest handled =
 requestFromChannel :: Channel RouteTag -> Playwright Request
 requestFromChannel chan = do
   obj <- lookupObject (channelGuid chan)
-  initializer <- either throwIO pure (fromJsonValue (remoteInitializer obj))
+  initializer <- throwDecode (remoteInitializer obj)
   pure (requestFromRef (routeInitializerRequest initializer))
 
 continueRoute :: Route -> Playwright ()
