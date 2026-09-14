@@ -22,8 +22,10 @@ module Playwright.Evaluate
   , evaluateOnFrameBool
   , evaluateOnFrameText
   , evaluateOnHandle
+  , evaluateOnHandleBool
   , evaluateOnHandleExpression
   , evaluateOnHandleExpressionNumbers
+  , evaluateOnHandleNumber
   , evaluateOnHandleNumbers
   , evaluateOnHandleText
   , evaluateOnLocator
@@ -237,6 +239,14 @@ evaluateOnHandleExpression handle expression =
 evaluateOnHandleNumbers :: JsHandle -> Text -> Playwright [Double]
 evaluateOnHandleNumbers handle expression =
   requireNumbers =<< evaluateOnHandle handle expression
+
+evaluateOnHandleNumber :: JsHandle -> Text -> Playwright Double
+evaluateOnHandleNumber handle expression =
+  requireNumber =<< evaluateOnHandle handle expression
+
+evaluateOnHandleBool :: JsHandle -> Text -> Playwright Bool
+evaluateOnHandleBool handle expression =
+  requireBool =<< evaluateOnHandle handle expression
 
 evaluateOnHandleText :: JsHandle -> Text -> Playwright Text
 evaluateOnHandleText handle expression =

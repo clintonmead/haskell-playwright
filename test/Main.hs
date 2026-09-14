@@ -75,6 +75,7 @@ import Playwright.JsHandlePropertiesSpec qualified as JsHandlePropertiesSpec
 import Playwright.JsHandleToStringSpec qualified as JsHandleToStringSpec
 import Playwright.LocatorClickSpec qualified as LocatorClickSpec
 import Playwright.LocatorConvenienceSpec qualified as LocatorConvenienceSpec
+import Playwright.LocatorDispatchEventTouchSpec qualified as LocatorDispatchEventTouchSpec
 import Playwright.LocatorElementHandleSpec qualified as LocatorElementHandleSpec
 import Playwright.LocatorEvaluateSpec qualified as LocatorEvaluateSpec
 import Playwright.LocatorFrameSpec qualified as LocatorFrameSpec
@@ -254,6 +255,7 @@ main =
         , LocatorSpec.tests
         , LocatorClickSpec.tests
         , LocatorConvenienceSpec.tests
+        , LocatorDispatchEventTouchSpec.tests
         , LocatorElementHandleSpec.tests
         , LocatorEvaluateSpec.tests
         , LocatorFrameSpec.tests

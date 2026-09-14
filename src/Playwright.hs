@@ -166,8 +166,10 @@ module Playwright
   , armFrameNavigated
   , armLoadEvent
   , armPopup
+  , arrayValue
   , asElement
   , boolArgument
+  , boolValue
   , blur
   , boundingBox
   , bringToFront
@@ -254,6 +256,9 @@ module Playwright
   , describeLocator
   , deviceScaleFactorFromInt
   , dispatchEvent
+  , dispatchEventHandle
+  , dispatchEventHandleWith
+  , dispatchEventWith
   , dispose
   , disposeHandle
   , downloadPath
@@ -309,8 +314,10 @@ module Playwright
   , evaluateOnFrameBool
   , evaluateOnFrameText
   , evaluateOnHandle
+  , evaluateOnHandleBool
   , evaluateOnHandleExpression
   , evaluateOnHandleExpressionNumbers
+  , evaluateOnHandleNumber
   , evaluateOnHandleNumbers
   , evaluateOnHandleText
   , evaluateOnLocator
@@ -397,6 +404,7 @@ module Playwright
   , isHidden
   , isVisible
   , jsHandleArgument
+  , jsHandleObjectArgument
   , jsHandleToString
   , jsonValue
   , jsonValueBool
@@ -446,9 +454,14 @@ module Playwright
   , nth
   , numberArgument
   , numbersArgument
+  , numberValue
+  , objectArgument
+  , objectHandleArgument
+  , objectHandlesArgument
   , objectNumberArgument
   , objectSpecialArgument
   , objectTextArgument
+  , objectValue
   , onLoad
   , onBrowserContext
   , onConsole
@@ -860,6 +873,8 @@ import Playwright.ElementHandle
   , clickHandle
   , clickHandleWith
   , contentFrameHandle
+  , dispatchEventHandle
+  , dispatchEventHandleWith
   , elementArgument
   , getAttributeHandle
   , innerHtmlHandle
@@ -942,8 +957,10 @@ import Playwright.Evaluate
   , evaluateOnFrameBool
   , evaluateOnFrameText
   , evaluateOnHandle
+  , evaluateOnHandleBool
   , evaluateOnHandleExpression
   , evaluateOnHandleExpressionNumbers
+  , evaluateOnHandleNumber
   , evaluateOnHandleNumbers
   , evaluateOnHandleText
   , evaluateOnLocator
@@ -1070,6 +1087,7 @@ import Playwright.JsHandle
   , getProperty
   , getPropertyList
   , jsHandleArgument
+  , jsHandleObjectArgument
   , jsHandleToString
   , jsonValue
   , jsonValueBool
@@ -1114,6 +1132,7 @@ import Playwright.Locator
   , describeLocator
   , dblclick
   , dispatchEvent
+  , dispatchEventWith
   , dragAndDrop
   , dropOnto
   , elementHandle
@@ -1438,12 +1457,21 @@ import Playwright.SerializedArgument
   , channelArgument
   , numberArgument
   , numbersArgument
+  , objectArgument
+  , objectHandleArgument
+  , objectHandlesArgument
   , objectNumberArgument
   , objectSpecialArgument
   , objectTextArgument
   , specialArgument
   , textArgument
   , undefinedArgument
+  )
+import Playwright.SerializedValue
+  ( arrayValue
+  , boolValue
+  , numberValue
+  , objectValue
   )
 import Playwright.SpecialJsValue
   ( SpecialJsValue (SpecialInfinity, SpecialNaN, SpecialNegInfinity, SpecialNegZero, SpecialNull, SpecialUndefined)

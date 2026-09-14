@@ -3,6 +3,8 @@ module Playwright.ElementHandle
   , boundingBox
   , clickHandle
   , clickHandleWith
+  , dispatchEventHandle
+  , dispatchEventHandleWith
   , tapHandle
   , elementArgument
   , contentFrameHandle
@@ -54,6 +56,9 @@ import Playwright.CssPixel
   ( CssPixel (CssPixel)
   , cssPixelToScientific
   )
+import Playwright.DomEventType
+  ( DomEventType (domEventTypeToText)
+  )
 import Playwright.ElementState
   ( ElementState (ElementDisabled, ElementEditable, ElementEnabled, ElementHidden, ElementStable, ElementVisible)
   )
@@ -86,6 +91,7 @@ import Playwright.Protocol
   ( ElementHandleBoundingBoxResult (elementHandleBoundingBoxResultValue)
   , ElementHandleClickParams (elementHandleClickParamsForce, elementHandleClickParamsNoWaitAfter, elementHandleClickParamsPosition)
   , ElementHandleClickResult
+  , ElementHandleDispatchEventResult
   , ElementHandleContentFrameResult (elementHandleContentFrameResultFrame)
   , ElementHandleGetAttributeResult (elementHandleGetAttributeResultValue)
   , ElementHandleInnerHTMLResult (elementHandleInnerHTMLResultValue)
@@ -107,6 +113,7 @@ import Playwright.Protocol
   , Rect (rectHeight, rectWidth, rectX, rectY)
   , mkElementHandleBoundingBoxParams
   , mkElementHandleClickParams
+  , mkElementHandleDispatchEventParams
   , mkElementHandleContentFrameParams
   , mkElementHandleGetAttributeParams
   , mkElementHandleInnerHTMLParams
@@ -131,6 +138,7 @@ import Playwright.Protocol qualified as Protocol
 import Playwright.SerializedArgument
   ( SerializedArgument
   , channelArgument
+  , undefinedArgument
   )
 import Playwright.Timeout
   ( Timeout
@@ -174,6 +182,19 @@ clickHandleWith handle opts = do
         , elementHandleClickParamsNoWaitAfter = clickOptionsNoWaitAfter opts
         , elementHandleClickParamsPosition = fmap toProtocolPoint (clickOptionsPosition opts)
         }
+  pure ()
+
+dispatchEventHandle :: ElementHandle -> DomEventType -> Playwright ()
+dispatchEventHandle handle eventType =
+  dispatchEventHandleWith handle eventType undefinedArgument
+
+dispatchEventHandleWith :: ElementHandle -> DomEventType -> SerializedArgument -> Playwright ()
+dispatchEventHandleWith handle eventType eventInit = do
+  _ :: ElementHandleDispatchEventResult <-
+    handleSend
+      handle
+      "dispatchEvent"
+      (mkElementHandleDispatchEventParams eventInit (domEventTypeToText eventType))
   pure ()
 
 toProtocolPoint :: Point -> Protocol.Point

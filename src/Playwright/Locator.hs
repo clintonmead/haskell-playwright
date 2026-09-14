@@ -13,6 +13,7 @@ module Playwright.Locator
   , describeLocator
   , dblclick
   , dispatchEvent
+  , dispatchEventWith
   , dragAndDrop
   , dropOnto
   , elementHandle
@@ -104,6 +105,9 @@ import Playwright.ClickOptions
 import Playwright.DomEventType
   ( DomEventType
   )
+import Playwright.SerializedArgument
+  ( SerializedArgument
+  )
 import Playwright.DropPayload
   ( DropPayload
   )
@@ -132,6 +136,7 @@ import Playwright.Frame.Action
   , clickFrameWith
   , dblclickFrame
   , dispatchEventFrame
+  , dispatchEventFrameWith
   , dragAndDropFrame
   , dropFrame
   , fillFrame
@@ -323,6 +328,16 @@ dblclick loc =
 dispatchEvent :: Locator -> DomEventType -> Playwright ()
 dispatchEvent loc eventType =
   withActionTimeout loc (dispatchEventFrame (locatorFrame loc) (locatorSelector loc) eventType)
+
+dispatchEventWith :: Locator -> DomEventType -> SerializedArgument -> Playwright ()
+dispatchEventWith loc eventType eventInit =
+  withActionTimeout loc $ \timeout ->
+    dispatchEventFrameWith
+      (locatorFrame loc)
+      (locatorSelector loc)
+      eventType
+      eventInit
+      timeout
 
 fill :: Locator -> Text -> Playwright ()
 fill loc value =

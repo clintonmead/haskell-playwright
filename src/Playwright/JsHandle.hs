@@ -5,6 +5,7 @@ module Playwright.JsHandle
   , getPropertyList
   , jsHandleArgument
   , jsHandleFromRef
+  , jsHandleObjectArgument
   , jsHandleToString
   , jsonValue
   , jsonValueBool
@@ -74,6 +75,7 @@ import Playwright.RemoteObject
 import Playwright.SerializedArgument
   ( SerializedArgument
   , channelArgument
+  , objectHandleArgument
   )
 import Playwright.SerializedValue
   ( SerializedPayload (PayloadArray, PayloadBool, PayloadNumber, PayloadSpecial, PayloadString)
@@ -94,6 +96,10 @@ jsHandleFromRef ref =
 jsHandleArgument :: JsHandle -> SerializedArgument
 jsHandleArgument handle =
   channelArgument (ChannelRef (channelGuid (jsHandleChannel handle)))
+
+jsHandleObjectArgument :: Text -> JsHandle -> SerializedArgument
+jsHandleObjectArgument field handle =
+  objectHandleArgument field (ChannelRef (channelGuid (jsHandleChannel handle)))
 
 jsHandleToString :: JsHandle -> Playwright Text
 jsHandleToString handle = do

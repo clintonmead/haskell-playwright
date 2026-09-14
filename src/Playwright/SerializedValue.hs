@@ -1,6 +1,10 @@
 module Playwright.SerializedValue
   ( SerializedValue (..)
   , SerializedPayload (..)
+  , arrayValue
+  , boolValue
+  , numberValue
+  , objectValue
   , undefinedValue
   ) where
 
@@ -74,6 +78,22 @@ data SerializedValue
 undefinedValue :: SerializedValue
 undefinedValue =
   SerializedNode (PayloadSpecial SpecialUndefined) Nothing
+
+numberValue :: Double -> SerializedValue
+numberValue n =
+  SerializedNode (PayloadNumber n) Nothing
+
+boolValue :: Bool -> SerializedValue
+boolValue flag =
+  SerializedNode (PayloadBool flag) Nothing
+
+arrayValue :: [SerializedValue] -> SerializedValue
+arrayValue items =
+  SerializedNode (PayloadArray items) Nothing
+
+objectValue :: [(Text, SerializedValue)] -> SerializedValue
+objectValue fields =
+  SerializedNode (PayloadObject fields) Nothing
 
 instance HasCodec SerializedValue where
   codec =

@@ -4,6 +4,9 @@ module Playwright.SerializedArgument
   , numberArgument
   , channelArgument
   , numbersArgument
+  , objectArgument
+  , objectHandleArgument
+  , objectHandlesArgument
   , objectNumberArgument
   , objectSpecialArgument
   , objectTextArgument
@@ -32,6 +35,7 @@ import Playwright.Json.ChannelRef
 import Playwright.SerializedValue
   ( SerializedPayload (PayloadArray, PayloadBool, PayloadHandle, PayloadNumber, PayloadObject, PayloadSpecial, PayloadString)
   , SerializedValue (SerializedNode)
+  , objectValue
   , undefinedValue
   )
 import Playwright.SpecialJsValue
@@ -96,6 +100,29 @@ channelArgument ref =
     { serializedArgumentValue = SerializedNode (PayloadHandle 0) Nothing
     , serializedArgumentHandles = [ref]
     }
+
+objectArgument :: [(Text, SerializedValue)] -> SerializedArgument
+objectArgument fields =
+  SerializedArgument
+    { serializedArgumentValue = objectValue fields
+    , serializedArgumentHandles = []
+    }
+
+objectHandlesArgument :: [(Text, ChannelRef)] -> SerializedArgument
+objectHandlesArgument fields =
+  SerializedArgument
+    { serializedArgumentValue =
+        objectValue
+          ( fmap
+              (\(index, (name, _)) -> (name, SerializedNode (PayloadHandle index) Nothing))
+              (zip [0 :: Int ..] fields)
+          )
+    , serializedArgumentHandles = fmap snd fields
+    }
+
+objectHandleArgument :: Text -> ChannelRef -> SerializedArgument
+objectHandleArgument field ref =
+  objectHandlesArgument [(field, ref)]
 
 objectNumberArgument :: [(Text, Double)] -> SerializedArgument
 objectNumberArgument fields =

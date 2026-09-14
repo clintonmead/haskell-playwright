@@ -6,6 +6,7 @@ module Playwright.Frame.Action
   , clickFrameWith
   , dblclickFrame
   , dispatchEventFrame
+  , dispatchEventFrameWith
   , fillFrame
   , focusFrame
   , hoverFrame
@@ -143,7 +144,8 @@ import Playwright.Protocol qualified as Protocol
   , mkPoint
   )
 import Playwright.SerializedArgument
-  ( undefinedArgument
+  ( SerializedArgument
+  , undefinedArgument
   )
 import Playwright.SelectOption
   ( SelectOption (SelectIndex, SelectLabel, SelectValue, SelectValueOrLabel)
@@ -195,10 +197,14 @@ dblclickFrame frame selector timeout =
 
 dispatchEventFrame :: Frame -> Selector -> DomEventType -> Timeout -> Playwright ()
 dispatchEventFrame frame selector eventType timeout =
+  dispatchEventFrameWith frame selector eventType undefinedArgument timeout
+
+dispatchEventFrameWith :: Frame -> Selector -> DomEventType -> SerializedArgument -> Timeout -> Playwright ()
+dispatchEventFrameWith frame selector eventType eventInit timeout =
   frameSend_ @FrameDispatchEventResult
     frame
     "dispatchEvent"
-    (mkFrameDispatchEventParams undefinedArgument selector timeout (domEventTypeToText eventType))
+    (mkFrameDispatchEventParams eventInit selector timeout (domEventTypeToText eventType))
       { frameDispatchEventParamsStrict = Just True
       }
 
