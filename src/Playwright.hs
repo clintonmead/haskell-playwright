@@ -261,8 +261,12 @@ module Playwright
   , dispatchEventWith
   , dispose
   , disposeHandle
-  , downloadPath
+  , downloadCancel
+  , downloadDelete
+  , downloadFailure
   , downloadPage
+  , downloadPath
+  , downloadSaveAs
   , downloadSuggestedFilename
   , downloadUrl
   , dragAndDrop
@@ -848,8 +852,12 @@ import Playwright.Download
   ( Download
   , SuggestedFilename (SuggestedFilename, suggestedFilenameToText)
   , armDownload
+  , downloadCancel
+  , downloadDelete
+  , downloadFailure
   , downloadPage
   , downloadPath
+  , downloadSaveAs
   , downloadSuggestedFilename
   , downloadUrl
   , waitForDownload

@@ -1,7 +1,11 @@
 module Playwright.Download
   ( Download
+  , downloadCancel
+  , downloadDelete
+  , downloadFailure
   , downloadPage
   , downloadPath
+  , downloadSaveAs
   , downloadSuggestedFilename
   , downloadUrl
   , SuggestedFilename (..)
@@ -12,8 +16,15 @@ module Playwright.Download
 import Playwright.Monad
   ( Playwright
   )
+import Control.Monad.IO.Class
+  ( liftIO
+  )
+import System.Directory
+  ( makeAbsolute
+  )
 import Data.Text
   ( Text
+  , pack
   , unpack
   )
 import Playwright.Channel
@@ -38,9 +49,17 @@ import Playwright.Page
   ( Page (pageChannel)
   )
 import Playwright.Protocol
-  ( ArtifactPathAfterFinishedResult (artifactPathAfterFinishedResultValue)
+  ( ArtifactCancelResult
+  , ArtifactDeleteResult
+  , ArtifactFailureResult (artifactFailureResultError)
+  , ArtifactPathAfterFinishedResult (artifactPathAfterFinishedResultValue)
+  , ArtifactSaveAsResult
   , PageDownloadEvent (pageDownloadEventArtifact, pageDownloadEventSuggestedFilename, pageDownloadEventUrl)
+  , mkArtifactCancelParams
+  , mkArtifactDeleteParams
+  , mkArtifactFailureParams
   , mkArtifactPathAfterFinishedParams
+  , mkArtifactSaveAsParams
   )
 import Playwright.Url
   ( Url
@@ -89,3 +108,40 @@ downloadPath download = do
       (MethodName "pathAfterFinished")
       mkArtifactPathAfterFinishedParams
   pure (unpack (artifactPathAfterFinishedResultValue result))
+
+downloadSaveAs :: Download -> FilePath -> Playwright ()
+downloadSaveAs download dest = do
+  absPath <- liftIO (makeAbsolute dest)
+  _ :: ArtifactSaveAsResult <-
+    send
+      (downloadArtifact download)
+      (MethodName "saveAs")
+      (mkArtifactSaveAsParams (pack absPath))
+  pure ()
+
+downloadDelete :: Download -> Playwright ()
+downloadDelete download = do
+  _ :: ArtifactDeleteResult <-
+    send
+      (downloadArtifact download)
+      (MethodName "delete")
+      mkArtifactDeleteParams
+  pure ()
+
+downloadCancel :: Download -> Playwright ()
+downloadCancel download = do
+  _ :: ArtifactCancelResult <-
+    send
+      (downloadArtifact download)
+      (MethodName "cancel")
+      mkArtifactCancelParams
+  pure ()
+
+downloadFailure :: Download -> Playwright (Maybe Text)
+downloadFailure download = do
+  result <-
+    send
+      (downloadArtifact download)
+      (MethodName "failure")
+      mkArtifactFailureParams
+  pure (artifactFailureResultError result)

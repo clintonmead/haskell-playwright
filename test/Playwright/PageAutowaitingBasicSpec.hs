@@ -48,12 +48,16 @@ import Playwright
   , dblclick
   , defaultClickOptions
   , defaultGotoOptions
+  , defaultTimeout
   , fill
   , goto
   , setContent
   , urlFromText
   , waitForLoadState
   , Playwright
+  )
+import Playwright.RaceTimeout
+  ( waitWithTimeout
   )
 import Playwright.Harness
   ( locate
@@ -154,7 +158,7 @@ clickThenLoad =
     setContent page ("<a id=\"anchor\" href=\"" <> prefix <> "/empty.html\">empty.html</a>")
     awaitLoad <- armLoadEvent page
     withAsync (click (locate page "a")) $ \clicked -> do
-      awaitLoad
+      waitWithTimeout defaultTimeout awaitLoad
       modifyIORef' messages (<> ["load"])
       wait clicked
       waitForLoadState page LoadStateLoad

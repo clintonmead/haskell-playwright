@@ -41,7 +41,7 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 - **page-history:** bfcache, reload during renderer navigation, goBack/goForward during submit, issue 20791, popup reload isolation.
 - **page-event-request:** service worker / intercept-race / Chromium 204 fixme leftovers.
 - **page-event-crash:** `chrome://crash` `goto` is fired in the background; awaiting it can hang the driver.
-- **downloads:** saveAs / cancel.
+- **downloads:** createReadStream / PDF / alt-click modifiers / `artifactsDir`.
 - **page-pdf:** remaining `PdfOptions` (format, margin, …).
 
 ## `tests/library` with no or thin coverage
