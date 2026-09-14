@@ -125,6 +125,7 @@ library
       Playwright.Point
       Playwright.PropertyName
       Playwright.Protocol
+      Playwright.ProxySettings
       Playwright.RaceTimeout
       Playwright.RegisterSelectorOptions
       Playwright.RemoteAddr
@@ -232,6 +233,7 @@ test-suite playwright-test
       Playwright.BrowserContextOfflineSpec
       Playwright.BrowserContextPageEventSpec
       Playwright.BrowserContextPagesSpec
+      Playwright.BrowserContextProxySpec
       Playwright.BrowserContextRouteSpec
       Playwright.BrowserContextServiceWorkerPolicySpec
       Playwright.BrowserContextSetExtraHTTPHeadersSpec
@@ -359,6 +361,7 @@ test-suite playwright-test
       Playwright.PageWaitForUrlSpec
       Playwright.PermissionsSpec
       Playwright.PopupSpec
+      Playwright.ProxySpec
       Playwright.QuerySelectorSpec
       Playwright.ResourceTimingSpec
       Playwright.RetargetSpec

@@ -37,19 +37,25 @@ import Playwright.Locale
 import Playwright.PermissionName
   ( PermissionName (permissionNameToText)
   )
+import Playwright.ProxySettings
+  ( ProxyHost (proxyHostToText)
+  , ProxySettings (proxySettingsBypass, proxySettingsPassword, proxySettingsServer, proxySettingsUsername)
+  )
 import Playwright.Protocol
-  ( BrowserNewContextParams (browserNewContextParamsAcceptDownloads, browserNewContextParamsBaseURL, browserNewContextParamsBypassCSP, browserNewContextParamsColorScheme, browserNewContextParamsDeviceScaleFactor, browserNewContextParamsExtraHTTPHeaders, browserNewContextParamsGeolocation, browserNewContextParamsHasTouch, browserNewContextParamsHttpCredentials, browserNewContextParamsIgnoreHTTPSErrors, browserNewContextParamsIsMobile, browserNewContextParamsJavaScriptEnabled, browserNewContextParamsLocale, browserNewContextParamsNoDefaultViewport, browserNewContextParamsOffline, browserNewContextParamsPermissions, browserNewContextParamsScreen, browserNewContextParamsServiceWorkers, browserNewContextParamsStorageState, browserNewContextParamsStrictSelectors, browserNewContextParamsTimezoneId, browserNewContextParamsUserAgent, browserNewContextParamsViewport)
+  ( BrowserNewContextParams (browserNewContextParamsAcceptDownloads, browserNewContextParamsBaseURL, browserNewContextParamsBypassCSP, browserNewContextParamsColorScheme, browserNewContextParamsDeviceScaleFactor, browserNewContextParamsExtraHTTPHeaders, browserNewContextParamsGeolocation, browserNewContextParamsHasTouch, browserNewContextParamsHttpCredentials, browserNewContextParamsIgnoreHTTPSErrors, browserNewContextParamsIsMobile, browserNewContextParamsJavaScriptEnabled, browserNewContextParamsLocale, browserNewContextParamsNoDefaultViewport, browserNewContextParamsOffline, browserNewContextParamsPermissions, browserNewContextParamsProxy, browserNewContextParamsScreen, browserNewContextParamsServiceWorkers, browserNewContextParamsStorageState, browserNewContextParamsStrictSelectors, browserNewContextParamsTimezoneId, browserNewContextParamsUserAgent, browserNewContextParamsViewport)
   , BrowserNewContextParamsAcceptDownloads (BrowserNewContextParamsAcceptDownloadsAccept, BrowserNewContextParamsAcceptDownloadsDeny)
   , BrowserNewContextParamsColorScheme (BrowserNewContextParamsColorSchemeDark, BrowserNewContextParamsColorSchemeLight, BrowserNewContextParamsColorSchemeNoOverride, BrowserNewContextParamsColorSchemeNoPreference)
   , BrowserNewContextParamsGeolocation (browserNewContextParamsGeolocationAccuracy)
   , BrowserNewContextParamsHttpCredentials (browserNewContextParamsHttpCredentialsOrigin, browserNewContextParamsHttpCredentialsSend)
   , BrowserNewContextParamsHttpCredentialsSend (BrowserNewContextParamsHttpCredentialsSendAlways, BrowserNewContextParamsHttpCredentialsSendUnauthorized)
+  , BrowserNewContextParamsProxy (browserNewContextParamsProxyBypass, browserNewContextParamsProxyPassword, browserNewContextParamsProxyUsername)
   , BrowserNewContextParamsScreen
   , BrowserNewContextParamsServiceWorkers (BrowserNewContextParamsServiceWorkersAllow, BrowserNewContextParamsServiceWorkersBlock)
   , BrowserNewContextParamsViewport
   , mkBrowserNewContextParams
   , mkBrowserNewContextParamsGeolocation
   , mkBrowserNewContextParamsHttpCredentials
+  , mkBrowserNewContextParamsProxy
   , mkBrowserNewContextParamsScreen
   , mkBrowserNewContextParamsViewport
   )
@@ -93,6 +99,7 @@ data NewContextOptions = NewContextOptions
   , newContextNoDefaultViewport :: Maybe Bool
   , newContextOffline :: Maybe Bool
   , newContextPermissions :: Maybe [PermissionName]
+  , newContextProxy :: Maybe ProxySettings
   , newContextScreen :: Maybe ViewportSize
   , newContextServiceWorkers :: Maybe ServiceWorkersPolicy
   , newContextStorageState :: Maybe StorageState
@@ -122,6 +129,7 @@ defaultNewContextOptions =
     , newContextNoDefaultViewport = Nothing
     , newContextOffline = Nothing
     , newContextPermissions = Nothing
+    , newContextProxy = Nothing
     , newContextScreen = Nothing
     , newContextServiceWorkers = Nothing
     , newContextStorageState = Nothing
@@ -151,6 +159,7 @@ toBrowserNewContextParams opts =
     , browserNewContextParamsNoDefaultViewport = newContextNoDefaultViewport opts
     , browserNewContextParamsOffline = newContextOffline opts
     , browserNewContextParamsPermissions = fmap (fmap permissionNameToText) (newContextPermissions opts)
+    , browserNewContextParamsProxy = fmap toProtocolProxy (newContextProxy opts)
     , browserNewContextParamsScreen = fmap toProtocolScreen (newContextScreen opts)
     , browserNewContextParamsServiceWorkers = fmap toProtocolServiceWorkers (newContextServiceWorkers opts)
     , browserNewContextParamsStorageState = fmap toNewContextStorageState (newContextStorageState opts)
@@ -229,3 +238,12 @@ toProtocolServiceWorkers policy =
       BrowserNewContextParamsServiceWorkersAllow
     ServiceWorkersBlock ->
       BrowserNewContextParamsServiceWorkersBlock
+
+toProtocolProxy :: ProxySettings -> BrowserNewContextParamsProxy
+toProtocolProxy settings =
+  ( mkBrowserNewContextParamsProxy (proxyHostToText (proxySettingsServer settings))
+  )
+    { browserNewContextParamsProxyBypass = proxySettingsBypass settings
+    , browserNewContextParamsProxyUsername = fmap httpUsernameToText (proxySettingsUsername settings)
+    , browserNewContextParamsProxyPassword = fmap httpPasswordToText (proxySettingsPassword settings)
+    }

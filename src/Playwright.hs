@@ -95,6 +95,8 @@ module Playwright
   , Playwright
   , Point (..)
   , PropertyName (..)
+  , ProxyHost (..)
+  , ProxySettings (..)
   , RegisterSelectorOptions (..)
   , Request (..)
   , RequestFailure (..)
@@ -1086,7 +1088,7 @@ import Playwright.Keyboard
   , keyboardUp
   )
 import Playwright.LaunchOptions
-  ( LaunchOptions (LaunchOptions, launchOptionsChromiumSandbox, launchOptionsHeadless, launchOptionsSlowMo, launchOptionsTimeout)
+  ( LaunchOptions (LaunchOptions, launchOptionsChromiumSandbox, launchOptionsHeadless, launchOptionsProxy, launchOptionsSlowMo, launchOptionsTimeout)
   , defaultLaunchOptions
   )
 import Playwright.LoadState
@@ -1179,7 +1181,7 @@ import Playwright.MimeType
   ( MimeType (MimeType, mimeTypeToText)
   )
 import Playwright.NewContextOptions
-  ( NewContextOptions (NewContextOptions, newContextAcceptDownloads, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextGeolocation, newContextHasTouch, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextIsMobile, newContextJavaScriptEnabled, newContextLocale, newContextNoDefaultViewport, newContextOffline, newContextPermissions, newContextScreen, newContextServiceWorkers, newContextStorageState, newContextStrictSelectors, newContextTimezoneId, newContextUserAgent, newContextViewport)
+  ( NewContextOptions (NewContextOptions, newContextAcceptDownloads, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextGeolocation, newContextHasTouch, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextIsMobile, newContextJavaScriptEnabled, newContextLocale, newContextNoDefaultViewport, newContextOffline, newContextPermissions, newContextProxy, newContextScreen, newContextServiceWorkers, newContextStorageState, newContextStrictSelectors, newContextTimezoneId, newContextUserAgent, newContextViewport)
   , defaultNewContextOptions
   )
 import Playwright.NewRequestOptions
@@ -1329,6 +1331,10 @@ import Playwright.Point
   )
 import Playwright.PropertyName
   ( PropertyName (PropertyName, propertyNameToText)
+  )
+import Playwright.ProxySettings
+  ( ProxyHost (ProxyHost, proxyHostToText)
+  , ProxySettings (ProxySettings, proxySettingsBypass, proxySettingsPassword, proxySettingsServer, proxySettingsUsername)
   )
 import Playwright.Request
   ( Request (Request, requestChannel)

@@ -23,6 +23,7 @@ import Playwright.BrowserContextNetworkEventSpec qualified as BrowserContextNetw
 import Playwright.BrowserContextOfflineSpec qualified as BrowserContextOfflineSpec
 import Playwright.BrowserContextPageEventSpec qualified as BrowserContextPageEventSpec
 import Playwright.BrowserContextPagesSpec qualified as BrowserContextPagesSpec
+import Playwright.BrowserContextProxySpec qualified as BrowserContextProxySpec
 import Playwright.BrowserContextRouteSpec qualified as BrowserContextRouteSpec
 import Playwright.BrowserContextServiceWorkerPolicySpec qualified as BrowserContextServiceWorkerPolicySpec
 import Playwright.BrowserContextSetExtraHTTPHeadersSpec qualified as BrowserContextSetExtraHTTPHeadersSpec
@@ -148,6 +149,7 @@ import Playwright.PageWaitForSelectorSpec qualified as PageWaitForSelectorSpec
 import Playwright.PageWaitForUrlSpec qualified as PageWaitForUrlSpec
 import Playwright.PermissionsSpec qualified as PermissionsSpec
 import Playwright.PopupSpec qualified as PopupSpec
+import Playwright.ProxySpec qualified as ProxySpec
 import Playwright.QuerySelectorSpec qualified as QuerySelectorSpec
 import Playwright.RetargetSpec qualified as RetargetSpec
 import Playwright.ResourceTimingSpec qualified as ResourceTimingSpec
@@ -195,6 +197,7 @@ main =
         , BrowserContextOfflineSpec.tests
         , BrowserContextPageEventSpec.tests
         , BrowserContextPagesSpec.tests
+        , BrowserContextProxySpec.tests
         , BrowserContextRouteSpec.tests
         , BrowserContextServiceWorkerPolicySpec.tests
         , BrowserContextSetExtraHTTPHeadersSpec.tests
@@ -323,6 +326,7 @@ main =
         , PageWaitForUrlSpec.tests
         , PermissionsSpec.tests
         , PopupSpec.tests
+        , ProxySpec.tests
         , QuerySelectorSpec.tests
         , RetargetSpec.tests
         , ResourceTimingSpec.tests

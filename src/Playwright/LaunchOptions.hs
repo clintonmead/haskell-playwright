@@ -19,12 +19,16 @@ import Playwright.Timeout
   ( Timeout
   , defaultLaunchTimeout
   )
+import Playwright.ProxySettings
+  ( ProxySettings
+  )
 
 data LaunchOptions = LaunchOptions
   { launchOptionsHeadless :: Maybe Bool
   , launchOptionsTimeout :: Timeout
   , launchOptionsChromiumSandbox :: Maybe Bool
   , launchOptionsSlowMo :: Maybe Timeout
+  , launchOptionsProxy :: Maybe ProxySettings
   }
   deriving stock (Eq, Show)
   deriving (FromJSON, ToJSON) via (Autodocodec LaunchOptions)
@@ -36,6 +40,7 @@ defaultLaunchOptions =
     , launchOptionsTimeout = defaultLaunchTimeout
     , launchOptionsChromiumSandbox = Just False
     , launchOptionsSlowMo = Nothing
+    , launchOptionsProxy = Nothing
     }
 
 instance HasCodec LaunchOptions where
@@ -46,3 +51,4 @@ instance HasCodec LaunchOptions where
         <*> requiredField' "timeout" .= launchOptionsTimeout
         <*> optionalField' "chromiumSandbox" .= launchOptionsChromiumSandbox
         <*> optionalField' "slowMo" .= launchOptionsSlowMo
+        <*> optionalField' "proxy" .= launchOptionsProxy

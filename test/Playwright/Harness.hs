@@ -14,6 +14,7 @@ module Playwright.Harness
   , withAssetsWith
   , testAssetsDir
   , withChromiumBrowser
+  , withChromiumBrowserWith
   , withChromiumContext
   , withChromiumContextWith
   , withChromiumPage
@@ -52,6 +53,7 @@ import Playwright
   , BrowserContext
   , ElementHandle
   , Locator
+  , LaunchOptions
   , NewContextOptions
   , Page
   , Playwright
@@ -105,11 +107,15 @@ requireHandle handle =
       pure value
 
 withChromiumBrowser :: (Browser -> Playwright a) -> IO a
-withChromiumBrowser action = do
+withChromiumBrowser =
+  withChromiumBrowserWith defaultLaunchOptions
+
+withChromiumBrowserWith :: LaunchOptions -> (Browser -> Playwright a) -> IO a
+withChromiumBrowserWith opts action = do
   _ <- requireNonEmptyEnv "PLAYWRIGHT_BROWSERS_PATH"
   runPlaywright $ do
     browserType <- chromium
-    withBrowser browserType defaultLaunchOptions action
+    withBrowser browserType opts action
 
 withChromiumPage :: (Page -> Playwright a) -> IO a
 withChromiumPage action =
