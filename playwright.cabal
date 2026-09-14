@@ -276,6 +276,7 @@ test-suite playwright-test
       Playwright.GlobalFetchCookieSpec
       Playwright.GlobalFetchSpec
       Playwright.Harness
+      Playwright.HitTargetSpec
       Playwright.IntegrationSpec
       Playwright.InterceptionSpec
       Playwright.JsHandleAsElementSpec
