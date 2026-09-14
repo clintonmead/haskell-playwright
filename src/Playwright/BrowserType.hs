@@ -4,11 +4,18 @@ module Playwright.BrowserType
   , browserTypeFromRef
   , browserTypesEqual
   , launch
+  , launchPersistentContext
   , withBrowser
   ) where
 
 import Playwright.Monad
   ( Playwright
+  )
+import Control.Monad.IO.Class
+  ( liftIO
+  )
+import System.Directory
+  ( makeAbsolute
   )
 import UnliftIO.Exception
   ( bracket
@@ -20,6 +27,11 @@ import Playwright.Browser
   ( Browser (browserChannel)
   , browserFromRef
   , closeBrowser
+  , validateNewContextOptions
+  )
+import Playwright.BrowserContext
+  ( BrowserContext
+  , contextFromRef
   )
 import Playwright.Channel
   ( BrowserTypeTag
@@ -29,7 +41,10 @@ import Playwright.Channel
 import Playwright.Connection
   ( lookupBrowserTypeGuid
   , lookupObject
+  , lookupSelectorEngines
+  , rememberBrowserContext
   , rememberBrowserType
+  , writeContextBaseUrl
   )
 import Playwright.Json.ChannelRef
   ( ChannelRef (ChannelRef, channelRefGuid)
@@ -40,11 +55,18 @@ import Playwright.Json.Decode
 import Playwright.LaunchOptions
   ( LaunchOptions
   )
+import Playwright.LaunchPersistent
+  ( toLaunchPersistentParams
+  )
 import Playwright.MethodName
   ( MethodName (MethodName)
   )
+import Playwright.NewContextOptions
+  ( NewContextOptions (newContextBaseURL)
+  )
 import Playwright.Protocol
   ( BrowserTypeInitializer (browserTypeInitializerExecutablePath, browserTypeInitializerName)
+  , BrowserTypeLaunchPersistentContextResult (browserTypeLaunchPersistentContextResultBrowser, browserTypeLaunchPersistentContextResultContext)
   , BrowserTypeLaunchResult (browserTypeLaunchResultBrowser)
   )
 import Playwright.RemoteObject
@@ -82,6 +104,32 @@ launch browserType opts = do
     (channelGuid (browserChannel browser))
     (channelGuid (browserTypeChannel browserType))
   pure browser
+
+launchPersistentContext :: BrowserType -> FilePath -> LaunchOptions -> NewContextOptions -> Playwright BrowserContext
+launchPersistentContext browserType userDataDir launchOpts ctxOpts = do
+  validateNewContextOptions ctxOpts
+  absUserDataDir <- liftIO (makeAbsolute userDataDir)
+  engines <- lookupSelectorEngines
+  result <-
+    send
+      (browserTypeChannel browserType)
+      (MethodName "launchPersistentContext")
+      (toLaunchPersistentParams absUserDataDir launchOpts ctxOpts engines)
+  browser <-
+    browserFromRef
+      (browserTypeLaunchPersistentContextResultBrowser result)
+  rememberBrowserType
+    (channelGuid (browserChannel browser))
+    (channelGuid (browserTypeChannel browserType))
+  let
+    contextRef = browserTypeLaunchPersistentContextResultContext result
+  rememberBrowserContext (channelGuid (browserChannel browser)) (channelRefGuid contextRef)
+  case newContextBaseURL ctxOpts of
+    Nothing ->
+      pure ()
+    Just base ->
+      writeContextBaseUrl (channelRefGuid contextRef) base
+  contextFromRef contextRef
 
 browserTypesEqual :: BrowserType -> BrowserType -> Bool
 browserTypesEqual left right =

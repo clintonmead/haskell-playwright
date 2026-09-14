@@ -35,6 +35,8 @@ import Playwright.BrowserContextViewportSpec qualified as BrowserContextViewport
 import Playwright.BrowserTypeBasicSpec qualified as BrowserTypeBasicSpec
 import Playwright.CapabilitiesSpec qualified as CapabilitiesSpec
 import Playwright.ConnectionSpec qualified as ConnectionSpec
+import Playwright.DefaultBrowserContext1Spec qualified as DefaultBrowserContext1Spec
+import Playwright.DefaultBrowserContext2Spec qualified as DefaultBrowserContext2Spec
 import Playwright.DownloadSpec qualified as DownloadSpec
 import Playwright.EmulationFocusSpec qualified as EmulationFocusSpec
 import Playwright.ElementHandleBoundingBoxSpec qualified as ElementHandleBoundingBoxSpec
@@ -205,6 +207,8 @@ main =
         , BrowserTypeBasicSpec.tests
         , CapabilitiesSpec.tests
         , ConnectionSpec.tests
+        , DefaultBrowserContext1Spec.tests
+        , DefaultBrowserContext2Spec.tests
         , DownloadSpec.tests
         , EmulationFocusSpec.tests
         , ElementHandleBoundingBoxSpec.tests

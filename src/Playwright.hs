@@ -410,6 +410,7 @@ module Playwright
   , lastLocator
   , latitudeFromInt
   , launch
+  , launchPersistentContext
   , localStorage
   , locator
   , locatorBoundingBox
@@ -748,6 +749,7 @@ import Playwright.BrowserType
   , browserTypeFromRef
   , browserTypesEqual
   , launch
+  , launchPersistentContext
   , withBrowser
   )
 import Playwright.CheckOptions

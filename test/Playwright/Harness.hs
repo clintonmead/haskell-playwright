@@ -18,6 +18,9 @@ module Playwright.Harness
   , withChromiumContextWith
   , withChromiumPage
   , withLocalApp
+  , withPersistentContext
+  , withPersistentContextWith
+  , withPersistentUserDataWith
   ) where
 
 import Control.Monad.IO.Class
@@ -54,10 +57,12 @@ import Playwright
   , Playwright
   , closeContext
   , chromium
+  , contextPages
   , defaultGotoOptions
   , defaultLaunchOptions
   , defaultNewContextOptions
   , goto
+  , launchPersistentContext
   , locator
   , newContextWith
   , newPage
@@ -82,6 +87,9 @@ import UnliftIO
   ( bracket
   , try
   , withRunInIO
+  )
+import UnliftIO.Temporary
+  ( withSystemTempDirectory
   )
 
 locate :: Page -> Text -> Locator
@@ -123,6 +131,36 @@ withChromiumContextWith opts action =
 withChromiumContext :: (BrowserContext -> Page -> Playwright a) -> IO a
 withChromiumContext =
   withChromiumContextWith defaultNewContextOptions
+
+withPersistentContextWith :: NewContextOptions -> (BrowserContext -> Page -> Playwright a) -> IO a
+withPersistentContextWith opts action = do
+  _ <- requireNonEmptyEnv "PLAYWRIGHT_BROWSERS_PATH"
+  withSystemTempDirectory "pw-user-data" $ \userDataDir ->
+    runPlaywright (withPersistentUserDataWith userDataDir opts action)
+
+withPersistentContext :: (BrowserContext -> Page -> Playwright a) -> IO a
+withPersistentContext =
+  withPersistentContextWith defaultNewContextOptions
+
+withPersistentUserDataWith :: FilePath -> NewContextOptions -> (BrowserContext -> Page -> Playwright a) -> Playwright a
+withPersistentUserDataWith userDataDir opts action = do
+  browserType <- chromium
+  bracket
+    (launchPersistentContext browserType userDataDir defaultLaunchOptions opts)
+    closeContext
+    ( \ctx -> do
+        page <- requirePersistentPage ctx
+        action ctx page
+    )
+
+requirePersistentPage :: BrowserContext -> Playwright Page
+requirePersistentPage ctx = do
+  pages <- contextPages ctx
+  case pages of
+    page : _ ->
+      pure page
+    [] ->
+      assertFailure "expected the persistent context default page"
 
 withAssetPage :: FilePath -> (Page -> Playwright a) -> IO a
 withAssetPage relativePath action =

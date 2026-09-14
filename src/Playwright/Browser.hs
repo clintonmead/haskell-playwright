@@ -11,6 +11,7 @@ module Playwright.Browser
   , newContext
   , newContextWith
   , onBrowserContext
+  , validateNewContextOptions
   , withPage
   , withPageWith
   ) where

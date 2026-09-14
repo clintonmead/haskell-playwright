@@ -101,6 +101,7 @@ library
       Playwright.Key
       Playwright.Keyboard
       Playwright.LaunchOptions
+      Playwright.LaunchPersistent
       Playwright.LoadState
       Playwright.Locale
       Playwright.Locator
@@ -244,6 +245,8 @@ test-suite playwright-test
       Playwright.BrowserTypeBasicSpec
       Playwright.CapabilitiesSpec
       Playwright.ConnectionSpec
+      Playwright.DefaultBrowserContext1Spec
+      Playwright.DefaultBrowserContext2Spec
       Playwright.DownloadSpec
       Playwright.ElementHandleBoundingBoxSpec
       Playwright.ElementHandleClickSpec
