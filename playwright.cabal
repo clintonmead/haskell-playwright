@@ -245,6 +245,7 @@ test-suite playwright-test
       Playwright.BrowserContextViewportSpec
       Playwright.BrowserSpec
       Playwright.BrowserTypeBasicSpec
+      Playwright.BrowserTypeLaunchSpec
       Playwright.CapabilitiesSpec
       Playwright.ConnectionSpec
       Playwright.DefaultBrowserContext1Spec

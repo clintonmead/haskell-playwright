@@ -34,6 +34,7 @@ import Playwright.BrowserContextUserAgentSpec qualified as BrowserContextUserAge
 import Playwright.BrowserContextViewportMobileSpec qualified as BrowserContextViewportMobileSpec
 import Playwright.BrowserContextViewportSpec qualified as BrowserContextViewportSpec
 import Playwright.BrowserTypeBasicSpec qualified as BrowserTypeBasicSpec
+import Playwright.BrowserTypeLaunchSpec qualified as BrowserTypeLaunchSpec
 import Playwright.CapabilitiesSpec qualified as CapabilitiesSpec
 import Playwright.ConnectionSpec qualified as ConnectionSpec
 import Playwright.DefaultBrowserContext1Spec qualified as DefaultBrowserContext1Spec
@@ -211,6 +212,7 @@ main =
         , BrowserContextViewportMobileSpec.tests
         , BrowserContextViewportSpec.tests
         , BrowserTypeBasicSpec.tests
+        , BrowserTypeLaunchSpec.tests
         , CapabilitiesSpec.tests
         , ConnectionSpec.tests
         , DefaultBrowserContext1Spec.tests

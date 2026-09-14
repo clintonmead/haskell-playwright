@@ -34,6 +34,7 @@ data LaunchOptions = LaunchOptions
   , launchOptionsSlowMo :: Maybe Timeout
   , launchOptionsProxy :: Maybe ProxySettings
   , launchOptionsDownloadsPath :: Maybe FilePath
+  , launchOptionsExecutablePath :: Maybe FilePath
   }
   deriving stock (Eq, Show)
   deriving (FromJSON, ToJSON) via (Autodocodec LaunchOptions)
@@ -47,12 +48,13 @@ defaultLaunchOptions =
     , launchOptionsSlowMo = Nothing
     , launchOptionsProxy = Nothing
     , launchOptionsDownloadsPath = Nothing
+    , launchOptionsExecutablePath = Nothing
     }
 
 instance HasCodec LaunchOptions where
   codec =
     object "LaunchOptions" $
-      ( \headless timeout sandbox slowMo proxy downloadsPath ->
+      ( \headless timeout sandbox slowMo proxy downloadsPath executablePath ->
           LaunchOptions
             { launchOptionsHeadless = headless
             , launchOptionsTimeout = timeout
@@ -60,6 +62,7 @@ instance HasCodec LaunchOptions where
             , launchOptionsSlowMo = slowMo
             , launchOptionsProxy = proxy
             , launchOptionsDownloadsPath = fmap unpack downloadsPath
+            , launchOptionsExecutablePath = fmap unpack executablePath
             }
       )
         <$> optionalField' "headless" .= launchOptionsHeadless
@@ -68,3 +71,4 @@ instance HasCodec LaunchOptions where
         <*> optionalField' "slowMo" .= launchOptionsSlowMo
         <*> optionalField' "proxy" .= launchOptionsProxy
         <*> optionalField' "downloadsPath" .= (fmap pack . launchOptionsDownloadsPath)
+        <*> optionalField' "executablePath" .= (fmap pack . launchOptionsExecutablePath)

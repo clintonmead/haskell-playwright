@@ -452,6 +452,7 @@ module Playwright
   , onLoad
   , onBrowserContext
   , onConsole
+  , onContextClose
   , onContextPage
   , onContextRequest
   , onContextRequestFailed
@@ -729,6 +730,7 @@ import Playwright.BrowserContext
   , grantPermissionsFor
   , isContextClosed
   , newPage
+  , onContextClose
   , onContextPage
   , pageContext
   , setContextDefaultNavigationTimeout
@@ -1088,7 +1090,7 @@ import Playwright.Keyboard
   , keyboardUp
   )
 import Playwright.LaunchOptions
-  ( LaunchOptions (LaunchOptions, launchOptionsChromiumSandbox, launchOptionsDownloadsPath, launchOptionsHeadless, launchOptionsProxy, launchOptionsSlowMo, launchOptionsTimeout)
+  ( LaunchOptions (LaunchOptions, launchOptionsChromiumSandbox, launchOptionsDownloadsPath, launchOptionsExecutablePath, launchOptionsHeadless, launchOptionsProxy, launchOptionsSlowMo, launchOptionsTimeout)
   , defaultLaunchOptions
   )
 import Playwright.LoadState

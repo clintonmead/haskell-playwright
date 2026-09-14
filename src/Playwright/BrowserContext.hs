@@ -16,6 +16,7 @@ module Playwright.BrowserContext
   , contextsEqual
   , contextRequest
   , isContextClosed
+  , onContextClose
   , onContextPage
   , grantPermissions
   , grantPermissionsFor
@@ -259,6 +260,13 @@ isContextClosed :: BrowserContext -> Playwright Bool
 isContextClosed ctx = do
   closed <- closedGuids
   pure (Set.member (channelGuid (browserContextChannel ctx)) closed)
+
+onContextClose :: BrowserContext -> Playwright () -> Playwright ()
+onContextClose ctx run =
+  registerEventHandler
+    (channelGuid (browserContextChannel ctx))
+    (MethodName "close")
+    (\_ -> run)
 
 onContextPage :: BrowserContext -> (Page -> Playwright ()) -> Playwright ()
 onContextPage ctx run =
