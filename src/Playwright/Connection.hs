@@ -7,10 +7,12 @@ module Playwright.Connection
   , registerEventHandler
   , registerEventWaiter
   , waitForChannelEvent
+  , waitForChannelEventUnlessClosed
   , waitForFutureChannelEvent
   , waitForFutureChannelEventUnlessClosed
   , registerFutureEventWaiter
   , waitForWaiter
+  , waitForWaiterUnlessClosed
   , rememberBrowserContext
   , lookupOwnedContextGuids
   , lookupContextBrowserGuid
@@ -377,9 +379,17 @@ waitForWaiter :: WaitId -> Playwright Value
 waitForWaiter waitId =
   inConnection (`Wait.waitForWaiter` waitId)
 
+waitForWaiterUnlessClosed :: WaitId -> Guid -> Playwright Value
+waitForWaiterUnlessClosed waitId closedGuid =
+  inConnection $ \conn -> Wait.waitForWaiterUnlessClosed conn waitId closedGuid
+
 waitForChannelEvent :: Guid -> MethodName -> Playwright Value
 waitForChannelEvent guid method =
   inConnection $ \conn -> Wait.waitForChannelEvent conn guid method
+
+waitForChannelEventUnlessClosed :: Guid -> MethodName -> Guid -> Playwright Value
+waitForChannelEventUnlessClosed eventGuid method closedGuid =
+  inConnection $ \conn -> Wait.waitForChannelEventUnlessClosed conn eventGuid method closedGuid
 
 waitForFutureChannelEvent :: Guid -> MethodName -> Playwright Value
 waitForFutureChannelEvent guid method =

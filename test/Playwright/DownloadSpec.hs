@@ -57,18 +57,22 @@ import Network.Wai.Handler.Warp
   )
 import Playwright
   ( AcceptDownloads (AcceptDownloadsAccept, AcceptDownloadsDeny)
+  , ClickOptions (clickOptionsModifiers)
   , Download
   , Exactness (Inexact)
   , Frame
+  , KeyboardModifier (KeyboardModifierAlt)
   , NewContextOptions (newContextAcceptDownloads)
   , Page
   , Playwright
   , UrlGlob (UrlGlob)
   , click
+  , clickWith
   , closeBrowser
   , closeContext
   , continueRoute
   , currentUrl
+  , defaultClickOptions
   , defaultGotoOptions
   , defaultNewContextOptions
   , downloadCancel
@@ -240,6 +244,19 @@ tests =
             click (locate page "a")
             download <- wait handle
             assertDownloadBody download
+    , testCase "should report alt-click downloads" $
+        withDownloadServer $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty")) defaultGotoOptions
+          setContent page ("<a href=\"" <> prefix <> "/download\">download</a>")
+          withAsync (waitForDownload page) $ \handle -> do
+            clickWith
+              (locate page "a")
+              defaultClickOptions {clickOptionsModifiers = Just [KeyboardModifierAlt]}
+            download <- wait handle
+            path <- downloadPath download
+            exists <- doesFileExist path
+            assertEqual "exists" True exists
+            assertFileBody path
     , testCase "should report new window downloads" $
         withDownloadServer $ \prefix page -> do
           download <-

@@ -35,7 +35,7 @@ import Playwright.CheckOptions
   ( CheckOptions (checkOptionsForce, checkOptionsTimeout, checkOptionsTrial)
   )
 import Playwright.ClickOptions
-  ( ClickOptions (clickOptionsForce, clickOptionsNoWaitAfter, clickOptionsPosition)
+  ( ClickOptions (clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition)
   , defaultClickOptions
   )
 import Playwright.CssPixel
@@ -69,6 +69,9 @@ import Playwright.Json.ProtocolBinary
 import Playwright.Key
   ( Key (keyToText)
   )
+import Playwright.KeyboardModifier
+  ( KeyboardModifier (KeyboardModifierAlt, KeyboardModifierControl, KeyboardModifierControlOrMeta, KeyboardModifierMeta, KeyboardModifierShift)
+  )
 import Playwright.MimeType
   ( mimeTypeToText
   )
@@ -82,7 +85,8 @@ import Playwright.Protocol
   , FrameBlurResult
   , FrameCheckParams (frameCheckParamsForce, frameCheckParamsStrict, frameCheckParamsTrial)
   , FrameCheckResult
-  , FrameClickParams (frameClickParamsForce, frameClickParamsNoWaitAfter, frameClickParamsPosition, frameClickParamsStrict)
+  , FrameClickParams (frameClickParamsForce, frameClickParamsModifiers, frameClickParamsNoWaitAfter, frameClickParamsPosition, frameClickParamsStrict)
+  , FrameClickParamsModifiers (FrameClickParamsModifiersAlt, FrameClickParamsModifiersControl, FrameClickParamsModifiersControlOrMeta, FrameClickParamsModifiersMeta, FrameClickParamsModifiersShift)
   , FrameClickResult
   , FrameDblclickParams (frameDblclickParamsStrict)
   , FrameDblclickResult
@@ -178,9 +182,24 @@ clickFrameWith frame selector timeout opts =
     (mkFrameClickParams selector timeout)
       { frameClickParamsStrict = Just True
       , frameClickParamsForce = clickOptionsForce opts
+      , frameClickParamsModifiers = fmap (fmap toFrameClickModifier) (clickOptionsModifiers opts)
       , frameClickParamsNoWaitAfter = clickOptionsNoWaitAfter opts
       , frameClickParamsPosition = fmap toProtocolPoint (clickOptionsPosition opts)
       }
+
+toFrameClickModifier :: KeyboardModifier -> FrameClickParamsModifiers
+toFrameClickModifier modifier =
+  case modifier of
+    KeyboardModifierAlt ->
+      FrameClickParamsModifiersAlt
+    KeyboardModifierControl ->
+      FrameClickParamsModifiersControl
+    KeyboardModifierControlOrMeta ->
+      FrameClickParamsModifiersControlOrMeta
+    KeyboardModifierMeta ->
+      FrameClickParamsModifiersMeta
+    KeyboardModifierShift ->
+      FrameClickParamsModifiersShift
 
 toProtocolPoint :: Point -> Protocol.Point
 toProtocolPoint point =

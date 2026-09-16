@@ -49,6 +49,7 @@ library
       Playwright.ConsoleMessage
       Playwright.ConsoleType
       Playwright.ContinueOptions
+      Playwright.Contrast
       Playwright.Cookie
       Playwright.CookieSameSite
       Playwright.CssPixel
@@ -73,6 +74,7 @@ library
       Playwright.Expose
       Playwright.FetchOptions
       Playwright.FileChooser
+      Playwright.ForcedColors
       Playwright.Frame
       Playwright.Frame.Action
       Playwright.Frame.Inspect
@@ -100,6 +102,7 @@ library
       Playwright.Json.ProtocolBinary
       Playwright.Key
       Playwright.Keyboard
+      Playwright.KeyboardModifier
       Playwright.LaunchOptions
       Playwright.LaunchPersistent
       Playwright.LoadState
@@ -127,6 +130,7 @@ library
       Playwright.Protocol
       Playwright.ProxySettings
       Playwright.RaceTimeout
+      Playwright.ReducedMotion
       Playwright.RegisterSelectorOptions
       Playwright.RemoteAddr
       Playwright.RemoteObject

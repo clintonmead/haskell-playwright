@@ -48,6 +48,7 @@ import Playwright
   , childLocator
   , click
   , clickWith
+  , closePageReason
   , defaultAddLocatorHandlerOptions
   , defaultClickOptions
   , defaultGetByRoleOptions
@@ -354,6 +355,16 @@ tests =
             assertEqual "blocked" 0 clicked2
             visible2 <- isVisible (locate page "#interstitial")
             assertEqual "visible" True visible2
+      , testCase "addLocatorHandler should throw when page closes" $
+          withHandleLocator $ \page -> do
+            addLocatorHandler page (getByText page "This interstitial covers the button" Inexact) $ \_ ->
+              closePageReason page "custom reason"
+            hover (locate page "#aside")
+            _ <-
+              evaluate
+                page
+                "() => { window.clicked = 0; window.setupAnnoyingInterstitial('mouseover', 1); }"
+            assertProtocolContains "custom reason" (click (locate page "#target"))
       ]
 
 coveredCases :: [(Text, Int, Maybe Text)]

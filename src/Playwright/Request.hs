@@ -1,6 +1,7 @@
 module Playwright.Request
   ( Request (..)
   , requestFromRef
+  , requestAllHeaders
   , requestFrameRef
   , requestFailure
   , requestHeaders
@@ -88,10 +89,12 @@ import Playwright.Protocol
   ( ChannelType (ChannelTypeRequest)
   , NameValue (nameValueName, nameValueValue)
   , RequestInitializer (requestInitializerFrame, requestInitializerHeaders, requestInitializerIsNavigationRequest, requestInitializerMethod, requestInitializerPostData, requestInitializerRedirectedFrom, requestInitializerResourceType, requestInitializerUrl)
+  , RequestRawRequestHeadersResult (requestRawRequestHeadersResultHeaders)
   , RequestResponseResult (requestResponseResultResponse)
   , RequestSizes (requestSizesRequestBodySize, requestSizesRequestHeadersSize, requestSizesResponseBodySize, requestSizesResponseHeadersSize)
   , ResponseInitializer (responseInitializerTiming)
   , ResponseSizesResult (responseSizesResultSizes)
+  , mkRequestRawRequestHeadersParams
   , mkRequestResponseParams
   , mkResponseSizesParams
   )
@@ -217,6 +220,15 @@ requestHeaders request = do
       pure headers
     Nothing ->
       fmap (fmap fromNameValue . requestInitializerHeaders) (requestInitializer request)
+
+requestAllHeaders :: Request -> Playwright [HttpHeader]
+requestAllHeaders request = do
+  result <-
+    send
+      (requestChannel request)
+      (MethodName "rawRequestHeaders")
+      mkRequestRawRequestHeadersParams
+  pure (fmap fromNameValue (requestRawRequestHeadersResultHeaders result))
 
 requestFrameRef :: Request -> Playwright (Maybe ChannelRef)
 requestFrameRef request =

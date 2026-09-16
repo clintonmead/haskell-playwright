@@ -49,7 +49,7 @@ import Playwright.Channel
   , send
   )
 import Playwright.ClickOptions
-  ( ClickOptions (clickOptionsForce, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsTimeout)
+  ( ClickOptions (clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsTimeout)
   , defaultClickOptions
   )
 import Playwright.CssPixel
@@ -79,6 +79,9 @@ import Playwright.Json.ProtocolBinary
   ( protocolBinaryFromByteString
   , protocolBinaryToByteString
   )
+import Playwright.KeyboardModifier
+  ( KeyboardModifier (KeyboardModifierAlt, KeyboardModifierControl, KeyboardModifierControlOrMeta, KeyboardModifierMeta, KeyboardModifierShift)
+  )
 import Playwright.MethodName
   ( MethodName (MethodName)
   )
@@ -89,7 +92,8 @@ import Playwright.Point
   )
 import Playwright.Protocol
   ( ElementHandleBoundingBoxResult (elementHandleBoundingBoxResultValue)
-  , ElementHandleClickParams (elementHandleClickParamsForce, elementHandleClickParamsNoWaitAfter, elementHandleClickParamsPosition)
+  , ElementHandleClickParams (elementHandleClickParamsForce, elementHandleClickParamsModifiers, elementHandleClickParamsNoWaitAfter, elementHandleClickParamsPosition)
+  , ElementHandleClickParamsModifiers (ElementHandleClickParamsModifiersAlt, ElementHandleClickParamsModifiersControl, ElementHandleClickParamsModifiersControlOrMeta, ElementHandleClickParamsModifiersMeta, ElementHandleClickParamsModifiersShift)
   , ElementHandleClickResult
   , ElementHandleDispatchEventResult
   , ElementHandleContentFrameResult (elementHandleContentFrameResultFrame)
@@ -179,10 +183,25 @@ clickHandleWith handle opts = do
       "click"
       (mkElementHandleClickParams timeout)
         { elementHandleClickParamsForce = clickOptionsForce opts
+        , elementHandleClickParamsModifiers = fmap (fmap toHandleClickModifier) (clickOptionsModifiers opts)
         , elementHandleClickParamsNoWaitAfter = clickOptionsNoWaitAfter opts
         , elementHandleClickParamsPosition = fmap toProtocolPoint (clickOptionsPosition opts)
         }
   pure ()
+
+toHandleClickModifier :: KeyboardModifier -> ElementHandleClickParamsModifiers
+toHandleClickModifier modifier =
+  case modifier of
+    KeyboardModifierAlt ->
+      ElementHandleClickParamsModifiersAlt
+    KeyboardModifierControl ->
+      ElementHandleClickParamsModifiersControl
+    KeyboardModifierControlOrMeta ->
+      ElementHandleClickParamsModifiersControlOrMeta
+    KeyboardModifierMeta ->
+      ElementHandleClickParamsModifiersMeta
+    KeyboardModifierShift ->
+      ElementHandleClickParamsModifiersShift
 
 dispatchEventHandle :: ElementHandle -> DomEventType -> Playwright ()
 dispatchEventHandle handle eventType =

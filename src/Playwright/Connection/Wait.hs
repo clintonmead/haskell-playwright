@@ -3,10 +3,12 @@ module Playwright.Connection.Wait
   , registerEventWaiter
   , registerFutureEventWaiter
   , waitForChannelEvent
+  , waitForChannelEventUnlessClosed
   , waitForFutureChannelEvent
   , waitForFutureChannelEventUnlessClosed
   , waitForLifecycle
   , waitForWaiter
+  , waitForWaiterUnlessClosed
   , waitUntilRemote
   , waitUntilRequestSettled
   , waitUntilUrl
@@ -165,10 +167,37 @@ waitForWaiter conn waitId = do
                 retry
   throwOutcome outcome
 
+waitForWaiterUnlessClosed :: Connection -> WaitId -> Guid -> IO Value
+waitForWaiterUnlessClosed conn waitId closedGuid = do
+  already <- atomically (Set.member closedGuid . sessionClosedGuids <$> readSession conn)
+  when already (throwIO targetClosedError)
+  closeId <- registerEventWaiter conn closedGuid (MethodName "close")
+  outcome <-
+    atomically $
+      withSession conn $ \session ->
+        case sessionClosed session of
+          Just err ->
+            pure (Left err, removeWaiter waitId (removeWaiter closeId session))
+          Nothing ->
+            case waiterValue session waitId of
+              Just params ->
+                pure (Right params, removeWaiter waitId (removeWaiter closeId session))
+              Nothing
+                | Set.member closedGuid (sessionClosedGuids session) || waiterFilled session closeId ->
+                    pure (Left targetClosedError, removeWaiter waitId (removeWaiter closeId session))
+                | otherwise ->
+                    retry
+  throwOutcome outcome
+
 waitForChannelEvent :: Connection -> Guid -> MethodName -> IO Value
 waitForChannelEvent conn guid method = do
   waitId <- registerEventWaiter conn guid method
   waitForWaiter conn waitId
+
+waitForChannelEventUnlessClosed :: Connection -> Guid -> MethodName -> Guid -> IO Value
+waitForChannelEventUnlessClosed conn eventGuid method closedGuid = do
+  waitId <- registerEventWaiter conn eventGuid method
+  waitForWaiterUnlessClosed conn waitId closedGuid
 
 waitForFutureChannelEvent :: Connection -> Guid -> MethodName -> IO Value
 waitForFutureChannelEvent conn guid method = do
@@ -280,4 +309,10 @@ waitUntilRequestSettled conn guid =
       Just err ->
         throwSTM err
       Nothing ->
-        unless (Set.member guid (sessionFinishedRequests session)) retry
+        if Set.member guid (sessionFinishedRequests session)
+          then pure ()
+          else case Map.lookup guid (sessionObjects session) of
+            Nothing ->
+              throwSTM targetClosedError
+            Just _ ->
+              retry

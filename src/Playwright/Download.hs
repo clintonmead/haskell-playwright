@@ -34,7 +34,7 @@ import Playwright.Channel
   )
 import Playwright.Connection
   ( registerEventWaiter
-  , waitForWaiter
+  , waitForWaiterUnlessClosed
   )
 import Playwright.Json.ChannelRef
   ( ChannelRef (channelRefGuid)
@@ -88,7 +88,7 @@ armDownload page = do
     guid = channelGuid (pageChannel page)
   waitId <- registerEventWaiter guid (MethodName "download")
   pure $ do
-    params <- waitForWaiter waitId
+    params <- waitForWaiterUnlessClosed waitId guid
     event <- throwDecode params
     pure
       ( Download

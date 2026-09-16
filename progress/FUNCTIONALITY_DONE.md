@@ -20,7 +20,8 @@ Core objects and the usual Page / Frame / Locator / ElementHandle / JSHandle / R
 - Network events: `onRequest` / `onResponse` / `onRequestFailed` / `onRequestFinished`, `waitForRequest` / `waitForResponse`, `page.requests`, sizes, `request.timing`, postData JSON, redirects.
 - Query: `querySelector` / `querySelectorAll` (`page.$` / `page.$$`), `evalOnSelectorBool`.
 - Downloads (`waitForDownload` / `downloadPath` / `downloadSaveAs` / `downloadDelete` / `downloadCancel` / `downloadFailure`), file chooser + `setInputFiles` payloads, PDF (`tagged`/`outline`), screenshot, workers, dialogs, console, pageerror, popups.
-- Locator click/fill/check/hover/select, `clickWith` (`noWaitAfter`, `force`, `position`, `timeout`), `clickHandleWith`, `dispatchEvent` / `dispatchEventWith` (`eventInit` as `SerializedArgument`), `dispatchEventHandle` / `dispatchEventHandleWith`, and `dropOnto` (in-memory file payloads and clipboard `data`; not host `localPaths`).
+- Locator click/fill/check/hover/select, `clickWith` (`noWaitAfter`, `force`, `position`, `timeout`, `modifiers`), `clickHandleWith`, `dispatchEvent` / `dispatchEventWith` (`eventInit` as `SerializedArgument`), `dispatchEventHandle` / `dispatchEventHandleWith`, and `dropOnto` (in-memory file payloads and clipboard `data`; not host `localPaths`).
+- Locator `filterHasText` / `filterHasNotText` / `filterHasTextRegex` (`internal:has-text=` / `internal:has-not-text=`). Page `closePageReason`. Context `reducedMotion` / `forcedColors` / `contrast` plus `emulateMedia` for those features. `waitForRequest` / `waitForResponse` / `waitForDownload` abort when the page closes. `requestAllHeaders` is `Request.rawRequestHeaders`.
 
 ## Official tests with a Haskell port
 

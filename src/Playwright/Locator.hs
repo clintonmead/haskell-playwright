@@ -19,6 +19,10 @@ module Playwright.Locator
   , elementHandle
   , elementHandles
   , fill
+  , filterHasNotText
+  , filterHasText
+  , filterHasTextRegex
+  , filterHasTextWith
   , filterVisible
   , first
   , focus
@@ -124,7 +128,7 @@ import Playwright.Error
   ( PlaywrightError (DecodeFailure)
   )
 import Playwright.Exactness
-  ( Exactness
+  ( Exactness (Inexact)
   )
 import Playwright.Frame
   ( Frame
@@ -175,6 +179,9 @@ import Playwright.GetBy
   , getByRoleSelector
   , getByTestIdSelector
   , getByTextSelector
+  , hasNotTextSelector
+  , hasTextRegexSelector
+  , hasTextSelector
   )
 import Playwright.GetByRoleOptions
   ( GetByRoleOptions
@@ -233,6 +240,22 @@ chainLocator parent inner =
 filterVisible :: Locator -> Bool -> Locator
 filterVisible loc visible =
   childLocator loc (selectorFromText ("visible=" <> if visible then "true" else "false"))
+
+filterHasText :: Locator -> Text -> Locator
+filterHasText loc text =
+  filterHasTextWith loc text Inexact
+
+filterHasTextWith :: Locator -> Text -> Exactness -> Locator
+filterHasTextWith loc text exactness =
+  childLocator loc (hasTextSelector text exactness)
+
+filterHasNotText :: Locator -> Text -> Locator
+filterHasNotText loc text =
+  childLocator loc (hasNotTextSelector text Inexact)
+
+filterHasTextRegex :: Locator -> Text -> Locator
+filterHasTextRegex loc source =
+  childLocator loc (hasTextRegexSelector source)
 
 describeLocator :: Locator -> Text -> Locator
 describeLocator loc description =

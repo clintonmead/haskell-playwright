@@ -40,6 +40,7 @@ module Playwright.Page
   , onPageClose
   , onPageCrash
   , closePageWith
+  , closePageReason
   , opener
   , pagesEqual
   , subscribeContext
@@ -153,7 +154,8 @@ import Playwright.RaceTimeout
   ( waitWithTimeout
   )
 import Playwright.Protocol
-  ( BrowserContextCloseResult
+  ( BrowserContextCloseParams (browserContextCloseParamsReason)
+  , BrowserContextCloseResult
   , BrowserContextUpdateSubscriptionParamsEvent
   , BrowserContextUpdateSubscriptionResult
   , FrameAddScriptTagParams (frameAddScriptTagParamsContent, frameAddScriptTagParamsType, frameAddScriptTagParamsUrl)
@@ -162,6 +164,7 @@ import Playwright.Protocol
   , FrameAddStyleTagResult (frameAddStyleTagResultElement)
   , PageAddInitScriptResult
   , PageBringToFrontResult
+  , PageCloseParams (pageCloseParamsReason)
   , PageCloseResult
   , PageRunBeforeUnloadResult
   , PageGoBackResult (pageGoBackResultResponse)
@@ -286,16 +289,27 @@ setDefaultNavigationTimeout page timeout =
 
 closePage :: Page -> Playwright ()
 closePage page =
-  closePageWith page False
+  closePageOpts page False Nothing
 
 closePageWith :: Page -> Bool -> Playwright ()
-closePageWith page runUnload = do
+closePageWith page runUnload =
+  closePageOpts page runUnload Nothing
+
+closePageReason :: Page -> Text -> Playwright ()
+closePageReason page reason =
+  closePageOpts page False (Just reason)
+
+closePageOpts :: Page -> Bool -> Maybe Text -> Playwright ()
+closePageOpts page runUnload reason = do
   ownsContext <- pageOwnsContext (channelGuid (pageChannel page))
   if ownsContext
     then
       ignoreTargetClosed $ do
         _ :: BrowserContextCloseResult <-
-          send (pageContextChannel page) (MethodName "close") mkBrowserContextCloseParams
+          send
+            (pageContextChannel page)
+            (MethodName "close")
+            mkBrowserContextCloseParams {browserContextCloseParamsReason = reason}
         pure ()
     else
       if runUnload
@@ -306,7 +320,10 @@ closePageWith page runUnload = do
         else
           ignoreTargetClosed $ do
             _ :: PageCloseResult <-
-              send (pageChannel page) (MethodName "close") mkPageCloseParams
+              send
+                (pageChannel page)
+                (MethodName "close")
+                mkPageCloseParams {pageCloseParamsReason = reason}
             pure ()
 
 isClosed :: Page -> Playwright Bool

@@ -3,6 +3,9 @@ module Playwright.GetBy
   , getByRoleSelector
   , getByTestIdSelector
   , getByTextSelector
+  , hasNotTextSelector
+  , hasTextRegexSelector
+  , hasTextSelector
   ) where
 
 import Data.Aeson
@@ -39,6 +42,18 @@ import Playwright.Selector
 getByTextSelector :: Text -> Exactness -> Selector
 getByTextSelector text exactness =
   selectorFromText ("internal:text=" <> escapeForTextSelector text exactness)
+
+hasTextSelector :: Text -> Exactness -> Selector
+hasTextSelector text exactness =
+  selectorFromText ("internal:has-text=" <> escapeForTextSelector text exactness)
+
+hasNotTextSelector :: Text -> Exactness -> Selector
+hasNotTextSelector text exactness =
+  selectorFromText ("internal:has-not-text=" <> escapeForTextSelector text exactness)
+
+hasTextRegexSelector :: Text -> Selector
+hasTextRegexSelector source =
+  selectorFromText ("internal:has-text=" <> source)
 
 getByLabelSelector :: Text -> Exactness -> Selector
 getByLabelSelector text exactness =

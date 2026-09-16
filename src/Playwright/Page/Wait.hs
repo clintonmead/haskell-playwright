@@ -8,6 +8,7 @@ module Playwright.Page.Wait
   , onLoad
   , onConsole
   , waitForConsole
+  , waitForConsoleWhere
   , waitForDialog
   , waitForFrameDetached
   , waitForFrameNavigated
@@ -54,6 +55,7 @@ import Playwright.Connection
   , registerEventWaiter
   , registerFutureEventWaiter
   , waitForChannelEvent
+  , waitForChannelEventUnlessClosed
   , waitForFutureChannelEvent
   , waitForWaiter
   , waitUntilUrl
@@ -362,6 +364,27 @@ waitForConsole page = do
   takeMessage <- armConsole page
   takeMessage
 
+waitForConsoleWhere :: Page -> (ConsoleMessage -> Bool) -> Playwright ConsoleMessage
+waitForConsoleWhere page predicate = do
+  timeout <- pageActionTimeout page
+  subscribeContext page BrowserContextUpdateSubscriptionParamsEventConsole
+  waitWithTimeout timeout collect
+  where
+    collect = do
+      params <-
+        waitForChannelEventUnlessClosed
+          (channelGuid (pageContextChannel page))
+          (MethodName "console")
+          (channelGuid (pageChannel page))
+      event <- throwDecode params
+      message <- consoleMessageFromEvent (pageContextChannel page) event
+      case consoleMessagePage message of
+        Just origin
+          | pagesEqual origin page && predicate message ->
+              pure message
+        _ ->
+          collect
+
 waitForResponse :: Page -> UrlGlob -> Playwright Response
 waitForResponse page glob = do
   timeout <- pageActionTimeout page
@@ -375,7 +398,11 @@ waitForResponseWith page glob timeout =
   where
     guid = channelGuid (pageContextChannel page)
     collectResponse = do
-      params <- waitForChannelEvent guid (MethodName "response")
+      params <-
+        waitForChannelEventUnlessClosed
+          guid
+          (MethodName "response")
+          (channelGuid (pageChannel page))
       event <- throwDecode params
       let response = responseFromRef (browserContextResponseEventResponse event)
       current <- responseUrl response
@@ -396,7 +423,11 @@ waitForRequestWith page glob timeout =
   where
     guid = channelGuid (pageContextChannel page)
     collectRequest = do
-      params <- waitForChannelEvent guid (MethodName "request")
+      params <-
+        waitForChannelEventUnlessClosed
+          guid
+          (MethodName "request")
+          (channelGuid (pageChannel page))
       event <- throwDecode params
       let request = requestFromRef (browserContextRequestEventRequest event)
       current <- requestUrl request

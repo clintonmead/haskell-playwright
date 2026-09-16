@@ -34,6 +34,8 @@ import Playwright
   , evaluateOnLocatorAllTexts
   , evaluateOnLocatorText
   , first
+  , filterHasText
+  , filterHasTextRegex
   , getAttribute
   , getByText
   , isVisible
@@ -229,6 +231,8 @@ tests =
           assertId page ":text-is(\"hello world\")" "me"
           attr <- getAttribute (getByText page "hello world" Exact) "id"
           assertEqual "getByText" (Just "me") attr
+          hasTextAttr <- getAttribute (filterHasText (locator page (selectorFromText "div")) "hello world") "id"
+          assertEqual "hasText" (Just "me") hasTextAttr
     , testCase "should work with text nodes in quoted mode" $
         withChromiumPage $ \page -> do
           setContent page "<div id=target1>Hello<span id=target2>wo  rld  </span>  Hi again  </div>"
@@ -288,6 +292,9 @@ tests =
           setContent page "<div id=me>hello\n  wo\"r>>ld</div>"
           assertId page "div:has-text(\"hello wo\\\"r>>ld\")" "me"
           assertId page "div:has-text(\"hello\\a wo\\\"r>>ld\")" "me"
+          newlineAttr <-
+            getAttribute (filterHasText (locator page (selectorFromText "div")) "hello\nwo\"r>>ld") "id"
+          assertEqual "hasText newline" (Just "me") newlineAttr
           assertProtocolContains "\"has-text\" engine expects a single string" (querySelector page (selectorFromText ":has-text(\"foo\", \"bar\")"))
           assertProtocolContains "\"has-text\" engine expects a single string" (querySelector page (selectorFromText ":has-text(foo > bar)"))
     , localOption (mkTimeout 30000000) $
@@ -442,10 +449,18 @@ tests =
           setContent page "<div id=div1>hello<span>world</span></div><div id=div2>hello</div>"
           assertEqual "helloworld" (Just "div1") =<< getAttribute (getByText page "helloworld" Exact) "id"
           assertEqual "hello" (Just "div2") =<< getAttribute (getByText page "hello" Exact) "id"
+          assertEqual "regex helloworld" (Just "div1")
+            =<< getAttribute (filterHasTextRegex (locator page (selectorFromText "div")) "/^helloworld$/") "id"
+          assertEqual "regex hello" (Just "div2")
+            =<< getAttribute (filterHasTextRegex (locator page (selectorFromText "div")) "/^hello$/") "id"
           setContent page "<div id=div1><span id=span1>hello</span>world</div><div id=div2><span id=span2>hello</span></div>"
           assertEqual "helloworld2" (Just "div1") =<< getAttribute (getByText page "helloworld" Exact) "id"
           ids <- evaluateOnLocatorAllTexts (getByText page "hello" Exact) "els => els.map(e => e.id)"
           assertEqual "spans" ["span1", "span2"] ids
+          assertEqual "regex helloworld2" (Just "div1")
+            =<< getAttribute (filterHasTextRegex (locator page (selectorFromText "div")) "/^helloworld$/") "id"
+          assertEqual "regex hello2" (Just "div2")
+            =<< getAttribute (filterHasTextRegex (locator page (selectorFromText "div")) "/^hello$/") "id"
     ]
 
 assertHtml :: Page -> Text -> Text -> Playwright ()

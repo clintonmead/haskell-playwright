@@ -14,8 +14,14 @@ import Playwright.AcceptDownloads
 import Playwright.ColorScheme
   ( ColorScheme (ColorSchemeDark, ColorSchemeLight, ColorSchemeNoOverride, ColorSchemeNoPreference)
   )
+import Playwright.Contrast
+  ( Contrast (ContrastMore, ContrastNoOverride, ContrastNoPreference)
+  )
 import Playwright.DeviceScaleFactor
   ( DeviceScaleFactor (deviceScaleFactorToScientific)
+  )
+import Playwright.ForcedColors
+  ( ForcedColors (ForcedColorsActive, ForcedColorsNoOverride, ForcedColorsNone)
   )
 import Playwright.Geolocation
   ( Accuracy (accuracyToScientific)
@@ -41,7 +47,7 @@ import Playwright.Locale
   ( Locale (localeToText)
   )
 import Playwright.NewContextOptions
-  ( NewContextOptions (newContextAcceptDownloads, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextGeolocation, newContextHasTouch, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextIsMobile, newContextJavaScriptEnabled, newContextLocale, newContextNoDefaultViewport, newContextOffline, newContextPermissions, newContextScreen, newContextServiceWorkers, newContextStrictSelectors, newContextTimezoneId, newContextUserAgent, newContextViewport)
+  ( NewContextOptions (newContextAcceptDownloads, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextContrast, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextForcedColors, newContextGeolocation, newContextHasTouch, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextIsMobile, newContextJavaScriptEnabled, newContextLocale, newContextNoDefaultViewport, newContextOffline, newContextPermissions, newContextReducedMotion, newContextScreen, newContextServiceWorkers, newContextStrictSelectors, newContextTimezoneId, newContextUserAgent, newContextViewport)
   )
 import Playwright.PermissionName
   ( PermissionName (permissionNameToText)
@@ -51,13 +57,16 @@ import Playwright.ProxySettings
   , ProxySettings (proxySettingsBypass, proxySettingsPassword, proxySettingsServer, proxySettingsUsername)
   )
 import Playwright.Protocol
-  ( BrowserTypeLaunchPersistentContextParams (browserTypeLaunchPersistentContextParamsAcceptDownloads, browserTypeLaunchPersistentContextParamsBaseURL, browserTypeLaunchPersistentContextParamsBypassCSP, browserTypeLaunchPersistentContextParamsChromiumSandbox, browserTypeLaunchPersistentContextParamsColorScheme, browserTypeLaunchPersistentContextParamsDeviceScaleFactor, browserTypeLaunchPersistentContextParamsDownloadsPath, browserTypeLaunchPersistentContextParamsExecutablePath, browserTypeLaunchPersistentContextParamsExtraHTTPHeaders, browserTypeLaunchPersistentContextParamsGeolocation, browserTypeLaunchPersistentContextParamsHasTouch, browserTypeLaunchPersistentContextParamsHeadless, browserTypeLaunchPersistentContextParamsHttpCredentials, browserTypeLaunchPersistentContextParamsIgnoreHTTPSErrors, browserTypeLaunchPersistentContextParamsIsMobile, browserTypeLaunchPersistentContextParamsJavaScriptEnabled, browserTypeLaunchPersistentContextParamsLocale, browserTypeLaunchPersistentContextParamsNoDefaultViewport, browserTypeLaunchPersistentContextParamsOffline, browserTypeLaunchPersistentContextParamsPermissions, browserTypeLaunchPersistentContextParamsProxy, browserTypeLaunchPersistentContextParamsScreen, browserTypeLaunchPersistentContextParamsSelectorEngines, browserTypeLaunchPersistentContextParamsServiceWorkers, browserTypeLaunchPersistentContextParamsSlowMo, browserTypeLaunchPersistentContextParamsStrictSelectors, browserTypeLaunchPersistentContextParamsTimezoneId, browserTypeLaunchPersistentContextParamsUserAgent, browserTypeLaunchPersistentContextParamsViewport)
+  ( BrowserTypeLaunchPersistentContextParams (browserTypeLaunchPersistentContextParamsAcceptDownloads, browserTypeLaunchPersistentContextParamsBaseURL, browserTypeLaunchPersistentContextParamsBypassCSP, browserTypeLaunchPersistentContextParamsChromiumSandbox, browserTypeLaunchPersistentContextParamsColorScheme, browserTypeLaunchPersistentContextParamsContrast, browserTypeLaunchPersistentContextParamsDeviceScaleFactor, browserTypeLaunchPersistentContextParamsDownloadsPath, browserTypeLaunchPersistentContextParamsExecutablePath, browserTypeLaunchPersistentContextParamsExtraHTTPHeaders, browserTypeLaunchPersistentContextParamsForcedColors, browserTypeLaunchPersistentContextParamsGeolocation, browserTypeLaunchPersistentContextParamsHasTouch, browserTypeLaunchPersistentContextParamsHeadless, browserTypeLaunchPersistentContextParamsHttpCredentials, browserTypeLaunchPersistentContextParamsIgnoreHTTPSErrors, browserTypeLaunchPersistentContextParamsIsMobile, browserTypeLaunchPersistentContextParamsJavaScriptEnabled, browserTypeLaunchPersistentContextParamsLocale, browserTypeLaunchPersistentContextParamsNoDefaultViewport, browserTypeLaunchPersistentContextParamsOffline, browserTypeLaunchPersistentContextParamsPermissions, browserTypeLaunchPersistentContextParamsProxy, browserTypeLaunchPersistentContextParamsReducedMotion, browserTypeLaunchPersistentContextParamsScreen, browserTypeLaunchPersistentContextParamsSelectorEngines, browserTypeLaunchPersistentContextParamsServiceWorkers, browserTypeLaunchPersistentContextParamsSlowMo, browserTypeLaunchPersistentContextParamsStrictSelectors, browserTypeLaunchPersistentContextParamsTimezoneId, browserTypeLaunchPersistentContextParamsUserAgent, browserTypeLaunchPersistentContextParamsViewport)
   , BrowserTypeLaunchPersistentContextParamsAcceptDownloads (BrowserTypeLaunchPersistentContextParamsAcceptDownloadsAccept, BrowserTypeLaunchPersistentContextParamsAcceptDownloadsDeny)
   , BrowserTypeLaunchPersistentContextParamsColorScheme (BrowserTypeLaunchPersistentContextParamsColorSchemeDark, BrowserTypeLaunchPersistentContextParamsColorSchemeLight, BrowserTypeLaunchPersistentContextParamsColorSchemeNoOverride, BrowserTypeLaunchPersistentContextParamsColorSchemeNoPreference)
+  , BrowserTypeLaunchPersistentContextParamsContrast (BrowserTypeLaunchPersistentContextParamsContrastMore, BrowserTypeLaunchPersistentContextParamsContrastNoOverride, BrowserTypeLaunchPersistentContextParamsContrastNoPreference)
+  , BrowserTypeLaunchPersistentContextParamsForcedColors (BrowserTypeLaunchPersistentContextParamsForcedColorsActive, BrowserTypeLaunchPersistentContextParamsForcedColorsNoOverride, BrowserTypeLaunchPersistentContextParamsForcedColorsNone)
   , BrowserTypeLaunchPersistentContextParamsGeolocation (browserTypeLaunchPersistentContextParamsGeolocationAccuracy)
   , BrowserTypeLaunchPersistentContextParamsHttpCredentials (browserTypeLaunchPersistentContextParamsHttpCredentialsOrigin, browserTypeLaunchPersistentContextParamsHttpCredentialsSend)
   , BrowserTypeLaunchPersistentContextParamsHttpCredentialsSend (BrowserTypeLaunchPersistentContextParamsHttpCredentialsSendAlways, BrowserTypeLaunchPersistentContextParamsHttpCredentialsSendUnauthorized)
   , BrowserTypeLaunchPersistentContextParamsProxy (browserTypeLaunchPersistentContextParamsProxyBypass, browserTypeLaunchPersistentContextParamsProxyPassword, browserTypeLaunchPersistentContextParamsProxyUsername)
+  , BrowserTypeLaunchPersistentContextParamsReducedMotion (BrowserTypeLaunchPersistentContextParamsReducedMotionNoOverride, BrowserTypeLaunchPersistentContextParamsReducedMotionNoPreference, BrowserTypeLaunchPersistentContextParamsReducedMotionReduce)
   , BrowserTypeLaunchPersistentContextParamsServiceWorkers (BrowserTypeLaunchPersistentContextParamsServiceWorkersAllow, BrowserTypeLaunchPersistentContextParamsServiceWorkersBlock)
   , SelectorEngine
   , mkBrowserTypeLaunchPersistentContextParams
@@ -68,6 +77,9 @@ import Playwright.Protocol
   , mkBrowserTypeLaunchPersistentContextParamsViewport
   , BrowserTypeLaunchPersistentContextParamsScreen
   , BrowserTypeLaunchPersistentContextParamsViewport
+  )
+import Playwright.ReducedMotion
+  ( ReducedMotion (ReducedMotionNoOverride, ReducedMotionNoPreference, ReducedMotionReduce)
   )
 import Playwright.ServiceWorkersPolicy
   ( ServiceWorkersPolicy (ServiceWorkersAllow, ServiceWorkersBlock)
@@ -101,11 +113,13 @@ toLaunchPersistentParams userDataDir launch opts engines =
     , browserTypeLaunchPersistentContextParamsBypassCSP = newContextBypassCSP opts
     , browserTypeLaunchPersistentContextParamsChromiumSandbox = launchOptionsChromiumSandbox launch
     , browserTypeLaunchPersistentContextParamsColorScheme = fmap toColor (newContextColorScheme opts)
+    , browserTypeLaunchPersistentContextParamsContrast = fmap toContrast (newContextContrast opts)
     , browserTypeLaunchPersistentContextParamsDeviceScaleFactor =
         fmap deviceScaleFactorToScientific (newContextDeviceScaleFactor opts)
     , browserTypeLaunchPersistentContextParamsDownloadsPath = fmap pack (launchOptionsDownloadsPath launch)
     , browserTypeLaunchPersistentContextParamsExecutablePath = fmap pack (launchOptionsExecutablePath launch)
     , browserTypeLaunchPersistentContextParamsExtraHTTPHeaders = fmap (fmap toNameValue) (newContextExtraHTTPHeaders opts)
+    , browserTypeLaunchPersistentContextParamsForcedColors = fmap toForced (newContextForcedColors opts)
     , browserTypeLaunchPersistentContextParamsGeolocation = fmap toGeo (newContextGeolocation opts)
     , browserTypeLaunchPersistentContextParamsHasTouch = newContextHasTouch opts
     , browserTypeLaunchPersistentContextParamsHeadless = launchOptionsHeadless launch
@@ -118,6 +132,7 @@ toLaunchPersistentParams userDataDir launch opts engines =
     , browserTypeLaunchPersistentContextParamsOffline = newContextOffline opts
     , browserTypeLaunchPersistentContextParamsPermissions = fmap (fmap permissionNameToText) (newContextPermissions opts)
     , browserTypeLaunchPersistentContextParamsProxy = fmap toLaunchProxy (launchOptionsProxy launch)
+    , browserTypeLaunchPersistentContextParamsReducedMotion = fmap toMotion (newContextReducedMotion opts)
     , browserTypeLaunchPersistentContextParamsScreen = fmap toScreen (newContextScreen opts)
     , browserTypeLaunchPersistentContextParamsSelectorEngines = listToMaybeEngines engines
     , browserTypeLaunchPersistentContextParamsServiceWorkers = fmap toWorkers (newContextServiceWorkers opts)
@@ -156,6 +171,36 @@ toColor scheme =
       BrowserTypeLaunchPersistentContextParamsColorSchemeNoPreference
     ColorSchemeNoOverride ->
       BrowserTypeLaunchPersistentContextParamsColorSchemeNoOverride
+
+toMotion :: ReducedMotion -> BrowserTypeLaunchPersistentContextParamsReducedMotion
+toMotion motion =
+  case motion of
+    ReducedMotionReduce ->
+      BrowserTypeLaunchPersistentContextParamsReducedMotionReduce
+    ReducedMotionNoPreference ->
+      BrowserTypeLaunchPersistentContextParamsReducedMotionNoPreference
+    ReducedMotionNoOverride ->
+      BrowserTypeLaunchPersistentContextParamsReducedMotionNoOverride
+
+toForced :: ForcedColors -> BrowserTypeLaunchPersistentContextParamsForcedColors
+toForced colors =
+  case colors of
+    ForcedColorsActive ->
+      BrowserTypeLaunchPersistentContextParamsForcedColorsActive
+    ForcedColorsNone ->
+      BrowserTypeLaunchPersistentContextParamsForcedColorsNone
+    ForcedColorsNoOverride ->
+      BrowserTypeLaunchPersistentContextParamsForcedColorsNoOverride
+
+toContrast :: Contrast -> BrowserTypeLaunchPersistentContextParamsContrast
+toContrast contrast =
+  case contrast of
+    ContrastNoPreference ->
+      BrowserTypeLaunchPersistentContextParamsContrastNoPreference
+    ContrastMore ->
+      BrowserTypeLaunchPersistentContextParamsContrastMore
+    ContrastNoOverride ->
+      BrowserTypeLaunchPersistentContextParamsContrastNoOverride
 
 toGeo :: Geolocation -> BrowserTypeLaunchPersistentContextParamsGeolocation
 toGeo location =

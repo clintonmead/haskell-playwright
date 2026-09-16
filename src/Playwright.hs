@@ -19,6 +19,7 @@ module Playwright
   , ClockTicks (..)
   , ClockTime (..)
   , ColorScheme (..)
+  , Contrast (..)
   , ConsoleMessage (..)
   , ConsoleType (..)
   , ContentType (..)
@@ -48,6 +49,7 @@ module Playwright
   , EmulateMedia (..)
   , Exactness (..)
   , FileChooser (..)
+  , ForcedColors (..)
   , FetchOptions (..)
   , FetchPostData (..)
   , FetchFormField (..)
@@ -74,6 +76,7 @@ module Playwright
   , InputFileName (..)
   , JsHandle (..)
   , Key (..)
+  , KeyboardModifier (..)
   , Latitude (..)
   , LaunchOptions (..)
   , LoadState (..)
@@ -98,6 +101,7 @@ module Playwright
   , ProxyHost (..)
   , ProxySettings (..)
   , RegisterSelectorOptions (..)
+  , ReducedMotion (..)
   , Request (..)
   , RequestFailure (..)
   , RemoteAddr (..)
@@ -213,6 +217,7 @@ module Playwright
   , closeContext
   , closeContextWith
   , closePage
+  , closePageReason
   , closePageWith
   , content
   , contentFrameHandle
@@ -361,6 +366,10 @@ module Playwright
   , disposeAPIRequestContext
   , fill
   , fillHandle
+  , filterHasNotText
+  , filterHasText
+  , filterHasTextRegex
+  , filterHasTextWith
   , filterVisible
   , firefox
   , first
@@ -515,6 +524,7 @@ module Playwright
   , registerSelector
   , registerSelectorWith
   , requestFrame
+  , requestAllHeaders
   , requestFailure
   , requestGC
   , requestHeaders
@@ -603,6 +613,7 @@ module Playwright
   , waitFor
   , waitForClose
   , waitForConsole
+  , waitForConsoleWhere
   , waitForContextClose
   , waitForContextConsole
   , waitForContextDialog
@@ -782,7 +793,7 @@ import Playwright.ClearCookiesOptions
   , defaultClearCookiesOptions
   )
 import Playwright.ClickOptions
-  ( ClickOptions (ClickOptions, clickOptionsForce, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsTimeout)
+  ( ClickOptions (ClickOptions, clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsTimeout)
   , defaultClickOptions
   )
 import Playwright.Clock
@@ -801,6 +812,9 @@ import Playwright.Clock
   )
 import Playwright.ColorScheme
   ( ColorScheme (ColorSchemeDark, ColorSchemeLight, ColorSchemeNoOverride, ColorSchemeNoPreference)
+  )
+import Playwright.Contrast
+  ( Contrast (ContrastMore, ContrastNoOverride, ContrastNoPreference)
   )
 import Playwright.ConsoleMessage
   ( ConsoleMessage (ConsoleMessage, consoleMessageArgs, consoleMessagePage, consoleMessageText, consoleMessageType)
@@ -922,7 +936,7 @@ import Playwright.ElementState
   ( ElementState (ElementDisabled, ElementEditable, ElementEnabled, ElementHidden, ElementStable, ElementVisible)
   )
 import Playwright.EmulateMedia
-  ( EmulateMedia (EmulateMedia, emulateMediaColorScheme, emulateMediaType)
+  ( EmulateMedia (EmulateMedia, emulateMediaColorScheme, emulateMediaContrast, emulateMediaForcedColors, emulateMediaReducedMotion, emulateMediaType)
   , defaultEmulateMedia
   , emulateMedia
   )
@@ -1006,6 +1020,9 @@ import Playwright.FileChooser
   , waitForFileChooser
   , waitForFileChooserWith
   )
+import Playwright.ForcedColors
+  ( ForcedColors (ForcedColorsActive, ForcedColorsNoOverride, ForcedColorsNone)
+  )
 import Playwright.Frame
   ( Frame (Frame, frameChannel, frameParent, frameUrl)
   , childFrames
@@ -1042,6 +1059,9 @@ import Playwright.AddLocatorHandlerOptions
   ( AddLocatorHandlerOptions (AddLocatorHandlerOptions, addLocatorHandlerNoWaitAfter, addLocatorHandlerTimes)
   , LocatorHandlerTimes (LocatorHandlerTimes, locatorHandlerTimesToInt)
   , defaultAddLocatorHandlerOptions
+  )
+import Playwright.ReducedMotion
+  ( ReducedMotion (ReducedMotionNoOverride, ReducedMotionNoPreference, ReducedMotionReduce)
   )
 import Playwright.RegisterSelectorOptions
   ( RegisterSelectorOptions (RegisterSelectorOptions, registerSelectorContentScript)
@@ -1115,6 +1135,9 @@ import Playwright.Keyboard
   , keyboardType
   , keyboardUp
   )
+import Playwright.KeyboardModifier
+  ( KeyboardModifier (KeyboardModifierAlt, KeyboardModifierControl, KeyboardModifierControlOrMeta, KeyboardModifierMeta, KeyboardModifierShift)
+  )
 import Playwright.LaunchOptions
   ( LaunchOptions (LaunchOptions, launchOptionsChromiumSandbox, launchOptionsDownloadsPath, launchOptionsExecutablePath, launchOptionsHeadless, launchOptionsProxy, launchOptionsSlowMo, launchOptionsTimeout)
   , defaultLaunchOptions
@@ -1146,6 +1169,10 @@ import Playwright.Locator
   , elementHandle
   , elementHandles
   , fill
+  , filterHasNotText
+  , filterHasText
+  , filterHasTextRegex
+  , filterHasTextWith
   , filterVisible
   , first
   , focus
@@ -1210,7 +1237,7 @@ import Playwright.MimeType
   ( MimeType (MimeType, mimeTypeToText)
   )
 import Playwright.NewContextOptions
-  ( NewContextOptions (NewContextOptions, newContextAcceptDownloads, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextGeolocation, newContextHasTouch, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextIsMobile, newContextJavaScriptEnabled, newContextLocale, newContextNoDefaultViewport, newContextOffline, newContextPermissions, newContextProxy, newContextScreen, newContextServiceWorkers, newContextStorageState, newContextStrictSelectors, newContextTimezoneId, newContextUserAgent, newContextViewport)
+  ( NewContextOptions (NewContextOptions, newContextAcceptDownloads, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextContrast, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextForcedColors, newContextGeolocation, newContextHasTouch, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextIsMobile, newContextJavaScriptEnabled, newContextLocale, newContextNoDefaultViewport, newContextOffline, newContextPermissions, newContextProxy, newContextReducedMotion, newContextScreen, newContextServiceWorkers, newContextStorageState, newContextStrictSelectors, newContextTimezoneId, newContextUserAgent, newContextViewport)
   , defaultNewContextOptions
   )
 import Playwright.NewRequestOptions
@@ -1229,6 +1256,7 @@ import Playwright.Page
   , addStyleTag
   , bringToFront
   , closePage
+  , closePageReason
   , closePageWith
   , content
   , getByLabel
@@ -1280,6 +1308,7 @@ import Playwright.Page.Wait
   , onLoad
   , onConsole
   , waitForConsole
+  , waitForConsoleWhere
   , waitForDialog
   , waitForFunction
   , waitForFunctionOnFrame
@@ -1367,6 +1396,7 @@ import Playwright.ProxySettings
   )
 import Playwright.Request
   ( Request (Request, requestChannel)
+  , requestAllHeaders
   , requestFailure
   , requestHeaders
   , requestIsNavigation

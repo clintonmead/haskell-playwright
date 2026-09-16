@@ -17,16 +17,19 @@ import Playwright
   ( AriaRole (AriaRole)
   , BrowserContext
   , ColorScheme (ColorSchemeDark)
+  , Contrast (ContrastMore)
+  , ForcedColors (ForcedColorsActive)
   , Geolocation (Geolocation, geolocationAccuracy, geolocationLatitude, geolocationLongitude)
   , GetByRoleOptions (getByRoleName)
   , HeaderName (HeaderName, headerNameToText)
   , HeaderValue (HeaderValue, headerValueToText)
   , HttpHeader (HttpHeader, httpHeaderName, httpHeaderValue)
   , Locale (Locale)
-  , NewContextOptions (newContextColorScheme, newContextExtraHTTPHeaders, newContextGeolocation, newContextHasTouch, newContextIsMobile, newContextLocale, newContextPermissions, newContextTimezoneId, newContextViewport)
+  , NewContextOptions (newContextColorScheme, newContextContrast, newContextExtraHTTPHeaders, newContextForcedColors, newContextGeolocation, newContextHasTouch, newContextIsMobile, newContextLocale, newContextPermissions, newContextReducedMotion, newContextTimezoneId, newContextViewport)
   , Page
   , PermissionName (PermissionName)
   , Playwright
+  , ReducedMotion (ReducedMotionReduce)
   , TimezoneId (TimezoneId)
   , UrlGlob (UrlGlob)
   , ViewportHeight (ViewportHeight)
@@ -126,6 +129,30 @@ tests =
               =<< evaluateBool page "() => matchMedia('(prefers-color-scheme: light)').matches"
             assertEqual "dark" True
               =<< evaluateBool page "() => matchMedia('(prefers-color-scheme: dark)').matches"
+    , testCase "should support reducedMotion option" $
+        withPersistentContextWith
+          defaultNewContextOptions {newContextReducedMotion = Just ReducedMotionReduce}
+          $ \_ page -> do
+            assertEqual "reduce" True
+              =<< evaluateBool page "() => matchMedia('(prefers-reduced-motion: reduce)').matches"
+            assertEqual "no preference" False
+              =<< evaluateBool page "() => matchMedia('(prefers-reduced-motion: no-preference)').matches"
+    , testCase "should support forcedColors option" $
+        withPersistentContextWith
+          defaultNewContextOptions {newContextForcedColors = Just ForcedColorsActive}
+          $ \_ page -> do
+            assertEqual "active" True
+              =<< evaluateBool page "() => matchMedia('(forced-colors: active)').matches"
+            assertEqual "none" False
+              =<< evaluateBool page "() => matchMedia('(forced-colors: none)').matches"
+    , testCase "should support contrast option" $
+        withPersistentContextWith
+          defaultNewContextOptions {newContextContrast = Just ContrastMore}
+          $ \_ page -> do
+            assertEqual "more" True
+              =<< evaluateBool page "() => matchMedia('(prefers-contrast: more)').matches"
+            assertEqual "no preference" False
+              =<< evaluateBool page "() => matchMedia('(prefers-contrast: no-preference)').matches"
     , testCase "should support timezoneId option" $
         withPersistentContextWith
           defaultNewContextOptions

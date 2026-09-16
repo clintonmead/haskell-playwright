@@ -3,13 +3,20 @@ module Playwright.PageClickSpec
   ) where
 
 import Playwright
-  ( click
+  ( ClickOptions (clickOptionsModifiers)
+  , Key (Key)
+  , KeyboardModifier (KeyboardModifierShift)
+  , click
+  , clickWith
+  , defaultClickOptions
   , defaultGotoOptions
   , evaluate
   , evaluateBool
   , evaluateNumber
   , evaluateText
   , goto
+  , keyboardDown
+  , keyboardUp
   , setContent
   , urlFromText
   )
@@ -99,4 +106,18 @@ tests =
             "<style>i { position: absolute; top: -1000px; }</style><span onclick='window.CLICKED = 42;'><i>woof</i><b>doggo</b></span>"
           click (locate page "span")
           assertEqual "clicked" (42 :: Double) =<< evaluateNumber page "() => window.CLICKED"
+    , testCase "should update modifiers correctly" $
+        withAssetPage "input/button.html" $ \page -> do
+          clickWith (locate page "button") defaultClickOptions {clickOptionsModifiers = Just [KeyboardModifierShift]}
+          assertEqual "shift" True =<< evaluateBool page "() => shiftKey"
+          clickWith (locate page "button") defaultClickOptions {clickOptionsModifiers = Just []}
+          assertEqual "cleared" False =<< evaluateBool page "() => shiftKey"
+          keyboardDown page (Key "Shift")
+          clickWith (locate page "button") defaultClickOptions {clickOptionsModifiers = Just []}
+          assertEqual "override" False =<< evaluateBool page "() => shiftKey"
+          click (locate page "button")
+          assertEqual "held" True =<< evaluateBool page "() => shiftKey"
+          keyboardUp page (Key "Shift")
+          click (locate page "button")
+          assertEqual "released" False =<< evaluateBool page "() => shiftKey"
     ]
