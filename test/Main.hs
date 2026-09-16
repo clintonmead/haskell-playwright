@@ -17,6 +17,7 @@ import Playwright.BrowserContextDeviceSpec qualified as BrowserContextDeviceSpec
 import Playwright.BrowserContextDsfSpec qualified as BrowserContextDsfSpec
 import Playwright.BrowserContextEventsSpec qualified as BrowserContextEventsSpec
 import Playwright.BrowserContextExposeFunctionSpec qualified as BrowserContextExposeFunctionSpec
+import Playwright.BrowserContextFetchAlgorithmsSpec qualified as BrowserContextFetchAlgorithmsSpec
 import Playwright.BrowserContextFetchSpec qualified as BrowserContextFetchSpec
 import Playwright.BrowserContextJavaScriptSpec qualified as BrowserContextJavaScriptSpec
 import Playwright.BrowserContextLocaleSpec qualified as BrowserContextLocaleSpec
@@ -201,6 +202,7 @@ main =
         , BrowserContextDsfSpec.tests
         , BrowserContextEventsSpec.tests
         , BrowserContextExposeFunctionSpec.tests
+        , BrowserContextFetchAlgorithmsSpec.tests
         , BrowserContextFetchSpec.tests
         , BrowserContextJavaScriptSpec.tests
         , BrowserContextLocaleSpec.tests

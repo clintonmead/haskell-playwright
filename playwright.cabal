@@ -234,6 +234,7 @@ test-suite playwright-test
       Playwright.BrowserContextDsfSpec
       Playwright.BrowserContextEventsSpec
       Playwright.BrowserContextExposeFunctionSpec
+      Playwright.BrowserContextFetchAlgorithmsSpec
       Playwright.BrowserContextFetchSpec
       Playwright.BrowserContextJavaScriptSpec
       Playwright.BrowserContextLocaleSpec
