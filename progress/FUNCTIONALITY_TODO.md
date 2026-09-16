@@ -30,7 +30,7 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 - **page-goto:** bad SSL (and after redirects / cross-origin); `networkidle2` invalid option (typed `LoadState` has no such constructor); Node `process` leak-listener tests; raw main-resource buffer (official Chromium fail); error message that includes HTTPS URL.
 - **page-autowaiting-no-hang:** first official case needs `httpsServer`. In-flight abort uses Warp throwing `ResourceVanished` (Node `socket.destroy()`).
 - **page-autowaiting-basic:** skip official internal hooks / expect call-log tests.
-- **page-click-scroll:** skip official Chromium fixme `display:contents` + `position` (`DOM.getBoxModel`).
+- **page-click:** skip Chromium-fixme fixed-position iframe, Node `__testHook*` navigation/detachment hooks, trial-run / noAutoWaiting internals, permission-popup overlay, and tweened-mouse cases. Click `button` / `clickCount` / offset / iframe / checkbox / offscreen / wait-for-visible are ported.
 - **page-click-timeout-1 / 3 / 4:** skip `__testHookBeforePointerAction` / `__testHookBeforeHitTarget` cases (Node-only internals). Protocol timeout errors are `Timeout <n>ms exceeded` (the JS client wraps call-log text such as “element is not enabled”).
 - **selectors-text:** skip locator regex `hasText` that needs extra escaping beyond `/pattern/flags`. String `hasText` and simple `/^…$/` filters are ported.
 - **selectors-role:** skip `getByRole` regex `name` (locator `role=…[name=/…/]` is covered). Skip `description`.

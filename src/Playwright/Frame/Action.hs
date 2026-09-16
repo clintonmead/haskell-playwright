@@ -35,7 +35,7 @@ import Playwright.CheckOptions
   ( CheckOptions (checkOptionsForce, checkOptionsTimeout, checkOptionsTrial)
   )
 import Playwright.ClickOptions
-  ( ClickOptions (clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition)
+  ( ClickOptions (clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition)
   , defaultClickOptions
   )
 import Playwright.CssPixel
@@ -75,6 +75,9 @@ import Playwright.KeyboardModifier
 import Playwright.MimeType
   ( mimeTypeToText
   )
+import Playwright.MouseButton
+  ( MouseButton (MouseButtonLeft, MouseButtonMiddle, MouseButtonRight)
+  )
 import Playwright.Point
   ( Point
   , pointX
@@ -85,7 +88,8 @@ import Playwright.Protocol
   , FrameBlurResult
   , FrameCheckParams (frameCheckParamsForce, frameCheckParamsStrict, frameCheckParamsTrial)
   , FrameCheckResult
-  , FrameClickParams (frameClickParamsForce, frameClickParamsModifiers, frameClickParamsNoWaitAfter, frameClickParamsPosition, frameClickParamsStrict)
+  , FrameClickParams (frameClickParamsButton, frameClickParamsClickCount, frameClickParamsForce, frameClickParamsModifiers, frameClickParamsNoWaitAfter, frameClickParamsPosition, frameClickParamsStrict)
+  , FrameClickParamsButton (FrameClickParamsButtonLeft, FrameClickParamsButtonMiddle, FrameClickParamsButtonRight)
   , FrameClickParamsModifiers (FrameClickParamsModifiersAlt, FrameClickParamsModifiersControl, FrameClickParamsModifiersControlOrMeta, FrameClickParamsModifiersMeta, FrameClickParamsModifiersShift)
   , FrameClickResult
   , FrameDblclickParams (frameDblclickParamsStrict)
@@ -181,11 +185,23 @@ clickFrameWith frame selector timeout opts =
     "click"
     (mkFrameClickParams selector timeout)
       { frameClickParamsStrict = Just True
+      , frameClickParamsButton = fmap toFrameClickButton (clickOptionsButton opts)
+      , frameClickParamsClickCount = clickOptionsClickCount opts
       , frameClickParamsForce = clickOptionsForce opts
       , frameClickParamsModifiers = fmap (fmap toFrameClickModifier) (clickOptionsModifiers opts)
       , frameClickParamsNoWaitAfter = clickOptionsNoWaitAfter opts
       , frameClickParamsPosition = fmap toProtocolPoint (clickOptionsPosition opts)
       }
+
+toFrameClickButton :: MouseButton -> FrameClickParamsButton
+toFrameClickButton button =
+  case button of
+    MouseButtonLeft ->
+      FrameClickParamsButtonLeft
+    MouseButtonRight ->
+      FrameClickParamsButtonRight
+    MouseButtonMiddle ->
+      FrameClickParamsButtonMiddle
 
 toFrameClickModifier :: KeyboardModifier -> FrameClickParamsModifiers
 toFrameClickModifier modifier =

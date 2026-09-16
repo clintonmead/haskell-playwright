@@ -6,6 +6,9 @@ module Playwright.ClickOptions
 import Playwright.KeyboardModifier
   ( KeyboardModifier
   )
+import Playwright.MouseButton
+  ( MouseButton
+  )
 import Playwright.Point
   ( Point
   )
@@ -14,7 +17,9 @@ import Playwright.Timeout
   )
 
 data ClickOptions = ClickOptions
-  { clickOptionsForce :: Maybe Bool
+  { clickOptionsButton :: Maybe MouseButton
+  , clickOptionsClickCount :: Maybe Int
+  , clickOptionsForce :: Maybe Bool
   , clickOptionsModifiers :: Maybe [KeyboardModifier]
   , clickOptionsNoWaitAfter :: Maybe Bool
   , clickOptionsPosition :: Maybe Point
@@ -25,7 +30,9 @@ data ClickOptions = ClickOptions
 defaultClickOptions :: ClickOptions
 defaultClickOptions =
   ClickOptions
-    { clickOptionsForce = Nothing
+    { clickOptionsButton = Nothing
+    , clickOptionsClickCount = Nothing
+    , clickOptionsForce = Nothing
     , clickOptionsModifiers = Nothing
     , clickOptionsNoWaitAfter = Nothing
     , clickOptionsPosition = Nothing

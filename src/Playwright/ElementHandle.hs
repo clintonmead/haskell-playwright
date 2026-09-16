@@ -49,7 +49,7 @@ import Playwright.Channel
   , send
   )
 import Playwright.ClickOptions
-  ( ClickOptions (clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsTimeout)
+  ( ClickOptions (clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsTimeout)
   , defaultClickOptions
   )
 import Playwright.CssPixel
@@ -85,6 +85,9 @@ import Playwright.KeyboardModifier
 import Playwright.MethodName
   ( MethodName (MethodName)
   )
+import Playwright.MouseButton
+  ( MouseButton (MouseButtonLeft, MouseButtonMiddle, MouseButtonRight)
+  )
 import Playwright.Point
   ( Point
   , pointX
@@ -92,7 +95,8 @@ import Playwright.Point
   )
 import Playwright.Protocol
   ( ElementHandleBoundingBoxResult (elementHandleBoundingBoxResultValue)
-  , ElementHandleClickParams (elementHandleClickParamsForce, elementHandleClickParamsModifiers, elementHandleClickParamsNoWaitAfter, elementHandleClickParamsPosition)
+  , ElementHandleClickParams (elementHandleClickParamsButton, elementHandleClickParamsClickCount, elementHandleClickParamsForce, elementHandleClickParamsModifiers, elementHandleClickParamsNoWaitAfter, elementHandleClickParamsPosition)
+  , ElementHandleClickParamsButton (ElementHandleClickParamsButtonLeft, ElementHandleClickParamsButtonMiddle, ElementHandleClickParamsButtonRight)
   , ElementHandleClickParamsModifiers (ElementHandleClickParamsModifiersAlt, ElementHandleClickParamsModifiersControl, ElementHandleClickParamsModifiersControlOrMeta, ElementHandleClickParamsModifiersMeta, ElementHandleClickParamsModifiersShift)
   , ElementHandleClickResult
   , ElementHandleDispatchEventResult
@@ -182,12 +186,24 @@ clickHandleWith handle opts = do
       handle
       "click"
       (mkElementHandleClickParams timeout)
-        { elementHandleClickParamsForce = clickOptionsForce opts
+        { elementHandleClickParamsButton = fmap toHandleClickButton (clickOptionsButton opts)
+        , elementHandleClickParamsClickCount = clickOptionsClickCount opts
+        , elementHandleClickParamsForce = clickOptionsForce opts
         , elementHandleClickParamsModifiers = fmap (fmap toHandleClickModifier) (clickOptionsModifiers opts)
         , elementHandleClickParamsNoWaitAfter = clickOptionsNoWaitAfter opts
         , elementHandleClickParamsPosition = fmap toProtocolPoint (clickOptionsPosition opts)
         }
   pure ()
+
+toHandleClickButton :: MouseButton -> ElementHandleClickParamsButton
+toHandleClickButton button =
+  case button of
+    MouseButtonLeft ->
+      ElementHandleClickParamsButtonLeft
+    MouseButtonRight ->
+      ElementHandleClickParamsButtonRight
+    MouseButtonMiddle ->
+      ElementHandleClickParamsButtonMiddle
 
 toHandleClickModifier :: KeyboardModifier -> ElementHandleClickParamsModifiers
 toHandleClickModifier modifier =
