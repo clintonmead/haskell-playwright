@@ -12,7 +12,8 @@ import Data.CaseInsensitive
   ( mk
   )
 import Data.Maybe
-  ( isJust
+  ( fromMaybe
+  , isJust
   , isNothing
   )
 import Data.Text
@@ -20,14 +21,19 @@ import Data.Text
   , intercalate
   , isInfixOf
   , isSuffixOf
+  , pack
   , replace
+  , unpack
   )
 import Network.HTTP.Types
   ( RequestHeaders
   , hAuthorization
   , hContentType
+  , hLocation
   , status200
+  , status302
   , status401
+  , status404
   )
 import Network.Wai
   ( Application
@@ -90,6 +96,7 @@ import Playwright
   , requestUrl
   , responseFromServiceWorker
   , responseUrl
+  , route
   , routeRequest
   , serviceWorkers
   , setContextExtraHTTPHeaders
@@ -477,6 +484,17 @@ tests =
               _ <- evaluate page "() => window['activationPromise']"
               assertEqual "status" (200 :: Double)
                 =<< evaluateOnWorkerNumber worker "() => fetch('/empty.html').then(r => r.status)"
+    , testCase "Page.route should work with intervention headers" $ do
+        captured <- newEmptyMVar
+        withChromiumContext $ \_ctx page ->
+          withLocalApp (interventionApp captured) $ \prefix -> do
+            route page (UrlGlob "*") continueRoute
+            _ <- goto page (urlFromText (prefix <> "/intervention")) defaultGotoOptions
+            headers <- takeMVarTimed captured
+            let
+              header = lookup (mk (BS8.pack "intervention")) headers
+            assertBool "intervention header" $
+              maybe False (BS8.isInfixOf (BS8.pack "feature/5718547946799104")) header
     ]
 
 urlEndsWith :: Text -> Request -> Playwright Bool
@@ -569,3 +587,30 @@ fetchAuthApp assets request respond =
               )
           else
             staticApp (defaultFileServerSettings assets) request respond
+
+interventionApp :: MVar RequestHeaders -> Application
+interventionApp captured request respond =
+  case pathInfo request of
+    ["intervention"] -> do
+      let
+        host = fromMaybe (BS8.pack "127.0.0.1") (lookup (mk (BS8.pack "host")) (requestHeaders request))
+        cross = "http://" <> unpack (replace "127.0.0.1" "localhost" (pack (BS8.unpack host)))
+        html =
+          LBS8.pack
+            ( "<script>document.write('<script src=\""
+                <> cross
+                <> "/intervention.js\"></scr' + 'ipt>');</script>"
+            )
+      respond (responseLBS status200 [(hContentType, "text/html")] html)
+    ["intervention.js"] ->
+      respond (responseLBS status302 [(hLocation, "/redirect.js")] LBS8.empty)
+    ["redirect.js"] -> do
+      putMVar captured (requestHeaders request)
+      respond
+        ( responseLBS
+            status200
+            [(hContentType, "text/javascript")]
+            (LBS8.pack "console.log(1);")
+        )
+    _ ->
+      respond (responseLBS status404 [] LBS8.empty)
