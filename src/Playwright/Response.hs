@@ -8,6 +8,7 @@ module Playwright.Response
   , responseStatusText
   , responseText
   , responseUrl
+  , responseFromServiceWorker
   , requestResponse
   ) where
 
@@ -52,7 +53,7 @@ import Playwright.MethodName
 import Playwright.Protocol
   ( NameValue (nameValueName, nameValueValue)
   , ResponseBodyResult (responseBodyResultBinary)
-  , ResponseInitializer (responseInitializerHeaders, responseInitializerRequest, responseInitializerStatus, responseInitializerStatusText, responseInitializerUrl)
+  , ResponseInitializer (responseInitializerFromServiceWorker, responseInitializerHeaders, responseInitializerRequest, responseInitializerStatus, responseInitializerStatusText, responseInitializerUrl)
   , mkResponseBodyParams
   )
 import Playwright.RemoteObject
@@ -109,6 +110,10 @@ responseHeaders response =
 responseOk :: Response -> Playwright Bool
 responseOk response =
   httpStatusOk <$> responseStatus response
+
+responseFromServiceWorker :: Response -> Playwright Bool
+responseFromServiceWorker response =
+  responseInitializerFromServiceWorker <$> responseInitializer response
 
 responseText :: Response -> Playwright Text
 responseText response = do

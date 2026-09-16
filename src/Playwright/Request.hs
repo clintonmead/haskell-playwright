@@ -13,6 +13,7 @@ module Playwright.Request
   , requestRedirectedTo
   , requestResourceType
   , requestResponseRef
+  , requestServiceWorkerRef
   , requestSizes
   , requestTiming
   , requestUrl
@@ -88,7 +89,7 @@ import Playwright.NetworkSizes
 import Playwright.Protocol
   ( ChannelType (ChannelTypeRequest)
   , NameValue (nameValueName, nameValueValue)
-  , RequestInitializer (requestInitializerFrame, requestInitializerHeaders, requestInitializerIsNavigationRequest, requestInitializerMethod, requestInitializerPostData, requestInitializerRedirectedFrom, requestInitializerResourceType, requestInitializerUrl)
+  , RequestInitializer (requestInitializerFrame, requestInitializerHeaders, requestInitializerIsNavigationRequest, requestInitializerMethod, requestInitializerPostData, requestInitializerRedirectedFrom, requestInitializerResourceType, requestInitializerServiceWorker, requestInitializerUrl)
   , RequestRawRequestHeadersResult (requestRawRequestHeadersResultHeaders)
   , RequestResponseResult (requestResponseResultResponse)
   , RequestSizes (requestSizesRequestBodySize, requestSizesRequestHeadersSize, requestSizesResponseBodySize, requestSizesResponseHeadersSize)
@@ -233,6 +234,10 @@ requestAllHeaders request = do
 requestFrameRef :: Request -> Playwright (Maybe ChannelRef)
 requestFrameRef request =
   requestInitializerFrame <$> requestInitializer request
+
+requestServiceWorkerRef :: Request -> Playwright (Maybe ChannelRef)
+requestServiceWorkerRef request =
+  requestInitializerServiceWorker <$> requestInitializer request
 
 requestRedirectedFrom :: Request -> Playwright (Maybe Request)
 requestRedirectedFrom request = do

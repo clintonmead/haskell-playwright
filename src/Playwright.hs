@@ -340,6 +340,7 @@ module Playwright
   , evaluateOnLocatorText
   , evaluateOnLocatorWith
   , evaluateOnWorker
+  , evaluateOnWorkerNumber
   , evaluateOnWorkerText
   , evaluateSpecial
   , evaluateSpecialWith
@@ -498,6 +499,7 @@ module Playwright
   , onRequestFinished
   , onResponse
   , onServiceWorker
+  , onWorkerClose
   , opener
   , orLocator
   , ownerFrameHandle
@@ -545,6 +547,7 @@ module Playwright
   , requestRedirectedTo
   , requestResourceType
   , requestResponse
+  , requestServiceWorker
   , requestSizes
   , requestTiming
   , requestUrl
@@ -552,6 +555,7 @@ module Playwright
   , requestsEqual
   , responseFrame
   , responseFinished
+  , responseFromServiceWorker
   , responseHeaders
   , responseOk
   , responseRequest
@@ -630,6 +634,8 @@ module Playwright
   , waitForContextDialog
   , waitForContextPage
   , waitForContextRequestFinished
+  , waitForContextRequestWhere
+  , waitForContextResponseWhere
   , waitForCrash
   , waitForDialog
   , waitForDownload
@@ -1392,6 +1398,8 @@ import Playwright.BrowserContext.Network
   , onContextRequestFinished
   , onContextResponse
   , waitForContextRequestFinished
+  , waitForContextRequestWhere
+  , waitForContextResponseWhere
   )
 import Playwright.BrowserContext.Wait
   ( waitForContextConsole
@@ -1444,6 +1452,9 @@ import Playwright.RequestFrame
   ( requestFrame
   , responseFrame
   )
+import Playwright.RequestServiceWorker
+  ( requestServiceWorker
+  )
 import Playwright.ResourceTiming
   ( ResourceTiming (ResourceTiming, resourceTimingConnectEnd, resourceTimingConnectStart, resourceTimingDomainLookupEnd, resourceTimingDomainLookupStart, resourceTimingRequestStart, resourceTimingResponseEnd, resourceTimingResponseStart, resourceTimingSecureConnectionStart, resourceTimingStartTime)
   )
@@ -1456,6 +1467,7 @@ import Playwright.Response
   , responseOk
   , requestResponse
   , responseRequest
+  , responseFromServiceWorker
   , responseStatus
   , responseStatusText
   , responseText
@@ -1602,8 +1614,10 @@ import Playwright.WheelDelta
 import Playwright.Worker
   ( Worker (Worker, workerChannel)
   , evaluateOnWorker
+  , evaluateOnWorkerNumber
   , evaluateOnWorkerText
   , onServiceWorker
+  , onWorkerClose
   , serviceWorkers
   , waitForServiceWorker
   , waitForWorker

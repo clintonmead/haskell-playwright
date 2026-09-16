@@ -1,8 +1,10 @@
 module Playwright.Worker
   ( Worker (..)
   , evaluateOnWorker
+  , evaluateOnWorkerNumber
   , evaluateOnWorkerText
   , onServiceWorker
+  , onWorkerClose
   , serviceWorkers
   , waitForServiceWorker
   , waitForWorker
@@ -75,7 +77,7 @@ import Playwright.SerializedArgument
   ( undefinedArgument
   )
 import Playwright.SerializedValue
-  ( SerializedPayload (PayloadString)
+  ( SerializedPayload (PayloadNumber, PayloadString)
   , SerializedValue (SerializedNode)
   )
 import Playwright.Timeout
@@ -162,6 +164,13 @@ onServiceWorker ctx run =
         run (workerFromRef (browserContextServiceWorkerEventWorker event))
     )
 
+onWorkerClose :: Worker -> Playwright () -> Playwright ()
+onWorkerClose worker run =
+  registerEventHandler
+    (channelGuid (workerChannel worker))
+    (MethodName "close")
+    (\_ -> run)
+
 workersEqual :: Worker -> Worker -> Bool
 workersEqual left right =
   channelGuid (workerChannel left) == channelGuid (workerChannel right)
@@ -183,5 +192,14 @@ evaluateOnWorkerText worker expression = do
   case value of
     SerializedNode (PayloadString text) _ ->
       pure text
+    _ ->
+      throwIO (EvaluateUnexpected value)
+
+evaluateOnWorkerNumber :: Worker -> Text -> Playwright Double
+evaluateOnWorkerNumber worker expression = do
+  value <- evaluateOnWorker worker expression
+  case value of
+    SerializedNode (PayloadNumber number) _ ->
+      pure number
     _ ->
       throwIO (EvaluateUnexpected value)

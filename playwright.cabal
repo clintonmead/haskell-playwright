@@ -139,6 +139,7 @@ library
       Playwright.RequestFrame
       Playwright.RequestId
       Playwright.RequestOverrides
+      Playwright.RequestServiceWorker
       Playwright.ResourceTiming
       Playwright.ResourceType
       Playwright.Response

@@ -5,6 +5,8 @@ module Playwright.BrowserContext.Network
   , onContextResponse
   , subscribeBrowserContext
   , waitForContextRequestFinished
+  , waitForContextRequestWhere
+  , waitForContextResponseWhere
   ) where
 
 import Playwright.Monad
@@ -20,6 +22,7 @@ import Playwright.Channel
 import Playwright.Connection
   ( registerEventHandler
   , waitForChannelEvent
+  , waitForChannelEventUnlessClosed
   )
 import Playwright.Json.Decode
   ( throwDecode
@@ -110,3 +113,39 @@ waitForContextRequestFinished ctx = do
         (MethodName "requestFinished")
     event <- throwDecode params
     pure (requestFromRef (browserContextRequestFinishedEventRequest event))
+
+waitForContextRequestWhere :: BrowserContext -> (Request -> Playwright Bool) -> Playwright Request
+waitForContextRequestWhere ctx predicate =
+  waitWithTimeout defaultTimeout $ do
+    subscribeBrowserContext ctx BrowserContextUpdateSubscriptionParamsEventRequest
+    collect
+  where
+    guid = channelGuid (browserContextChannel ctx)
+    collect = do
+      params <-
+        waitForChannelEventUnlessClosed guid (MethodName "request") guid
+      event <- throwDecode params
+      let
+        request = requestFromRef (browserContextRequestEventRequest event)
+      matched <- predicate request
+      if matched
+        then pure request
+        else collect
+
+waitForContextResponseWhere :: BrowserContext -> (Response -> Playwright Bool) -> Playwright Response
+waitForContextResponseWhere ctx predicate =
+  waitWithTimeout defaultTimeout $ do
+    subscribeBrowserContext ctx BrowserContextUpdateSubscriptionParamsEventResponse
+    collect
+  where
+    guid = channelGuid (browserContextChannel ctx)
+    collect = do
+      params <-
+        waitForChannelEventUnlessClosed guid (MethodName "response") guid
+      event <- throwDecode params
+      let
+        response = responseFromRef (browserContextResponseEventResponse event)
+      matched <- predicate response
+      if matched
+        then pure response
+        else collect
