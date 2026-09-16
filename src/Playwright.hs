@@ -135,6 +135,8 @@ module Playwright
   , ViewportWidth (..)
   , WaitForState (..)
   , WebStorage (..)
+  , WebSocket
+  , WebSocketFrame (..)
   , WheelDelta (..)
   , Worker (..)
   , abortRoute
@@ -425,6 +427,7 @@ module Playwright
   , isEnabled
   , isHidden
   , isVisible
+  , isWebSocketClosed
   , jsHandleArgument
   , jsHandleObjectArgument
   , jsHandleToString
@@ -500,6 +503,11 @@ module Playwright
   , onRequestFinished
   , onResponse
   , onServiceWorker
+  , onWebSocket
+  , onWebSocketClose
+  , onWebSocketError
+  , onWebSocketFrameReceived
+  , onWebSocketFrameSent
   , onWorkerClose
   , opener
   , orLocator
@@ -680,8 +688,15 @@ module Playwright
   , waitForWorker
   , waitForWorkerConsole
   , waitForServiceWorker
+  , waitForWebSocket
+  , waitForWebSocketClose
+  , waitForWebSocketError
+  , waitForWebSocketFrameReceived
+  , waitForWebSocketFrameSent
   , waitForWith
   , webkit
+  , webSocketUrl
+  , webSocketsEqual
   , wheelDeltaFromInt
   , withBrowser
   , withPage
@@ -1609,6 +1624,25 @@ import Playwright.WebStorage
   , storageItems
   , storageRemoveItem
   , storageSetItem
+  )
+import Playwright.WebSocket
+  ( WebSocket
+  , isWebSocketClosed
+  , onWebSocket
+  , onWebSocketClose
+  , onWebSocketError
+  , onWebSocketFrameReceived
+  , onWebSocketFrameSent
+  , waitForWebSocket
+  , waitForWebSocketClose
+  , waitForWebSocketError
+  , waitForWebSocketFrameReceived
+  , waitForWebSocketFrameSent
+  , webSocketUrl
+  , webSocketsEqual
+  )
+import Playwright.WebSocketFrame
+  ( WebSocketFrame (WebSocketBinary, WebSocketText)
   )
 import Playwright.WheelDelta
   ( WheelDelta (WheelDelta)

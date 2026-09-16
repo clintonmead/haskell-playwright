@@ -1,13 +1,16 @@
 module Playwright.Connection.Wait
-  ( deliverEvent
+  ( EventAbort (EventAbort, eventAbortError, eventAbortGuid, eventAbortMethod)
+  , deliverEvent
   , registerEventWaiter
   , registerFutureEventWaiter
   , waitForChannelEvent
+  , waitForChannelEventUnlessAborted
   , waitForChannelEventUnlessClosed
   , waitForFutureChannelEvent
   , waitForFutureChannelEventUnlessClosed
   , waitForLifecycle
   , waitForWaiter
+  , waitForWaiterUnlessAborted
   , waitForWaiterUnlessClosed
   , waitUntilRemote
   , waitUntilRequestSettled
@@ -25,10 +28,12 @@ import Control.Exception
   )
 import Control.Monad
   ( unless
-  , when
   )
 import Data.Aeson
   ( Value
+  )
+import Data.Maybe
+  ( listToMaybe
   )
 import Data.Map.Strict qualified as Map
 import Data.Sequence qualified as Seq
@@ -167,27 +172,73 @@ waitForWaiter conn waitId = do
                 retry
   throwOutcome outcome
 
+data EventAbort = EventAbort
+  { eventAbortGuid :: Guid
+  , eventAbortMethod :: MethodName
+  , eventAbortError :: PlaywrightError
+  }
+
 waitForWaiterUnlessClosed :: Connection -> WaitId -> Guid -> IO Value
-waitForWaiterUnlessClosed conn waitId closedGuid = do
-  already <- atomically (Set.member closedGuid . sessionClosedGuids <$> readSession conn)
-  when already (throwIO targetClosedError)
-  closeId <- registerEventWaiter conn closedGuid (MethodName "close")
-  outcome <-
+waitForWaiterUnlessClosed conn waitId closedGuid =
+  waitForWaiterUnlessAborted
+    conn
+    waitId
+    [EventAbort closedGuid (MethodName "close") targetClosedError]
+
+waitForWaiterUnlessAborted :: Connection -> WaitId -> [EventAbort] -> IO Value
+waitForWaiterUnlessAborted conn waitId aborts = do
+  already <-
     atomically $
       withSession conn $ \session ->
-        case sessionClosed session of
+        case closedAbort session of
           Just err ->
-            pure (Left err, removeWaiter waitId (removeWaiter closeId session))
+            pure (Just err, removeWaiter waitId session)
           Nothing ->
-            case waiterValue session waitId of
-              Just params ->
-                pure (Right params, removeWaiter waitId (removeWaiter closeId session))
-              Nothing
-                | Set.member closedGuid (sessionClosedGuids session) || waiterFilled session closeId ->
-                    pure (Left targetClosedError, removeWaiter waitId (removeWaiter closeId session))
-                | otherwise ->
-                    retry
-  throwOutcome outcome
+            pure (Nothing, session)
+  case already of
+    Just err ->
+      throwIO err
+    Nothing -> do
+      abortIds <- traverse registerAbort aborts
+      outcome <-
+        atomically $
+          withSession conn $ \session ->
+            let
+              dropWaiters = foldr removeWaiter session (waitId : abortIds)
+            in
+              case sessionClosed session of
+                Just err ->
+                  pure (Left err, dropWaiters)
+                Nothing ->
+                  case waiterValue session waitId of
+                    Just params ->
+                      pure (Right params, dropWaiters)
+                    Nothing ->
+                      case filledAbort session abortIds of
+                        Just err ->
+                          pure (Left err, dropWaiters)
+                        Nothing ->
+                          retry
+      throwOutcome outcome
+  where
+    closedAbort session =
+      listToMaybe
+        [ eventAbortError abort
+        | abort <- aborts
+        , eventAbortMethod abort == MethodName "close"
+        , Set.member (eventAbortGuid abort) (sessionClosedGuids session)
+        ]
+    registerAbort abort =
+      registerEventWaiter conn (eventAbortGuid abort) (eventAbortMethod abort)
+    filledAbort session abortIds =
+      listToMaybe
+        [ eventAbortError abort
+        | (abort, abortId) <- zip aborts abortIds
+        , waiterFilled session abortId
+            || ( eventAbortMethod abort == MethodName "close"
+                   && Set.member (eventAbortGuid abort) (sessionClosedGuids session)
+               )
+        ]
 
 waitForChannelEvent :: Connection -> Guid -> MethodName -> IO Value
 waitForChannelEvent conn guid method = do
@@ -195,9 +246,17 @@ waitForChannelEvent conn guid method = do
   waitForWaiter conn waitId
 
 waitForChannelEventUnlessClosed :: Connection -> Guid -> MethodName -> Guid -> IO Value
-waitForChannelEventUnlessClosed conn eventGuid method closedGuid = do
+waitForChannelEventUnlessClosed conn eventGuid method closedGuid =
+  waitForChannelEventUnlessAborted
+    conn
+    eventGuid
+    method
+    [EventAbort closedGuid (MethodName "close") targetClosedError]
+
+waitForChannelEventUnlessAborted :: Connection -> Guid -> MethodName -> [EventAbort] -> IO Value
+waitForChannelEventUnlessAborted conn eventGuid method aborts = do
   waitId <- registerEventWaiter conn eventGuid method
-  waitForWaiterUnlessClosed conn waitId closedGuid
+  waitForWaiterUnlessAborted conn waitId aborts
 
 waitForFutureChannelEvent :: Connection -> Guid -> MethodName -> IO Value
 waitForFutureChannelEvent conn guid method = do
@@ -206,26 +265,11 @@ waitForFutureChannelEvent conn guid method = do
 
 waitForFutureChannelEventUnlessClosed :: Connection -> Guid -> MethodName -> IO Value
 waitForFutureChannelEventUnlessClosed conn guid method = do
-  already <- atomically (Set.member guid . sessionClosedGuids <$> readSession conn)
-  when already (throwIO targetClosedError)
   waitId <- registerFutureEventWaiter conn guid method
-  closeId <- registerEventWaiter conn guid (MethodName "close")
-  outcome <-
-    atomically $
-      withSession conn $ \session ->
-        case sessionClosed session of
-          Just err ->
-            pure (Left err, removeWaiter waitId (removeWaiter closeId session))
-          Nothing ->
-            case waiterValue session waitId of
-              Just params ->
-                pure (Right params, removeWaiter waitId (removeWaiter closeId session))
-              Nothing
-                | Set.member guid (sessionClosedGuids session) || waiterFilled session closeId ->
-                    pure (Left targetClosedError, removeWaiter waitId (removeWaiter closeId session))
-                | otherwise ->
-                    retry
-  throwOutcome outcome
+  waitForWaiterUnlessAborted
+    conn
+    waitId
+    [EventAbort guid (MethodName "close") targetClosedError]
 
 throwOutcome :: Either PlaywrightError a -> IO a
 throwOutcome outcome =

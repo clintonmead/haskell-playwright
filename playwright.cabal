@@ -178,6 +178,8 @@ library
       Playwright.ViewportSize
       Playwright.WaitForState
       Playwright.WaitId
+      Playwright.WebSocket
+      Playwright.WebSocketFrame
       Playwright.WebStorage
       Playwright.WheelDelta
       Playwright.Worker
@@ -389,6 +391,7 @@ test-suite playwright-test
       Playwright.TapSpec
       Playwright.TransportSpec
       Playwright.UnrouteBehaviorSpec
+      Playwright.WebSocketSpec
       Playwright.WheelSpec
       Playwright.WorkersSpec
       Paths_playwright
@@ -418,6 +421,8 @@ test-suite playwright-test
     , unliftio
     , wai
     , wai-app-static
+    , wai-websockets
     , warp
+    , websockets
     , zlib
   default-language: GHC2021

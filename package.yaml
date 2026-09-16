@@ -81,5 +81,7 @@ tests:
       - unliftio
       - wai
       - wai-app-static
+      - wai-websockets
       - warp
+      - websockets
       - zlib

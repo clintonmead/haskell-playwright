@@ -77,6 +77,8 @@ data PlaywrightError
   | RouteAlreadyHandled
   | SelectorsRegister Text
   | LocatorNotMainFrame
+  | SocketClosed
+  | SocketError
   deriving stock (Eq, Show)
 
 instance Exception PlaywrightError

@@ -18,6 +18,7 @@ module Playwright.Channel
   , RouteTag
   , ArtifactTag
   , APIRequestContextTag
+  , WebSocketTag
   , send
   ) where
 
@@ -59,6 +60,7 @@ data DisposableTag
 data RouteTag
 data ArtifactTag
 data APIRequestContextTag
+data WebSocketTag
 
 type Channel :: Type -> Type
 newtype Channel a = Channel

@@ -1,5 +1,6 @@
 module Playwright.Connection
   ( Connection
+  , EventAbort (EventAbort)
   , withConnection
   , sendCommand
   , guidsOfType
@@ -7,6 +8,7 @@ module Playwright.Connection
   , registerEventHandler
   , registerEventWaiter
   , waitForChannelEvent
+  , waitForChannelEventUnlessAborted
   , waitForChannelEventUnlessClosed
   , waitForFutureChannelEvent
   , waitForFutureChannelEventUnlessClosed
@@ -76,6 +78,7 @@ import Control.Exception
   )
 import Control.Monad
   ( unless
+  , when
   )
 import Control.Monad.IO.Class
   ( liftIO
@@ -125,7 +128,8 @@ import Playwright.Connection.Types
   , withSession
   )
 import Playwright.Connection.Wait
-  ( deliverEvent
+  ( EventAbort (EventAbort)
+  , deliverEvent
   )
 import Playwright.Connection.Wait qualified as Wait
 import Playwright.Error
@@ -391,6 +395,10 @@ waitForChannelEventUnlessClosed :: Guid -> MethodName -> Guid -> Playwright Valu
 waitForChannelEventUnlessClosed eventGuid method closedGuid =
   inConnection $ \conn -> Wait.waitForChannelEventUnlessClosed conn eventGuid method closedGuid
 
+waitForChannelEventUnlessAborted :: Guid -> MethodName -> [EventAbort] -> Playwright Value
+waitForChannelEventUnlessAborted eventGuid method aborts =
+  inConnection $ \conn -> Wait.waitForChannelEventUnlessAborted conn eventGuid method aborts
+
 waitForFutureChannelEvent :: Guid -> MethodName -> Playwright Value
 waitForFutureChannelEvent guid method =
   inConnection $ \conn -> Wait.waitForFutureChannelEvent conn guid method
@@ -587,6 +595,8 @@ handleEvent conn guid method params = do
       pure ()
   deliverEvent conn guid method params
   runEventHandlers conn guid method params
+  when (method == MethodName "webSocket") $
+    waitForDispatchedHandlers conn
 
 applyLoadstate :: Connection -> Guid -> Value -> IO ()
 applyLoadstate conn guid params = do
