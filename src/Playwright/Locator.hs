@@ -1,6 +1,7 @@
 module Playwright.Locator
   ( Locator (..)
   , allLocators
+  , andLocator
   , blur
   , chainLocator
   , check
@@ -19,6 +20,8 @@ module Playwright.Locator
   , elementHandle
   , elementHandles
   , fill
+  , filterHas
+  , filterHasNot
   , filterHasNotText
   , filterHasText
   , filterHasTextRegex
@@ -51,6 +54,7 @@ module Playwright.Locator
   , locatorScrollIntoView
   , locatorSelectText
   , nth
+  , orLocator
   , press
   , pressSequentially
   , selectOption
@@ -235,7 +239,27 @@ childLocator parent child =
 
 chainLocator :: Locator -> Locator -> Locator
 chainLocator parent inner =
-  childLocator parent (selectorFromText ("internal:chain=" <> jsonEncodeText (selectorToText (locatorSelector inner))))
+  childLocator parent (innerJsonSelector "internal:chain=" inner)
+
+filterHas :: Locator -> Locator -> Locator
+filterHas loc inner =
+  childLocator loc (innerJsonSelector "internal:has=" inner)
+
+filterHasNot :: Locator -> Locator -> Locator
+filterHasNot loc inner =
+  childLocator loc (innerJsonSelector "internal:has-not=" inner)
+
+andLocator :: Locator -> Locator -> Locator
+andLocator loc inner =
+  childLocator loc (innerJsonSelector "internal:and=" inner)
+
+orLocator :: Locator -> Locator -> Locator
+orLocator loc inner =
+  childLocator loc (innerJsonSelector "internal:or=" inner)
+
+innerJsonSelector :: Text -> Locator -> Selector
+innerJsonSelector prefix inner =
+  selectorFromText (prefix <> jsonEncodeText (selectorToText (locatorSelector inner)))
 
 filterVisible :: Locator -> Bool -> Locator
 filterVisible loc visible =

@@ -168,6 +168,35 @@ tests =
           click (locate page "button")
           fill (locate page "#text") "Hello"
           assertEqual "filled" "Hello" =<< inputValue (locate page "#text")
+    , testCase "should scroll zero-sized element into view" $
+        withChromiumPage $ \page -> do
+          setViewportSize page (ViewportSize (ViewportWidth 1280) (ViewportHeight 720))
+          setContent
+            page
+            "<style>html,body { margin: 0; padding: 0; } ::-webkit-scrollbar { display: none; } * { scrollbar-width: none; }</style><div style=\"height: 2000px; text-align: center; border: 10px solid blue;\"><h1>SCROLL DOWN</h1></div><div id=lazyload style=\"font-size:75px; background-color: green;\"></div><script>const lazyLoadElement = document.querySelector('#lazyload'); const observer = new IntersectionObserver((entries) => { if (entries.some(entry => entry.isIntersecting)) { lazyLoadElement.textContent = 'LAZY LOADED CONTENT'; lazyLoadElement.style.height = '20px'; observer.disconnect(); } }); observer.observe(lazyLoadElement);</script>"
+          let
+            lazy = locate page "#lazyload"
+          before <- locatorBoundingBox lazy
+          case before of
+            Nothing ->
+              assertFailure "expected bounding box"
+            Just found -> do
+              assertEqual "x" (cssPixelFromInt 0) (boundingBoxX found)
+              assertEqual "y" (cssPixelFromInt 2020) (boundingBoxY found)
+              assertEqual "width" (cssPixelFromInt 1280) (boundingBoxWidth found)
+              assertEqual "height" (cssPixelFromInt 0) (boundingBoxHeight found)
+          locatorScrollIntoView lazy
+          waitFor (Locator.getByText lazy "LAZY LOADED CONTENT" Inexact) WaitForVisible
+          assertEqual "text" "LAZY LOADED CONTENT" =<< innerText lazy
+          after <- locatorBoundingBox lazy
+          case after of
+            Nothing ->
+              assertFailure "expected bounding box after scroll"
+            Just found -> do
+              assertEqual "x after" (cssPixelFromInt 0) (boundingBoxX found)
+              assertEqual "y after" (cssPixelFromInt 720) (boundingBoxY found)
+              assertEqual "width after" (cssPixelFromInt 1280) (boundingBoxWidth found)
+              assertEqual "height after" (cssPixelFromInt 20) (boundingBoxHeight found)
     , testCase "press should throw on unknown keys" $
         withChromiumPage $ \page -> do
           setContent page "<input type='text' value='hello' />"

@@ -21,7 +21,7 @@ Core objects and the usual Page / Frame / Locator / ElementHandle / JSHandle / R
 - Query: `querySelector` / `querySelectorAll` (`page.$` / `page.$$`), `evalOnSelectorBool`.
 - Downloads (`waitForDownload` / `downloadPath` / `downloadSaveAs` / `downloadDelete` / `downloadCancel` / `downloadFailure`), file chooser + `setInputFiles` payloads, PDF (`tagged`/`outline`), screenshot, workers, dialogs, console, pageerror, popups.
 - Locator click/fill/check/hover/select, `clickWith` (`noWaitAfter`, `force`, `position`, `timeout`, `modifiers`), `clickHandleWith`, `dispatchEvent` / `dispatchEventWith` (`eventInit` as `SerializedArgument`), `dispatchEventHandle` / `dispatchEventHandleWith`, and `dropOnto` (in-memory file payloads and clipboard `data`; not host `localPaths`).
-- Locator `filterHasText` / `filterHasNotText` / `filterHasTextRegex` (`internal:has-text=` / `internal:has-not-text=`). Page `closePageReason`. Context `reducedMotion` / `forcedColors` / `contrast` plus `emulateMedia` for those features. `waitForRequest` / `waitForResponse` / `waitForDownload` abort when the page closes. `requestAllHeaders` is `Request.rawRequestHeaders`.
+- Locator `filterHasText` / `filterHasNotText` / `filterHasTextRegex` (`internal:has-text=` / `internal:has-not-text=`). Locator `filterHas` / `filterHasNot` / `andLocator` / `orLocator` (`internal:has=` / `internal:has-not=` / `internal:and=` / `internal:or=` plus JSON of the inner selector). Page `closePageReason`. Context `reducedMotion` / `forcedColors` / `contrast` plus `emulateMedia` for those features. `waitForRequest` / `waitForResponse` / `waitForDownload` abort when the page closes. `requestAllHeaders` is `Request.rawRequestHeaders`.
 
 ## Official tests with a Haskell port
 

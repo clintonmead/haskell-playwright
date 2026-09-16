@@ -38,7 +38,8 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 - **interception:** skip Node `iso.globToRegexPattern` / `urlMatches` unit tests, unbalanced-brace glob validation (Haskell `UrlGlob` does not reject `{`), `page.route` with a `vm` RegExp, and blob-URL intercept (official WebKit-only). The `http://localhos**?*oo` case uses `localhost` like other cross-host ports.
 - **page-add-locator-handler:** skip Playwright `expect` (`toBeVisible`, `toHaveScreenshot`). Protocol timeout errors now include the driver call log (so “locator handler has finished…” / intercept messages are visible). Official `window.builtins.setTimeout` is provided via `addInitScript` (test-runner-only on Node).
 - **page-request-intercept:** skip Android loopback rewrite and Firefox-only multipart file upload (`fixme` on Chromium). Protocol fetch timeouts are `Timeout <n>ms exceeded` (JS prefixes `route.fetch:`). Warp static `title.html` is `text/html` (Node test server adds `charset=utf-8`).
-- **page-history:** bfcache, reload during renderer navigation, goBack/goForward during submit, issue 20791, popup reload isolation.
+- **locator-query:** skip regex `hasText` / `getByRole` `name` quote-escaping suites, `getByTestId(/regex/)`, same-frame constructor errors, and Node `__testHookBeforeQuery` count-during-navigation.
+- **locator-misc-2:** skip locator screenshot snapshot.
 - **page-event-request:** service worker / intercept-race / Chromium 204 fixme leftovers.
 - **page-event-crash:** `chrome://crash` `goto` is fired in the background; awaiting it can hang the driver.
 - **downloads:** createReadStream / PDF / `artifactsDir`.

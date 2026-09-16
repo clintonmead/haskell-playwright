@@ -150,6 +150,7 @@ module Playwright
   , allInnerTexts
   , allLocators
   , allTextContents
+  , andLocator
   , apiResponseBody
   , apiResponseDispose
   , apiResponseHeaders
@@ -366,6 +367,8 @@ module Playwright
   , disposeAPIRequestContext
   , fill
   , fillHandle
+  , filterHas
+  , filterHasNot
   , filterHasNotText
   , filterHasText
   , filterHasTextRegex
@@ -491,6 +494,7 @@ module Playwright
   , onRequestFinished
   , onResponse
   , opener
+  , orLocator
   , ownerFrameHandle
   , pageContext
   , pageErrors
@@ -1151,6 +1155,7 @@ import Playwright.Locale
 import Playwright.Locator
   ( Locator (Locator, locatorContextChannel, locatorFrame, locatorMainFrame, locatorPageChannel, locatorSelector)
   , allLocators
+  , andLocator
   , blur
   , chainLocator
   , check
@@ -1169,6 +1174,8 @@ import Playwright.Locator
   , elementHandle
   , elementHandles
   , fill
+  , filterHas
+  , filterHasNot
   , filterHasNotText
   , filterHasText
   , filterHasTextRegex
@@ -1197,6 +1204,7 @@ import Playwright.Locator
   , locatorScrollIntoView
   , locatorSelectText
   , nth
+  , orLocator
   , press
   , pressSequentially
   , selectOption
