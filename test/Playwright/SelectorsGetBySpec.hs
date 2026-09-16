@@ -18,6 +18,7 @@ import Playwright
   , getByPlaceholderRegex
   , getByRole
   , getByTestId
+  , getByTestIdAttr
   , getByTestIdRegex
   , getByText
   , getByTitle
@@ -78,6 +79,18 @@ tests =
             , "<a href=\"https://playwright.dev\">he llo 56</a>"
             ]
             links
+    , testCase "getByTestId with custom testId should work" $
+        withChromiumPage $ \page -> do
+          setContent page "<div><div data-my-custom-testid=\"Hello\">Hello world</div></div>"
+          assertEqual "text" "Hello world" =<< innerText (getByTestIdAttr page "data-my-custom-testid" "Hello")
+    , testCase "getByTestId with comma-separated testIdAttributes should match any" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<section><div data-pw=\"Hello\">first</div><div data-ti=\"Hello\">second</div><div data-testid=\"Hello\">third</div></section>"
+          assertEqual "count" 2 =<< locatorCount (getByTestIdAttr page "data-pw,data-ti" "Hello")
+          texts <- evaluateOnLocatorAllTexts (getByTestIdAttr page "data-pw,data-ti" "Hello") "els => els.map(e => e.textContent)"
+          assertEqual "texts" ["first", "second"] texts
     , testCase "getByTestId should work for regex" $
         withChromiumPage $ \page -> do
           setContent page "<div><div data-testid=\"Hello\">Hello world</div></div>"

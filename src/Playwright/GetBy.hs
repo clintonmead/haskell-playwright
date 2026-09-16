@@ -29,6 +29,7 @@ import Data.Text
   , pack
   , replace
   )
+import Data.Text qualified as Text
 import Data.Text.Encoding
   ( decodeUtf8
   )
@@ -98,13 +99,21 @@ getByAttributeSelectorRegex :: Text -> Text -> Selector
 getByAttributeSelectorRegex attr source =
   selectorFromText ("internal:attr=[" <> attr <> "=" <> escapeRegexForSelector source <> "]")
 
-getByTestIdSelector :: Text -> Selector
-getByTestIdSelector testId =
-  selectorFromText ("internal:testid=[data-testid=" <> escapeForAttributeSelector testId Exact <> "]")
+getByTestIdSelector :: Text -> Text -> Selector
+getByTestIdSelector attrName testId =
+  selectorFromText
+    ("internal:testid=[" <> encodeTestIdAttributeName attrName <> "=" <> escapeForAttributeSelector testId Exact <> "]")
 
-getByTestIdSelectorRegex :: Text -> Selector
-getByTestIdSelectorRegex source =
-  selectorFromText ("internal:testid=[data-testid=" <> escapeRegexForSelector source <> "]")
+getByTestIdSelectorRegex :: Text -> Text -> Selector
+getByTestIdSelectorRegex attrName source =
+  selectorFromText
+    ("internal:testid=[" <> encodeTestIdAttributeName attrName <> "=" <> escapeRegexForSelector source <> "]")
+
+encodeTestIdAttributeName :: Text -> Text
+encodeTestIdAttributeName attrName =
+  if Text.isInfixOf "," attrName
+    then decodeUtf8 (toStrict (encode attrName))
+    else attrName
 
 getByRoleSelector :: AriaRole -> GetByRoleOptions -> Selector
 getByRoleSelector role opts =

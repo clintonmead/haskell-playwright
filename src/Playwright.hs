@@ -399,6 +399,8 @@ module Playwright
   , getByPlaceholderRegex
   , getByRole
   , getByTestId
+  , getByTestIdAttr
+  , getByTestIdAttrRegex
   , getByTestIdRegex
   , getByText
   , getByTitle
@@ -1319,6 +1321,8 @@ import Playwright.Page
   , getByPlaceholderRegex
   , getByRole
   , getByTestId
+  , getByTestIdAttr
+  , getByTestIdAttrRegex
   , getByTestIdRegex
   , getByText
   , getByTitle

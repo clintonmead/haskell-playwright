@@ -37,6 +37,8 @@ module Playwright.Locator
   , getByPlaceholderRegex
   , getByRole
   , getByTestId
+  , getByTestIdAttr
+  , getByTestIdAttrRegex
   , getByTestIdRegex
   , getByText
   , getByTitle
@@ -346,12 +348,20 @@ getByLabel loc text exactness =
   childLocator loc (getByLabelSelector text exactness)
 
 getByTestId :: Locator -> Text -> Locator
-getByTestId loc testId =
-  childLocator loc (getByTestIdSelector testId)
+getByTestId loc =
+  getByTestIdAttr loc "data-testid"
+
+getByTestIdAttr :: Locator -> Text -> Text -> Locator
+getByTestIdAttr loc attrName testId =
+  childLocator loc (getByTestIdSelector attrName testId)
 
 getByTestIdRegex :: Locator -> Text -> Locator
-getByTestIdRegex loc source =
-  childLocator loc (getByTestIdSelectorRegex source)
+getByTestIdRegex loc =
+  getByTestIdAttrRegex loc "data-testid"
+
+getByTestIdAttrRegex :: Locator -> Text -> Text -> Locator
+getByTestIdAttrRegex loc attrName source =
+  childLocator loc (getByTestIdSelectorRegex attrName source)
 
 getByAltText :: Locator -> Text -> Exactness -> Locator
 getByAltText loc text exactness =

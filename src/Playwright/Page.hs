@@ -21,6 +21,8 @@ module Playwright.Page
   , getByPlaceholderRegex
   , getByRole
   , getByTestId
+  , getByTestIdAttr
+  , getByTestIdAttrRegex
   , getByTestIdRegex
   , getByText
   , getByTitle
@@ -494,12 +496,20 @@ frameLocator page iframeSelector =
   locator page (nestedSelector iframeSelector enterFrameSelector)
 
 getByTestId :: Page -> Text -> Locator
-getByTestId page testId =
-  locator page (getByTestIdSelector testId)
+getByTestId page =
+  getByTestIdAttr page "data-testid"
+
+getByTestIdAttr :: Page -> Text -> Text -> Locator
+getByTestIdAttr page attrName testId =
+  locator page (getByTestIdSelector attrName testId)
 
 getByTestIdRegex :: Page -> Text -> Locator
-getByTestIdRegex page source =
-  locator page (getByTestIdSelectorRegex source)
+getByTestIdRegex page =
+  getByTestIdAttrRegex page "data-testid"
+
+getByTestIdAttrRegex :: Page -> Text -> Text -> Locator
+getByTestIdAttrRegex page attrName source =
+  locator page (getByTestIdSelectorRegex attrName source)
 
 getByAltText :: Page -> Text -> Exactness -> Locator
 getByAltText page text exactness =
