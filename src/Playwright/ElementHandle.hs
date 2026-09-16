@@ -49,7 +49,7 @@ import Playwright.Channel
   , send
   )
 import Playwright.ClickOptions
-  ( ClickOptions (clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsTimeout)
+  ( ClickOptions (clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsTimeout, clickOptionsTrial)
   , defaultClickOptions
   )
 import Playwright.CssPixel
@@ -95,7 +95,7 @@ import Playwright.Point
   )
 import Playwright.Protocol
   ( ElementHandleBoundingBoxResult (elementHandleBoundingBoxResultValue)
-  , ElementHandleClickParams (elementHandleClickParamsButton, elementHandleClickParamsClickCount, elementHandleClickParamsForce, elementHandleClickParamsModifiers, elementHandleClickParamsNoWaitAfter, elementHandleClickParamsPosition)
+  , ElementHandleClickParams (elementHandleClickParamsButton, elementHandleClickParamsClickCount, elementHandleClickParamsForce, elementHandleClickParamsModifiers, elementHandleClickParamsNoWaitAfter, elementHandleClickParamsPosition, elementHandleClickParamsTrial)
   , ElementHandleClickParamsButton (ElementHandleClickParamsButtonLeft, ElementHandleClickParamsButtonMiddle, ElementHandleClickParamsButtonRight)
   , ElementHandleClickParamsModifiers (ElementHandleClickParamsModifiersAlt, ElementHandleClickParamsModifiersControl, ElementHandleClickParamsModifiersControlOrMeta, ElementHandleClickParamsModifiersMeta, ElementHandleClickParamsModifiersShift)
   , ElementHandleClickResult
@@ -192,6 +192,7 @@ clickHandleWith handle opts = do
         , elementHandleClickParamsModifiers = fmap (fmap toHandleClickModifier) (clickOptionsModifiers opts)
         , elementHandleClickParamsNoWaitAfter = clickOptionsNoWaitAfter opts
         , elementHandleClickParamsPosition = fmap toProtocolPoint (clickOptionsPosition opts)
+        , elementHandleClickParamsTrial = clickOptionsTrial opts
         }
   pure ()
 

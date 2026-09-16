@@ -23,7 +23,7 @@ import Data.Text
   , replace
   )
 import Playwright
-  ( ClickOptions (clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsPosition, clickOptionsTimeout)
+  ( ClickOptions (clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsPosition, clickOptionsTimeout, clickOptionsTrial)
   , ConsoleMessage (consoleMessageText)
   , Frame
   , Key (Key)
@@ -33,7 +33,7 @@ import Playwright
   , Page
   , Playwright
   , Point (Point)
-  , SpecialJsValue (SpecialNull)
+  , SpecialJsValue (SpecialNull, SpecialUndefined)
   , StyleTag (styleTagContent)
   , Timeout
   , ViewportHeight (ViewportHeight)
@@ -41,7 +41,10 @@ import Playwright
   , ViewportWidth (ViewportWidth)
   , addStyleTag
   , asElement
+  , childFrameLocator
+  , childLocator
   , click
+  , clickHandleWith
   , clickWith
   , contentFrameHandle
   , cssPixelFromInt
@@ -56,10 +59,12 @@ import Playwright
   , evaluateNumber
   , evaluateOnElement
   , evaluateOnFrameText
+  , evaluateOnLocator
   , evaluateSpecial
   , evaluateText
   , evaluateTexts
   , fill
+  , frameLocator
   , goto
   , innerText
   , keyboardDown
@@ -404,7 +409,265 @@ tests =
           assertEqual "clicked" "Clicked" =<< evaluateText page "() => window.result"
           assertEqual "offsetX" (1900 :: Double) =<< evaluateNumber page "() => window.offsetX"
           assertEqual "offsetY" (1910 :: Double) =<< evaluateNumber page "() => window.offsetY"
+    , testCase "should wait for stable position" $
+        withAssetPage "input/button.html" $ \page -> do
+          _ <-
+            evalOnSelector
+              page
+              (selectorFromText "button")
+              "button => { button.style.transition = 'margin 500ms linear 0s'; button.style.marginLeft = '200px'; button.style.borderWidth = '0'; button.style.width = '200px'; button.style.height = '20px'; button.style.display = 'block'; document.body.style.margin = '0'; }"
+          rafraf page 1
+          click (locate page "button")
+          assertEqual "clicked" "Clicked" =<< evaluateText page "() => window.result"
+          assertEqual "pageX" (300 :: Double) =<< evaluateNumber page "() => window.pageX"
+          assertEqual "pageY" (10 :: Double) =<< evaluateNumber page "() => window.pageY"
+    , testCase "should wait for becoming hit target" $
+        withAssetPage "input/button.html" $ \page -> do
+          addFlyover page
+          withAsync (click (locate page "button")) $ \pending -> do
+            stillPending pending
+            _ <- evalOnSelector page (selectorFromText ".flyover") "flyOver => { flyOver.style.left = '0'; }"
+            rafraf page 5
+            stillPending pending
+            _ <- evalOnSelector page (selectorFromText ".flyover") "flyOver => { flyOver.style.left = '200px'; }"
+            wait pending
+          assertEqual "clicked" "Clicked" =<< evaluateText page "() => window.result"
+    , testCase "should wait for becoming hit target with trial run" $
+        withAssetPage "input/button.html" $ \page -> do
+          addFlyover page
+          withAsync (clickWith (locate page "button") defaultClickOptions {clickOptionsTrial = Just True}) $ \pending -> do
+            stillPending pending
+            _ <- evalOnSelector page (selectorFromText ".flyover") "flyOver => { flyOver.style.left = '0'; }"
+            rafraf page 5
+            stillPending pending
+            _ <- evalOnSelector page (selectorFromText ".flyover") "flyOver => { flyOver.style.left = '200px'; }"
+            wait pending
+          assertEqual "not clicked" "Was not clicked" =<< evaluateText page "() => window.result"
+    , testCase "trial run should work with short timeout" $
+        withAssetPage "input/button.html" $ \page -> do
+          _ <- evalOnSelector page (selectorFromText "button") "button => { button.disabled = true; }"
+          timeout <- requireTimeout 2000
+          assertProtocolContains
+            "click action (trial run)"
+            ( clickWith
+                (locate page "button")
+                defaultClickOptions {clickOptionsTrial = Just True, clickOptionsTimeout = Just timeout}
+            )
+          assertEqual "not clicked" "Was not clicked" =<< evaluateText page "() => window.result"
+    , testCase "trial run should not click" $
+        withAssetPage "input/button.html" $ \page -> do
+          clickWith (locate page "button") defaultClickOptions {clickOptionsTrial = Just True}
+          assertEqual "not clicked" "Was not clicked" =<< evaluateText page "() => window.result"
+    , testCase "should fail when obscured and not waiting for hit target" $
+        withAssetPage "input/button.html" $ \page -> do
+          handle <- requireHandle =<< querySelector page (selectorFromText "button")
+          _ <-
+            evaluate
+              page
+              "() => { document.body.style.position = 'relative'; const blocker = document.createElement('div'); blocker.style.position = 'absolute'; blocker.style.width = '400px'; blocker.style.height = '20px'; blocker.style.left = '0'; blocker.style.top = '0'; document.body.appendChild(blocker); }"
+          clickHandleWith handle defaultClickOptions {clickOptionsForce = Just True}
+          assertEqual "not clicked" "Was not clicked" =<< evaluateText page "() => window.result"
+    , testCase "should wait for button to be enabled" $
+        waitUntilEnabled "<button onclick=\"window.__CLICKED=true;\" disabled><span>Click target</span></button>" "text=Click target" "button"
+    , testCase "should wait for input to be enabled" $
+        waitUntilEnabled "<input onclick=\"window.__CLICKED=true;\" disabled>" "input" "input"
+    , testCase "should wait for select to be enabled" $
+        waitUntilEnabled
+          "<select disabled><option selected>Hello</option></select><script>document.querySelector('select').addEventListener('mousedown', event => { window.__CLICKED=true; event.preventDefault(); });</script>"
+          "select"
+          "select"
+    , testCase "should click disabled div" $
+        withChromiumPage $ \page -> do
+          setContent page "<div onclick=\"window.__CLICKED=true\" disabled>Click target</div>"
+          click (locate page "text=Click target")
+          assertEqual "clicked" True =<< evaluateBool page "() => window.__CLICKED"
+    , testCase "should wait for BUTTON to be clickable when it has pointer-events:none" $
+        withChromiumPage $ \page -> do
+          setContent page "<button onclick=\"window.__CLICKED=true\" style=\"pointer-events:none\"><span>Click target</span></button>"
+          withAsync (click (locate page "text=Click target")) $ \pending -> do
+            rafraf page 5
+            assertEqual "undefined" SpecialUndefined =<< evaluateSpecial page "() => window.__CLICKED"
+            stillPending pending
+            _ <- evaluate page "() => document.querySelector('button').style.removeProperty('pointer-events')"
+            wait pending
+          assertEqual "clicked" True =<< evaluateBool page "() => window.__CLICKED"
+    , testCase "should wait for LABEL to be clickable when it has pointer-events:none" $
+        withChromiumPage $ \page -> do
+          setContent page "<label onclick=\"window.__CLICKED=true\" style=\"pointer-events:none\"><span>Click target</span></label>"
+          withAsync (click (locate page "text=Click target")) $ \pending -> do
+            forM_ ([0 .. 4] :: [Int]) $ \_ ->
+              assertEqual "undefined" SpecialUndefined =<< evaluateSpecial page "() => window.__CLICKED"
+            _ <- evaluate page "() => document.querySelector('label').style.removeProperty('pointer-events')"
+            wait pending
+          assertEqual "clicked" True =<< evaluateBool page "() => window.__CLICKED"
+    , testCase "should click an offscreen element when scroll-behavior is smooth" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<div style=\"border: 1px solid black; height: 500px; overflow: auto; width: 500px; scroll-behavior: smooth\"><button style=\"margin-top: 2000px\" onClick=\"window.clicked = true\">hi</button></div>"
+          click (locate page "button")
+          assertEqual "clicked" True =<< evaluateBool page "() => window.clicked"
+    , testCase "should report nice error when element is detached and force-clicked" $
+        withAssetPage "input/animating-button.html" $ \page -> do
+          _ <- evaluate page "() => addButton()"
+          handle <- requireHandle =<< querySelector page (selectorFromText "button")
+          _ <- evaluate page "() => stopButton(true)"
+          assertProtocolContains
+            "Element is not attached to the DOM"
+            (clickHandleWith handle defaultClickOptions {clickOptionsForce = Just True})
+          assertEqual "undefined" SpecialUndefined =<< evaluateSpecial page "() => window.clicked"
+    , testCase "should fail when element detaches after animation" $
+        withAssetPage "input/animating-button.html" $ \page -> do
+          _ <- evaluate page "() => addButton()"
+          handle <- requireHandle =<< querySelector page (selectorFromText "button")
+          withAsync (clickHandleWith handle defaultClickOptions) $ \pending -> do
+            _ <- evaluate page "() => stopButton(true)"
+            assertProtocolContains "Element is not attached to the DOM" (wait pending)
+          assertEqual "undefined" SpecialUndefined =<< evaluateSpecial page "() => window.clicked"
+    , testCase "should retry when element detaches after animation" $
+        withAssetPage "input/animating-button.html" $ \page -> do
+          _ <- evaluate page "() => addButton()"
+          withAsync (click (locate page "button")) $ \pending -> do
+            stillPending pending
+            _ <- evaluate page "() => stopButton(true)"
+            _ <- evaluate page "() => addButton()"
+            stillPending pending
+            _ <- evaluate page "() => stopButton(true)"
+            _ <- evaluate page "() => addButton()"
+            stillPending pending
+            _ <- evaluate page "() => stopButton(false)"
+            wait pending
+          assertEqual "clicked" True =<< evaluateBool page "() => window.clicked"
+    , testCase "should retry when element is animating from outside the viewport" $
+        withChromiumPage $ \page -> do
+          setContent page animatingButtonMarkup
+          handle <- requireHandle =<< querySelector page (selectorFromText "button")
+          withAsync (clickHandleWith handle defaultClickOptions) $ \pending -> do
+            _ <- evaluateOnElement handle "button => { button.className = 'animated'; }"
+            wait pending
+          assertEqual "clicked" True =<< evaluateBool page "() => window.clicked"
+    , testCase "should fail when element is animating from outside the viewport with force" $
+        withChromiumPage $ \page -> do
+          setContent page animatingButtonMarkup
+          handle <- requireHandle =<< querySelector page (selectorFromText "button")
+          withAsync (clickHandleWith handle defaultClickOptions {clickOptionsForce = Just True}) $ \pending -> do
+            _ <- evaluateOnElement handle "button => { button.className = 'animated'; }"
+            assertProtocolContains "Element is outside of the viewport" (wait pending)
+          assertEqual "undefined" SpecialUndefined =<< evaluateSpecial page "() => window.clicked"
+    , testCase "should dispatch microtasks in order" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<button id=button>Click me</button><script>let mutationCount = 0; const observer = new MutationObserver(() => { ++mutationCount; }); observer.observe(document.body, { attributes: true, childList: true, subtree: true }); button.addEventListener('mousedown', () => { mutationCount = 0; document.body.appendChild(document.createElement('div')); }); button.addEventListener('mouseup', () => { window.result = mutationCount; });</script>"
+          click (locate page "button")
+          assertEqual "mutations" (1 :: Double) =<< evaluateNumber page "() => window.result"
+    , testCase "should click the button when window.innerWidth is corrupted" $
+        withAssetPage "input/button.html" $ \page -> do
+          _ <- evaluate page "() => { Object.defineProperty(window, 'innerWidth', { value: 0 }); }"
+          click (locate page "button")
+          assertEqual "clicked" "Clicked" =<< evaluateText page "() => window.result"
+    , testCase "should click zero-sized input by label" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<label>Click me<input onclick=\"window.__clicked=true\" style=\"width:0;height:0;padding:0;margin:0;border:0;\"></label>"
+          click (locate page "text=Click me")
+          assertEqual "clicked" True =<< evaluateBool page "() => window.__clicked"
+    , testCase "should climb dom for inner label with pointer-events:none" $
+        withChromiumPage $ \page -> do
+          setContent page "<button onclick=\"window.__CLICKED=true;\"><label style=\"pointer-events:none\">Click target</label></button>"
+          click (locate page "text=Click target")
+          assertEqual "clicked" True =<< evaluateBool page "() => window.__CLICKED"
+    , testCase "should climb up to [role=button]" $
+        withChromiumPage $ \page -> do
+          setContent page "<div role=button onclick=\"window.__CLICKED=true;\"><div style=\"pointer-events:none\"><span><div>Click target</div></span></div>"
+          click (locate page "text=Click target")
+          assertEqual "clicked" True =<< evaluateBool page "() => window.__CLICKED"
+    , testCase "should climb up to a anchor" $
+        withChromiumPage $ \page -> do
+          setContent page "<a href=\"#\" onclick=\"window.__CLICKED=true\" id=\"outer\"><div id=\"intermediate\"><div id=\"inner\" style=\"pointer-events: none\">Inner</div></div></a>"
+          click (locate page "#inner")
+          assertEqual "clicked" True =<< evaluateBool page "() => window.__CLICKED"
+    , testCase "should climb up to a [role=link]" $
+        withChromiumPage $ \page -> do
+          setContent page "<div role=link onclick=\"window.__CLICKED=true\" id=\"outer\"><div id=\"inner\" style=\"pointer-events: none\">Inner</div></div>"
+          click (locate page "#inner")
+          assertEqual "clicked" True =<< evaluateBool page "() => window.__CLICKED"
+    , testCase "should click in an iframe with border" $
+        clickIframeTarget iframeBorderMarkup
+    , testCase "should click in an iframe with border 2" $
+        clickIframeTarget iframeBorderMarkup2
+    , testCase "should click in a transformed iframe" $
+        clickIframeTarget iframeTransformedMarkup
+    , testCase "should click in a transformed iframe with force" $
+        withChromiumPage $ \page -> do
+          setContent page iframeForceMarkup
+          clickWith (childLocator (frameLocator page (selectorFromText "iframe")) (selectorFromText "div")) defaultClickOptions {clickOptionsForce = Just True}
+          assertEqual "clicked" True =<< evaluateBool page "() => window._clicked"
+    , testCase "should click in a nested transformed iframe" $
+        withChromiumPage $ \page -> do
+          setContent page nestedIframeMarkup
+          let
+            target =
+              childLocator
+                (childFrameLocator (frameLocator page (selectorFromText "iframe")) (selectorFromText "iframe"))
+                (selectorFromText "div")
+          _ <- evaluateOnLocator target "div => { div.addEventListener('click', () => { window.top._clicked = true; }); }"
+          click target
+          assertEqual "clicked" True =<< evaluateBool page "() => window._clicked"
     ]
+
+waitUntilEnabled :: Text -> Text -> Text -> IO ()
+waitUntilEnabled markup selector tag =
+  withChromiumPage $ \page -> do
+    setContent page markup
+    withAsync (click (locate page selector)) $ \pending -> do
+      rafraf page 5
+      assertEqual "undefined" SpecialUndefined =<< evaluateSpecial page "() => window.__CLICKED"
+      stillPending pending
+      _ <- evaluate page ("() => document.querySelector('" <> tag <> "').removeAttribute('disabled')")
+      wait pending
+    assertEqual "clicked" True =<< evaluateBool page "() => window.__CLICKED"
+
+addFlyover :: Page -> Playwright ()
+addFlyover page =
+  evalOnSelector
+    page
+    (selectorFromText "button")
+    "button => { button.style.borderWidth = '0'; button.style.width = '200px'; button.style.height = '20px'; document.body.style.margin = '0'; document.body.style.position = 'relative'; const flyOver = document.createElement('div'); flyOver.className = 'flyover'; flyOver.style.position = 'absolute'; flyOver.style.width = '400px'; flyOver.style.height = '20px'; flyOver.style.left = '-200px'; flyOver.style.top = '0'; flyOver.style.background = 'red'; document.body.appendChild(flyOver); }"
+    >> pure ()
+
+clickIframeTarget :: Text -> IO ()
+clickIframeTarget markup =
+  withChromiumPage $ \page -> do
+    setContent page markup
+    click (childLocator (frameLocator page (selectorFromText "iframe")) (selectorFromText "div"))
+    assertEqual "clicked" True =<< evaluateBool page "() => window._clicked"
+
+animatingButtonMarkup :: Text
+animatingButtonMarkup =
+  "<style>@keyframes move { from { left: -300px; } to { left: 0; } } button { position: absolute; left: -300px; top: 0; bottom: 0; width: 200px; } button.animated { animation: 1s linear 1s move forwards; }</style><div style=\"position: relative; width: 300px; height: 300px;\"><button onclick=\"window.clicked=true\"></button></div>"
+
+iframeBorderMarkup :: Text
+iframeBorderMarkup =
+  "<style>body, html, iframe { margin: 0; padding: 0; border: none; box-sizing: border-box; } iframe { border: 4px solid black; background: gray; margin-left: 33px; margin-top: 24px; width: 400px; height: 400px; }</style><iframe srcdoc=\"<style>body, html { margin: 0; padding: 0; } div { margin-left: 10px; margin-top: 20px; width: 2px; height: 2px; }</style><div>Target</div><script>document.querySelector('div').addEventListener('click', () => window.top._clicked = true);</script>\"></iframe>"
+
+iframeBorderMarkup2 :: Text
+iframeBorderMarkup2 =
+  "<style>body, html, iframe { margin: 0; padding: 0; border: none; } iframe { border: 4px solid black; background: gray; margin-left: 33px; margin-top: 24px; width: 400px; height: 400px; }</style><iframe srcdoc=\"<style>body, html { margin: 0; padding: 0; } div { margin-left: 10px; margin-top: 20px; width: 2px; height: 2px; }</style><div>Target</div><script>document.querySelector('div').addEventListener('click', () => window.top._clicked = true);</script>\"></iframe>"
+
+iframeTransformedMarkup :: Text
+iframeTransformedMarkup =
+  "<style>body, html, iframe { margin: 0; padding: 0; border: none; } iframe { border: 4px solid black; background: gray; margin-left: 33px; margin-top: 24px; width: 400px; height: 400px; transform: translate(100px, 100px) scale(1.2) rotate3d(1, 1, 1, 25deg); }</style><iframe srcdoc=\"<style>body, html { margin: 0; padding: 0; } div { margin-left: 10px; margin-top: 20px; width: 2px; height: 2px; }</style><div>Target</div><script>document.querySelector('div').addEventListener('click', () => window.top._clicked = true);</script>\"></iframe>"
+
+iframeForceMarkup :: Text
+iframeForceMarkup =
+  "<style>body, html, iframe { margin: 0; padding: 0; border: none; } iframe { background: gray; margin-left: 33px; margin-top: 24px; width: 400px; height: 400px; transform: translate(-40px, -40px) scale(0.8); }</style><iframe srcdoc=\"<style>body, html { margin: 0; padding: 0; } div { margin-left: 10px; margin-top: 20px; width: 2px; height: 2px; }</style><div>Target</div><script>document.querySelector('div').addEventListener('click', () => window.top._clicked = true);</script>\"></iframe>"
+
+nestedIframeMarkup :: Text
+nestedIframeMarkup =
+  "<style>body, html, iframe { margin: 0; padding: 0; box-sizing: border-box; } iframe { border: 1px solid black; background: gray; margin-left: 33px; margin-top: 24px; width: 400px; height: 400px; transform: scale(0.8); }</style><iframe srcdoc=\"<style>body, html, iframe { margin: 0; padding: 0; box-sizing: border-box; } iframe { border: 3px solid black; background: gray; margin-left: 18px; margin-top: 14px; width: 200px; height: 200px; transform: scale(0.7); }</style><iframe srcdoc='<style>div { margin-left: 10px; margin-top: 20px; width: 2px; height: 2px; }</style><div>Target</div>'></iframe>\"></iframe>"
+
 
 waitForStyleGone :: Text -> Text -> Text -> IO ()
 waitForStyleGone property hidden shown =

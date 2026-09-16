@@ -35,7 +35,7 @@ import Playwright.CheckOptions
   ( CheckOptions (checkOptionsForce, checkOptionsTimeout, checkOptionsTrial)
   )
 import Playwright.ClickOptions
-  ( ClickOptions (clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition)
+  ( ClickOptions (clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsTrial)
   , defaultClickOptions
   )
 import Playwright.CssPixel
@@ -88,7 +88,7 @@ import Playwright.Protocol
   , FrameBlurResult
   , FrameCheckParams (frameCheckParamsForce, frameCheckParamsStrict, frameCheckParamsTrial)
   , FrameCheckResult
-  , FrameClickParams (frameClickParamsButton, frameClickParamsClickCount, frameClickParamsForce, frameClickParamsModifiers, frameClickParamsNoWaitAfter, frameClickParamsPosition, frameClickParamsStrict)
+  , FrameClickParams (frameClickParamsButton, frameClickParamsClickCount, frameClickParamsForce, frameClickParamsModifiers, frameClickParamsNoWaitAfter, frameClickParamsPosition, frameClickParamsStrict, frameClickParamsTrial)
   , FrameClickParamsButton (FrameClickParamsButtonLeft, FrameClickParamsButtonMiddle, FrameClickParamsButtonRight)
   , FrameClickParamsModifiers (FrameClickParamsModifiersAlt, FrameClickParamsModifiersControl, FrameClickParamsModifiersControlOrMeta, FrameClickParamsModifiersMeta, FrameClickParamsModifiersShift)
   , FrameClickResult
@@ -191,6 +191,7 @@ clickFrameWith frame selector timeout opts =
       , frameClickParamsModifiers = fmap (fmap toFrameClickModifier) (clickOptionsModifiers opts)
       , frameClickParamsNoWaitAfter = clickOptionsNoWaitAfter opts
       , frameClickParamsPosition = fmap toProtocolPoint (clickOptionsPosition opts)
+      , frameClickParamsTrial = clickOptionsTrial opts
       }
 
 toFrameClickButton :: MouseButton -> FrameClickParamsButton

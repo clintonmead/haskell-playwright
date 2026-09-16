@@ -24,6 +24,7 @@ data ClickOptions = ClickOptions
   , clickOptionsNoWaitAfter :: Maybe Bool
   , clickOptionsPosition :: Maybe Point
   , clickOptionsTimeout :: Maybe Timeout
+  , clickOptionsTrial :: Maybe Bool
   }
   deriving stock (Eq, Show)
 
@@ -37,4 +38,5 @@ defaultClickOptions =
     , clickOptionsNoWaitAfter = Nothing
     , clickOptionsPosition = Nothing
     , clickOptionsTimeout = Nothing
+    , clickOptionsTrial = Nothing
     }
