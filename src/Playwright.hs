@@ -396,6 +396,7 @@ module Playwright
   , getProperty
   , getPropertyList
   , goBack
+  , goBackWith
   , goForward
   , goto
   , gotoFrame
@@ -1153,7 +1154,7 @@ import Playwright.KeyboardModifier
   ( KeyboardModifier (KeyboardModifierAlt, KeyboardModifierControl, KeyboardModifierControlOrMeta, KeyboardModifierMeta, KeyboardModifierShift)
   )
 import Playwright.LaunchOptions
-  ( LaunchOptions (LaunchOptions, launchOptionsArgs, launchOptionsChromiumSandbox, launchOptionsDownloadsPath, launchOptionsExecutablePath, launchOptionsHeadless, launchOptionsProxy, launchOptionsSlowMo, launchOptionsTimeout)
+  ( LaunchOptions (LaunchOptions, launchOptionsArgs, launchOptionsChromiumSandbox, launchOptionsDownloadsPath, launchOptionsExecutablePath, launchOptionsHeadless, launchOptionsIgnoreDefaultArgs, launchOptionsProxy, launchOptionsSlowMo, launchOptionsTimeout)
   , defaultLaunchOptions
   )
 import Playwright.LoadState
@@ -1282,6 +1283,7 @@ import Playwright.Page
   , getByTestId
   , getByText
   , goBack
+  , goBackWith
   , goForward
   , goto
   , isClosed

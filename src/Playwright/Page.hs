@@ -19,6 +19,7 @@ module Playwright.Page
   , getByTestId
   , getByText
   , goBack
+  , goBackWith
   , goForward
   , isClosed
   , reload
@@ -144,6 +145,10 @@ import Playwright.Json.Decode
 import Playwright.Json.ProtocolBinary
   ( protocolBinaryToByteString
   )
+import Playwright.LoadState
+  ( LoadState
+  , toLifecycle
+  )
 import Playwright.Locator
   ( Locator (Locator, locatorContextChannel, locatorFrame, locatorMainFrame, locatorPageChannel, locatorSelector)
   )
@@ -167,6 +172,7 @@ import Playwright.Protocol
   , PageCloseParams (pageCloseParamsReason)
   , PageCloseResult
   , PageRunBeforeUnloadResult
+  , PageGoBackParams (pageGoBackParamsWaitUntil)
   , PageGoBackResult (pageGoBackResultResponse)
   , PageGoForwardResult (pageGoForwardResultResponse)
   , PageInitializer (pageInitializerMainFrame, pageInitializerOpener)
@@ -488,9 +494,19 @@ getByRole page role opts =
   locator page (getByRoleSelector role opts)
 
 goBack :: Page -> Playwright (Maybe Response)
-goBack page = do
+goBack page =
+  goBackWith page Nothing
+
+goBackWith :: Page -> Maybe LoadState -> Playwright (Maybe Response)
+goBackWith page waitUntil = do
   timeout <- pageNavigationTimeout page
-  result <- send (pageChannel page) (MethodName "goBack") (mkPageGoBackParams timeout)
+  result <-
+    send
+      (pageChannel page)
+      (MethodName "goBack")
+      (mkPageGoBackParams timeout)
+        { pageGoBackParamsWaitUntil = fmap toLifecycle waitUntil
+        }
   pure (fmap (responseFromRef) (pageGoBackResultResponse result))
 
 goForward :: Page -> Playwright (Maybe Response)

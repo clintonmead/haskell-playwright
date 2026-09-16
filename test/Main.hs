@@ -3,6 +3,7 @@ module Main
   ) where
 
 import Playwright.BeforeunloadSpec qualified as BeforeunloadSpec
+import Playwright.BfcacheSpec qualified as BfcacheSpec
 import Playwright.BrowserSpec qualified as BrowserSpec
 import Playwright.BrowserContextAddCookiesSpec qualified as BrowserContextAddCookiesSpec
 import Playwright.BrowserContextAddInitScriptSpec qualified as BrowserContextAddInitScriptSpec
@@ -39,6 +40,7 @@ import Playwright.CapabilitiesSpec qualified as CapabilitiesSpec
 import Playwright.ConnectionSpec qualified as ConnectionSpec
 import Playwright.DefaultBrowserContext1Spec qualified as DefaultBrowserContext1Spec
 import Playwright.DefaultBrowserContext2Spec qualified as DefaultBrowserContext2Spec
+import Playwright.DisableWebSecuritySpec qualified as DisableWebSecuritySpec
 import Playwright.DownloadSpec qualified as DownloadSpec
 import Playwright.DownloadsPathSpec qualified as DownloadsPathSpec
 import Playwright.EmulationFocusSpec qualified as EmulationFocusSpec
@@ -183,6 +185,7 @@ main =
       "playwright"
         [ TransportSpec.tests
         , BeforeunloadSpec.tests
+        , BfcacheSpec.tests
         , BrowserSpec.tests
         , BrowserContextAddCookiesSpec.tests
         , BrowserContextAddInitScriptSpec.tests
@@ -219,6 +222,7 @@ main =
         , ConnectionSpec.tests
         , DefaultBrowserContext1Spec.tests
         , DefaultBrowserContext2Spec.tests
+        , DisableWebSecuritySpec.tests
         , DownloadSpec.tests
         , DownloadsPathSpec.tests
         , EmulationFocusSpec.tests

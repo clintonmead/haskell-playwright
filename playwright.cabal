@@ -218,6 +218,7 @@ test-suite playwright-test
   main-is: Main.hs
   other-modules:
       Playwright.BeforeunloadSpec
+      Playwright.BfcacheSpec
       Playwright.BrowserContextAddCookiesSpec
       Playwright.BrowserContextAddInitScriptSpec
       Playwright.BrowserContextBaseUrlSpec
@@ -254,6 +255,7 @@ test-suite playwright-test
       Playwright.ConnectionSpec
       Playwright.DefaultBrowserContext1Spec
       Playwright.DefaultBrowserContext2Spec
+      Playwright.DisableWebSecuritySpec
       Playwright.DownloadsPathSpec
       Playwright.DownloadSpec
       Playwright.ElementHandleBoundingBoxSpec
