@@ -49,7 +49,7 @@ import Playwright.Channel
   , send
   )
 import Playwright.ClickOptions
-  ( ClickOptions (clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsTimeout, clickOptionsTrial)
+  ( ClickOptions (clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsSteps, clickOptionsTimeout, clickOptionsTrial)
   , defaultClickOptions
   )
 import Playwright.CssPixel
@@ -95,7 +95,7 @@ import Playwright.Point
   )
 import Playwright.Protocol
   ( ElementHandleBoundingBoxResult (elementHandleBoundingBoxResultValue)
-  , ElementHandleClickParams (elementHandleClickParamsButton, elementHandleClickParamsClickCount, elementHandleClickParamsForce, elementHandleClickParamsModifiers, elementHandleClickParamsNoWaitAfter, elementHandleClickParamsPosition, elementHandleClickParamsTrial)
+  , ElementHandleClickParams (elementHandleClickParamsButton, elementHandleClickParamsClickCount, elementHandleClickParamsForce, elementHandleClickParamsModifiers, elementHandleClickParamsNoWaitAfter, elementHandleClickParamsPosition, elementHandleClickParamsSteps, elementHandleClickParamsTrial)
   , ElementHandleClickParamsButton (ElementHandleClickParamsButtonLeft, ElementHandleClickParamsButtonMiddle, ElementHandleClickParamsButtonRight)
   , ElementHandleClickParamsModifiers (ElementHandleClickParamsModifiersAlt, ElementHandleClickParamsModifiersControl, ElementHandleClickParamsModifiersControlOrMeta, ElementHandleClickParamsModifiersMeta, ElementHandleClickParamsModifiersShift)
   , ElementHandleClickResult
@@ -192,6 +192,7 @@ clickHandleWith handle opts = do
         , elementHandleClickParamsModifiers = fmap (fmap toHandleClickModifier) (clickOptionsModifiers opts)
         , elementHandleClickParamsNoWaitAfter = clickOptionsNoWaitAfter opts
         , elementHandleClickParamsPosition = fmap toProtocolPoint (clickOptionsPosition opts)
+        , elementHandleClickParamsSteps = clickOptionsSteps opts
         , elementHandleClickParamsTrial = clickOptionsTrial opts
         }
   pure ()

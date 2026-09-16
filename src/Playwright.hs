@@ -797,7 +797,7 @@ import Playwright.ClearCookiesOptions
   , defaultClearCookiesOptions
   )
 import Playwright.ClickOptions
-  ( ClickOptions (ClickOptions, clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsTimeout, clickOptionsTrial)
+  ( ClickOptions (ClickOptions, clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsSteps, clickOptionsTimeout, clickOptionsTrial)
   , defaultClickOptions
   )
 import Playwright.Clock

@@ -23,6 +23,7 @@ data ClickOptions = ClickOptions
   , clickOptionsModifiers :: Maybe [KeyboardModifier]
   , clickOptionsNoWaitAfter :: Maybe Bool
   , clickOptionsPosition :: Maybe Point
+  , clickOptionsSteps :: Maybe Int
   , clickOptionsTimeout :: Maybe Timeout
   , clickOptionsTrial :: Maybe Bool
   }
@@ -37,6 +38,7 @@ defaultClickOptions =
     , clickOptionsModifiers = Nothing
     , clickOptionsNoWaitAfter = Nothing
     , clickOptionsPosition = Nothing
+    , clickOptionsSteps = Nothing
     , clickOptionsTimeout = Nothing
     , clickOptionsTrial = Nothing
     }

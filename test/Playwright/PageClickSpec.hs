@@ -16,6 +16,7 @@ import UnliftIO.IORef
   )
 import Control.Monad
   ( forM_
+  , replicateM
   )
 import Data.Text
   ( Text
@@ -23,9 +24,11 @@ import Data.Text
   , replace
   )
 import Playwright
-  ( ClickOptions (clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsPosition, clickOptionsTimeout, clickOptionsTrial)
+  ( AriaRole (AriaRole)
+  , ClickOptions (clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsPosition, clickOptionsSteps, clickOptionsTimeout, clickOptionsTrial)
   , ConsoleMessage (consoleMessageText)
   , Frame
+  , GetByRoleOptions (getByRoleName)
   , Key (Key)
   , KeyboardModifier (KeyboardModifierShift)
   , LoadState (LoadStateLoad)
@@ -39,6 +42,7 @@ import Playwright
   , ViewportHeight (ViewportHeight)
   , ViewportSize (ViewportSize)
   , ViewportWidth (ViewportWidth)
+  , addInitScript
   , addStyleTag
   , asElement
   , childFrameLocator
@@ -50,6 +54,7 @@ import Playwright
   , cssPixelFromInt
   , dblclick
   , defaultClickOptions
+  , defaultGetByRoleOptions
   , defaultGotoOptions
   , emptyStyleTag
   , evalOnSelector
@@ -65,18 +70,23 @@ import Playwright
   , evaluateTexts
   , fill
   , frameLocator
+  , getByRole
   , goto
   , innerText
   , keyboardDown
   , keyboardUp
   , locatorOnFrame
   , milliseconds
+  , mouseDown
+  , mouseMove
+  , mouseUp
   , onConsole
   , querySelector
   , selectorFromText
   , setContent
   , setViewportSize
   , urlFromText
+  , waitForConsoleWhere
   , waitForLoadState
   , waitForPopup
   )
@@ -615,6 +625,100 @@ tests =
           _ <- evaluateOnLocator target "div => { div.addEventListener('click', () => { window.top._clicked = true; }); }"
           click target
           assertEqual "clicked" True =<< evaluateBool page "() => window._clicked"
+    , testCase "ensure events are dispatched in the individual tasks" $
+        withChromiumPage $ \page -> do
+          addInitScript
+            page
+            "window.builtins = { setTimeout: window.setTimeout.bind(window), clearTimeout: window.clearTimeout.bind(window), requestAnimationFrame: window.requestAnimationFrame.bind(window) };"
+          setContent
+            page
+            "<div id=\"outer\" style=\"background: #d4d4d4; width: 60px; height: 60px;\"><div id=\"inner\" style=\"background: #adadad; width: 46px; height: 46px;\"></div></div>"
+          _ <-
+            evaluate
+              page
+              "() => { function onClick(name) { console.log('click ' + name); window.builtins.setTimeout(function() { console.log('timeout ' + name); }, 0); void Promise.resolve().then(function() { console.log('promise ' + name); }); } document.getElementById('inner').addEventListener('click', () => onClick('inner')); document.getElementById('outer').addEventListener('click', () => onClick('outer')); }"
+          messages <-
+            withAsync
+              (replicateM 6 (fmap consoleMessageText (waitForConsoleWhere page (const True))))
+              $ \pending -> do
+                click (locate page "#inner")
+                wait pending
+          assertEqual
+            "order"
+            ["click inner", "promise inner", "click outer", "promise outer", "timeout inner", "timeout outer"]
+            messages
+    , testCase "should click if opened select covers the button" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<div><select><option>very long text #1</option><option>very long text #2</option><option>very long text #3</option><option>very long text #4</option><option>very long text #5</option><option>very long text #6</option></select></div><div><button onclick=\"window.__CLICKED=42\">clickme</button></div>"
+          click (locate page "select")
+          click (locate page "button")
+          assertEqual "clicked" (42 :: Double) =<< evaluateNumber page "() => window.__CLICKED"
+    , testCase "should fire contextmenu event on right click in correct order" $
+        withChromiumPage $ \page -> do
+          setContent page "<button id=\"target\">Click me</button>"
+          _ <-
+            evaluate
+              page
+              "() => { const logEvent = e => console.log(e.type); document.addEventListener('mousedown', logEvent); document.addEventListener('mouseup', logEvent); document.addEventListener('contextmenu', logEvent); }"
+          entries <- newIORef ([] :: [Text])
+          onConsole page $ \message ->
+            modifyIORef' entries (<> [consoleMessageText message])
+          clickWith
+            (getByRole page (AriaRole "button") defaultGetByRoleOptions {getByRoleName = Just "Click me"})
+            defaultClickOptions {clickOptionsButton = Just MouseButtonRight}
+          assertEqual "order" ["mousedown", "contextmenu", "mouseup"] =<< readIORef entries
+    , testCase "should set PointerEvent.pressure on pointerdown" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<button id=\"target\">Click me</button><script>window.pressures = []; document.addEventListener('pointerdown', e => window.pressures.push(['pointerdown', e.pressure])); document.addEventListener('pointerup', e => window.pressures.push(['pointerup', e.pressure]));</script>"
+          click (locate page "button")
+          assertEqual "pressures" True
+            =<< evaluateBool
+              page
+              "() => { const p = window.pressures; const has = wanted => p.some(x => JSON.stringify(x) === JSON.stringify(wanted)); return has(['pointerdown', 0.5]) && has(['pointerup', 0]); }"
+    , testCase "should set PointerEvent.pressure on pointermove" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<body style=\"margin: 0; padding: 0;\"><div id=\"target\" style=\"width: 500px; height: 500px; background-color: red;\"></div><script>window.pressures = []; document.addEventListener('pointermove', e => window.pressures.push([e.pressure, e.clientX, e.clientY]));</script></body>"
+          click (locate page "div#target")
+          mouseMove page (Point (cssPixelFromInt 10) (cssPixelFromInt 10))
+          mouseDown page
+          mouseMove page (Point (cssPixelFromInt 250) (cssPixelFromInt 250))
+          mouseUp page
+          mouseMove page (Point (cssPixelFromInt 50) (cssPixelFromInt 50))
+          assertEqual "pressures" True
+            =<< evaluateBool
+              page
+              "() => { const p = window.pressures; const has = wanted => p.some(x => JSON.stringify(x) === JSON.stringify(wanted)); return has([0, 250, 250]) && has([0, 10, 10]) && has([0.5, 250, 250]) && has([0, 50, 50]); }"
+    , testCase "should click into shadow root with slotted div" $
+        withChromiumPage $ \page -> do
+          setContent page "<my-button><template shadowrootmode=\"open\"><button><slot></slot></button></template><div>Foo</div></my-button>"
+          click (getByRole page (AriaRole "button") defaultGetByRoleOptions {getByRoleName = Just "Foo"})
+    , testCase "should click shadow root button" $
+        withChromiumPage $ \page -> do
+          setContent page "<my-button><template shadowrootmode=\"open\"><button><slot></slot></button></template><div>Foo</div></my-button>"
+          click (locate page "my-button")
+    , testCase "should click with tweened mouse movement" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<body style=\"margin: 0; padding: 0; height: 500px; width: 500px;\"><div style=\"position: relative; top: 280px; left: 150px; width: 100px; height: 40px\">Click me</div></body>"
+          mouseMove page (Point (cssPixelFromInt 100) (cssPixelFromInt 100))
+          _ <-
+            evaluate
+              page
+              "() => { window.result = []; document.addEventListener('mousemove', event => { window.result.push([event.clientX, event.clientY]); }); }"
+          clickWith (locate page "div") defaultClickOptions {clickOptionsSteps = Just 5}
+          assertEqual
+            "path"
+            True
+            =<< evaluateBool
+              page
+              "() => JSON.stringify(window.result) === JSON.stringify([[120,140],[140,180],[160,220],[180,260],[200,300]])"
     ]
 
 waitUntilEnabled :: Text -> Text -> Text -> IO ()
