@@ -11,12 +11,19 @@ import Playwright
   , defaultGetByRoleOptions
   , evaluateOnLocatorAllTexts
   , evaluateOnLocatorText
+  , getByAltText
+  , getByAltTextRegex
   , getByLabel
+  , getByPlaceholder
+  , getByPlaceholderRegex
   , getByRole
   , getByTestId
   , getByTestIdRegex
   , getByText
+  , getByTitle
+  , getByTitleRegex
   , innerText
+  , locatorCount
   , setContent
   )
 import Playwright.Harness
@@ -84,4 +91,22 @@ tests =
           setContent page "<div>yo</div><div>ya</div><div>\nye  </div>"
           html <- evaluateOnLocatorText (getByText page "ye" Inexact) "e => e.outerHTML"
           assertEqual "ye" True (">\nye  </div>" `isInfixOf` html)
+    , testCase "getByPlaceholder should work" $
+        withChromiumPage $ \page -> do
+          setContent page "<div><input placeholder='Hello'><input placeholder='Hello World'></div>"
+          assertEqual "inexact" 2 =<< locatorCount (getByPlaceholder page "hello" Inexact)
+          assertEqual "exact" 1 =<< locatorCount (getByPlaceholder page "Hello" Exact)
+          assertEqual "regex" 1 =<< locatorCount (getByPlaceholderRegex page "/wor/i")
+    , testCase "getByAltText should work" $
+        withChromiumPage $ \page -> do
+          setContent page "<div><input alt='Hello'><input alt='Hello World'></div>"
+          assertEqual "inexact" 2 =<< locatorCount (getByAltText page "hello" Inexact)
+          assertEqual "exact" 1 =<< locatorCount (getByAltText page "Hello" Exact)
+          assertEqual "regex" 1 =<< locatorCount (getByAltTextRegex page "/wor/i")
+    , testCase "getByTitle should work" $
+        withChromiumPage $ \page -> do
+          setContent page "<div><input title='Hello'><input title='Hello World'></div>"
+          assertEqual "inexact" 2 =<< locatorCount (getByTitle page "hello" Inexact)
+          assertEqual "exact" 1 =<< locatorCount (getByTitle page "Hello" Exact)
+          assertEqual "regex" 1 =<< locatorCount (getByTitleRegex page "/wor/i")
     ]

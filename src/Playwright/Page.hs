@@ -14,11 +14,17 @@ module Playwright.Page
   , setContent
   , title
   , url
+  , getByAltText
+  , getByAltTextRegex
   , getByLabel
+  , getByPlaceholder
+  , getByPlaceholderRegex
   , getByRole
   , getByTestId
   , getByTestIdRegex
   , getByText
+  , getByTitle
+  , getByTitleRegex
   , goBack
   , goBackWith
   , goForward
@@ -123,11 +129,17 @@ import Playwright.Exactness
   ( Exactness
   )
 import Playwright.GetBy
-  ( getByLabelSelector
+  ( getByAltTextSelector
+  , getByAltTextSelectorRegex
+  , getByLabelSelector
+  , getByPlaceholderSelector
+  , getByPlaceholderSelectorRegex
   , getByRoleSelector
   , getByTestIdSelector
   , getByTestIdSelectorRegex
   , getByTextSelector
+  , getByTitleSelector
+  , getByTitleSelectorRegex
   )
 import Playwright.GetByRoleOptions
   ( GetByRoleOptions
@@ -488,6 +500,30 @@ getByTestId page testId =
 getByTestIdRegex :: Page -> Text -> Locator
 getByTestIdRegex page source =
   locator page (getByTestIdSelectorRegex source)
+
+getByAltText :: Page -> Text -> Exactness -> Locator
+getByAltText page text exactness =
+  locator page (getByAltTextSelector text exactness)
+
+getByAltTextRegex :: Page -> Text -> Locator
+getByAltTextRegex page source =
+  locator page (getByAltTextSelectorRegex source)
+
+getByPlaceholder :: Page -> Text -> Exactness -> Locator
+getByPlaceholder page text exactness =
+  locator page (getByPlaceholderSelector text exactness)
+
+getByPlaceholderRegex :: Page -> Text -> Locator
+getByPlaceholderRegex page source =
+  locator page (getByPlaceholderSelectorRegex source)
+
+getByTitle :: Page -> Text -> Exactness -> Locator
+getByTitle page text exactness =
+  locator page (getByTitleSelector text exactness)
+
+getByTitleRegex :: Page -> Text -> Locator
+getByTitleRegex page source =
+  locator page (getByTitleSelectorRegex source)
 
 getByText :: Page -> Text -> Exactness -> Locator
 getByText page text exactness =

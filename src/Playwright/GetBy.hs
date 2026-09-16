@@ -1,9 +1,15 @@
 module Playwright.GetBy
-  ( getByLabelSelector
+  ( getByAltTextSelector
+  , getByAltTextSelectorRegex
+  , getByLabelSelector
+  , getByPlaceholderSelector
+  , getByPlaceholderSelectorRegex
   , getByRoleSelector
   , getByTestIdSelector
   , getByTestIdSelectorRegex
   , getByTextSelector
+  , getByTitleSelector
+  , getByTitleSelectorRegex
   , hasNotTextSelector
   , hasTextRegexSelector
   , hasTextSelector
@@ -59,6 +65,38 @@ hasTextRegexSelector source =
 getByLabelSelector :: Text -> Exactness -> Selector
 getByLabelSelector text exactness =
   selectorFromText ("internal:label=" <> escapeForTextSelector text exactness)
+
+getByAltTextSelector :: Text -> Exactness -> Selector
+getByAltTextSelector =
+  getByAttributeSelector "alt"
+
+getByAltTextSelectorRegex :: Text -> Selector
+getByAltTextSelectorRegex =
+  getByAttributeSelectorRegex "alt"
+
+getByPlaceholderSelector :: Text -> Exactness -> Selector
+getByPlaceholderSelector =
+  getByAttributeSelector "placeholder"
+
+getByPlaceholderSelectorRegex :: Text -> Selector
+getByPlaceholderSelectorRegex =
+  getByAttributeSelectorRegex "placeholder"
+
+getByTitleSelector :: Text -> Exactness -> Selector
+getByTitleSelector =
+  getByAttributeSelector "title"
+
+getByTitleSelectorRegex :: Text -> Selector
+getByTitleSelectorRegex =
+  getByAttributeSelectorRegex "title"
+
+getByAttributeSelector :: Text -> Text -> Exactness -> Selector
+getByAttributeSelector attr text exactness =
+  selectorFromText ("internal:attr=[" <> attr <> "=" <> escapeForAttributeSelector text exactness <> "]")
+
+getByAttributeSelectorRegex :: Text -> Text -> Selector
+getByAttributeSelectorRegex attr source =
+  selectorFromText ("internal:attr=[" <> attr <> "=" <> escapeRegexForSelector source <> "]")
 
 getByTestIdSelector :: Text -> Selector
 getByTestIdSelector testId =

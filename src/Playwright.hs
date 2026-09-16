@@ -392,11 +392,17 @@ module Playwright
   , fulfillRoute
   , getAttribute
   , getAttributeHandle
+  , getByAltText
+  , getByAltTextRegex
   , getByLabel
+  , getByPlaceholder
+  , getByPlaceholderRegex
   , getByRole
   , getByTestId
   , getByTestIdRegex
   , getByText
+  , getByTitle
+  , getByTitleRegex
   , getProperty
   , getPropertyList
   , goBack
@@ -1306,11 +1312,17 @@ import Playwright.Page
   , closePageReason
   , closePageWith
   , content
+  , getByAltText
+  , getByAltTextRegex
   , getByLabel
+  , getByPlaceholder
+  , getByPlaceholderRegex
   , getByRole
   , getByTestId
   , getByTestIdRegex
   , getByText
+  , getByTitle
+  , getByTitleRegex
   , goBack
   , goBackWith
   , goForward

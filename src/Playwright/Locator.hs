@@ -30,11 +30,17 @@ module Playwright.Locator
   , first
   , focus
   , getAttribute
+  , getByAltText
+  , getByAltTextRegex
   , getByLabel
+  , getByPlaceholder
+  , getByPlaceholderRegex
   , getByRole
   , getByTestId
   , getByTestIdRegex
   , getByText
+  , getByTitle
+  , getByTitleRegex
   , hover
   , highlight
   , hideHighlight
@@ -180,11 +186,17 @@ import Playwright.Frame.Wait
   ( waitForSelectorFrame
   )
 import Playwright.GetBy
-  ( getByLabelSelector
+  ( getByAltTextSelector
+  , getByAltTextSelectorRegex
+  , getByLabelSelector
+  , getByPlaceholderSelector
+  , getByPlaceholderSelectorRegex
   , getByRoleSelector
   , getByTestIdSelector
   , getByTestIdSelectorRegex
   , getByTextSelector
+  , getByTitleSelector
+  , getByTitleSelectorRegex
   , hasNotTextSelector
   , hasTextRegexSelector
   , hasTextSelector
@@ -340,6 +352,30 @@ getByTestId loc testId =
 getByTestIdRegex :: Locator -> Text -> Locator
 getByTestIdRegex loc source =
   childLocator loc (getByTestIdSelectorRegex source)
+
+getByAltText :: Locator -> Text -> Exactness -> Locator
+getByAltText loc text exactness =
+  childLocator loc (getByAltTextSelector text exactness)
+
+getByAltTextRegex :: Locator -> Text -> Locator
+getByAltTextRegex loc source =
+  childLocator loc (getByAltTextSelectorRegex source)
+
+getByPlaceholder :: Locator -> Text -> Exactness -> Locator
+getByPlaceholder loc text exactness =
+  childLocator loc (getByPlaceholderSelector text exactness)
+
+getByPlaceholderRegex :: Locator -> Text -> Locator
+getByPlaceholderRegex loc source =
+  childLocator loc (getByPlaceholderSelectorRegex source)
+
+getByTitle :: Locator -> Text -> Exactness -> Locator
+getByTitle loc text exactness =
+  childLocator loc (getByTitleSelector text exactness)
+
+getByTitleRegex :: Locator -> Text -> Locator
+getByTitleRegex loc source =
+  childLocator loc (getByTitleSelectorRegex source)
 
 getByRole :: Locator -> AriaRole -> GetByRoleOptions -> Locator
 getByRole loc role opts =
