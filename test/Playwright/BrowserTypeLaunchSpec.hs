@@ -3,7 +3,7 @@ module Playwright.BrowserTypeLaunchSpec
   ) where
 
 import Playwright
-  ( LaunchOptions (launchOptionsExecutablePath)
+  ( LaunchOptions (launchOptionsArgs, launchOptionsExecutablePath)
   , chromium
   , closeBrowser
   , defaultLaunchOptions
@@ -70,10 +70,30 @@ tests =
         withChromiumBrowser $ \browser -> do
           concurrently_ (closeBrowser browser) (closeBrowser browser)
           closeBrowser browser
+    , testCase "should throw if userDataDir is passed as an argument" $
+        withChromiumBrowser $ \_browser -> do
+          browserType <- chromium
+          assertProtocolContains
+            "launchPersistentContext"
+            ( launch
+                browserType
+                defaultLaunchOptions
+                  { launchOptionsArgs = Just ["--user-data-dir=random-path", "--profile=random-path"]
+                  }
+            )
+    , testCase "should throw if page argument is passed" $
+        withChromiumBrowser $ \_browser -> do
+          browserType <- chromium
+          assertProtocolContains
+            "can not specify page"
+            ( launch
+                browserType
+                defaultLaunchOptions {launchOptionsArgs = Just ["http://example.com"]}
+            )
     ]
 
 -- Official cases that stay skipped:
--- userDataDir / args / port (not on typed LaunchOptions; userDataDir belongs on launchPersistentContext)
+-- userDataDir / port as untyped launch options (userDataDir belongs on launchPersistentContext)
 -- __testHookBeforeCreateBrowser timeout / Dummy exception
 -- `process` as options, `await using` (Node)
 -- dummy_bad_browser_executable.js (same as invalid executablePath)

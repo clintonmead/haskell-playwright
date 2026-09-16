@@ -302,6 +302,7 @@ test-suite playwright-test
       Playwright.LocatorMiscSpec
       Playwright.LocatorQuerySpec
       Playwright.LocatorSpec
+      Playwright.OopifSpec
       Playwright.PageAddInitScriptSpec
       Playwright.PageAddLocatorHandlerSpec
       Playwright.PageAddScriptTagSpec

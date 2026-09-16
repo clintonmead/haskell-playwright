@@ -170,6 +170,7 @@ module Playwright
   , armFrameDetached
   , armFrameNavigated
   , armLoadEvent
+  , armNavigatedFrame
   , armPopup
   , arrayValue
   , asElement
@@ -322,7 +323,9 @@ module Playwright
   , evaluateOnElementWith
   , evaluateOnFrame
   , evaluateOnFrameBool
+  , evaluateOnFrameNumber
   , evaluateOnFrameText
+  , evaluateOnFrameWith
   , evaluateOnHandle
   , evaluateOnHandleBool
   , evaluateOnHandleExpression
@@ -574,6 +577,7 @@ module Playwright
   , setChecked
   , setCheckedHandle
   , setContent
+  , setContentOnFrame
   , setContextDefaultNavigationTimeout
   , setContextDefaultTimeout
   , setContextExtraHTTPHeaders
@@ -637,10 +641,12 @@ module Playwright
   , waitForFunctionWithArg
   , waitForLoadEvent
   , waitForLoadState
+  , waitForLoadStateFrame
   , waitForNavigation
   , waitForNavigationWith
   , waitForFrameNavigated
   , waitForFrameDetached
+  , waitForNavigatedFrame
   , waitForPageError
   , waitForPopup
   , waitUntilJsHandlePreview
@@ -981,7 +987,9 @@ import Playwright.Evaluate
   , evaluateOnElementWith
   , evaluateOnFrame
   , evaluateOnFrameBool
+  , evaluateOnFrameNumber
   , evaluateOnFrameText
+  , evaluateOnFrameWith
   , evaluateOnHandle
   , evaluateOnHandleBool
   , evaluateOnHandleExpression
@@ -1034,12 +1042,14 @@ import Playwright.Frame
   , currentUrl
   , framesEqual
   , gotoFrame
+  , setContentOnFrame
   )
 import Playwright.Frame.Inspect
   ( frameElement
   )
 import Playwright.Frame.Wait
-  ( waitForSelectorHandleOnFrame
+  ( waitForLoadStateFrame
+  , waitForSelectorHandleOnFrame
   )
 import Playwright.FulfillOptions
   ( ContentType (ContentType, contentTypeToText)
@@ -1143,7 +1153,7 @@ import Playwright.KeyboardModifier
   ( KeyboardModifier (KeyboardModifierAlt, KeyboardModifierControl, KeyboardModifierControlOrMeta, KeyboardModifierMeta, KeyboardModifierShift)
   )
 import Playwright.LaunchOptions
-  ( LaunchOptions (LaunchOptions, launchOptionsChromiumSandbox, launchOptionsDownloadsPath, launchOptionsExecutablePath, launchOptionsHeadless, launchOptionsProxy, launchOptionsSlowMo, launchOptionsTimeout)
+  ( LaunchOptions (LaunchOptions, launchOptionsArgs, launchOptionsChromiumSandbox, launchOptionsDownloadsPath, launchOptionsExecutablePath, launchOptionsHeadless, launchOptionsProxy, launchOptionsSlowMo, launchOptionsTimeout)
   , defaultLaunchOptions
   )
 import Playwright.LoadState
@@ -1312,6 +1322,7 @@ import Playwright.Page.Wait
   , armFrameDetached
   , armFrameNavigated
   , armLoadEvent
+  , armNavigatedFrame
   , armPopup
   , onLoad
   , onConsole
@@ -1329,6 +1340,7 @@ import Playwright.Page.Wait
   , waitForNavigationWith
   , waitForFrameNavigated
   , waitForFrameDetached
+  , waitForNavigatedFrame
   , waitForPopup
   , waitForRequest
   , waitForRequestFailed

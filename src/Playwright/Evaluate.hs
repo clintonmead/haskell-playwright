@@ -20,7 +20,9 @@ module Playwright.Evaluate
   , evaluateOnElementWith
   , evaluateOnFrame
   , evaluateOnFrameBool
+  , evaluateOnFrameNumber
   , evaluateOnFrameText
+  , evaluateOnFrameWith
   , evaluateOnHandle
   , evaluateOnHandleBool
   , evaluateOnHandleExpression
@@ -193,6 +195,10 @@ evaluateOnFrame :: Frame -> Text -> Playwright SerializedValue
 evaluateOnFrame =
   evaluateFrame
 
+evaluateOnFrameWith :: Frame -> Text -> SerializedArgument -> Playwright SerializedValue
+evaluateOnFrameWith =
+  evaluateFrameWith
+
 evaluateOnFrameText :: Frame -> Text -> Playwright Text
 evaluateOnFrameText frame expression =
   requireText =<< evaluateOnFrame frame expression
@@ -200,6 +206,10 @@ evaluateOnFrameText frame expression =
 evaluateOnFrameBool :: Frame -> Text -> Playwright Bool
 evaluateOnFrameBool frame expression =
   requireBool =<< evaluateOnFrame frame expression
+
+evaluateOnFrameNumber :: Frame -> Text -> Playwright Double
+evaluateOnFrameNumber frame expression =
+  requireNumber =<< evaluateOnFrame frame expression
 
 evaluateOnElement :: ElementHandle -> Text -> Playwright SerializedValue
 evaluateOnElement handle expression =

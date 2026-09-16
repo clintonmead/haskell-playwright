@@ -15,6 +15,7 @@ module Playwright.Frame
   , frameSend_
   , gotoFrame
   , setContentFrame
+  , setContentOnFrame
   , titleFrame
   ) where
 
@@ -103,6 +104,7 @@ import Playwright.SerializedValue
   )
 import Playwright.Timeout
   ( Timeout
+  , defaultTimeout
   )
 import Playwright.TimeoutDefaults
   ( emptyTimeoutDefaults
@@ -233,6 +235,10 @@ contentFrame frame = do
 setContentFrame :: Frame -> Text -> Timeout -> Playwright ()
 setContentFrame frame html timeout =
   frameSend_ @FrameSetContentResult frame "setContent" (mkFrameSetContentParams html timeout)
+
+setContentOnFrame :: Frame -> Text -> Playwright ()
+setContentOnFrame frame html =
+  setContentFrame frame html defaultTimeout
 
 evaluateFrame :: Frame -> Text -> Playwright SerializedValue
 evaluateFrame frame expression =

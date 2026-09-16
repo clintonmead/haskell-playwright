@@ -3,6 +3,7 @@ module Playwright.Page.Wait
   , armDialog
   , armFrameDetached
   , armFrameNavigated
+  , armNavigatedFrame
   , armLoadEvent
   , armPopup
   , onLoad
@@ -12,6 +13,7 @@ module Playwright.Page.Wait
   , waitForDialog
   , waitForFrameDetached
   , waitForFrameNavigated
+  , waitForNavigatedFrame
   , waitForFunction
   , waitForFunctionOnFrame
   , waitForFunctionPolling
@@ -274,15 +276,23 @@ waitForNavigation page = do
   waitForNavigationWith page timeout Nothing
 
 waitForFrameNavigated :: Page -> Playwright ()
-waitForFrameNavigated page = do
+waitForFrameNavigated page =
+  waitForNavigatedFrame page (pageMainFrame page)
+
+waitForNavigatedFrame :: Page -> Frame -> Playwright ()
+waitForNavigatedFrame page frame = do
   timeout <- pageNavigationTimeout page
-  takeNavigated <- armFrameNavigated page
+  takeNavigated <- armNavigatedFrame frame
   waitWithTimeout timeout takeNavigated
 
 armFrameNavigated :: Page -> Playwright (Playwright ())
-armFrameNavigated page = do
+armFrameNavigated page =
+  armNavigatedFrame (pageMainFrame page)
+
+armNavigatedFrame :: Frame -> Playwright (Playwright ())
+armNavigatedFrame frame = do
   let
-    frameGuid = channelGuid (frameChannel (pageMainFrame page))
+    frameGuid = channelGuid (frameChannel frame)
   waitId <- registerFutureEventWaiter frameGuid (MethodName "navigated")
   pure $ do
     _ <- waitForWaiter waitId

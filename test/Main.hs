@@ -86,6 +86,7 @@ import Playwright.LocatorMiscSpec qualified as LocatorMiscSpec
 import Playwright.LocatorMisc2Spec qualified as LocatorMisc2Spec
 import Playwright.LocatorQuerySpec qualified as LocatorQuerySpec
 import Playwright.LocatorSpec qualified as LocatorSpec
+import Playwright.OopifSpec qualified as OopifSpec
 import Playwright.PageAddInitScriptSpec qualified as PageAddInitScriptSpec
 import Playwright.PageAddLocatorHandlerSpec qualified as PageAddLocatorHandlerSpec
 import Playwright.PageAddScriptTagSpec qualified as PageAddScriptTagSpec
@@ -265,6 +266,7 @@ main =
         , LocatorMiscSpec.tests
         , LocatorMisc2Spec.tests
         , LocatorQuerySpec.tests
+        , OopifSpec.tests
         , PageAddInitScriptSpec.tests
         , PageAddLocatorHandlerSpec.tests
         , PageAddScriptTagSpec.tests

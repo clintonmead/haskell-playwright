@@ -16,7 +16,8 @@ import Data.Aeson
   , ToJSON
   )
 import Data.Text
-  ( pack
+  ( Text
+  , pack
   , unpack
   )
 import Playwright.Timeout
@@ -35,6 +36,7 @@ data LaunchOptions = LaunchOptions
   , launchOptionsProxy :: Maybe ProxySettings
   , launchOptionsDownloadsPath :: Maybe FilePath
   , launchOptionsExecutablePath :: Maybe FilePath
+  , launchOptionsArgs :: Maybe [Text]
   }
   deriving stock (Eq, Show)
   deriving (FromJSON, ToJSON) via (Autodocodec LaunchOptions)
@@ -49,12 +51,13 @@ defaultLaunchOptions =
     , launchOptionsProxy = Nothing
     , launchOptionsDownloadsPath = Nothing
     , launchOptionsExecutablePath = Nothing
+    , launchOptionsArgs = Nothing
     }
 
 instance HasCodec LaunchOptions where
   codec =
     object "LaunchOptions" $
-      ( \headless timeout sandbox slowMo proxy downloadsPath executablePath ->
+      ( \headless timeout sandbox slowMo proxy downloadsPath executablePath args ->
           LaunchOptions
             { launchOptionsHeadless = headless
             , launchOptionsTimeout = timeout
@@ -63,6 +66,7 @@ instance HasCodec LaunchOptions where
             , launchOptionsProxy = proxy
             , launchOptionsDownloadsPath = fmap unpack downloadsPath
             , launchOptionsExecutablePath = fmap unpack executablePath
+            , launchOptionsArgs = args
             }
       )
         <$> optionalField' "headless" .= launchOptionsHeadless
@@ -72,3 +76,4 @@ instance HasCodec LaunchOptions where
         <*> optionalField' "proxy" .= launchOptionsProxy
         <*> optionalField' "downloadsPath" .= (fmap pack . launchOptionsDownloadsPath)
         <*> optionalField' "executablePath" .= (fmap pack . launchOptionsExecutablePath)
+        <*> optionalField' "args" .= launchOptionsArgs

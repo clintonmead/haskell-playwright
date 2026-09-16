@@ -10,12 +10,14 @@ module Playwright.Harness
   , withAssetPage
   , withAssets
   , withAssetsContextWith
+  , withAssetsLaunchWith
   , withAssetsPrefix
   , withAssetsWith
   , testAssetsDir
   , withChromiumBrowser
   , withChromiumBrowserWith
   , withChromiumContext
+  , withChromiumContextLaunchWith
   , withChromiumContextWith
   , withChromiumPage
   , withLocalApp
@@ -124,9 +126,9 @@ withChromiumPage action =
   withChromiumBrowser $ \browser ->
     withPage browser action
 
-withChromiumContextWith :: NewContextOptions -> (BrowserContext -> Page -> Playwright a) -> IO a
-withChromiumContextWith opts action =
-  withChromiumBrowser $ \browser ->
+withChromiumContextLaunchWith :: LaunchOptions -> NewContextOptions -> (BrowserContext -> Page -> Playwright a) -> IO a
+withChromiumContextLaunchWith launchOpts opts action =
+  withChromiumBrowserWith launchOpts $ \browser ->
     bracket
       ( do
           ctx <- newContextWith browser opts
@@ -135,6 +137,10 @@ withChromiumContextWith opts action =
       )
       (\(ctx, _) -> closeContext ctx)
       (\(ctx, page) -> action ctx page)
+
+withChromiumContextWith :: NewContextOptions -> (BrowserContext -> Page -> Playwright a) -> IO a
+withChromiumContextWith =
+  withChromiumContextLaunchWith defaultLaunchOptions
 
 withChromiumContext :: (BrowserContext -> Page -> Playwright a) -> IO a
 withChromiumContext =
@@ -200,11 +206,15 @@ withAssetsPrefix action = do
   withApplication (pure (staticApp (defaultFileServerSettings assets))) $ \port ->
     action ("http://127.0.0.1:" <> pack (show port))
 
-withAssetsContextWith :: NewContextOptions -> (Text -> BrowserContext -> Page -> Playwright a) -> IO a
-withAssetsContextWith opts action =
+withAssetsLaunchWith :: LaunchOptions -> NewContextOptions -> (Text -> BrowserContext -> Page -> Playwright a) -> IO a
+withAssetsLaunchWith launchOpts opts action =
   withAssetsPrefix $ \prefix ->
-    withChromiumContextWith opts $ \ctx page ->
+    withChromiumContextLaunchWith launchOpts opts $ \ctx page ->
       action prefix ctx page
+
+withAssetsContextWith :: NewContextOptions -> (Text -> BrowserContext -> Page -> Playwright a) -> IO a
+withAssetsContextWith =
+  withAssetsLaunchWith defaultLaunchOptions
 
 withAssetsWith :: NewContextOptions -> (Text -> Page -> Playwright a) -> IO a
 withAssetsWith opts action =
