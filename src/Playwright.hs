@@ -677,6 +677,7 @@ module Playwright
   , waitForURL
   , waitForURLWith
   , waitForWorker
+  , waitForWorkerConsole
   , waitForServiceWorker
   , waitForWith
   , webkit
@@ -838,7 +839,7 @@ import Playwright.Contrast
   ( Contrast (ContrastMore, ContrastNoOverride, ContrastNoPreference)
   )
 import Playwright.ConsoleMessage
-  ( ConsoleMessage (ConsoleMessage, consoleMessageArgs, consoleMessagePage, consoleMessageText, consoleMessageType)
+  ( ConsoleMessage (ConsoleMessage, consoleMessageArgs, consoleMessagePage, consoleMessageText, consoleMessageType, consoleMessageWorkerRef)
   )
 import Playwright.ConsoleType
   ( ConsoleType (ConsoleAssert, ConsoleClear, ConsoleCount, ConsoleDebug, ConsoleDir, ConsoleDirXml, ConsoleError, ConsoleInfo, ConsoleLog, ConsoleProfile, ConsoleProfileEnd, ConsoleTable, ConsoleTimeEnd, ConsoleTrace, ConsoleVerbose, ConsoleWarning)
@@ -1621,6 +1622,7 @@ import Playwright.Worker
   , serviceWorkers
   , waitForServiceWorker
   , waitForWorker
+  , waitForWorkerConsole
   , workerUrl
   , workers
   , workersEqual

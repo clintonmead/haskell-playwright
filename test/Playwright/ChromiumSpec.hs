@@ -7,6 +7,7 @@ import Control.Monad
   , when
   )
 import Data.ByteString.Char8 qualified as BS8
+import Data.ByteString.Lazy.Char8 qualified as LBS8
 import Data.CaseInsensitive
   ( mk
   )
@@ -23,6 +24,7 @@ import Data.Text
   )
 import Network.HTTP.Types
   ( RequestHeaders
+  , hContentType
   , status200
   )
 import Network.Wai
@@ -36,7 +38,9 @@ import Network.Wai.Application.Static
   , staticApp
   )
 import Playwright
-  ( ContentType (ContentType)
+  ( ConsoleMessage (consoleMessageArgs, consoleMessageText, consoleMessageType)
+  , ConsoleType (ConsoleLog)
+  , ContentType (ContentType)
   , FulfillBody (FulfillText)
   , FulfillOptions (fulfillBody, fulfillContentType, fulfillStatus)
   , HeaderName (HeaderName)
@@ -50,6 +54,7 @@ import Playwright
   , UrlGlob (UrlGlob)
   , Worker
   , closeContext
+  , closePage
   , contextRoute
   , continueRoute
   , defaultFulfillOptions
@@ -63,8 +68,10 @@ import Playwright
   , evaluateText
   , fulfillRoute
   , goto
+  , jsonValueText
   , newContext
   , newPage
+  , onConsole
   , onContextClose
   , onContextRequest
   , onContextResponse
@@ -83,9 +90,12 @@ import Playwright
   , setOffline
   , urlFromText
   , urlToText
+  , waitForConsole
+  , waitForContextConsole
   , waitForContextRequestWhere
   , waitForContextResponseWhere
   , waitForServiceWorker
+  , waitForWorkerConsole
   , workersEqual
   )
 import Playwright.Harness
@@ -396,6 +406,48 @@ tests =
                 "custom header"
                 (Just (BS8.pack "custom!"))
                 (lookup (mk (BS8.pack "x-custom-header")) headers)
+    , testCase "should emit console messages from service worker" $
+        withAssets $ \prefix page -> do
+          let
+            ctx = pageContext page
+          emptyPage <- newPage ctx
+          _ <- goto emptyPage (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          emptyMessages <- newIORef ([] :: [ConsoleMessage])
+          onConsole emptyPage (\message -> modifyIORef' emptyMessages (<> [message]))
+          worker <-
+            withAsync (waitForServiceWorker ctx) $ \pending -> do
+              _ <- goto page (urlFromText (prefix <> "/serviceworkers/empty/sw.html")) defaultGotoOptions
+              wait pending
+          withAsync (waitForWorkerConsole worker) $ \workerPending ->
+            withAsync (waitForConsole page) $ \pagePending -> do
+              _ <-
+                evaluateOnWorker
+                  worker
+                  "() => console.log('hello from service worker', { i: 'am', am: 1, complex: { yup: true } })"
+              workerMessage <- wait workerPending
+              pageMessage <- wait pagePending
+              assertEqual "type" ConsoleLog (consoleMessageType workerMessage)
+              assertEqual "same text" (consoleMessageText workerMessage) (consoleMessageText pageMessage)
+              assertBool "text" ("hello from service worker" `isInfixOf` consoleMessageText workerMessage)
+              assertEqual "empty page quiet" 0 . length =<< readIORef emptyMessages
+              closePage page
+              assertEqual "args" 2 (length (consoleMessageArgs workerMessage))
+              case consoleMessageArgs workerMessage of
+                firstArg : _ ->
+                  assertEqual "arg0" "hello from service worker" =<< jsonValueText firstArg
+                _ ->
+                  assertFailure "expected console args"
+    , testCase "should capture console.log from ServiceWorker start" $ do
+        assets <- testAssetsDir
+        withChromiumContext $ \ctx page ->
+          withLocalApp (swStartLogApp assets) $ \prefix ->
+            withAsync (waitForServiceWorker ctx) $ \swPending ->
+              withAsync (waitForContextConsole ctx) $ \consolePending -> do
+                _ <- goto page (urlFromText (prefix <> "/serviceworkers/empty/sw.html")) defaultGotoOptions
+                _ <- wait swPending
+                message <- wait consolePending
+                assertEqual "text" "Hello from the first line of sw.js" (consoleMessageText message)
+                assertEqual "type" ConsoleLog (consoleMessageType message)
     ]
 
 urlEndsWith :: Text -> Request -> Playwright Bool
@@ -439,5 +491,18 @@ innerHeaderApp assets captured request respond =
     ["inner.txt"] -> do
       putMVar captured (requestHeaders request)
       respond (responseLBS status200 [] "ok")
+    _ ->
+      staticApp (defaultFileServerSettings assets) request respond
+
+swStartLogApp :: FilePath -> Application
+swStartLogApp assets request respond =
+  case pathInfo request of
+    ["serviceworkers", "empty", "sw.js"] ->
+      respond
+        ( responseLBS
+            status200
+            [(hContentType, "text/javascript")]
+            (LBS8.pack "console.log('Hello from the first line of sw.js');")
+        )
     _ ->
       staticApp (defaultFileServerSettings assets) request respond

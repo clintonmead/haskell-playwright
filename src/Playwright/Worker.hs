@@ -8,6 +8,7 @@ module Playwright.Worker
   , serviceWorkers
   , waitForServiceWorker
   , waitForWorker
+  , waitForWorkerConsole
   , workerFromRef
   , workersEqual
   , workerUrl
@@ -28,7 +29,10 @@ import Data.Text
   ( Text
   )
 import Playwright.BrowserContext
-  ( BrowserContext (browserContextChannel)
+  ( BrowserContext (BrowserContext, browserContextChannel)
+  )
+import Playwright.BrowserContext.Network
+  ( subscribeBrowserContext
   )
 import Playwright.Channel
   ( Channel (Channel, channelGuid)
@@ -41,7 +45,12 @@ import Playwright.Connection
   , lookupObject
   , registerEventHandler
   , waitForChannelEvent
+  , waitForChannelEventUnlessClosed
   , waitForFutureChannelEventUnlessClosed
+  )
+import Playwright.ConsoleMessage
+  ( ConsoleMessage (consoleMessageWorkerRef)
+  , consoleMessageFromEvent
   )
 import Playwright.Error
   ( PlaywrightError (EvaluateUnexpected)
@@ -60,6 +69,7 @@ import Playwright.Page
   )
 import Playwright.Protocol
   ( BrowserContextServiceWorkerEvent (browserContextServiceWorkerEventWorker)
+  , BrowserContextUpdateSubscriptionParamsEvent (BrowserContextUpdateSubscriptionParamsEventConsole)
   , ChannelType (ChannelTypeWorker)
   , PageWorkerEvent (pageWorkerEventWorker)
   , WorkerEvaluateExpressionParams (workerEvaluateExpressionParamsIsFunction)
@@ -135,6 +145,33 @@ waitForServiceWorker ctx =
         (MethodName "serviceWorker")
     event <- throwDecode params
     pure (workerFromRef (browserContextServiceWorkerEventWorker event))
+
+contextFromWorker :: Worker -> Playwright BrowserContext
+contextFromWorker worker = do
+  obj <- lookupObject (channelGuid (workerChannel worker))
+  pure (BrowserContext (Channel (remoteParent obj)))
+
+waitForWorkerConsole :: Worker -> Playwright ConsoleMessage
+waitForWorkerConsole worker = do
+  ctx <- contextFromWorker worker
+  subscribeBrowserContext ctx BrowserContextUpdateSubscriptionParamsEventConsole
+  waitWithTimeout defaultTimeout collect
+  where
+    collect = do
+      ctx' <- contextFromWorker worker
+      params <-
+        waitForChannelEventUnlessClosed
+          (channelGuid (browserContextChannel ctx'))
+          (MethodName "console")
+          (channelGuid (workerChannel worker))
+      event <- throwDecode params
+      message <- consoleMessageFromEvent (browserContextChannel ctx') event
+      case consoleMessageWorkerRef message of
+        Just ref
+          | channelRefGuid ref == channelGuid (workerChannel worker) ->
+              pure message
+        _ ->
+          collect
 
 serviceWorkers :: BrowserContext -> Playwright [Worker]
 serviceWorkers ctx = do

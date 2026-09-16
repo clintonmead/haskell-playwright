@@ -27,12 +27,15 @@ import Playwright.JsHandle
   ( JsHandle
   , jsHandleFromRef
   )
+import Playwright.Json.ChannelRef
+  ( ChannelRef
+  )
 import Playwright.Page
   ( Page
   , pageFromRef
   )
 import Playwright.Protocol
-  ( BrowserContextConsoleEvent (browserContextConsoleEventArgs, browserContextConsoleEventPage, browserContextConsoleEventText, browserContextConsoleEventType)
+  ( BrowserContextConsoleEvent (browserContextConsoleEventArgs, browserContextConsoleEventPage, browserContextConsoleEventText, browserContextConsoleEventType, browserContextConsoleEventWorker)
   )
 
 data ConsoleMessage = ConsoleMessage
@@ -40,6 +43,7 @@ data ConsoleMessage = ConsoleMessage
   , consoleMessageText :: Text
   , consoleMessageArgs :: [JsHandle]
   , consoleMessagePage :: Maybe Page
+  , consoleMessageWorkerRef :: Maybe ChannelRef
   }
 
 consoleMessageFromEvent :: Channel BrowserContextTag -> BrowserContextConsoleEvent -> Playwright ConsoleMessage
@@ -62,4 +66,5 @@ consoleMessageFromEvent contextChannel event = do
       , consoleMessageText = browserContextConsoleEventText event
       , consoleMessageArgs = fmap (jsHandleFromRef) (browserContextConsoleEventArgs event)
       , consoleMessagePage = matchedPage
+      , consoleMessageWorkerRef = browserContextConsoleEventWorker event
       }
