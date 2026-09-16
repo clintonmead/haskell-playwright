@@ -21,6 +21,7 @@ module Playwright.Page
   , goBack
   , goBackWith
   , goForward
+  , goForwardWith
   , isClosed
   , reload
   , requestGC
@@ -174,6 +175,7 @@ import Playwright.Protocol
   , PageRunBeforeUnloadResult
   , PageGoBackParams (pageGoBackParamsWaitUntil)
   , PageGoBackResult (pageGoBackResultResponse)
+  , PageGoForwardParams (pageGoForwardParamsWaitUntil)
   , PageGoForwardResult (pageGoForwardResultResponse)
   , PageInitializer (pageInitializerMainFrame, pageInitializerOpener)
   , PagePdfParams (pagePdfParamsOutline, pagePdfParamsTagged)
@@ -510,9 +512,19 @@ goBackWith page waitUntil = do
   pure (fmap (responseFromRef) (pageGoBackResultResponse result))
 
 goForward :: Page -> Playwright (Maybe Response)
-goForward page = do
+goForward page =
+  goForwardWith page Nothing
+
+goForwardWith :: Page -> Maybe LoadState -> Playwright (Maybe Response)
+goForwardWith page waitUntil = do
   timeout <- pageNavigationTimeout page
-  result <- send (pageChannel page) (MethodName "goForward") (mkPageGoForwardParams timeout)
+  result <-
+    send
+      (pageChannel page)
+      (MethodName "goForward")
+      (mkPageGoForwardParams timeout)
+        { pageGoForwardParamsWaitUntil = fmap toLifecycle waitUntil
+        }
   pure (fmap (responseFromRef) (pageGoForwardResultResponse result))
 
 reload :: Page -> Playwright (Maybe Response)

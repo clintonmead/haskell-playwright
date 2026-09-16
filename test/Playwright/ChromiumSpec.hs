@@ -24,8 +24,10 @@ import Data.Text
   )
 import Network.HTTP.Types
   ( RequestHeaders
+  , hAuthorization
   , hContentType
   , status200
+  , status401
   )
 import Network.Wai
   ( Application
@@ -45,9 +47,13 @@ import Playwright
   , FulfillOptions (fulfillBody, fulfillContentType, fulfillStatus)
   , HeaderName (HeaderName)
   , HeaderValue (HeaderValue)
+  , HttpCredentials (HttpCredentials, httpCredentialsOrigin, httpCredentialsPassword, httpCredentialsSend, httpCredentialsUsername)
   , HttpHeader (HttpHeader)
+  , HttpPassword (HttpPassword)
   , HttpStatus (HttpStatus)
+  , HttpUsername (HttpUsername)
   , LaunchOptions (launchOptionsArgs)
+  , NewContextOptions (newContextHttpCredentials)
   , Playwright
   , Request
   , Response
@@ -107,6 +113,7 @@ import Playwright.Harness
   , withAssetsPrefix
   , withChromiumBrowser
   , withChromiumContext
+  , withChromiumContextWith
   , withLocalApp
   , withPersistentLaunchWith
   )
@@ -448,6 +455,28 @@ tests =
                 message <- wait consolePending
                 assertEqual "text" "Hello from the first line of sw.js" (consoleMessageText message)
                 assertEqual "type" ConsoleLog (consoleMessageType message)
+    , testCase "httpCredentials" $ do
+        assets <- testAssetsDir
+        withChromiumContextWith
+          defaultNewContextOptions
+            { newContextHttpCredentials =
+                Just
+                  HttpCredentials
+                    { httpCredentialsUsername = HttpUsername "user"
+                    , httpCredentialsPassword = HttpPassword "pass"
+                    , httpCredentialsOrigin = Nothing
+                    , httpCredentialsSend = Nothing
+                    }
+            }
+          $ \ctx page ->
+            withLocalApp (fetchAuthApp assets) $ \prefix -> do
+              worker <-
+                withAsync (waitForServiceWorker ctx) $ \pending -> do
+                  _ <- goto page (urlFromText (prefix <> "/serviceworkers/fetch/sw.html")) defaultGotoOptions
+                  wait pending
+              _ <- evaluate page "() => window['activationPromise']"
+              assertEqual "status" (200 :: Double)
+                =<< evaluateOnWorkerNumber worker "() => fetch('/empty.html').then(r => r.status)"
     ]
 
 urlEndsWith :: Text -> Request -> Playwright Bool
@@ -506,3 +535,37 @@ swStartLogApp assets request respond =
         )
     _ ->
       staticApp (defaultFileServerSettings assets) request respond
+
+fetchAuthApp :: FilePath -> Application
+fetchAuthApp assets request respond =
+  let
+    needsAuth =
+      case pathInfo request of
+        ["serviceworkers", "fetch", "sw.html"] ->
+          True
+        ["empty.html"] ->
+          True
+        _ ->
+          False
+    authorized =
+      lookup hAuthorization (requestHeaders request) == Just (BS8.pack "Basic dXNlcjpwYXNz")
+  in
+    if needsAuth && not authorized
+      then
+        respond
+          ( responseLBS
+              status401
+              [("WWW-Authenticate", BS8.pack "Basic realm=\"test\"")]
+              LBS8.empty
+          )
+      else
+        if pathInfo request == ["empty.html"] && authorized
+          then
+            respond
+              ( responseLBS
+                  status200
+                  [(hContentType, "text/html")]
+                  (LBS8.pack "<html><title>ok</title></html>")
+              )
+          else
+            staticApp (defaultFileServerSettings assets) request respond

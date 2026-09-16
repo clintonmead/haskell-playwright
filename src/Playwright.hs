@@ -399,6 +399,7 @@ module Playwright
   , goBack
   , goBackWith
   , goForward
+  , goForwardWith
   , goto
   , gotoFrame
   , grantPermissions
@@ -1296,6 +1297,7 @@ import Playwright.Page
   , goBack
   , goBackWith
   , goForward
+  , goForwardWith
   , goto
   , isClosed
   , locator
