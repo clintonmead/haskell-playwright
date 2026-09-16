@@ -8,7 +8,7 @@ import Data.Text
   )
 import Playwright
   ( AriaRole (AriaRole)
-  , GetByRoleOptions (getByRoleChecked, getByRoleDisabled, getByRoleExpanded, getByRoleIncludeHidden, getByRoleLevel, getByRoleName, getByRolePressed, getByRoleSelected)
+  , GetByRoleOptions (getByRoleChecked, getByRoleDisabled, getByRoleExpanded, getByRoleIncludeHidden, getByRoleLevel, getByRoleName, getByRoleNameRegex, getByRolePressed, getByRoleSelected)
   , Locator
   , Page
   , allInnerTexts
@@ -341,6 +341,16 @@ tests =
           assertRoleHtmls
             page
             "role=button[name=/h.*o/i]"
+            (helloVisible <> hallo)
+          assertGetByHtmls
+            page
+            (AriaRole "button")
+            defaultGetByRoleOptions {getByRoleNameRegex = Just "/^H[ae]llo$/"}
+            (helloVisible <> hallo)
+          assertGetByHtmls
+            page
+            (AriaRole "button")
+            defaultGetByRoleOptions {getByRoleNameRegex = Just "/h.*o/i"}
             (helloVisible <> hallo)
           assertRoleHtmls page "role=button[name=\"Hello\"][include-hidden]" helloHidden
           assertGetByHtmls

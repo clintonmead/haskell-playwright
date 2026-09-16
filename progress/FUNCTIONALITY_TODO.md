@@ -33,12 +33,12 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 - **page-click:** skip Chromium-fixme fixed-position iframe, Node `__testHook*` navigation/detachment/noAutoWaiting hooks, dblclick trial, and the racy geolocation permission-popup overlay.
 - **page-click-timeout-1 / 3 / 4:** skip `__testHookBeforePointerAction` / `__testHookBeforeHitTarget` cases (Node-only internals). Protocol timeout errors are `Timeout <n>ms exceeded` (the JS client wraps call-log text such as “element is not enabled”).
 - **selectors-text:** skip locator regex `hasText` that needs extra escaping beyond `/pattern/flags`. String `hasText` and simple `/^…$/` filters are ported.
-- **selectors-role:** skip `getByRole` regex `name` (locator `role=…[name=/…/]` is covered). Skip `description`.
+- **selectors-role:** skip `description`. `getByRoleNameRegex` covers `/pattern/flags` names.
 - **retarget:** skip Playwright `expect` matchers (`toBeEnabled`, `toHaveValue`, `toHaveText`, `toHaveClass`, …). Core locator/handle/page checks and `waitForElementState` are ported. Official `giveItAChanceToResolve` is `rafraf(page, 5)` (double `requestAnimationFrame`, not a sleep).
 - **interception:** skip Node `iso.globToRegexPattern` / `urlMatches` unit tests, unbalanced-brace glob validation (Haskell `UrlGlob` does not reject `{`), `page.route` with a `vm` RegExp, and blob-URL intercept (official WebKit-only). The `http://localhos**?*oo` case uses `localhost` like other cross-host ports.
 - **page-add-locator-handler:** skip Playwright `expect` (`toBeVisible`, `toHaveScreenshot`). Protocol timeout errors now include the driver call log (so “locator handler has finished…” / intercept messages are visible). Official `window.builtins.setTimeout` is provided via `addInitScript` (test-runner-only on Node).
 - **page-request-intercept:** skip Android loopback rewrite and Firefox-only multipart file upload (`fixme` on Chromium). Protocol fetch timeouts are `Timeout <n>ms exceeded` (JS prefixes `route.fetch:`). Warp static `title.html` is `text/html` (Node test server adds `charset=utf-8`).
-- **locator-query:** skip regex `hasText` / `getByRole` `name` quote-escaping suites, `getByTestId(/regex/)`, same-frame constructor errors, and Node `__testHookBeforeQuery` count-during-navigation.
+- **locator-query:** skip regex `hasText` / `getByRole` `name` quote-escaping suites, same-frame constructor errors, and Node `__testHookBeforeQuery` count-during-navigation. `getByTestIdRegex` covers `/pattern/flags`.
 - **locator-misc-2:** skip locator screenshot snapshot.
 - **page-event-request:** service worker / intercept-race / Chromium 204 fixme leftovers.
 - **page-event-crash:** `chrome://crash` `goto` is fired in the background; awaiting it can hang the driver.

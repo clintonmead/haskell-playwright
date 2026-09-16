@@ -33,6 +33,7 @@ module Playwright.Locator
   , getByLabel
   , getByRole
   , getByTestId
+  , getByTestIdRegex
   , getByText
   , hover
   , highlight
@@ -182,6 +183,7 @@ import Playwright.GetBy
   ( getByLabelSelector
   , getByRoleSelector
   , getByTestIdSelector
+  , getByTestIdSelectorRegex
   , getByTextSelector
   , hasNotTextSelector
   , hasTextRegexSelector
@@ -334,6 +336,10 @@ getByLabel loc text exactness =
 getByTestId :: Locator -> Text -> Locator
 getByTestId loc testId =
   childLocator loc (getByTestIdSelector testId)
+
+getByTestIdRegex :: Locator -> Text -> Locator
+getByTestIdRegex loc source =
+  childLocator loc (getByTestIdSelectorRegex source)
 
 getByRole :: Locator -> AriaRole -> GetByRoleOptions -> Locator
 getByRole loc role opts =

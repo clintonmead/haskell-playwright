@@ -14,6 +14,7 @@ import Playwright
   , getByLabel
   , getByRole
   , getByTestId
+  , getByTestIdRegex
   , getByText
   , innerText
   , setContent
@@ -70,6 +71,10 @@ tests =
             , "<a href=\"https://playwright.dev\">he llo 56</a>"
             ]
             links
+    , testCase "getByTestId should work for regex" $
+        withChromiumPage $ \page -> do
+          setContent page "<div><div data-testid=\"Hello\">Hello world</div></div>"
+          assertEqual "text" "Hello world" =<< innerText (getByTestIdRegex page "/He[l]*o/")
     , testCase "getByTestId should escape id" $
         withChromiumPage $ \page -> do
           setContent page "<div><div data-testid='He\"llo'>Hello world</div></div>"

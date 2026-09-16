@@ -395,6 +395,7 @@ module Playwright
   , getByLabel
   , getByRole
   , getByTestId
+  , getByTestIdRegex
   , getByText
   , getProperty
   , getPropertyList
@@ -1094,7 +1095,7 @@ import Playwright.Geolocation
   , longitudeFromInt
   )
 import Playwright.GetByRoleOptions
-  ( GetByRoleOptions (GetByRoleOptions, getByRoleChecked, getByRoleDisabled, getByRoleExact, getByRoleExpanded, getByRoleIncludeHidden, getByRoleLevel, getByRoleName, getByRolePressed, getByRoleSelected)
+  ( GetByRoleOptions (GetByRoleOptions, getByRoleChecked, getByRoleDisabled, getByRoleExact, getByRoleExpanded, getByRoleIncludeHidden, getByRoleLevel, getByRoleName, getByRoleNameRegex, getByRolePressed, getByRoleSelected)
   , defaultGetByRoleOptions
   )
 import Playwright.AddLocatorHandlerOptions
@@ -1308,6 +1309,7 @@ import Playwright.Page
   , getByLabel
   , getByRole
   , getByTestId
+  , getByTestIdRegex
   , getByText
   , goBack
   , goBackWith

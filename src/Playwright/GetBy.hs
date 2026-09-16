@@ -2,6 +2,7 @@ module Playwright.GetBy
   ( getByLabelSelector
   , getByRoleSelector
   , getByTestIdSelector
+  , getByTestIdSelectorRegex
   , getByTextSelector
   , hasNotTextSelector
   , hasTextRegexSelector
@@ -32,7 +33,7 @@ import Playwright.Exactness
   ( Exactness (Exact, Inexact)
   )
 import Playwright.GetByRoleOptions
-  ( GetByRoleOptions (getByRoleChecked, getByRoleDisabled, getByRoleExact, getByRoleExpanded, getByRoleIncludeHidden, getByRoleLevel, getByRoleName, getByRolePressed, getByRoleSelected)
+  ( GetByRoleOptions (getByRoleChecked, getByRoleDisabled, getByRoleExact, getByRoleExpanded, getByRoleIncludeHidden, getByRoleLevel, getByRoleName, getByRoleNameRegex, getByRolePressed, getByRoleSelected)
   )
 import Playwright.Selector
   ( Selector
@@ -63,6 +64,10 @@ getByTestIdSelector :: Text -> Selector
 getByTestIdSelector testId =
   selectorFromText ("internal:testid=[data-testid=" <> escapeForAttributeSelector testId Exact <> "]")
 
+getByTestIdSelectorRegex :: Text -> Selector
+getByTestIdSelectorRegex source =
+  selectorFromText ("internal:testid=[data-testid=" <> escapeRegexForSelector source <> "]")
+
 getByRoleSelector :: AriaRole -> GetByRoleOptions -> Selector
 getByRoleSelector role opts =
   selectorFromText ("internal:role=" <> ariaRoleToText role <> mconcat attrs)
@@ -76,13 +81,21 @@ getByRoleSelector role opts =
         , boolAttr "expanded" (getByRoleExpanded opts)
         , boolAttr "include-hidden" (getByRoleIncludeHidden opts)
         , fmap (\level -> "[level=" <> pack (show level) <> "]") (getByRoleLevel opts)
-        , fmap (\name -> "[name=" <> escapeForAttributeSelector name (getByRoleExact opts) <> "]") (getByRoleName opts)
+        , nameAttr opts
         , boolAttr "pressed" (getByRolePressed opts)
         ]
 
 boolAttr :: Text -> Maybe Bool -> Maybe Text
 boolAttr name value =
   fmap (\flag -> "[" <> name <> "=" <> boolText flag <> "]") value
+
+nameAttr :: GetByRoleOptions -> Maybe Text
+nameAttr opts =
+  case getByRoleNameRegex opts of
+    Just source ->
+      Just ("[name=" <> escapeRegexForSelector source <> "]")
+    Nothing ->
+      fmap (\name -> "[name=" <> escapeForAttributeSelector name (getByRoleExact opts) <> "]") (getByRoleName opts)
 
 boolText :: Bool -> Text
 boolText flag =
@@ -100,6 +113,10 @@ escapeForAttributeSelector value exactness =
     <> replace "\"" "\\\"" (replace "\\" "\\\\" value)
     <> "\""
     <> exactnessSuffix exactness
+
+escapeRegexForSelector :: Text -> Text
+escapeRegexForSelector source =
+  replace ">>" "\\>\\>" source
 
 exactnessSuffix :: Exactness -> Text
 exactnessSuffix exactness =

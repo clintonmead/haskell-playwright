@@ -17,6 +17,7 @@ module Playwright.Page
   , getByLabel
   , getByRole
   , getByTestId
+  , getByTestIdRegex
   , getByText
   , goBack
   , goBackWith
@@ -125,6 +126,7 @@ import Playwright.GetBy
   ( getByLabelSelector
   , getByRoleSelector
   , getByTestIdSelector
+  , getByTestIdSelectorRegex
   , getByTextSelector
   )
 import Playwright.GetByRoleOptions
@@ -482,6 +484,10 @@ frameLocator page iframeSelector =
 getByTestId :: Page -> Text -> Locator
 getByTestId page testId =
   locator page (getByTestIdSelector testId)
+
+getByTestIdRegex :: Page -> Text -> Locator
+getByTestIdRegex page source =
+  locator page (getByTestIdSelectorRegex source)
 
 getByText :: Page -> Text -> Exactness -> Locator
 getByText page text exactness =

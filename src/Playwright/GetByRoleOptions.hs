@@ -18,6 +18,7 @@ data GetByRoleOptions = GetByRoleOptions
   , getByRoleIncludeHidden :: Maybe Bool
   , getByRoleLevel :: Maybe Int
   , getByRoleName :: Maybe Text
+  , getByRoleNameRegex :: Maybe Text
   , getByRolePressed :: Maybe Bool
   , getByRoleSelected :: Maybe Bool
   }
@@ -33,6 +34,7 @@ defaultGetByRoleOptions =
     , getByRoleIncludeHidden = Nothing
     , getByRoleLevel = Nothing
     , getByRoleName = Nothing
+    , getByRoleNameRegex = Nothing
     , getByRolePressed = Nothing
     , getByRoleSelected = Nothing
     }
