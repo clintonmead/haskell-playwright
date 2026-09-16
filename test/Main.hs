@@ -37,6 +37,7 @@ import Playwright.BrowserContextViewportSpec qualified as BrowserContextViewport
 import Playwright.BrowserTypeBasicSpec qualified as BrowserTypeBasicSpec
 import Playwright.BrowserTypeLaunchSpec qualified as BrowserTypeLaunchSpec
 import Playwright.CapabilitiesSpec qualified as CapabilitiesSpec
+import Playwright.ChromiumSpec qualified as ChromiumSpec
 import Playwright.ConnectionSpec qualified as ConnectionSpec
 import Playwright.DefaultBrowserContext1Spec qualified as DefaultBrowserContext1Spec
 import Playwright.DefaultBrowserContext2Spec qualified as DefaultBrowserContext2Spec
@@ -219,6 +220,7 @@ main =
         , BrowserTypeBasicSpec.tests
         , BrowserTypeLaunchSpec.tests
         , CapabilitiesSpec.tests
+        , ChromiumSpec.tests
         , ConnectionSpec.tests
         , DefaultBrowserContext1Spec.tests
         , DefaultBrowserContext2Spec.tests

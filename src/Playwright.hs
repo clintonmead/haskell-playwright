@@ -497,6 +497,7 @@ module Playwright
   , onRequestFailed
   , onRequestFinished
   , onResponse
+  , onServiceWorker
   , opener
   , orLocator
   , ownerFrameHandle
@@ -573,6 +574,7 @@ module Playwright
   , selectTextWith
   , selectorFromText
   , selectorToText
+  , serviceWorkers
   , sessionExpires
   , sessionStorage
   , setChecked
@@ -669,6 +671,7 @@ module Playwright
   , waitForURL
   , waitForURLWith
   , waitForWorker
+  , waitForServiceWorker
   , waitForWith
   , webkit
   , wheelDeltaFromInt
@@ -678,6 +681,7 @@ module Playwright
   , runPlaywright
   , workerUrl
   , workers
+  , workersEqual
   ) where
 
 import Playwright.AcceptDownloads
@@ -1599,7 +1603,11 @@ import Playwright.Worker
   ( Worker (Worker, workerChannel)
   , evaluateOnWorker
   , evaluateOnWorkerText
+  , onServiceWorker
+  , serviceWorkers
+  , waitForServiceWorker
   , waitForWorker
   , workerUrl
   , workers
+  , workersEqual
   )

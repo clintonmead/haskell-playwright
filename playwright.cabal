@@ -252,6 +252,7 @@ test-suite playwright-test
       Playwright.BrowserTypeBasicSpec
       Playwright.BrowserTypeLaunchSpec
       Playwright.CapabilitiesSpec
+      Playwright.ChromiumSpec
       Playwright.ConnectionSpec
       Playwright.DefaultBrowserContext1Spec
       Playwright.DefaultBrowserContext2Spec
