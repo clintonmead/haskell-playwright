@@ -38,6 +38,15 @@
           playwrightTest = pkgs.writeShellScriptBin "playwright-test" (
             builtins.readFile ./scripts/playwright-test
           );
+          playwrightTestHeaded = pkgs.writeShellScriptBin "playwright-test-headed" (
+            builtins.readFile ./scripts/playwright-test-headed
+          );
+          headedLibs = pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [
+            pkgs.libGL
+            pkgs.libglvnd
+            pkgs.mesa
+            pkgs.vulkan-loader
+          ];
         in
         {
           default = pkgs.mkShell {
@@ -48,6 +57,7 @@
               hpkgs.haskell-language-server
               stackWrapped
               playwrightTest
+              playwrightTestHeaded
               pkgs.nodejs
               pkgs.playwright-driver
               pkgs.playwright-driver.browsers
@@ -57,7 +67,8 @@
               pkgs.libyaml
               pkgs.zlib
               pkgs.gmp
-            ];
+            ]
+            ++ headedLibs;
             PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers}";
             PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "true";
             PLAYWRIGHT_NODEJS_PATH = "${pkgs.nodejs}/bin/node";

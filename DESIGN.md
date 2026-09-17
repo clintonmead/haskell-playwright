@@ -114,6 +114,19 @@ nix develop --command bash -c 'playwright-test -p /page-goto/'
 
 `TASTY_PATTERN` is Tasty's own environment-variable form of the same filter. Full-suite `playwright-test` (no extra args) is for a green commit.
 
+### Headed demo
+
+`playwright-test-headed` runs the same Tasty suite with a visible Chromium window, one test at a time, and `slowMo` so clicks and typing are watchable. It needs `DISPLAY` or `WAYLAND_DISPLAY`. Launch reads `PLAYWRIGHT_HEADED=1` (headless false) and optional `PLAYWRIGHT_SLOWMO` (milliseconds). Default headed Chromium args include `--disable-gpu` and `--ozone-platform=x11` when `DISPLAY` is set (`PLAYWRIGHT_HEADED_GPU=1` skips `--disable-gpu`).
+
+```
+playwright-test-headed
+playwright-test-headed --demo
+playwright-test-headed -p /page-click/
+nix develop --command bash -c 'playwright-test-headed --demo'
+```
+
+`--demo` is a visual subset (goto, click, fill, drag, keyboard, dialogs, …). With no extra args the full suite runs headed. Do not use the quiet `playwright-test` wrapper for this: it hides successes and captures output until exit.
+
 ### Test reliability
 
 Do not put artificial delays in tests, particularly when those artificial delays are not in the official Playwright tests. That could result in flaky tests and unexpected runtime failures.
@@ -158,7 +171,8 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - Protocol floats that are not timeouts are `Scientific` (Autodocodec has no `HasCodec Double`).
 - The test binary is linked `-threaded -with-rtsopts=-N`. Tasty’s default `--num-threads` is the number of RTS capabilities (CPU threads). Override with `-j` / `--num-threads` / `TASTY_NUM_THREADS`. Individual runs use Tasty `-p` (see Testing). Driver teardown ignores `waitForProcess` `ECHILD` (`does not exist (No child processes)`), which can still occur when many tests close Node drivers at once.
 - Local packages are built with `-O0` (`optimization: False` in `cabal.project`, `$locals` / local `ghc-options` in Stack). Snapshot/Hackage dependencies stay optimized.
-- Cabal `verbose: 0` plus the flake `cabal` wrapper (`-v0`) and Stack `cabal-verbosity: 0` keep successful builds quiet; GHC errors and test output still show. In the Nix shell, `playwright-test` (see `scripts/playwright-test`) builds once, runs the Tasty binary with `--hide-successes --hide-progress`, and strips the driver's host-requirements skip line. Extra args go to Tasty (`playwright-test -p/page-goto/`).
+- Cabal `verbose: 0` plus the flake `cabal` wrapper (`-v0`) and Stack `cabal-verbosity: 0` keep successful builds quiet; GHC errors and test output still show. In the Nix shell, `playwright-test` (see `scripts/playwright-test`) builds once, runs the Tasty binary with `--hide-successes --hide-progress`, and strips the driver's host-requirements skip line. Extra args go to Tasty (`playwright-test -p/page-goto/`). `playwright-test-headed` (see `scripts/playwright-test-headed`) is the live Chromium demo: `PLAYWRIGHT_HEADED=1`, sequential `--num-threads 1`, no output capture.
+- `launch` / `launchPersistentContext` overlay `PLAYWRIGHT_HEADED` / `PLAYWRIGHT_SLOWMO` onto `LaunchOptions` so headed demos do not depend on each spec calling the harness.
 - Locator `evaluate` is `Frame.evalOnSelector` with `strict: true`. Page `evaluate` is `Frame.evaluateExpression` with `isFunction: true`.
 - `Frame.navigated` updates the stored initializer URL and name so `page.url` and `frame.name` stay live.
 - `getByRole`/`getByText`/`getByLabel`/`getByTestId`/`getByAltText`/`getByPlaceholder`/`getByTitle` are client-side `internal:` selectors, matching Playwright's locatorUtils. `GetByRoleOptions` maps `checked`/`disabled`/`selected`/`expanded`/`includeHidden`/`level`/`name`/`pressed` onto `internal:role` attributes (`exact` applies to `name`). `getByRoleNameRegex` / `getByTestIdRegex` / `getByAltTextRegex` / `getByPlaceholderRegex` / `getByTitleRegex` take a `/pattern/flags` source. `getByTestIdAttr` takes the attribute name (comma-separated names are JSON-encoded like JS `encodeTestIdAttributeName`).

@@ -103,6 +103,7 @@ library
       Playwright.Key
       Playwright.Keyboard
       Playwright.KeyboardModifier
+      Playwright.LaunchEnv
       Playwright.LaunchOptions
       Playwright.LaunchPersistent
       Playwright.LoadState

@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+# Headed Chromium demo of the Haskell Playwright suite.
+#
+# Chromium windows open on DISPLAY (or WAYLAND_DISPLAY). Tests run one at a
+# time with slowMo so clicks, typing, and navigation are visible. No prompts.
+#
+#   playwright-test-headed
+#   playwright-test-headed --demo
+#   playwright-test-headed -p /page-click/
+#   nix develop --command bash -c 'playwright-test-headed -p /page-fill/'
+#
+# PLAYWRIGHT_SLOWMO       delay in ms between Playwright actions (default 250)
+# PLAYWRIGHT_HEADED_GPU=1 use GPU instead of --disable-gpu
+set -eu
+
+SHOWCASE='$1 == "locator-highlight" || $1 == "page-goto" || $1 == "page-click" || $1 == "locator-click" || $1 == "page-click-scroll" || $1 == "page-fill" || $1 == "page-drag" || $1 == "page-keyboard" || $1 == "page-mouse" || $1 == "page-dialog" || $1 == "page-screenshot" || $1 == "page-check" || $1 == "page-select-option" || $1 == "page-filechooser" || $1 == "tap" || $1 == "wheel" || $1 == "geolocation" || $1 == "selectors-get-by" || $1 == "popup" || $1 == "web-socket"'
+
+export PLAYWRIGHT_HEADED=1
+export PLAYWRIGHT_SLOWMO="${PLAYWRIGHT_SLOWMO:-250}"
+
+if [ -z "${PLAYWRIGHT_HEADED_GPU:-}" ]; then
+  export LIBGL_ALWAYS_SOFTWARE="${LIBGL_ALWAYS_SOFTWARE:-1}"
+fi
+
+hpack --force
+cabal build playwright-test
+bin="$(cabal list-bin playwright:test:playwright-test)"
+
+all=0
+demo=0
+pass_through=0
+has_timeout=0
+has_pattern=0
+has_threads=0
+tasty_args=()
+
+for arg in "$@"; do
+  case "$arg" in
+    --all)
+      all=1
+      continue
+      ;;
+    --demo)
+      demo=1
+      continue
+      ;;
+    --help|-h|--list-tests)
+      pass_through=1
+      ;;
+    --timeout|--timeout=*)
+      has_timeout=1
+      ;;
+    -p|--pattern|--pattern=*)
+      has_pattern=1
+      ;;
+    --num-threads|-j|--num-threads=*|-j*)
+      has_threads=1
+      ;;
+  esac
+  tasty_args+=("$arg")
+done
+
+if [ -n "${TASTY_PATTERN:-}" ]; then
+  has_pattern=1
+fi
+
+if [ "$pass_through" -eq 0 ]; then
+  case "$(uname -s)" in
+    Darwin)
+      ;;
+    *)
+      if [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
+        echo "playwright-test-headed: set DISPLAY (or WAYLAND_DISPLAY) so Chromium can open a window." >&2
+        echo "On NixOS, run this from a graphical session, or: export DISPLAY=:0" >&2
+        exit 1
+      fi
+      ;;
+  esac
+fi
+
+extra=()
+if [ "$has_threads" -eq 0 ]; then
+  extra+=(--num-threads 1)
+fi
+if [ "$has_timeout" -eq 0 ] && [ "$pass_through" -eq 0 ]; then
+  extra+=(--timeout 180s)
+fi
+if [ "$demo" -eq 1 ] && [ "$has_pattern" -eq 0 ] && [ "$pass_through" -eq 0 ]; then
+  extra+=(-p "$SHOWCASE")
+elif [ "$has_pattern" -eq 0 ] && [ "$pass_through" -eq 0 ]; then
+  extra+=(-p '/./')
+fi
+
+ensure_matches() {
+  listed="$("$bin" --list-tests "${extra[@]}" "${tasty_args[@]}" 2>/dev/null || true)"
+  if [ -z "$listed" ]; then
+    echo "playwright-test-headed: pattern matched no tests" >&2
+    exit 1
+  fi
+}
+
+if [ "$pass_through" -eq 1 ]; then
+  exec "$bin" "${extra[@]}" "${tasty_args[@]}"
+fi
+
+if [ "${#extra[@]}" -gt 0 ] || [ "${#tasty_args[@]}" -gt 0 ] || [ -n "${TASTY_PATTERN:-}" ]; then
+  ensure_matches
+fi
+
+count="$("$bin" --list-tests "${extra[@]}" "${tasty_args[@]}" 2>/dev/null | grep -c . || true)"
+echo "playwright-test-headed: ${count} Haskell tests, headed Chromium, slowMo=${PLAYWRIGHT_SLOWMO}ms, sequential." >&2
+echo "playwright-test-headed: windows open on this display; no input needed." >&2
+
+color_args=()
+if [ -t 1 ]; then
+  color_args+=(--color always)
+else
+  color_args+=(--color never)
+fi
+
+set +e
+"$bin" "${extra[@]}" "${color_args[@]}" "${tasty_args[@]}" 2> >(grep -v --line-buffered 'Skipping host requirements validation' >&2)
+status=$?
+set -e
+exit "$status"

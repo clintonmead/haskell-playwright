@@ -52,6 +52,9 @@ import Playwright.Json.ChannelRef
 import Playwright.Json.Decode
   ( throwDecode
   )
+import Playwright.LaunchEnv
+  ( applyEnvLaunchOverrides
+  )
 import Playwright.LaunchOptions
   ( LaunchOptions (launchOptionsDownloadsPath)
   )
@@ -92,7 +95,7 @@ browserTypeFromRef ref = do
 
 launch :: BrowserType -> LaunchOptions -> Playwright Browser
 launch browserType opts = do
-  resolved <- liftIO (resolveLaunchDownloads opts)
+  resolved <- liftIO (resolveLaunchDownloads opts >>= applyEnvLaunchOverrides)
   result <-
     send
       (browserTypeChannel browserType)
@@ -110,7 +113,7 @@ launchPersistentContext :: BrowserType -> FilePath -> LaunchOptions -> NewContex
 launchPersistentContext browserType userDataDir launchOpts ctxOpts = do
   validateNewContextOptions ctxOpts
   absUserDataDir <- liftIO (makeAbsolute userDataDir)
-  resolvedLaunch <- liftIO (resolveLaunchDownloads launchOpts)
+  resolvedLaunch <- liftIO (resolveLaunchDownloads launchOpts >>= applyEnvLaunchOverrides)
   engines <- lookupSelectorEngines
   result <-
     send
