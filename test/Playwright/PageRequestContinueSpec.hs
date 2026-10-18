@@ -3,6 +3,7 @@ module Playwright.PageRequestContinueSpec
   ) where
 
 import Data.ByteString qualified as BS
+import Data.CaseInsensitive qualified as CI
 import Data.ByteString.Char8 qualified as BS8
 import Data.ByteString.Lazy.Char8 qualified as LBS8
 import Data.Maybe
@@ -12,6 +13,7 @@ import Data.Maybe
 import Data.Text
   ( isSuffixOf
   , pack
+  , unpack
   )
 import Data.Text.Encoding
   ( encodeUtf8
@@ -191,6 +193,62 @@ tests =
             seen <- readIORef requests
             assertEqual "body" (Just binary) (bodyOf "/sleep.zzz" seen)
 
+    , testCase "should use content-type from original request" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (recordingApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            route page (UrlGlob "**/title.html") $ \handled ->
+              continueRouteWith handled defaultContinueOptions {continuePostData = Just "{\"b\":2}"}
+            _ <-
+              evaluateText
+                page
+                ( "() => fetch('" <> prefix
+                    <> "/title.html', { method: 'POST', body: '{\"a\":1}', headers: { 'content-type': 'application/json' } }).then(r => r.text())"
+                )
+            seen <- readIORef requests
+            assertEqual "content-type" (Just "application/json") (headerOf "/title.html" "content-type" seen)
+            assertEqual "body" (Just "{\"b\":2}") (bodyOf "/title.html" seen)
+    , testCase "should not allow to override unsafe HTTP headers" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (recordingApp requests) $ \prefix -> do
+            route page (UrlGlob "**/*") $ \handled ->
+              continueRouteWith
+                handled
+                defaultContinueOptions
+                  { continueHeaders =
+                      Just
+                        [ HttpHeader (HeaderName "host") (HeaderValue "bar")
+                        , HttpHeader (HeaderName "trailer") (HeaderValue "baz")
+                        ]
+                  }
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            seen <- readIORef requests
+            assertEqual "trailer" Nothing (headerOf "/empty.html" "trailer" seen)
+            assertEqual "host" (Just (BS8.pack (drop 7 (unpack prefix)))) (headerOf "/empty.html" "host" seen)
+    , testCase "should compute content-length from post data" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (recordingApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            let longBody = BS8.replicate 7500 'a'
+            route page (UrlGlob "**/*") $ \handled ->
+              continueRouteWith handled defaultContinueOptions {continuePostData = Just longBody}
+            _ <- evaluateText page "() => fetch('/sleep.zzz', { method: 'PATCH', body: 'birdy' }).then(r => r.text())"
+            seen <- readIORef requests
+            assertEqual "body" (Just longBody) (bodyOf "/sleep.zzz" seen)
+    , testCase "postData should return empty string when overriding body with empty string" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (recordingApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            route page (UrlGlob "**/*") $ \handled ->
+              continueRouteWith handled defaultContinueOptions {continuePostData = Just ""}
+            _ <- evaluateText page "() => fetch('/sleep.zzz', { method: 'POST', body: 'original' }).then(r => r.text())"
+            seen <- readIORef requests
+            assertEqual "body" (Just "") (bodyOf "/sleep.zzz" seen)
+
     ]
 
 echoFooHeader :: Application
@@ -207,6 +265,7 @@ data Recorded = Recorded
   { recordedMethod :: BS8.ByteString
   , recordedPath :: BS8.ByteString
   , recordedBody :: BS8.ByteString
+  , recordedHeaders :: [(BS8.ByteString, BS8.ByteString)]
   }
 
 -- | Records every request's method, path, and body, and answers with an
@@ -219,9 +278,15 @@ recordingApp requests request respond = do
         (Wai.requestMethod request)
         (Wai.rawPathInfo request)
         (LBS8.toStrict body)
+        (map (\(name, value) -> (CI.foldedCase name, value)) (Wai.requestHeaders request))
         :
     )
   respond (responseLBS status200 [(hContentType, "text/html")] "")
+
+-- | A header the last request to the path carried.
+headerOf :: BS8.ByteString -> BS8.ByteString -> [Recorded] -> Maybe BS8.ByteString
+headerOf path name requests =
+  lookup name . recordedHeaders =<< lastFor path requests
 
 -- | The method of the last request to the path.
 methodOf :: BS8.ByteString -> [Recorded] -> Maybe BS8.ByteString
