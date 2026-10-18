@@ -5,26 +5,47 @@
 //   scripts/upstream-gaps library                 # every spec in tests/library
 //   SHOW=1 scripts/upstream-gaps page page-drag   # one spec, with the names
 //
-// Matching is by name (letters and digits only, "@tag" suffixes ignored), so
-// a missing name can be a rewording rather than a real gap. Check the upstream
-// file before porting. A spec with no Haskell file is reported as NO HS FILE.
+// A case matches when a Haskell testCase name is equal to it, or is a prefix
+// of it (or it of the Haskell name), once letters and digits are compared.
+// "@tag" suffixes are ignored. A miss can still be a rewording, so read the
+// upstream file before porting. A spec with no Haskell file is NO HS FILE.
 const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const norm = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 const hsDir = path.join(ROOT, 'test/Playwright');
-const hsByNorm = new Map(
-  fs.readdirSync(hsDir)
-    .filter((f) => f.endsWith('Spec.hs'))
-    .map((f) => [norm(f.replace(/Spec\.hs$/, '')), f])
-);
+const hsSpecs = fs.readdirSync(hsDir).filter((f) => f.endsWith('Spec.hs'));
+const hsByNorm = new Map(hsSpecs.map((f) => [norm(f.replace(/Spec\.hs$/, '')), f]));
 
 const [dirname, only] = process.argv.slice(2);
 if (!dirname) {
   console.error('usage: upstream-gaps <tests subdir> [spec-name-fragment]');
   process.exit(2);
 }
+
+// Haskell test names for one spec file, normalized.
+function haskellNames(file) {
+  const src = fs.readFileSync(path.join(hsDir, file), 'utf8');
+  const names = [];
+  const re = /testCase\s+"((?:[^"\\]|\\.)*)"/g;
+  let m;
+  while ((m = re.exec(src))) names.push(norm(m[1]));
+  // Names built from a list, e.g. `testCase (\"should ... \" <> x)`, keep the literal
+  // part, which is still a useful prefix.
+  const re2 = /testCase\s+\(\s*"((?:[^"\\]|\\.)*)"/g;
+  while ((m = re2.exec(src))) names.push(norm(m[1]));
+  // Haskell names are rarely more than a prefix of the upstream name, so a
+  // literal match on the whole source is a fallback.
+  return { names, whole: norm(src) };
+}
+
+function matches(upstream, hs) {
+  const u = norm(upstream.replace(/\s*@\w+/g, ''));
+  if (hs.whole.includes(u)) return true;
+  return hs.names.some((h) => h.length >= 12 && (u.startsWith(h) || h.startsWith(u)));
+}
+
 const d = path.join(ROOT, 'upstream-typescript-playwright/tests', dirname);
 for (const f of fs.readdirSync(d).sort()) {
   if (!/\.spec\.ts$/.test(f)) continue;
@@ -37,9 +58,8 @@ for (const f of fs.readdirSync(d).sort()) {
   let m;
   while ((m = re.exec(src))) names.push(m[1]);
   if (!names.length) continue;
-  const hs = hsName ? fs.readFileSync(path.join(hsDir, hsName), 'utf8') : '';
-  const hsN = norm(hs);
-  const missing = names.filter((n) => !hsN.includes(norm(n.replace(/\s*@\w+/g, ''))));
+  const hs = hsName ? haskellNames(hsName) : { names: [], whole: '' };
+  const missing = names.filter((n) => !matches(n, hs));
   console.log(`== ${f} -> ${hsName || 'NO HS FILE'}  missing ${missing.length}/${names.length}`);
   if (process.env.SHOW) for (const n of missing) console.log(`   - ${n}`);
 }
