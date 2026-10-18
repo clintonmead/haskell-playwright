@@ -1,6 +1,7 @@
 module Playwright.Page.Wait
   ( armConsole
   , armDialog
+  , onDialog
   , armFrameDetached
   , armFrameNavigated
   , armNavigatedFrame
@@ -82,7 +83,7 @@ import Playwright.ConsoleMessage
   , consoleMessageFromEvent
   )
 import Playwright.Dialog
-  ( Dialog
+  ( Dialog (dialogPage)
   , dialogFromRef
   )
 import Playwright.ElementHandle
@@ -212,6 +213,21 @@ onLoad page run =
           run
         _ ->
           pure ()
+
+-- | Runs the handler for each dialog the page opens. The handler must accept or
+-- dismiss the dialog, or the page stays blocked.
+onDialog :: Page -> (Dialog -> Playwright ()) -> Playwright ()
+onDialog page run = do
+  subscribeContext page BrowserContextUpdateSubscriptionParamsEventDialog
+  registerEventHandler
+    (channelGuid (pageContextChannel page))
+    (MethodName "dialog")
+    $ \params -> do
+      event <- throwDecode params
+      dialog <- dialogFromRef (browserContextDialogEventDialog event)
+      if maybe False (`pagesEqual` page) (dialogPage dialog)
+        then run dialog
+        else pure ()
 
 onConsole :: Page -> (ConsoleMessage -> Playwright ()) -> Playwright ()
 onConsole page run = do

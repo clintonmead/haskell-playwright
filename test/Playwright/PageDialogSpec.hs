@@ -16,9 +16,13 @@ import Playwright
   , evaluateBool
   , evaluateSpecial
   , evaluateText
+  , onDialog
+  , setContent
+  , click
   )
 import Playwright.Harness
-  ( withChromiumPage
+  ( locate
+  , withChromiumPage
   , assertEqual
   )
 import Test.Tasty
@@ -75,4 +79,28 @@ tests =
           takeDialog <- armDialog page
           withAsync (takeDialog >>= dismissDialog) $ \_ -> do
             assertEqual "false" False =<< evaluateBool page "() => confirm('boolean?')"
+    , testCase "should handle multiple alerts" $
+        withChromiumPage $ \page -> do
+          onDialog page acceptDialog
+          setContent
+            page
+            "\n    <p>Hello World</p>\n    <script>\n      alert('Please dismiss this dialog');\n      alert('Please dismiss this dialog');\n      alert('Please dismiss this dialog');\n    </script>\n  "
+          assertEqual "text" "Hello World" =<< evaluateText page "() => document.querySelector('p').textContent"
+    , testCase "should handle multiple confirms" $
+        withChromiumPage $ \page -> do
+          onDialog page acceptDialog
+          setContent
+            page
+            "\n    <p>Hello World</p>\n    <script>\n      confirm('Please confirm me?');\n      confirm('Please confirm me?');\n      confirm('Please confirm me?');\n    </script>\n  "
+          assertEqual "text" "Hello World" =<< evaluateText page "() => document.querySelector('p').textContent"
+    , testCase "should auto-dismiss the prompt without listeners" $
+        withChromiumPage $ \page -> do
+          special <- evaluateSpecial page "() => prompt('question?')"
+          assertEqual "result" SpecialNull special
+    , testCase "should auto-dismiss the alert without listeners" $
+        withChromiumPage $ \page -> do
+          setContent page "<div onclick=\"window.alert(123); window._clicked=true\">Click me</div>"
+          click (locate page "div")
+          assertEqual "clicked" True =<< evaluateBool page "() => window._clicked"
+
     ]

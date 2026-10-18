@@ -176,6 +176,7 @@ module Playwright
   , apiResponseUrl
   , armConsole
   , armDialog
+  , onDialog
   , armDownload
   , armFileChooser
   , armFrameDetached
@@ -1402,6 +1403,7 @@ import Playwright.Page
 import Playwright.Page.Wait
   ( armConsole
   , armDialog
+  , onDialog
   , armFrameDetached
   , armFrameNavigated
   , armLoadEvent
