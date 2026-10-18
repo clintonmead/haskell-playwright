@@ -11,7 +11,9 @@ import Playwright
   , milliseconds
   , setContent
   , textArgument
+  , url
   , urlFromText
+  , urlToText
   , waitForURL
   , waitForURLWith
   )
@@ -20,6 +22,7 @@ import Playwright.Harness
   , locate
   , withAssetPage
   , withAssets
+  , assertEqual
   , assertFailure
   )
 import Test.Tasty
@@ -55,4 +58,35 @@ tests =
           setContent page "<a href='#foobar'>foobar</a>"
           click (locate page "a")
           waitForURL page (UrlGlob "**/*#foobar")
+    , testCase "should work with history.pushState()" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          setContent
+            page
+            "<a onclick='javascript:pushState()'>SPA</a><script>function pushState() { history.pushState({}, '', 'wow.html') }</script>"
+          click (locate page "a")
+          waitForURL page (UrlGlob "**/wow.html")
+          assertEqual "url" (prefix <> "/wow.html") . urlToText =<< url page
+    , testCase "should work with history.replaceState()" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          setContent
+            page
+            "<a onclick='javascript:replaceState()'>SPA</a><script>function replaceState() { history.replaceState({}, '', '/replaced.html') }</script>"
+          click (locate page "a")
+          waitForURL page (UrlGlob "**/replaced.html")
+          assertEqual "url" (prefix <> "/replaced.html") . urlToText =<< url page
+    , testCase "should work with DOM history.back()/history.forward()" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          setContent
+            page
+            "<a id=back onclick='javascript:goBack()'>back</a><a id=forward onclick='javascript:goForward()'>forward</a><script>function goBack() { history.back(); } function goForward() { history.forward(); } history.pushState({}, '', '/first.html'); history.pushState({}, '', '/second.html');</script>"
+          assertEqual "second" (prefix <> "/second.html") . urlToText =<< url page
+          click (locate page "a#back")
+          waitForURL page (UrlGlob "**/first.html")
+          assertEqual "first" (prefix <> "/first.html") . urlToText =<< url page
+          click (locate page "a#forward")
+          waitForURL page (UrlGlob "**/second.html")
+          assertEqual "second again" (prefix <> "/second.html") . urlToText =<< url page
     ]
