@@ -12,6 +12,7 @@ module Playwright.Page
   , pdfWith
   , screenshot
   , setContent
+  , setContentWith
   , title
   , url
   , getByAltText
@@ -103,16 +104,20 @@ import Playwright.Connection
   , setTimeoutNavigation
   , waitForChannelEvent
   )
+import Playwright.SetContentOptions
+  ( SetContentOptions (setContentOptionsTimeout, setContentOptionsWaitUntil)
+  , defaultSetContentOptions
+  )
 import Playwright.Frame
   ( Frame (frameChannel)
   , childFrames
-  , contentFrame
+  , frameContent
   , currentName
   , currentUrl
   , frameFromRef
   , frameSend
   , gotoFrame
-  , setContentFrame
+  , setContentFrameWith
   , titleFrame
   )
 import Playwright.Frame.Inspect
@@ -415,12 +420,16 @@ url :: Page -> Playwright Url
 url page = currentUrl (pageMainFrame page)
 
 content :: Page -> Playwright Text
-content page = contentFrame (pageMainFrame page)
+content page = frameContent (pageMainFrame page)
 
 setContent :: Page -> Text -> Playwright ()
-setContent page html = do
-  timeout <- pageNavigationTimeout page
-  setContentFrame (pageMainFrame page) html timeout
+setContent page html =
+  setContentWith page html defaultSetContentOptions
+
+setContentWith :: Page -> Text -> SetContentOptions -> Playwright ()
+setContentWith page html opts = do
+  timeout <- maybe (pageNavigationTimeout page) pure (setContentOptionsTimeout opts)
+  setContentFrameWith (pageMainFrame page) html timeout (setContentOptionsWaitUntil opts)
 
 setViewportSize :: Page -> ViewportSize -> Playwright ()
 setViewportSize page size = do

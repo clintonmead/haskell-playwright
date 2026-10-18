@@ -161,6 +161,7 @@ library
       Playwright.SerializedValue
       Playwright.ServiceWorkersPolicy
       Playwright.Session
+      Playwright.SetContentOptions
       Playwright.SpecialJsValue
       Playwright.StorageItem
       Playwright.StorageKind

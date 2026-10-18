@@ -118,6 +118,8 @@ module Playwright
   , SelectAttributes (..)
   , SelectOption (..)
   , SelectOptionOptions (..)
+  , SetContentOptions (..)
+  , defaultSetContentOptions
   , Selector
   , ServiceWorkersPolicy (..)
   , SpecialJsValue (..)
@@ -391,6 +393,7 @@ module Playwright
   , focus
   , focusHandle
   , frameByName
+  , frameContent
   , frameElement
   , frameLocator
   , frames
@@ -609,6 +612,7 @@ module Playwright
   , setChecked
   , setCheckedHandle
   , setContent
+  , setContentWith
   , setContentOnFrame
   , setContextDefaultNavigationTimeout
   , setContextDefaultTimeout
@@ -1086,6 +1090,7 @@ import Playwright.ForcedColors
 import Playwright.Frame
   ( Frame (Frame, frameChannel, frameParent, frameUrl)
   , childFrames
+  , frameContent
   , currentName
   , currentUrl
   , framesEqual
@@ -1363,6 +1368,7 @@ import Playwright.Page
   , requestGC
   , screenshot
   , setContent
+  , setContentWith
   , setDefaultNavigationTimeout
   , setDefaultTimeout
   , setExtraHTTPHeaders
@@ -1563,6 +1569,10 @@ import Playwright.SecurityDetails
 import Playwright.SelectOption
   ( SelectAttributes (SelectAttributes, selectAttributesIndex, selectAttributesLabel, selectAttributesValue)
   , SelectOption (SelectIndex, SelectLabel, SelectMatching, SelectValue, SelectValueOrLabel)
+  )
+import Playwright.SetContentOptions
+  ( SetContentOptions (SetContentOptions, setContentOptionsTimeout, setContentOptionsWaitUntil)
+  , defaultSetContentOptions
   )
 import Playwright.SelectOptionOptions
   ( SelectOptionOptions (SelectOptionOptions, selectOptionOptionsForce, selectOptionOptionsTimeout)

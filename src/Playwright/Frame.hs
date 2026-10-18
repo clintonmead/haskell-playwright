@@ -1,7 +1,7 @@
 module Playwright.Frame
   ( Frame (..)
   , childFrames
-  , contentFrame
+  , frameContent
   , currentName
   , currentUrl
   , evalOnSelectorAllFrame
@@ -15,6 +15,7 @@ module Playwright.Frame
   , frameSend_
   , gotoFrame
   , setContentFrame
+  , setContentFrameWith
   , setContentOnFrame
   , titleFrame
   ) where
@@ -57,7 +58,8 @@ import Playwright.Json.Decode
   ( throwDecode
   )
 import Playwright.LoadState
-  ( defaultNavigationLoadState
+  ( LoadState
+  , defaultNavigationLoadState
   , toLifecycle
   )
 import Playwright.MethodName
@@ -75,6 +77,7 @@ import Playwright.Protocol
   , FrameGotoParams (frameGotoParamsReferer, frameGotoParamsWaitUntil)
   , FrameGotoResult (frameGotoResultResponse)
   , FrameInitializer (frameInitializerName, frameInitializerParentFrame, frameInitializerUrl)
+  , FrameSetContentParams (frameSetContentParamsWaitUntil)
   , FrameSetContentResult
   , FrameTitleResult (frameTitleResultValue)
   , mkFrameContentParams
@@ -227,14 +230,23 @@ titleFrame frame = do
   result <- frameSend frame "title" mkFrameTitleParams
   pure (frameTitleResultValue result)
 
-contentFrame :: Frame -> Playwright Text
-contentFrame frame = do
+frameContent :: Frame -> Playwright Text
+frameContent frame = do
   result <- frameSend frame "content" mkFrameContentParams
   pure (frameContentResultValue result)
 
 setContentFrame :: Frame -> Text -> Timeout -> Playwright ()
 setContentFrame frame html timeout =
-  frameSend_ @FrameSetContentResult frame "setContent" (mkFrameSetContentParams html timeout)
+  setContentFrameWith frame html timeout Nothing
+
+setContentFrameWith :: Frame -> Text -> Timeout -> Maybe LoadState -> Playwright ()
+setContentFrameWith frame html timeout waitUntil =
+  frameSend_ @FrameSetContentResult
+    frame
+    "setContent"
+    (mkFrameSetContentParams html timeout)
+      { frameSetContentParamsWaitUntil = fmap toLifecycle waitUntil
+      }
 
 setContentOnFrame :: Frame -> Text -> Playwright ()
 setContentOnFrame frame html =
