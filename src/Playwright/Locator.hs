@@ -16,6 +16,7 @@ module Playwright.Locator
   , dispatchEvent
   , dispatchEventWith
   , dragAndDrop
+  , dragAndDropWith
   , dropOnto
   , elementHandle
   , elementHandles
@@ -119,6 +120,9 @@ import Playwright.CheckOptions
 import Playwright.ClickOptions
   ( ClickOptions (clickOptionsTimeout)
   )
+import Playwright.DragAndDropOptions
+  ( DragAndDropOptions (dragAndDropOptionsTimeout)
+  )
 import Playwright.DomEventType
   ( DomEventType
   )
@@ -155,6 +159,7 @@ import Playwright.Frame.Action
   , dispatchEventFrame
   , dispatchEventFrameWith
   , dragAndDropFrame
+  , dragAndDropFrameWith
   , dropFrame
   , fillFrame
   , setInputFilesFrame
@@ -533,6 +538,21 @@ dragAndDrop source target =
         (locatorSelector source)
         (locatorSelector target)
     )
+
+dragAndDropWith :: Locator -> Locator -> DragAndDropOptions -> Playwright ()
+dragAndDropWith source target opts = do
+  timeout <-
+    case dragAndDropOptionsTimeout opts of
+      Just value ->
+        pure value
+      Nothing ->
+        locatorActionTimeout source
+  dragAndDropFrameWith
+    (locatorFrame source)
+    (locatorSelector source)
+    (locatorSelector target)
+    timeout
+    opts
 
 dropOnto :: Locator -> DropPayload -> Playwright ()
 dropOnto loc payload =

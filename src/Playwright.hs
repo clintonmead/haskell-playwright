@@ -43,6 +43,7 @@ module Playwright
   , DomEventType (..)
   , DropData (..)
   , DropFile (..)
+  , DragAndDropOptions (..)
   , DropPayload (..)
   , ElementHandle (..)
   , ElementState (..)
@@ -249,6 +250,7 @@ module Playwright
   , defaultClearCookiesOptions
   , defaultClickOptions
   , defaultContinueOptions
+  , defaultDragAndDropOptions
   , defaultEmulateMedia
   , defaultFetchOptions
   , defaultFulfillOptions
@@ -279,6 +281,7 @@ module Playwright
   , downloadSuggestedFilename
   , downloadUrl
   , dragAndDrop
+  , dragAndDropWith
   , dropOnto
   , dismissDialog
   , dialogsEqual
@@ -923,6 +926,10 @@ import Playwright.Download
   , downloadUrl
   , waitForDownload
   )
+import Playwright.DragAndDropOptions
+  ( DragAndDropOptions (DragAndDropOptions, dragAndDropOptionsForce, dragAndDropOptionsSourcePosition, dragAndDropOptionsSteps, dragAndDropOptionsTargetPosition, dragAndDropOptionsTimeout, dragAndDropOptionsTrial)
+  , defaultDragAndDropOptions
+  )
 import Playwright.DropPayload
   ( DropData (DropData, dropDataMimeType, dropDataValue)
   , DropFile (DropFile, dropFileBytes, dropFileMimeType, dropFileName)
@@ -1217,6 +1224,7 @@ import Playwright.Locator
   , dispatchEvent
   , dispatchEventWith
   , dragAndDrop
+  , dragAndDropWith
   , dropOnto
   , elementHandle
   , elementHandles

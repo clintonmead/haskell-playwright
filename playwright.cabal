@@ -59,6 +59,7 @@ library
       Playwright.Disposable
       Playwright.DomEventType
       Playwright.Download
+      Playwright.DragAndDropOptions
       Playwright.Driver
       Playwright.DropPayload
       Playwright.ElementHandle

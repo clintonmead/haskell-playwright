@@ -18,6 +18,7 @@ module Playwright.Frame.Action
   , typeTextFrame
   , uncheckFrame
   , dragAndDropFrame
+  , dragAndDropFrameWith
   , dropFrame
   , setInputFilesFrame
   ) where
@@ -43,6 +44,10 @@ import Playwright.CssPixel
   )
 import Playwright.DomEventType
   ( DomEventType (domEventTypeToText)
+  )
+import Playwright.DragAndDropOptions
+  ( DragAndDropOptions (dragAndDropOptionsForce, dragAndDropOptionsSourcePosition, dragAndDropOptionsSteps, dragAndDropOptionsTargetPosition, dragAndDropOptionsTrial)
+  , defaultDragAndDropOptions
   )
 import Playwright.DropPayload
   ( DropData (dropDataMimeType, dropDataValue)
@@ -96,7 +101,7 @@ import Playwright.Protocol
   , FrameDblclickResult
   , FrameDispatchEventParams (frameDispatchEventParamsStrict)
   , FrameDispatchEventResult
-  , FrameDragAndDropParams (frameDragAndDropParamsStrict)
+  , FrameDragAndDropParams (frameDragAndDropParamsForce, frameDragAndDropParamsSourcePosition, frameDragAndDropParamsSteps, frameDragAndDropParamsStrict, frameDragAndDropParamsTargetPosition, frameDragAndDropParamsTrial)
   , FrameDragAndDropResult
   , FrameDropParams (frameDropParamsData, frameDropParamsPayloads, frameDropParamsStrict)
   , FrameDropParamsData
@@ -346,11 +351,20 @@ typeTextFrame frame selector text timeout =
 
 dragAndDropFrame :: Frame -> Selector -> Selector -> Timeout -> Playwright ()
 dragAndDropFrame frame source target timeout =
+  dragAndDropFrameWith frame source target timeout defaultDragAndDropOptions
+
+dragAndDropFrameWith :: Frame -> Selector -> Selector -> Timeout -> DragAndDropOptions -> Playwright ()
+dragAndDropFrameWith frame source target timeout opts =
   frameSend_ @FrameDragAndDropResult
     frame
     "dragAndDrop"
     (mkFrameDragAndDropParams source target timeout)
       { frameDragAndDropParamsStrict = Just True
+      , frameDragAndDropParamsForce = dragAndDropOptionsForce opts
+      , frameDragAndDropParamsSourcePosition = fmap toProtocolPoint (dragAndDropOptionsSourcePosition opts)
+      , frameDragAndDropParamsSteps = dragAndDropOptionsSteps opts
+      , frameDragAndDropParamsTargetPosition = fmap toProtocolPoint (dragAndDropOptionsTargetPosition opts)
+      , frameDragAndDropParamsTrial = dragAndDropOptionsTrial opts
       }
 
 dropFrame :: Frame -> Selector -> DropPayload -> Timeout -> Playwright ()
