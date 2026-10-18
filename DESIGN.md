@@ -149,6 +149,13 @@ Make commits to git at appropriate milestones.
 
 If you have non-trivial commands you run regularly, ensure they are scripted, either in `/scripts` or in `flake.nix`. This is so humans can easily reproduce your build and test runs. 
 
+### Do not run commands with long timeouts
+
+You shouldn't be running commands with timeouts greater than a minute, unless you're sure that command correctly running should take that time. Instead you should either:
+
+a. Monitor the output of the command live AND/OR
+b. Run a shorter timeout out, and confirm that the process was actually doing something that was interuptted before using a longer timeout.
+
 ### Update your progress regularly
 
 There are the files `progress/FUNCTIONALITY_DONE.md` and `progress/FUNCTIONALITY_TODO.md`. Update these files as you go, and also ensure they're up to date before commits.
