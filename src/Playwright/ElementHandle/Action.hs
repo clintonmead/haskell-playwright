@@ -53,7 +53,8 @@ import Playwright.Protocol
   , mkJSHandleDisposeParams
   )
 import Playwright.SelectOption
-  ( SelectOption (SelectIndex, SelectLabel, SelectValue, SelectValueOrLabel)
+  ( SelectAttributes (selectAttributesIndex, selectAttributesLabel, selectAttributesValue)
+  , SelectOption (SelectIndex, SelectLabel, SelectMatching, SelectValue, SelectValueOrLabel)
   )
 import Playwright.Timeout
   ( defaultTimeout
@@ -117,6 +118,12 @@ toProtocolOption option =
       mkElementHandleSelectOptionParamsOptions {elementHandleSelectOptionParamsOptionsLabel = Just text}
     SelectIndex index ->
       mkElementHandleSelectOptionParamsOptions {elementHandleSelectOptionParamsOptionsIndex = Just index}
+    SelectMatching attributes ->
+      mkElementHandleSelectOptionParamsOptions
+        { elementHandleSelectOptionParamsOptionsValue = selectAttributesValue attributes
+        , elementHandleSelectOptionParamsOptionsLabel = selectAttributesLabel attributes
+        , elementHandleSelectOptionParamsOptionsIndex = selectAttributesIndex attributes
+        }
 
 disposeHandle :: ElementHandle -> Playwright ()
 disposeHandle handle = do

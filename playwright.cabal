@@ -152,6 +152,7 @@ library
       Playwright.ScriptTag
       Playwright.SecurityDetails
       Playwright.SelectOption
+      Playwright.SelectOptionOptions
       Playwright.Selector
       Playwright.Selectors
       Playwright.SerializedArgument

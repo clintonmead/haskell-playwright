@@ -68,6 +68,7 @@ module Playwright.Locator
   , press
   , pressSequentially
   , selectOption
+  , selectOptionWith
   , setChecked
   , setInputFiles
   , tap
@@ -169,6 +170,7 @@ import Playwright.Frame.Action
   , hideHighlightFrame
   , pressFrame
   , selectOptionFrame
+  , selectOptionFrameWith
   , tapFrame
   , typeTextFrame
   , uncheckFrame
@@ -219,6 +221,9 @@ import Playwright.Key
   )
 import Playwright.SelectOption
   ( SelectOption
+  )
+import Playwright.SelectOptionOptions
+  ( SelectOptionOptions (selectOptionOptionsTimeout)
   )
 import Playwright.Selector
   ( Selector
@@ -561,6 +566,21 @@ dropOnto loc payload =
 selectOption :: Locator -> [SelectOption] -> Playwright [Text]
 selectOption loc options =
   withActionTimeout loc (selectOptionFrame (locatorFrame loc) (locatorSelector loc) options)
+
+selectOptionWith :: Locator -> [SelectOption] -> SelectOptionOptions -> Playwright [Text]
+selectOptionWith loc options opts = do
+  timeout <-
+    case selectOptionOptionsTimeout opts of
+      Just value ->
+        pure value
+      Nothing ->
+        locatorActionTimeout loc
+  selectOptionFrameWith
+    (locatorFrame loc)
+    (locatorSelector loc)
+    options
+    timeout
+    opts
 
 innerText :: Locator -> Playwright Text
 innerText loc =

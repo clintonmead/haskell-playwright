@@ -14,6 +14,7 @@ module Playwright.Frame.Action
   , hideHighlightFrame
   , pressFrame
   , selectOptionFrame
+  , selectOptionFrameWith
   , tapFrame
   , typeTextFrame
   , uncheckFrame
@@ -117,7 +118,7 @@ import Playwright.Protocol
   , FrameHideHighlightResult
   , FramePressParams (framePressParamsStrict)
   , FramePressResult
-  , FrameSelectOptionParams (frameSelectOptionParamsOptions, frameSelectOptionParamsStrict)
+  , FrameSelectOptionParams (frameSelectOptionParamsForce, frameSelectOptionParamsOptions, frameSelectOptionParamsStrict)
   , FrameSelectOptionParamsOptions (frameSelectOptionParamsOptionsIndex, frameSelectOptionParamsOptionsLabel, frameSelectOptionParamsOptionsValue, frameSelectOptionParamsOptionsValueOrLabel)
   , FrameSelectOptionResult (frameSelectOptionResultValues)
   , FrameSetInputFilesParams (frameSetInputFilesParamsPayloads, frameSetInputFilesParamsStrict)
@@ -161,7 +162,12 @@ import Playwright.SerializedArgument
   , undefinedArgument
   )
 import Playwright.SelectOption
-  ( SelectOption (SelectIndex, SelectLabel, SelectValue, SelectValueOrLabel)
+  ( SelectAttributes (selectAttributesIndex, selectAttributesLabel, selectAttributesValue)
+  , SelectOption (SelectIndex, SelectLabel, SelectMatching, SelectValue, SelectValueOrLabel)
+  )
+import Playwright.SelectOptionOptions
+  ( SelectOptionOptions (selectOptionOptionsForce)
+  , defaultSelectOptionOptions
   )
 import Playwright.Selector
   ( Selector
@@ -418,13 +424,18 @@ toPayload file =
     (inputFileNameToText (inputFileName file))
 
 selectOptionFrame :: Frame -> Selector -> [SelectOption] -> Timeout -> Playwright [Text]
-selectOptionFrame frame selector options timeout = do
+selectOptionFrame frame selector options timeout =
+  selectOptionFrameWith frame selector options timeout defaultSelectOptionOptions
+
+selectOptionFrameWith :: Frame -> Selector -> [SelectOption] -> Timeout -> SelectOptionOptions -> Playwright [Text]
+selectOptionFrameWith frame selector options timeout opts = do
   result <-
     frameSend
       frame
       "selectOption"
       (mkFrameSelectOptionParams selector timeout)
         { frameSelectOptionParamsStrict = Just True
+        , frameSelectOptionParamsForce = selectOptionOptionsForce opts
         , frameSelectOptionParamsOptions = Just (fmap toProtocolOption options)
         }
   pure (frameSelectOptionResultValues result)
@@ -440,3 +451,9 @@ toProtocolOption option =
       mkFrameSelectOptionParamsOptions {frameSelectOptionParamsOptionsLabel = Just text}
     SelectIndex index ->
       mkFrameSelectOptionParamsOptions {frameSelectOptionParamsOptionsIndex = Just index}
+    SelectMatching attributes ->
+      mkFrameSelectOptionParamsOptions
+        { frameSelectOptionParamsOptionsValue = selectAttributesValue attributes
+        , frameSelectOptionParamsOptionsLabel = selectAttributesLabel attributes
+        , frameSelectOptionParamsOptionsIndex = selectAttributesIndex attributes
+        }

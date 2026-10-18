@@ -242,3 +242,4 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - `requestPostDataJSON` parses `requestPostData` with Aeson; missing body is `Nothing`, invalid JSON is `DecodeFailure` (`POST data is not a valid JSON object: …`).
 - `dragAndDrop` / `dragAndDropWith` are locator functions. `DragAndDropOptions` maps `force`, `sourcePosition`, `targetPosition`, `steps`, `timeout`, and `trial` onto `Frame.dragAndDrop` (always `strict: true`, like `locator.dragTo`).
 - Test specs share the iframe helper `Playwright.Harness.attachFrame page frameId url`. Do not copy it into a spec.
+- `SelectOption` covers the JS option forms one at a time. `SelectMatching` (`SelectAttributes`) is the JS object with several of value, label and index, and every set attribute must match. `selectOptionWith` takes `SelectOptionOptions` (`force`, `timeout`). The element-handle form of `selectOption` is not ported yet.

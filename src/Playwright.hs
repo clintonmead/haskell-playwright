@@ -115,7 +115,9 @@ module Playwright
   , ScreenshotOptions (..)
   , ScriptTag (..)
   , SecurityDetails (..)
+  , SelectAttributes (..)
   , SelectOption (..)
+  , SelectOptionOptions (..)
   , Selector
   , ServiceWorkersPolicy (..)
   , SpecialJsValue (..)
@@ -251,6 +253,7 @@ module Playwright
   , defaultClickOptions
   , defaultContinueOptions
   , defaultDragAndDropOptions
+  , defaultSelectOptionOptions
   , defaultEmulateMedia
   , defaultFetchOptions
   , defaultFulfillOptions
@@ -595,6 +598,7 @@ module Playwright
   , scrollIntoViewIfNeededWith
   , selectOption
   , selectOptionHandle
+  , selectOptionWith
   , selectText
   , selectTextWith
   , selectorFromText
@@ -1263,6 +1267,7 @@ import Playwright.Locator
   , press
   , pressSequentially
   , selectOption
+  , selectOptionWith
   , setChecked
   , setInputFiles
   , tap
@@ -1556,7 +1561,12 @@ import Playwright.SecurityDetails
   ( SecurityDetails (SecurityDetails, securityDetailsIssuer, securityDetailsProtocol, securityDetailsSubjectName, securityDetailsValidFrom, securityDetailsValidTo)
   )
 import Playwright.SelectOption
-  ( SelectOption (SelectIndex, SelectLabel, SelectValue, SelectValueOrLabel)
+  ( SelectAttributes (SelectAttributes, selectAttributesIndex, selectAttributesLabel, selectAttributesValue)
+  , SelectOption (SelectIndex, SelectLabel, SelectMatching, SelectValue, SelectValueOrLabel)
+  )
+import Playwright.SelectOptionOptions
+  ( SelectOptionOptions (SelectOptionOptions, selectOptionOptionsForce, selectOptionOptionsTimeout)
+  , defaultSelectOptionOptions
   )
 import Playwright.Selector
   ( Selector
