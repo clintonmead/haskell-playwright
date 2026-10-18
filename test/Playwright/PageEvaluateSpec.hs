@@ -11,6 +11,9 @@ import Playwright
   , boolArgument
   , evaluate
   , evaluateBoolWith
+  , evaluateHandleExpression
+  , jsonValueNumber
+  , urlToText
   , evaluateNumber
   , evaluateNumberWith
   , evaluateNumbersWith
@@ -33,7 +36,7 @@ import Playwright.Harness
   , assertFailure
   )
 import Playwright.SerializedValue
-  ( SerializedPayload (PayloadBigInt, PayloadObject, PayloadString)
+  ( SerializedPayload (PayloadBigInt, PayloadDate, PayloadObject, PayloadString, PayloadUrl)
   , SerializedValue (SerializedNode)
   )
 import Test.Tasty
@@ -178,4 +181,60 @@ tests =
               assertEqual "bigint" ("42" :: Text) digits
             _ ->
               assertFailure "expected bigint"
+    , testCase "should return NaN" $
+        withChromiumPage $ \page -> do
+          special <- evaluateSpecial page "() => NaN"
+          assertEqual "NaN" SpecialNaN special
+    , testCase "should return -0" $
+        withChromiumPage $ \page -> do
+          special <- evaluateSpecial page "() => -0"
+          assertEqual "-0" SpecialNegZero special
+    , testCase "should return Infinity" $
+        withChromiumPage $ \page -> do
+          special <- evaluateSpecial page "() => Infinity"
+          assertEqual "Infinity" SpecialInfinity special
+    , testCase "should return -Infinity" $
+        withChromiumPage $ \page -> do
+          special <- evaluateSpecial page "() => -Infinity"
+          assertEqual "-Infinity" SpecialNegInfinity special
+    , testCase "should roundtrip promise to value" $
+        withChromiumPage $ \page -> do
+          mapM_
+            ( \special -> do
+                result <- evaluateSpecialWith page "value => Promise.resolve(value)" (specialArgument special)
+                assertEqual (show special) special result
+            )
+            [SpecialNull, SpecialInfinity, SpecialNegZero, SpecialUndefined]
+    , testCase "should evaluate date" $
+        withChromiumPage $ \page -> do
+          result <- evaluate page "() => new Date('2020-02-05T00:00:00.000Z')"
+          case result of
+            SerializedNode (PayloadDate iso) _ ->
+              assertEqual "date" "2020-02-05T00:00:00.000Z" iso
+            _ ->
+              assertFailure ("expected a date, got " <> show result)
+    , testCase "should evaluate url" $
+        withChromiumPage $ \page -> do
+          result <- evaluate page "() => new URL('https://example.com/')"
+          case result of
+            SerializedNode (PayloadUrl url) _ ->
+              assertEqual "url" "https://example.com/" (urlToText url)
+            _ ->
+              assertFailure ("expected a url, got " <> show result)
+    , testCase "should accept a string" $
+        withChromiumPage $ \page -> do
+          handle <- evaluateHandleExpression page "1 + 2"
+          assertEqual "sum" (3 :: Double) =<< jsonValueNumber handle
+    , testCase "should accept a string with semi colons" $
+        withChromiumPage $ \page -> do
+          handle <- evaluateHandleExpression page "2 + 5;"
+          assertEqual "sum" (7 :: Double) =<< jsonValueNumber handle
+    , testCase "should accept a string with comments" $
+        withChromiumPage $ \page -> do
+          handle <- evaluateHandleExpression page "2 + 5;\n// do some stuff"
+          assertEqual "sum" (7 :: Double) =<< jsonValueNumber handle
+    , testCase "should evaluate exception" $
+        withChromiumPage $ \page ->
+          assertProtocolContains "Bar" (evaluate page "() => { throw new Error('Bar'); }")
+
     ]
