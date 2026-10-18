@@ -40,7 +40,11 @@ module Playwright.Page.Wait
   , armRequestFailed
   , waitForRequestFinished
   , waitForRequestWith
+  , armResponse
+  , armResponseWhere
+  , armResponseWith
   , waitForResponse
+  , waitForResponseWhere
   , waitForResponseWith
   , waitForSelector
   , waitForSelectorHandle
@@ -500,24 +504,51 @@ waitForResponse page glob = do
   waitForResponseWith page glob timeout
 
 waitForResponseWith :: Page -> UrlGlob -> Timeout -> Playwright Response
-waitForResponseWith page glob timeout =
-  waitWithTimeout timeout $ do
-    subscribeContext page BrowserContextUpdateSubscriptionParamsEventResponse
-    collectResponse
+waitForResponseWith page glob timeout = do
+  takeResponse <- armResponseWith page glob timeout
+  takeResponse
+
+-- | Registers for the next response whose URL matches the glob, before the
+-- action that makes it runs. See 'armRequest'.
+armResponse :: Page -> UrlGlob -> Playwright (Playwright Response)
+armResponse page glob = do
+  timeout <- pageActionTimeout page
+  armResponseWith page glob timeout
+
+armResponseWith :: Page -> UrlGlob -> Timeout -> Playwright (Playwright Response)
+armResponseWith page glob timeout =
+  armResponseWhereWith page (\response -> matchesUrlGlob glob <$> responseUrl response) timeout
+
+-- | Waits for the next response that the predicate accepts.
+waitForResponseWhere :: Page -> (Response -> Playwright Bool) -> Playwright Response
+waitForResponseWhere page predicate = do
+  takeResponse <- armResponseWhere page predicate
+  takeResponse
+
+-- | Registers for the next response that the predicate accepts, before the
+-- action that makes it runs. The predicate runs once per response event.
+armResponseWhere :: Page -> (Response -> Playwright Bool) -> Playwright (Playwright Response)
+armResponseWhere page predicate = do
+  timeout <- pageActionTimeout page
+  armResponseWhereWith page predicate timeout
+
+armResponseWhereWith :: Page -> (Response -> Playwright Bool) -> Timeout -> Playwright (Playwright Response)
+armResponseWhereWith page predicate timeout = do
+  subscribeContext page BrowserContextUpdateSubscriptionParamsEventResponse
+  firstWaiter <- registerEventWaiter guid (MethodName "response")
+  pure (waitWithTimeout timeout (collectResponse firstWaiter))
   where
     guid = channelGuid (pageContextChannel page)
-    collectResponse = do
-      params <-
-        waitForChannelEventUnlessClosed
-          guid
-          (MethodName "response")
-          (channelGuid (pageChannel page))
+    collectResponse waitId = do
+      params <- waitForWaiterUnlessClosed waitId (channelGuid (pageChannel page))
       event <- throwDecode params
       let response = responseFromRef (browserContextResponseEventResponse event)
-      current <- responseUrl response
-      if matchesUrlGlob glob current
+      matched <- predicate response
+      if matched
         then pure response
-        else collectResponse
+        else do
+          nextWaiter <- registerEventWaiter guid (MethodName "response")
+          collectResponse nextWaiter
 
 waitForRequest :: Page -> UrlGlob -> Playwright Request
 waitForRequest page glob = do

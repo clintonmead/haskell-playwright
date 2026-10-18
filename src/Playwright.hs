@@ -711,7 +711,11 @@ module Playwright
   , waitForRequestFailedWith
   , waitForRequestFinished
   , waitForRequestWith
+  , armResponse
+  , armResponseWhere
+  , armResponseWith
   , waitForResponse
+  , waitForResponseWhere
   , waitForResponseWith
   , waitForSelector
   , waitForSelectorHandle
@@ -1446,7 +1450,11 @@ import Playwright.Page.Wait
   , waitForRequestFailedWith
   , waitForRequestFinished
   , waitForRequestWith
+  , armResponse
+  , armResponseWhere
+  , armResponseWith
   , waitForResponse
+  , waitForResponseWhere
   , waitForResponseWith
   , waitForSelector
   , waitForSelectorHandle
