@@ -244,3 +244,5 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - Test specs share the iframe helper `Playwright.Harness.attachFrame page frameId url`. Do not copy it into a spec.
 - `SelectOption` covers the JS option forms one at a time. `SelectMatching` (`SelectAttributes`) is the JS object with several of value, label and index, and every set attribute must match. `selectOptionWith` takes `SelectOptionOptions` (`force`, `timeout`). The element-handle form of `selectOption` is not ported yet.
 - `setContentWith` takes `SetContentOptions` (`timeout`, `waitUntil`). The frame's content is `Playwright.frameContent` (it was `contentFrame`, easy to confuse with `contentFrameHandle`).
+- Navigation waits take `WaitForNavigationOptions` (`timeout`, `url` glob, `waitUntil`). `armNavigationOptions` registers the waiter before the action runs, so a same-document or fast navigation is never missed. Prefer the armed form in tests over `withAsync`. `waitForLoadStateWith` adds the timeout.
+- `Harness.stallingStylesheetApp` serves the assets but holds `one-style.css` until a test releases it. It is the shared way to keep a page loading.

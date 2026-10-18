@@ -21,8 +21,11 @@ module Playwright.Page.Wait
   , waitForFunctionWithArg
   , waitForLoadEvent
   , waitForLoadState
+  , waitForLoadStateWith
   , waitForNavigation
   , waitForNavigationWith
+  , waitForNavigationOptions
+  , armNavigationOptions
   , waitForPopup
   , waitForRequest
   , waitForRequestFailed
@@ -42,6 +45,12 @@ module Playwright.Page.Wait
 
 import Playwright.Monad
   ( Playwright
+  )
+import Data.Aeson
+  ( Value
+  )
+import Data.Maybe
+  ( fromMaybe
   )
 import Data.Scientific
   ( fromFloatDigits
@@ -91,7 +100,7 @@ import Playwright.JsHandle
   ( JsHandle
   )
 import Playwright.LoadState
-  ( LoadState (LoadStateLoad)
+  ( LoadState (LoadStateCommit, LoadStateLoad)
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -148,6 +157,10 @@ import Playwright.UrlGlob
   ( UrlGlob
   , matchesUrlGlob
   )
+import Playwright.WaitForNavigationOptions
+  ( WaitForNavigationOptions (waitForNavigationOptionsTimeout, waitForNavigationOptionsUrl, waitForNavigationOptionsWaitUntil)
+  , defaultWaitForNavigationOptions
+  )
 import Playwright.WaitForState
   ( WaitForState
   )
@@ -174,6 +187,11 @@ waitForSelectorStrict page selector state = do
 waitForLoadState :: Page -> LoadState -> Playwright ()
 waitForLoadState page =
   waitForLoadStateFrame (pageMainFrame page)
+
+-- | Fails with a wait timeout if the load state is not reached in time.
+waitForLoadStateWith :: Page -> LoadState -> Timeout -> Playwright ()
+waitForLoadStateWith page state timeout =
+  waitWithTimeout timeout (waitForLoadState page state)
 
 onLoad :: Page -> Playwright () -> Playwright ()
 onLoad page run =
@@ -271,9 +289,8 @@ waitForURLWith page glob timeout =
     waitForLoadState page LoadStateLoad
 
 waitForNavigation :: Page -> Playwright (Maybe Response)
-waitForNavigation page = do
-  timeout <- pageNavigationTimeout page
-  waitForNavigationWith page timeout Nothing
+waitForNavigation page =
+  waitForNavigationOptions page defaultWaitForNavigationOptions
 
 waitForFrameNavigated :: Page -> Playwright ()
 waitForFrameNavigated page =
@@ -316,26 +333,60 @@ armFrameDetached page = do
 
 waitForNavigationWith :: Page -> Timeout -> Maybe UrlGlob -> Playwright (Maybe Response)
 waitForNavigationWith page timeout glob =
-  waitWithTimeout timeout (collectNavigation page glob)
+  waitForNavigationOptions
+    page
+    defaultWaitForNavigationOptions
+      { waitForNavigationOptionsTimeout = Just timeout
+      , waitForNavigationOptionsUrl = glob
+      }
 
-collectNavigation :: Page -> Maybe UrlGlob -> Playwright (Maybe Response)
-collectNavigation page glob = do
+waitForNavigationOptions :: Page -> WaitForNavigationOptions -> Playwright (Maybe Response)
+waitForNavigationOptions page opts = do
+  takeNavigation <- armNavigationOptions page opts
+  takeNavigation
+
+-- | Registers for the next navigation now, so it is not missed if it starts
+-- before the returned action runs.
+armNavigationOptions :: Page -> WaitForNavigationOptions -> Playwright (Playwright (Maybe Response))
+armNavigationOptions page opts = do
+  timeout <-
+    maybe (pageNavigationTimeout page) pure (waitForNavigationOptionsTimeout opts)
+  waitId <-
+    registerFutureEventWaiter
+      (channelGuid (frameChannel (pageMainFrame page)))
+      (MethodName "navigated")
+  pure $ waitWithTimeout timeout $ do
+    params <- waitForWaiter waitId
+    finishNavigation page opts params
+
+collectNavigation :: Page -> WaitForNavigationOptions -> Playwright (Maybe Response)
+collectNavigation page opts = do
   let
     frameGuid = channelGuid (frameChannel (pageMainFrame page))
   params <- waitForFutureChannelEvent frameGuid (MethodName "navigated")
+  finishNavigation page opts params
+
+finishNavigation :: Page -> WaitForNavigationOptions -> Value -> Playwright (Maybe Response)
+finishNavigation page opts params = do
   event <- throwDecode params
-  let matches = maybe True (`matchesUrlGlob` frameNavigatedEventUrl event) glob
+  let matches = maybe True (`matchesUrlGlob` frameNavigatedEventUrl event) (waitForNavigationOptionsUrl opts)
   if matches
-    then do
-      waitForLoadState page LoadStateLoad
-      case frameNavigatedEventNewDocument event >>= frameNavigatedEventNewDocumentRequest of
-        Nothing ->
-          pure Nothing
-        Just requestRef -> do
-          responseRef <- requestResponseRef (requestFromRef requestRef)
-          pure (fmap (responseFromRef) responseRef)
-    else
-      collectNavigation page glob
+    then completeNavigation page opts event
+    else collectNavigation page opts
+
+completeNavigation :: Page -> WaitForNavigationOptions -> FrameNavigatedEvent -> Playwright (Maybe Response)
+completeNavigation page opts event = do
+  case fromMaybe LoadStateLoad (waitForNavigationOptionsWaitUntil opts) of
+    LoadStateCommit ->
+      pure ()
+    state ->
+      waitForLoadState page state
+  case frameNavigatedEventNewDocument event >>= frameNavigatedEventNewDocumentRequest of
+    Nothing ->
+      pure Nothing
+    Just requestRef -> do
+      responseRef <- requestResponseRef (requestFromRef requestRef)
+      pure (fmap responseFromRef responseRef)
 
 armDialog :: Page -> Playwright (Playwright Dialog)
 armDialog page = do

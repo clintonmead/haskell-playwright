@@ -118,6 +118,8 @@ module Playwright
   , SelectAttributes (..)
   , SelectOption (..)
   , SelectOptionOptions (..)
+  , WaitForNavigationOptions (..)
+  , defaultWaitForNavigationOptions
   , SetContentOptions (..)
   , defaultSetContentOptions
   , Selector
@@ -679,9 +681,12 @@ module Playwright
   , waitForFunctionWithArg
   , waitForLoadEvent
   , waitForLoadState
+  , waitForLoadStateWith
   , waitForLoadStateFrame
   , waitForNavigation
   , waitForNavigationWith
+  , waitForNavigationOptions
+  , armNavigationOptions
   , waitForFrameNavigated
   , waitForFrameDetached
   , waitForNavigatedFrame
@@ -1403,8 +1408,11 @@ import Playwright.Page.Wait
   , waitForFunctionWithArg
   , waitForLoadEvent
   , waitForLoadState
+  , waitForLoadStateWith
   , waitForNavigation
   , waitForNavigationWith
+  , waitForNavigationOptions
+  , armNavigationOptions
   , waitForFrameNavigated
   , waitForFrameDetached
   , waitForNavigatedFrame
@@ -1569,6 +1577,10 @@ import Playwright.SecurityDetails
 import Playwright.SelectOption
   ( SelectAttributes (SelectAttributes, selectAttributesIndex, selectAttributesLabel, selectAttributesValue)
   , SelectOption (SelectIndex, SelectLabel, SelectMatching, SelectValue, SelectValueOrLabel)
+  )
+import Playwright.WaitForNavigationOptions
+  ( WaitForNavigationOptions (WaitForNavigationOptions, waitForNavigationOptionsTimeout, waitForNavigationOptionsUrl, waitForNavigationOptionsWaitUntil)
+  , defaultWaitForNavigationOptions
   )
 import Playwright.SetContentOptions
   ( SetContentOptions (SetContentOptions, setContentOptionsTimeout, setContentOptionsWaitUntil)

@@ -24,6 +24,7 @@ module Playwright.Harness
   , withChromiumContextLaunchWith
   , withChromiumContextWith
   , withChromiumPage
+  , stallingStylesheetApp
   , withLocalApp
   , withPersistentContext
   , withPersistentContextWith
@@ -49,8 +50,14 @@ import Data.Text
   , pack
   , unpack
   )
+import Network.HTTP.Types
+  ( hContentType
+  , status200
+  )
 import Network.Wai
   ( Application
+  , pathInfo
+  , responseLBS
   )
 import Network.Wai.Application.Static
   ( defaultFileServerSettings
@@ -112,6 +119,11 @@ import UnliftIO.Async
   ( Async
   , poll
   )
+import UnliftIO.MVar
+  ( MVar
+  , putMVar
+  , takeMVar
+  )
 import UnliftIO.Temporary
   ( withSystemTempDirectory
   )
@@ -149,6 +161,22 @@ requireTimeout n =
       assertFailure ("milliseconds " <> show n)
     Just timeout ->
       pure timeout
+
+-- | Serves the test assets, but holds one-style.css until the test releases it.
+-- The app puts to arrived when the stylesheet request comes in.
+stallingStylesheetApp :: FilePath -> MVar () -> MVar () -> Application
+stallingStylesheetApp assets arrived release =
+  let
+    static = staticApp (defaultFileServerSettings assets)
+  in
+    \request respond ->
+      case pathInfo request of
+        ["one-style.css"] -> do
+          putMVar arrived ()
+          takeMVar release
+          respond (responseLBS status200 [(hContentType, "text/css")] "")
+        _ ->
+          static request respond
 
 -- | Waits for two animation frames, five times over, so in-flight work gets a
 -- chance to run without a sleep.
