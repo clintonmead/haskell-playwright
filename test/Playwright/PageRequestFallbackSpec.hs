@@ -12,6 +12,12 @@ import Data.ByteString
   ( ByteString
   )
 import Data.ByteString.Char8 qualified as Char8
+import Data.Aeson
+  ( Value
+  , object
+  , (.=)
+  )
+import Data.ByteString qualified as ByteString
 import Data.ByteString.Lazy qualified as LBS
 import UnliftIO.IORef
   ( IORef
@@ -68,6 +74,7 @@ import Playwright
   , requestHeaders
   , requestMethod
   , requestPostData
+  , requestPostDataJSON
   , requestUrl
   , responseRequest
   , responseText
@@ -225,6 +232,37 @@ tests =
           fromServer <- capturedBody <$> takeMVar captured
           assertEqual "route" (Just (Char8.pack "doggo")) fromRoute
           assertEqual "server" (Char8.pack "doggo") fromServer
+    , testCase "should amend binary post data" $
+        withCaptureServer $ \prefix captured page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let bytes = ByteString.pack (map fromIntegral [0 .. 255 :: Int])
+          seen <- newIORef (Nothing :: Maybe ByteString)
+          route page (UrlGlob "**/*") $ \handled -> do
+            writeIORef seen =<< requestPostData =<< routeRequest handled
+            continueRoute handled
+          route page (UrlGlob "**/*") $ \handled ->
+            fallbackRouteWith handled defaultContinueOptions {continuePostData = Just bytes}
+          _ <- evaluate page "() => fetch('/sleep.zzz', { method: 'POST', body: 'birdy' })"
+          fromRoute <- readIORef seen
+          fromServer <- capturedBody <$> takeMVar captured
+          assertEqual "route" (Just bytes) fromRoute
+          assertEqual "server" bytes fromServer
+    , testCase "should amend json post data" $
+        withCaptureServer $ \prefix captured page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          seen <- newIORef (Nothing :: Maybe Value)
+          route page (UrlGlob "**/*") $ \handled -> do
+            writeIORef seen =<< requestPostDataJSON =<< routeRequest handled
+            continueRoute handled
+          route page (UrlGlob "**/*") $ \handled ->
+            fallbackRouteWith
+              handled
+              defaultContinueOptions {continuePostData = Just (Char8.pack "{\"foo\":\"bar\"}")}
+          _ <- evaluate page "() => fetch('/sleep.zzz', { method: 'POST', body: 'birdy' })"
+          fromRoute <- readIORef seen
+          fromServer <- capturedBody <$> takeMVar captured
+          assertEqual "route" (Just (object ["foo" .= ("bar" :: Text)])) fromRoute
+          assertEqual "server" (Char8.pack "{\"foo\":\"bar\"}") fromServer
     , testCase "should override request url" $
         withAssets $ \prefix page -> do
           seen <- newIORef (Nothing :: Maybe Text)

@@ -112,7 +112,7 @@ Do not pass `-p` directly to `nix develop` (`-p` is a Nix flag):
 nix develop --command bash -c 'playwright-test -p /page-goto/'
 ```
 
-`TASTY_PATTERN` is Tasty's own environment-variable form of the same filter. Full-suite `playwright-test` (no extra args) is for a green commit.
+`TASTY_PATTERN` is Tasty's own environment-variable form of the same filter. Full-suite `playwright-test` (no extra args) is periodic, not per commit: see the test budget under "Advice for working unattended".
 
 ### Headed demo
 
@@ -261,7 +261,7 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 These came from long sessions. Follow them unless the user says otherwise.
 
 - **Always wrap a test run in `timeout`.** Tasty has no per-test timeout, so one test that waits forever hangs the whole run. Use `timeout 400 $bin ...` and stream to a file, or use `--hide-successes` on small groups only.
-- **Full suite is ~2–3 minutes now.** Run targeted groups (`-p '/group/ || /other/'`) while working, and the full suite before a commit that changes shared library code (`Connection*`, `Frame*`, `Page*`, `Locator*`, `Harness`), or every few batches otherwise.
+- **Test budget: full runs take at most ~10% of dev time.** The full suite is ~2.5 minutes. Commit after the new or changed group passes (`playwright-test -p '/group/'`, with a few reruns for anything timing-sensitive). Run the full suite about once every four or five commits, and before a wide change to shared library code (`Connection*`, `Frame*`, `Page*`, `Locator*`, `Harness`). Do not start a full run while a targeted loop still needs its result.
 - **Prefer `armX` waiters over `withAsync`.** A `withAsync (wait...)` started after the action can miss an event that fires first. Register with `armX` (or `registerFutureEventWaiterWhere`), then run the action, then take the result. See `armNavigationOptions` and `armLoadEvent`.
 - **Lifecycle events can arrive in any order.** Never re-arm after a non-matching event: the next event can fire before the re-arm. Use an accept predicate on the waiter instead.
 - **Keep the `-Weverything` list clean.** New imports need explicit import lists (`-Wmissing-import-lists`). Unused imports are errors, so after moving helpers around, remove the imports the compiler reports.
