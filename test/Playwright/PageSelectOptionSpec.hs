@@ -317,6 +317,14 @@ tests =
             _ <- wait pending
             assertEqual "value" "two" =<< evaluateOnLocatorText (locate page "select") "select => select.value"
             assertEqual "result" "two" =<< evaluateText page "() => window.result"
+    , testCase "should return [] on no matched values" $
+        withAssetPage "input/select.html" $ \page -> do
+          result <- selectOption (locate page "select") []
+          assertEqual "result" [] result
+    , testCase "should return [] on no values" $
+        withAssetPage "input/select.html" $ \page -> do
+          result <- selectOption (locate page "select") []
+          assertEqual "result" [] result
     ]
 
 -- | Appends an option to the page's select, so a waiting selectOption can
