@@ -1568,7 +1568,7 @@ import Playwright.ScreenshotOptions
   , defaultScreenshotOptions
   )
 import Playwright.ScriptTag
-  ( ScriptTag (ScriptTag, scriptTagContent, scriptTagType, scriptTagUrl)
+  ( ScriptTag (ScriptTag, scriptTagContent, scriptTagPath, scriptTagType, scriptTagUrl)
   , emptyScriptTag
   )
 import Playwright.SecurityDetails

@@ -246,3 +246,4 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - `setContentWith` takes `SetContentOptions` (`timeout`, `waitUntil`). The frame's content is `Playwright.frameContent` (it was `contentFrame`, easy to confuse with `contentFrameHandle`).
 - Navigation waits take `WaitForNavigationOptions` (`timeout`, `url` glob, `waitUntil`). `armNavigationOptions` registers the waiter before the action runs, so a same-document or fast navigation is never missed. Prefer the armed form in tests over `withAsync`. `waitForLoadStateWith` adds the timeout.
 - `Harness.stallingStylesheetApp` serves the assets but holds `one-style.css` until a test releases it. It is the shared way to keep a page loading.
+- `ScriptTag.scriptTagPath` reads the file on the client and appends a `//# sourceURL=` line, as the JS client does. `path` replaces `content`.

@@ -74,11 +74,19 @@ import Data.List
   ( find
   )
 import Data.Set qualified as Set
+import Control.Monad.IO.Class
+  ( liftIO
+  )
 import Data.ByteString
   ( ByteString
   )
+import Data.ByteString qualified as ByteString
 import Data.Text
   ( Text
+  )
+import Data.Text qualified as Text
+import Data.Text.Encoding
+  ( decodeUtf8
   )
 import Playwright.AriaRole
   ( AriaRole
@@ -233,7 +241,7 @@ import Playwright.Response
   , responseFromRef
   )
 import Playwright.ScriptTag
-  ( ScriptTag (scriptTagContent, scriptTagType, scriptTagUrl)
+  ( ScriptTag (scriptTagContent, scriptTagPath, scriptTagType, scriptTagUrl)
   )
 import Playwright.StyleTag
   ( StyleTag (styleTagContent, styleTagUrl)
@@ -614,12 +622,13 @@ addInitScript page source = do
 
 addScriptTag :: Page -> ScriptTag -> Playwright ElementHandle
 addScriptTag page tag = do
+  scriptContent <- scriptTagSource tag
   result <-
     frameSend
       (pageMainFrame page)
       "addScriptTag"
       mkFrameAddScriptTagParams
-        { frameAddScriptTagParamsContent = scriptTagContent tag
+        { frameAddScriptTagParamsContent = scriptContent
         , frameAddScriptTagParamsType = scriptTagType tag
         , frameAddScriptTagParamsUrl = scriptTagUrl tag
         }
@@ -627,6 +636,17 @@ addScriptTag page tag = do
     ( elementHandleFromRef
         (frameAddScriptTagResultElement result)
     )
+
+-- | The script text to send. A path is read from disk and marked with a
+-- sourceURL, so stack traces name the file, as the JS client does.
+scriptTagSource :: ScriptTag -> Playwright (Maybe Text)
+scriptTagSource tag =
+  case scriptTagPath tag of
+    Nothing ->
+      pure (scriptTagContent tag)
+    Just path -> do
+      bytes <- liftIO (ByteString.readFile path)
+      pure (Just (decodeUtf8 bytes <> "\n//# sourceURL=" <> Text.pack (filter (/= '\n') path)))
 
 addStyleTag :: Page -> StyleTag -> Playwright ElementHandle
 addStyleTag page tag = do
