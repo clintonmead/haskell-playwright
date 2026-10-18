@@ -3,6 +3,7 @@ module Playwright.Connection.Wait
   , deliverEvent
   , registerEventWaiter
   , registerFutureEventWaiter
+  , registerFutureEventWaiterWhere
   , waitForChannelEvent
   , waitForChannelEventUnlessAborted
   , waitForChannelEventUnlessClosed
@@ -95,8 +96,8 @@ deliverEvent conn guid method params =
   where
     waitingFor session waitId =
       case Map.lookup waitId (sessionWaiters session) of
-        Just (EventWaiter waiterGuid waiterMethod Nothing) ->
-          waiterGuid == guid && waiterMethod == method
+        Just (EventWaiter waiterGuid waiterMethod Nothing accepts) ->
+          waiterGuid == guid && waiterMethod == method && accepts params
         _ ->
           False
     bufferEvent session =
@@ -132,26 +133,32 @@ registerEventWaiter conn guid method =
             , session
                 { sessionNextWaitId = succ waitId
                 , sessionWaiters =
-                    Map.insert waitId (EventWaiter guid method (Just params)) (sessionWaiters session)
+                    Map.insert waitId (EventWaiter guid method (Just params) (const True)) (sessionWaiters session)
                 , sessionEventBuffer = Map.insert (guid, method) rest (sessionEventBuffer session)
                 }
             )
           Seq.EmptyL ->
-            insertWaitingWaiter session waitId guid method
+            insertWaitingWaiter session waitId guid method (const True)
 
 registerFutureEventWaiter :: Connection -> Guid -> MethodName -> IO WaitId
 registerFutureEventWaiter conn guid method =
+  registerFutureEventWaiterWhere conn guid method (const True)
+
+-- | Like registerFutureEventWaiter, but the waiter only takes events for which
+-- the predicate holds. Other events of the same kind are left for later.
+registerFutureEventWaiterWhere :: Connection -> Guid -> MethodName -> (Value -> Bool) -> IO WaitId
+registerFutureEventWaiterWhere conn guid method accepts =
   atomically $
     stateSession conn $ \session ->
-      insertWaitingWaiter session (sessionNextWaitId session) guid method
+      insertWaitingWaiter session (sessionNextWaitId session) guid method accepts
 
-insertWaitingWaiter :: Session -> WaitId -> Guid -> MethodName -> (WaitId, Session)
-insertWaitingWaiter session waitId guid method =
+insertWaitingWaiter :: Session -> WaitId -> Guid -> MethodName -> (Value -> Bool) -> (WaitId, Session)
+insertWaitingWaiter session waitId guid method accepts =
   ( waitId
   , session
       { sessionNextWaitId = succ waitId
       , sessionWaiters =
-          Map.insert waitId (EventWaiter guid method Nothing) (sessionWaiters session)
+          Map.insert waitId (EventWaiter guid method Nothing accepts) (sessionWaiters session)
       , sessionEventWaiters = waitId : sessionEventWaiters session
       }
   )
@@ -282,7 +289,7 @@ throwOutcome outcome =
 waiterValue :: Session -> WaitId -> Maybe Value
 waiterValue session waitId =
   case Map.lookup waitId (sessionWaiters session) of
-    Just (EventWaiter _ _ (Just params)) ->
+    Just (EventWaiter _ _ (Just params) _) ->
       Just params
     _ ->
       Nothing

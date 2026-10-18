@@ -13,6 +13,7 @@ module Playwright.Connection
   , waitForFutureChannelEvent
   , waitForFutureChannelEventUnlessClosed
   , registerFutureEventWaiter
+  , registerFutureEventWaiterWhere
   , waitForWaiter
   , waitForWaiterUnlessClosed
   , rememberBrowserContext
@@ -378,6 +379,10 @@ registerEventWaiter guid method =
 registerFutureEventWaiter :: Guid -> MethodName -> Playwright WaitId
 registerFutureEventWaiter guid method =
   inConnection $ \conn -> Wait.registerFutureEventWaiter conn guid method
+
+registerFutureEventWaiterWhere :: Guid -> MethodName -> (Value -> Bool) -> Playwright WaitId
+registerFutureEventWaiterWhere guid method accepts =
+  inConnection $ \conn -> Wait.registerFutureEventWaiterWhere conn guid method accepts
 
 waitForWaiter :: WaitId -> Playwright Value
 waitForWaiter waitId =

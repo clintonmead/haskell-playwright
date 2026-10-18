@@ -19,6 +19,8 @@ module Playwright.Page.Wait
   , waitForFunctionPolling
   , waitForFunctionWith
   , waitForFunctionWithArg
+  , waitForDomContentLoadedEvent
+  , armDomContentLoadedEvent
   , waitForLoadEvent
   , waitForLoadState
   , waitForLoadStateWith
@@ -48,6 +50,8 @@ import Playwright.Monad
   )
 import Data.Aeson
   ( Value
+  , Result (Error, Success)
+  , fromJSON
   )
 import Data.Maybe
   ( fromMaybe
@@ -65,6 +69,7 @@ import Playwright.Connection
   ( registerEventHandler
   , registerEventWaiter
   , registerFutureEventWaiter
+  , registerFutureEventWaiterWhere
   , waitForChannelEvent
   , waitForChannelEventUnlessClosed
   , waitForFutureChannelEvent
@@ -116,6 +121,7 @@ import Playwright.Page
   )
 import Playwright.Protocol
   ( BrowserContextDialogEvent (browserContextDialogEventDialog)
+  , LifecycleEvent (LifecycleEventDomcontentloaded, LifecycleEventLoad)
   , BrowserContextPageEvent (browserContextPageEventPage)
   , BrowserContextRequestEvent (browserContextRequestEventRequest)
   , BrowserContextRequestFailedEvent (browserContextRequestFailedEventRequest)
@@ -228,21 +234,41 @@ waitForLoadEvent page = do
   takeLoad <- armLoadEvent page
   waitWithTimeout timeout takeLoad
 
+waitForDomContentLoadedEvent :: Page -> Playwright ()
+waitForDomContentLoadedEvent page = do
+  timeout <- pageNavigationTimeout page
+  takeEvent <- armDomContentLoadedEvent page
+  waitWithTimeout timeout takeEvent
+
 armLoadEvent :: Page -> Playwright (Playwright ())
-armLoadEvent page = do
+armLoadEvent page =
+  armLifecycleEvent page LifecycleEventLoad
+
+armDomContentLoadedEvent :: Page -> Playwright (Playwright ())
+armDomContentLoadedEvent page =
+  armLifecycleEvent page LifecycleEventDomcontentloaded
+
+-- | Registers for the next main-frame lifecycle event of the given kind, and
+-- skips any other lifecycle events while it waits.
+armLifecycleEvent :: Page -> LifecycleEvent -> Playwright (Playwright ())
+armLifecycleEvent page lifecycle = do
   waitId <-
-    registerFutureEventWaiter
+    registerFutureEventWaiterWhere
       (channelGuid (frameChannel (pageMainFrame page)))
       (MethodName "loadstate")
+      (isLifecycleEvent lifecycle)
   pure $ do
-    params <- waitForWaiter waitId
-    event <- throwDecode params
-    case frameLoadstateEventAdd event of
-      Just LifecycleEventLoad ->
-        pure ()
-      _ -> do
-        takeLoad <- armLoadEvent page
-        takeLoad
+    _ <- waitForWaiter waitId
+    pure ()
+
+-- | Whether a loadstate event reports the lifecycle event being waited for.
+isLifecycleEvent :: LifecycleEvent -> Value -> Bool
+isLifecycleEvent lifecycle params =
+  case fromJSON params of
+    Success event ->
+      frameLoadstateEventAdd (event :: FrameLoadstateEvent) == Just lifecycle
+    Error _ ->
+      False
 
 waitForTimeout :: Page -> Timeout -> Playwright ()
 waitForTimeout page =

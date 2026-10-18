@@ -16,4 +16,5 @@ data EventWaiter = EventWaiter
   { eventWaiterGuid :: Guid
   , eventWaiterMethod :: MethodName
   , eventWaiterValue :: Maybe Value
+  , eventWaiterAccepts :: Value -> Bool
   }

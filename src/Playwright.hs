@@ -179,6 +179,7 @@ module Playwright
   , armFrameDetached
   , armFrameNavigated
   , armLoadEvent
+  , armDomContentLoadedEvent
   , armNavigatedFrame
   , armPopup
   , arrayValue
@@ -679,6 +680,7 @@ module Playwright
   , waitForFunctionPolling
   , waitForFunctionWith
   , waitForFunctionWithArg
+  , waitForDomContentLoadedEvent
   , waitForLoadEvent
   , waitForLoadState
   , waitForLoadStateWith
@@ -1394,6 +1396,7 @@ import Playwright.Page.Wait
   , armFrameDetached
   , armFrameNavigated
   , armLoadEvent
+  , armDomContentLoadedEvent
   , armNavigatedFrame
   , armPopup
   , onLoad
@@ -1406,6 +1409,7 @@ import Playwright.Page.Wait
   , waitForFunctionPolling
   , waitForFunctionWith
   , waitForFunctionWithArg
+  , waitForDomContentLoadedEvent
   , waitForLoadEvent
   , waitForLoadState
   , waitForLoadStateWith
