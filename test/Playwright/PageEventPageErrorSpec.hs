@@ -7,18 +7,35 @@ import UnliftIO.Async
   , withAsync
   )
 import Data.Text
-  ( isInfixOf
+  ( Text
+  , isInfixOf
+  , pack
   )
 import Playwright
-  ( PageError (pageErrorMessage, pageErrorName, pageErrorStack)
+  ( Page
+  , PageError (pageErrorMessage, pageErrorName, pageErrorStack)
+  , Playwright
+  , SpecialJsValue (SpecialNull, SpecialUndefined)
+  , clearPageErrors
   , defaultGotoOptions
   , evaluate
+  , evaluateWith
   , goto
+  , numberArgument
+  , pageErrors
+  , setContent
+  , specialArgument
+  , textArgument
   , urlFromText
   , waitForPageError
+  , waitForTimeout
+  )
+import Playwright.SerializedArgument
+  ( SerializedArgument
   )
 import Playwright.Harness
-  ( withAssets
+  ( requireTimeout
+  , withAssets
   , withChromiumPage
   , assertBool
   , assertEqual
@@ -58,4 +75,69 @@ tests =
             err <- wait handle
             assertEqual "name" "my-name" (pageErrorName err)
             assertEqual "message" "my-message" (pageErrorMessage err)
+    , testCase "should support an empty Error.name property" $
+        withChromiumPage $ \page -> do
+          _ <-
+            evaluate
+              page
+              "() => { setTimeout(() => { const error = new Error('my-message'); error.name = ''; throw error; }, 0); }"
+          err <- waitForPageError page
+          assertEqual "name" "" (pageErrorName err)
+          assertEqual "message" "my-message" (pageErrorMessage err)
+    , testCase "should handle odd values" $
+        withChromiumPage $ \page -> do
+          oddValueMessage page (specialArgument SpecialNull) "null"
+          oddValueMessage page (specialArgument SpecialUndefined) "undefined"
+          oddValueMessage page (numberArgument 0) "0"
+          oddValueMessage page (textArgument "") ""
+    , testCase "should handle object" $
+        withChromiumPage $ \page -> do
+          _ <- evaluate page "() => { setTimeout(() => { throw {}; }, 0); }"
+          err <- waitForPageError page
+          assertEqual "message" "Object" (pageErrorMessage err)
+    , testCase "should handle window" $
+        withChromiumPage $ \page -> do
+          _ <- evaluate page "() => { setTimeout(() => { throw window; }, 0); }"
+          err <- waitForPageError page
+          assertEqual "message" "Window" (pageErrorMessage err)
+    , testCase "should emit error from unhandled rejects" $
+        withChromiumPage $ \page -> do
+          setContent page "\n        <script>\n          Promise.reject(new Error('sad :('));\n        </script>\n    "
+          err <- waitForPageError page
+          assertBool "message" ("sad :(" `isInfixOf` pageErrorMessage err)
+    , testCase "pageErrors should work" $
+        withChromiumPage $ \page -> do
+          _ <-
+            evaluate
+              page
+              "async () => { for (let i = 0; i < 301; i++) { setTimeout(() => { throw new Error('error' + i); }, 0); } await new Promise(f => setTimeout(f, 2000)); }"
+          errors <- pageErrors page
+          let messages = map pageErrorMessage errors
+              expected = ["error" <> pack (show i) | i <- [201 .. 300 :: Int]]
+          assertBool "at least 100 errors" (length messages >= 100)
+          assertEqual "last errors" expected (drop (length messages - length expected) messages)
+    , testCase "clearPageErrors should work" $
+        withChromiumPage $ \page -> do
+          _ <-
+            evaluate
+              page
+              "() => { setTimeout(() => { throw new Error('error1'); }, 0); setTimeout(() => { throw new Error('error2'); }, 0); }"
+          waitForTimeout page =<< requireTimeout 1000
+          errors <- pageErrors page
+          assertBool "error1" ("error1" `elem` map pageErrorMessage errors)
+          assertBool "error2" ("error2" `elem` map pageErrorMessage errors)
+          clearPageErrors page
+          assertEqual "cleared" [] =<< (map pageErrorMessage <$> pageErrors page)
+          _ <- evaluate page "() => { setTimeout(() => { throw new Error('error3'); }, 0); }"
+          waitForTimeout page =<< requireTimeout 1000
+          remaining <- map pageErrorMessage <$> pageErrors page
+          assertEqual "one error" 1 (length remaining)
+          assertBool "error3" (any ("error3" `isInfixOf`) remaining)
     ]
+
+-- | Throws the given value from a timeout and checks the page error's message.
+oddValueMessage :: Page -> SerializedArgument -> Text -> Playwright ()
+oddValueMessage page value expected = do
+  _ <- evaluateWith page "value => { setTimeout(() => { throw value; }, 0); }" value
+  err <- waitForPageError page
+  assertEqual "message" expected (pageErrorMessage err)
