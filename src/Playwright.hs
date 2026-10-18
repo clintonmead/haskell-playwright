@@ -50,6 +50,7 @@ module Playwright
   , EmulateMedia (..)
   , Exactness (..)
   , FileChooser (..)
+  , fileChooserSetFiles
   , ForcedColors (..)
   , FetchOptions (..)
   , FetchPostData (..)
@@ -1095,6 +1096,7 @@ import Playwright.FetchOptions
 import Playwright.FileChooser
   ( FileChooser (FileChooser, fileChooserElement, fileChooserMultiple, fileChooserPage)
   , armFileChooser
+  , fileChooserSetFiles
   , waitForFileChooser
   , waitForFileChooserWith
   )

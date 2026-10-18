@@ -1,6 +1,7 @@
 module Playwright.FileChooser
   ( FileChooser (..)
   , armFileChooser
+  , fileChooserSetFiles
   , waitForFileChooser
   , waitForFileChooserWith
   ) where
@@ -19,6 +20,10 @@ import Playwright.Connection
 import Playwright.ElementHandle
   ( ElementHandle
   , elementHandleFromRef
+  , setInputFilesHandle
+  )
+import Playwright.InputFile
+  ( InputFile
   )
 import Playwright.Json.Decode
   ( throwDecode
@@ -78,3 +83,8 @@ armFileChooser page = do
         , fileChooserMultiple = pageFileChooserEventIsMultiple event
         , fileChooserPage = page
         }
+
+-- | Sets the files the chooser picked. This is setInputFiles on the input.
+fileChooserSetFiles :: FileChooser -> [InputFile] -> Playwright ()
+fileChooserSetFiles chooser files =
+  setInputFilesHandle (fileChooserElement chooser) files
