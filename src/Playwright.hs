@@ -147,6 +147,7 @@ module Playwright
   , WheelDelta (..)
   , Worker (..)
   , abortRoute
+  , abortRouteWith
   , acceptDialog
   , acceptDialogWith
   , addContextInitScript
@@ -699,6 +700,7 @@ module Playwright
   , waitForPopup
   , waitUntilJsHandlePreview
   , waitForRequest
+  , armRequestFailed
   , waitForRequestFailed
   , waitForRequestFailedWith
   , waitForRequestFinished
@@ -1427,6 +1429,7 @@ import Playwright.Page.Wait
   , waitForNavigatedFrame
   , waitForPopup
   , waitForRequest
+  , armRequestFailed
   , waitForRequestFailed
   , waitForRequestFailedWith
   , waitForRequestFinished
@@ -1549,6 +1552,7 @@ import Playwright.Response
 import Playwright.Route
   ( Route
   , abortRoute
+  , abortRouteWith
   , continueRoute
   , continueRouteWith
   , fallbackRoute

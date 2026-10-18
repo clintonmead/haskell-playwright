@@ -32,6 +32,7 @@ module Playwright.Page.Wait
   , waitForRequest
   , waitForRequestFailed
   , waitForRequestFailedWith
+  , armRequestFailed
   , waitForRequestFinished
   , waitForRequestWith
   , waitForResponse
@@ -528,18 +529,24 @@ waitForRequestFailed page = do
   waitForRequestFailedWith page timeout
 
 waitForRequestFailedWith :: Page -> Timeout -> Playwright Request
-waitForRequestFailedWith page timeout =
-  waitWithTimeout timeout $ do
-    subscribeContext page BrowserContextUpdateSubscriptionParamsEventRequestFailed
-    params <-
-      waitForChannelEvent
-        (channelGuid (pageContextChannel page))
-        (MethodName "requestFailed")
+waitForRequestFailedWith page timeout = do
+  takeFailed <- armRequestFailedWith page timeout
+  takeFailed
+
+-- | Registers for the next failed request before the action that fails it runs.
+armRequestFailed :: Page -> Playwright (Playwright Request)
+armRequestFailed page = do
+  timeout <- pageActionTimeout page
+  armRequestFailedWith page timeout
+
+armRequestFailedWith :: Page -> Timeout -> Playwright (Playwright Request)
+armRequestFailedWith page timeout = do
+  subscribeContext page BrowserContextUpdateSubscriptionParamsEventRequestFailed
+  waitId <- registerEventWaiter (channelGuid (pageContextChannel page)) (MethodName "requestFailed")
+  pure $ waitWithTimeout timeout $ do
+    params <- waitForWaiter waitId
     event <- throwDecode params
-    pure
-      ( requestFromRef
-          (browserContextRequestFailedEventRequest event)
-      )
+    pure (requestFromRef (browserContextRequestFailedEventRequest event))
 
 waitForRequestFinished :: Page -> Playwright Request
 waitForRequestFinished page = do

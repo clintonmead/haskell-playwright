@@ -265,3 +265,5 @@ These came from long sessions. Follow them unless the user says otherwise.
 - **Gap hunting:** `scripts/upstream-gaps <dir> <spec>` lists upstream names with no Haskell match. Verify each against the upstream file before porting, because names drift.
 - **Skips are fine if they are documented.** A case that needs a JS-only hook, a Node-only API, or a type the Haskell API cannot express goes in the TODO with the reason.
 - **Commit after each batch that passes.** Use a semantic message, the `Co-Authored-By` trailer from the session, and never amend or push without being asked.
+- `route` handlers see the request headers the route got, and a `setExtraHTTPHeaders` referer does not show up there for a navigation. The server does receive it. Test the server side (a local app that records the header) when the assertion is about the wire.
+- `armRequestFailed` registers the failed-request waiter now. `abortRouteWith` sends a protocol error code (for example `internetdisconnected`).

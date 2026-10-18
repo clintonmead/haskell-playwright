@@ -1,6 +1,7 @@
 module Playwright.Route
   ( Route (Route)
   , abortRoute
+  , abortRouteWith
   , continueRoute
   , continueRouteWith
   , fallbackRoute
@@ -102,6 +103,7 @@ import Playwright.MethodName
   )
 import Playwright.Protocol
   ( NameValue
+  , RouteAbortParams (routeAbortParamsErrorCode)
   , RouteAbortResult
   , RouteContinueParams (routeContinueParamsHeaders, routeContinueParamsMethod, routeContinueParamsPostData, routeContinueParamsUrl)
   , RouteContinueResult
@@ -182,10 +184,24 @@ applyContinueOverrides request opts = do
   pure next
 
 abortRoute :: Route -> Playwright ()
-abortRoute handled = do
+abortRoute handled =
+  abortRouteWithCode handled Nothing
+
+-- | Aborts with a Playwright error code, such as "internetdisconnected".
+abortRouteWith :: Route -> Text -> Playwright ()
+abortRouteWith handled code =
+  abortRouteWithCode handled (Just code)
+
+abortRouteWithCode :: Route -> Maybe Text -> Playwright ()
+abortRouteWithCode handled code = do
   ignoreTargetClosed $ do
     _ :: RouteAbortResult <-
-      send (routeChannel handled) (MethodName "abort") mkRouteAbortParams
+      send
+        (routeChannel handled)
+        (MethodName "abort")
+        mkRouteAbortParams
+          { routeAbortParamsErrorCode = code
+          }
     pure ()
   settleRoute handled True
 
