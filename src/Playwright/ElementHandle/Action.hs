@@ -4,6 +4,7 @@ module Playwright.ElementHandle.Action
   , fillHandle
   , focusHandle
   , hoverHandle
+  , pressHandle
   , selectOptionHandle
   , setCheckedHandle
   , uncheckHandle
@@ -38,6 +39,7 @@ import Playwright.Protocol
   , ElementHandleFillResult
   , ElementHandleFocusResult
   , ElementHandleHoverResult
+  , ElementHandlePressResult
   , ElementHandleSelectOptionParams (elementHandleSelectOptionParamsOptions)
   , ElementHandleSelectOptionParamsOptions (elementHandleSelectOptionParamsOptionsIndex, elementHandleSelectOptionParamsOptionsLabel, elementHandleSelectOptionParamsOptionsValue, elementHandleSelectOptionParamsOptionsValueOrLabel)
   , ElementHandleSelectOptionResult (elementHandleSelectOptionResultValues)
@@ -47,10 +49,15 @@ import Playwright.Protocol
   , mkElementHandleFillParams
   , mkElementHandleFocusParams
   , mkElementHandleHoverParams
+  , mkElementHandlePressParams
   , mkElementHandleSelectOptionParams
   , mkElementHandleSelectOptionParamsOptions
   , mkElementHandleUncheckParams
   , mkJSHandleDisposeParams
+  )
+import Playwright.Key
+  ( Key
+  , keyToText
   )
 import Playwright.SelectOption
   ( SelectAttributes (selectAttributesIndex, selectAttributesLabel, selectAttributesValue)
@@ -64,6 +71,12 @@ hoverHandle :: ElementHandle -> Playwright ()
 hoverHandle handle = do
   _ :: ElementHandleHoverResult <-
     send (elementHandleChannel handle) (MethodName "hover") (mkElementHandleHoverParams defaultTimeout)
+  pure ()
+
+pressHandle :: ElementHandle -> Key -> Playwright ()
+pressHandle handle key = do
+  _ :: ElementHandlePressResult <-
+    send (elementHandleChannel handle) (MethodName "press") (mkElementHandlePressParams (keyToText key) defaultTimeout)
   pure ()
 
 fillHandle :: ElementHandle -> Text -> Playwright ()

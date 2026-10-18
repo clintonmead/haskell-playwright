@@ -10,11 +10,24 @@ import Data.Text
   )
 import Data.Text qualified as Text
 import Playwright
-  ( Frame
+  ( BoundingBox (boundingBoxHeight, boundingBoxWidth, boundingBoxX, boundingBoxY)
+  , CssPixel (cssPixelToScientific)
+  , Frame
   , JsHandle
   , Key (Key)
+  , MouseButton (MouseButtonRight)
   , Page
   , Playwright
+  , Point (Point)
+  , boundingBox
+  , cssPixelFromInt
+  , evaluateBool
+  , evaluateTexts
+  , mouseClickWith
+  , mouseDownWith
+  , mouseMove
+  , pressHandle
+  , querySelector
   , asElement
   , click
   , contentFrameHandle
@@ -432,7 +445,138 @@ tests =
           assertEqual "focused" "focusable" =<< evaluateText page "() => document.activeElement.id"
           typeText (locate page "#non-focusable-and-non-editable") "foo"
           assertEqual "still focused" "focusable" =<< evaluateText page "() => document.activeElement.id"
+    , testCase "should send a character with ElementHandle.press" $
+        withAssetPage "input/textarea.html" $ \page -> do
+          textarea <- requireHandle =<< querySelector page (selectorFromText "textarea")
+          pressHandle textarea (Key "a")
+          assertEqual "first" "a" =<< evaluateOnLocatorText (locate page "textarea") "t => t.value"
+          _ <- evaluate page "() => window.addEventListener('keydown', e => e.preventDefault(), true)"
+          pressHandle textarea (Key "b")
+          assertEqual "prevented" "a" =<< evaluateOnLocatorText (locate page "textarea") "t => t.value"
+    , testCase "should dispatch key events in separate tasks" $
+        withChromiumPage $ \page -> do
+          setContent page "<input>"
+          log' <-
+            evaluateHandle
+              page
+              "() => { const log = []; const input = document.querySelector('input'); for (const type of ['keydown', 'keypress']) { input.addEventListener(type, () => { log.push(type); queueMicrotask(() => log.push('microtask-' + type)); }); } input.focus(); return log; }"
+          keyboardPress page (Key "a")
+          assertEqual "order" ["keydown", "microtask-keydown", "keypress", "microtask-keypress"]
+            =<< jsonValueTexts log'
+    , testCase "should report shiftKey" $
+        withAssetPage "input/keyboard.html" $ \page ->
+          mapM_ (checkModifierReports page) ["Shift", "Alt", "Control"]
+    , testCase "should report multiple modifiers" $
+        withAssetPage "input/keyboard.html" $ \page -> do
+          keyboardDown page (Key "Control")
+          expectResult page "control down" "Keydown: Control ControlLeft LEFT [Control]"
+          keyboardDown page (Key "Alt")
+          expectResult page "alt down" "Keydown: Alt AltLeft LEFT [Alt Control]"
+          keyboardDown page (Key ";")
+          expectResult page "semicolon down" "Keydown: ; Semicolon STANDARD [Alt Control]"
+          keyboardUp page (Key ";")
+          expectResult page "semicolon up" "Keyup: ; Semicolon STANDARD [Alt Control]"
+          keyboardUp page (Key "Control")
+          expectResult page "control up" "Keyup: Control ControlLeft LEFT [Alt]"
+          keyboardUp page (Key "Alt")
+          expectResult page "alt up" "Keyup: Alt AltLeft LEFT []"
+    , testCase "should dispatch insertText after context menu was opened" $
+        withAssetPage "input/textarea.html" $ \page -> do
+          _ <- openContextMenuWatch page
+          textarea <- requireHandle =<< querySelector page (selectorFromText "textarea")
+          box <- requireBox =<< boundingBox textarea
+          _ <- mouseClickWith page (centerOf box) (Just MouseButtonRight) Nothing
+          _ <- evaluate page "() => window.contextMenuPromise"
+          keyboardInsertText page "嗨"
+          _ <- waitForFunction page "() => document.querySelector('textarea').value === '嗨'"
+          assertEqual "value" "嗨" =<< evaluateOnLocatorText (locate page "textarea") "t => t.value"
+    , testCase "should type after context menu was opened" $
+        withChromiumPage $ \page -> do
+          _ <-
+            evaluate
+              page
+              "() => { window.keys = []; window.addEventListener('keydown', e => window.keys.push(e.key)); window.contextMenuPromise = new Promise(x => window.addEventListener('contextmenu', () => x('menu'), false)); }"
+          mouseMove page (pointAt 100 100)
+          mouseDownWith page (Just MouseButtonRight)
+          _ <- evaluate page "() => window.contextMenuPromise"
+          keyboardDown page (Key "ArrowDown")
+          _ <- waitForFunction page "() => window.keys.length === 1"
+          assertEqual "keys" ["ArrowDown"] =<< evaluateTexts page "() => window.keys"
+    , testCase "should have correct Keydown/Keyup order when pressing Escape key" $
+        withAssetPage "input/keyboard.html" $ \page -> do
+          keyboardPress page (Key "Escape")
+          expectResult page "escape" "Keydown: Escape Escape STANDARD []\nKeyup: Escape Escape STANDARD []"
+    , testCase "should close dialog on Escape key press in contenteditable" $
+        withChromiumPage $ \page -> do
+          setContent page "\n    <dialog>\n      <div contenteditable>Edit Me</div>\n    </dialog>\n  "
+          _ <- evaluate page "() => document.querySelector('dialog').showModal()"
+          assertEqual "open" True =<< evaluateBool page "() => document.querySelector('dialog').open"
+          press (locate page "dialog [contenteditable]") (Key "Escape")
+          assertEqual "closed" False =<< evaluateBool page "() => document.querySelector('dialog').open"
+    , testCase "should work after a cross origin navigation" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let otherOrigin = Text.replace "127.0.0.1" "localhost" prefix
+          _ <- goto page (urlFromText (otherOrigin <> "/empty.html")) defaultGotoOptions
+          lastEvent <- captureLastKeydown page
+          keyboardPress page (Key "a")
+          assertEqual "key" "a" =<< evaluateOnHandleText lastEvent "e => e.key"
     ]
+
+-- | Checks the Keydown / Keypress / Keyup report for a modifier held while
+-- typing "!".
+checkModifierReports :: Page -> Text -> Playwright ()
+checkModifierReports page modifier = do
+  keyboardDown page (Key modifier)
+  expectResult page "modifier down" ("Keydown: " <> modifier <> " " <> modifier <> "Left LEFT [" <> modifier <> "]")
+  keyboardDown page (Key "!")
+  let
+    bangDown =
+      if modifier == "Shift"
+        then "Keydown: ! Digit1 STANDARD [Shift]\nKeypress: ! Digit1 STANDARD 33 [Shift]"
+        else "Keydown: ! Digit1 STANDARD [" <> modifier <> "]"
+  expectResult page "bang down" bangDown
+  keyboardUp page (Key "!")
+  expectResult page "bang up" ("Keyup: ! Digit1 STANDARD [" <> modifier <> "]")
+  keyboardUp page (Key modifier)
+  expectResult page "modifier up" ("Keyup: " <> modifier <> " " <> modifier <> "Left LEFT []")
+
+-- | Asserts the text the keyboard.html page recorded so far.
+expectResult :: Page -> String -> Text -> Playwright ()
+expectResult page label expected =
+  assertEqual label expected =<< evaluateText page "() => getResult()"
+
+-- | Records that a context menu opened, so the test can wait for it.
+openContextMenuWatch :: Page -> Playwright ()
+openContextMenuWatch page = do
+  _ <-
+    evaluate
+      page
+      "() => { window.contextMenuPromise = new Promise(x => window.addEventListener('contextmenu', () => x('menu'), false)); }"
+  pure ()
+
+-- | The centre of an element, rounded to whole pixels.
+centerOf :: BoundingBox -> Point
+centerOf box =
+  Point
+    (cssPixelFromInt (midpoint (boundingBoxX box) (boundingBoxWidth box)))
+    (cssPixelFromInt (midpoint (boundingBoxY box) (boundingBoxHeight box)))
+  where
+    midpoint :: CssPixel -> CssPixel -> Int
+    midpoint start size =
+      round (cssPixelToScientific start + cssPixelToScientific size / 2)
+
+pointAt :: Int -> Int -> Point
+pointAt x y =
+  Point (cssPixelFromInt x) (cssPixelFromInt y)
+
+requireBox :: Maybe BoundingBox -> Playwright BoundingBox
+requireBox found =
+  case found of
+    Nothing ->
+      assertFailure "expected a bounding box"
+    Just box ->
+      pure box
 
 captureLastKeydown :: Page -> Playwright JsHandle
 captureLastKeydown page =

@@ -431,6 +431,7 @@ module Playwright
   , highlight
   , hideHighlight
   , hoverHandle
+  , pressHandle
   , httpStatusOk
   , innerHtml
   , innerHtmlHandle
@@ -994,6 +995,7 @@ import Playwright.ElementHandle.Action
   , fillHandle
   , focusHandle
   , hoverHandle
+  , pressHandle
   , selectOptionHandle
   , setCheckedHandle
   , uncheckHandle
