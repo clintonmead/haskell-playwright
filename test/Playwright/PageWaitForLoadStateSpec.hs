@@ -18,6 +18,8 @@ import Playwright
   , evaluate
   , evaluateText
   , goto
+  , newPage
+  , pageContext
   , setContent
   , setContentWith
   , url
@@ -176,6 +178,11 @@ tests =
           waitForLoadState page LoadStateDomContentLoaded
           waitForLoadState page LoadStateLoad
           waitForLoadState page LoadStateNetworkIdle
+    , testCase "should wait for load state of newPage" $
+        withChromiumPage $ \page -> do
+          newPage' <- newPage (pageContext page)
+          waitForLoadState newPage' LoadStateLoad
+          assertEqual "ready state" "complete" =<< evaluateText newPage' "() => document.readyState"
     ]
 
 -- | Navigates with waitUntil domcontentloaded, so the goto returns before the
