@@ -30,8 +30,12 @@ module Playwright.Page.Wait
   , waitForNavigationOptions
   , armNavigationOptions
   , waitForPopup
+  , armRequest
+  , armRequestWhere
+  , armRequestWith
   , waitForRequest
   , waitForRequestFailed
+  , waitForRequestWhere
   , waitForRequestFailedWith
   , armRequestFailed
   , waitForRequestFinished
@@ -76,6 +80,7 @@ import Playwright.Connection
   , waitForChannelEventUnlessClosed
   , waitForFutureChannelEvent
   , waitForWaiter
+  , waitForWaiterUnlessClosed
   , waitUntilUrl
   )
 import Playwright.ConsoleMessage
@@ -520,24 +525,53 @@ waitForRequest page glob = do
   waitForRequestWith page glob timeout
 
 waitForRequestWith :: Page -> UrlGlob -> Timeout -> Playwright Request
-waitForRequestWith page glob timeout =
-  waitWithTimeout timeout $ do
-    subscribeContext page BrowserContextUpdateSubscriptionParamsEventRequest
-    collectRequest
+waitForRequestWith page glob timeout = do
+  takeRequest <- armRequestWith page glob timeout
+  takeRequest
+
+-- | Registers for the next request whose URL matches the glob, before the
+-- action that makes it runs. The subscription is made here, not when the
+-- returned action starts, so a request that fires first is not missed.
+armRequest :: Page -> UrlGlob -> Playwright (Playwright Request)
+armRequest page glob = do
+  timeout <- pageActionTimeout page
+  armRequestWith page glob timeout
+
+armRequestWith :: Page -> UrlGlob -> Timeout -> Playwright (Playwright Request)
+armRequestWith page glob timeout =
+  armRequestWhereWith page (\request -> matchesUrlGlob glob <$> requestUrl request) timeout
+
+-- | Waits for the next request that the predicate accepts.
+waitForRequestWhere :: Page -> (Request -> Playwright Bool) -> Playwright Request
+waitForRequestWhere page predicate = do
+  takeRequest <- armRequestWhere page predicate
+  takeRequest
+
+-- | Registers for the next request that the predicate accepts, before the
+-- action that makes it runs. See 'armRequest'.
+armRequestWhere :: Page -> (Request -> Playwright Bool) -> Playwright (Playwright Request)
+armRequestWhere page predicate = do
+  timeout <- pageActionTimeout page
+  armRequestWhereWith page predicate timeout
+
+armRequestWhereWith :: Page -> (Request -> Playwright Bool) -> Timeout -> Playwright (Playwright Request)
+armRequestWhereWith page predicate timeout = do
+  subscribeContext page BrowserContextUpdateSubscriptionParamsEventRequest
+  firstWaiter <- registerEventWaiter guid (MethodName "request")
+  pure (waitWithTimeout timeout (collectRequest firstWaiter))
   where
     guid = channelGuid (pageContextChannel page)
-    collectRequest = do
-      params <-
-        waitForChannelEventUnlessClosed
-          guid
-          (MethodName "request")
-          (channelGuid (pageChannel page))
+    collectRequest waitId = do
+      params <- waitForWaiterUnlessClosed waitId (channelGuid (pageChannel page))
       event <- throwDecode params
       let request = requestFromRef (browserContextRequestEventRequest event)
-      current <- requestUrl request
-      if matchesUrlGlob glob current
+      matched <- predicate request
+      if matched
         then pure request
-        else collectRequest
+        else do
+          -- Events that arrive between waiters are buffered, so none are lost.
+          nextWaiter <- registerEventWaiter guid (MethodName "request")
+          collectRequest nextWaiter
 
 waitForRequestFailed :: Page -> Playwright Request
 waitForRequestFailed page = do

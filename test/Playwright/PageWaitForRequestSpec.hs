@@ -2,12 +2,11 @@ module Playwright.PageWaitForRequestSpec
   ( tests
   ) where
 
-import UnliftIO.Async
-  ( wait
-  , withAsync
-  )
 import Playwright
   ( UrlGlob (UrlGlob)
+  , armRequest
+  , armRequestWhere
+  , armRequestWith
   , defaultGotoOptions
   , evaluate
   , goto
@@ -41,14 +40,42 @@ tests =
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           let wanted = prefix <> "/digits/2.png"
-          withAsync (waitForRequest page (UrlGlob wanted)) $ \handle -> do
-            _ <-
-              evaluate
-                page
-                "() => { void fetch('/digits/1.png'); void fetch('/digits/2.png'); void fetch('/digits/3.png'); }"
-            request <- wait handle
-            url <- requestUrl request
-            assertEqual "url" wanted (urlToText url)
+          takeRequest <- armRequest page (UrlGlob wanted)
+          _ <-
+            evaluate
+              page
+              "() => { void fetch('/digits/1.png'); void fetch('/digits/2.png'); void fetch('/digits/3.png'); }"
+          request <- takeRequest
+          url <- requestUrl request
+          assertEqual "url" wanted (urlToText url)
+    , testCase "should work with predicate" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let wanted = prefix <> "/digits/2.png"
+          takeRequest <- armRequestWhere page (\request -> (== wanted) . urlToText <$> requestUrl request)
+          _ <-
+            evaluate
+              page
+              "() => { void fetch('/digits/1.png'); void fetch('/digits/2.png'); void fetch('/digits/3.png'); }"
+          request <- takeRequest
+          url <- requestUrl request
+          assertEqual "url" wanted (urlToText url)
+    , testCase "should work with no timeout" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let wanted = prefix <> "/digits/2.png"
+          case milliseconds 0 of
+            Nothing ->
+              assertFailure "timeout"
+            Just timeout -> do
+              takeRequest <- armRequestWith page (UrlGlob wanted) timeout
+              _ <-
+                evaluate
+                  page
+                  "() => setTimeout(() => { void fetch('/digits/1.png'); void fetch('/digits/2.png'); void fetch('/digits/3.png'); }, 50)"
+              request <- takeRequest
+              url <- requestUrl request
+              assertEqual "url" wanted (urlToText url)
     , testCase "should respect timeout" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions

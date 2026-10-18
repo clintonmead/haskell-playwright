@@ -701,9 +701,13 @@ module Playwright
   , waitForPageError
   , waitForPopup
   , waitUntilJsHandlePreview
+  , armRequest
+  , armRequestWhere
+  , armRequestWith
   , waitForRequest
   , armRequestFailed
   , waitForRequestFailed
+  , waitForRequestWhere
   , waitForRequestFailedWith
   , waitForRequestFinished
   , waitForRequestWith
@@ -1432,9 +1436,13 @@ import Playwright.Page.Wait
   , waitForFrameDetached
   , waitForNavigatedFrame
   , waitForPopup
+  , armRequest
+  , armRequestWhere
+  , armRequestWith
   , waitForRequest
   , armRequestFailed
   , waitForRequestFailed
+  , waitForRequestWhere
   , waitForRequestFailedWith
   , waitForRequestFinished
   , waitForRequestWith

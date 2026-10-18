@@ -5,22 +5,9 @@ module Playwright.PageNetworkSizesSpec
 import Codec.Compression.GZip
   ( compress
   )
-import Control.Monad
-  ( void
-  , when
-  )
 import UnliftIO.Async
-  ( race
-  , wait
+  ( wait
   , withAsync
-  )
-import UnliftIO.Concurrent
-  ( threadDelay
-  )
-import UnliftIO.MVar
-  ( newEmptyMVar
-  , takeMVar
-  , tryPutMVar
   )
 import UnliftIO.Exception
   ( try
@@ -67,19 +54,17 @@ import Playwright
   , HttpStatus (HttpStatus)
   , NetworkSizes (networkRequestBodySize, networkRequestHeadersSize, networkResponseBodySize, networkResponseHeadersSize)
   , Page
-  , Request
+  , UrlGlob (UrlGlob)
   , defaultGotoOptions
   , evaluate
+  , armRequest
   , goto
-  , onRequest
   , requestRedirectedTo
   , requestResponse
   , requestSizes
-  , requestUrl
   , responseRequest
   , responseStatus
   , urlFromText
-  , urlToText
   , waitForRequestFailed
   , Playwright
   )
@@ -109,7 +94,7 @@ tests =
     "page-network-sizes"
     [ testCase "should set bodySize and headersSize" $
         withServerPage emptyGetApp $ \prefix page -> do
-          awaitRequest <- requestTo page (prefix <> "/get")
+          awaitRequest <- armRequest page (UrlGlob (prefix <> "/get"))
           withAsync awaitRequest $ \pending -> do
             _ <-
               evaluate
@@ -121,7 +106,7 @@ tests =
             assertBool "headers" (headersSizeToInt (networkRequestHeadersSize sizes) >= 250)
     , testCase "should set bodySize to 0 if there was no body" $
         withServerPage emptyGetApp $ \prefix page -> do
-          awaitRequest <- requestTo page (prefix <> "/get")
+          awaitRequest <- armRequest page (UrlGlob (prefix <> "/get"))
           withAsync awaitRequest $ \pending -> do
             _ <- evaluate page "() => fetch('./get').then(r => r.text())"
             request <- wait pending
@@ -130,7 +115,7 @@ tests =
             assertBool "headers" (headersSizeToInt (networkRequestHeadersSize sizes) >= 190)
     , testCase "should set bodySize, headersSize, and transferSize" $
         withServerPage emptyGetApp $ \prefix page -> do
-          awaitRequest <- requestTo page (prefix <> "/get")
+          awaitRequest <- armRequest page (UrlGlob (prefix <> "/get"))
           withAsync awaitRequest $ \pending -> do
             _ <- evaluate page "() => fetch('./get').then(r => r.text())"
             request <- wait pending
@@ -177,7 +162,7 @@ tests =
           let compressed = compress (LBS.fromStrict asset)
           withLocalApp (gzipApp compressed) $ \prefix -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-            awaitRequest <- requestTo page (prefix <> "/simplezip.json")
+            awaitRequest <- armRequest page (UrlGlob (prefix <> "/simplezip.json"))
             withAsync awaitRequest $ \pending -> do
               _ <- evaluate page "() => fetch('./simplezip.json').then(r => r.text())"
               request <- wait pending
@@ -188,7 +173,7 @@ tests =
                 (bodySizeToInt (networkResponseBodySize sizes))
     , testCase "should handle redirects" $
         withServerPage redirectApp $ \prefix page -> do
-          awaitRequest <- requestTo page (prefix <> "/foo")
+          awaitRequest <- armRequest page (UrlGlob (prefix <> "/foo"))
           withAsync awaitRequest $ \pending -> do
             _ <-
               evaluate
@@ -232,7 +217,7 @@ statusCodeTest :: Int -> Status -> TestTree
 statusCodeTest code status =
   testCase ("should work with " <> show code <> " status code") $
     withServerPage (statusApp status) $ \prefix page -> do
-      awaitRequest <- requestTo page (prefix <> "/foo")
+      awaitRequest <- armRequest page (UrlGlob (prefix <> "/foo"))
       withAsync awaitRequest $ \pending -> do
         _ <-
           evaluate
@@ -248,23 +233,6 @@ statusCodeTest code status =
         sizes <- requestSizes request
         assertEqual "request body" 5 (bodySizeToInt (networkRequestBodySize sizes))
         assertEqual "response body" 3 (bodySizeToInt (networkResponseBodySize sizes))
-
--- | Collects the first request to an exact URL. Call it before the action
--- that makes the request: 'waitForRequest' subscribes on a forked thread, so a
--- request that fires first is missed. The returned action waits at most 30 s.
-requestTo :: Page -> Text -> Playwright (Playwright Request)
-requestTo page url = do
-  found <- newEmptyMVar
-  onRequest page $ \request -> do
-    current <- urlToText <$> requestUrl request
-    when (current == url) (void (tryPutMVar found request))
-  pure $ do
-    outcome <- race (threadDelay 30000000) (takeMVar found)
-    case outcome of
-      Left () ->
-        assertFailure ("timed out waiting for request to " <> show url)
-      Right request ->
-        pure request
 
 withServerPage :: Application -> (Text -> Page -> Playwright a) -> IO a
 withServerPage app action =
