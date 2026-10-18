@@ -248,3 +248,20 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - `Harness.stallingStylesheetApp` serves the assets but holds `one-style.css` until a test releases it. It is the shared way to keep a page loading.
 - `ScriptTag.scriptTagPath` reads the file on the client and appends a `//# sourceURL=` line, as the JS client does. `path` replaces `content`.
 - Event waiters take an accept predicate (`registerFutureEventWaiterWhere`). A lifecycle wait (`armLoadEvent`, `armDomContentLoadedEvent`) uses it, so a non-matching `loadstate` event leaves the waiter armed instead of dropping it. Re-arming after each non-matching event lost the next event and hung.
+
+## Advice for working unattended
+
+These came from long sessions. Follow them unless the user says otherwise.
+
+- **Always wrap a test run in `timeout`.** Tasty has no per-test timeout, so one test that waits forever hangs the whole run. Use `timeout 400 $bin ...` and stream to a file, or use `--hide-successes` on small groups only.
+- **Full suite is ~2–3 minutes now.** Run targeted groups (`-p '/group/ || /other/'`) while working, and the full suite before a commit that changes shared library code (`Connection*`, `Frame*`, `Page*`, `Locator*`, `Harness`), or every few batches otherwise.
+- **Prefer `armX` waiters over `withAsync`.** A `withAsync (wait...)` started after the action can miss an event that fires first. Register with `armX` (or `registerFutureEventWaiterWhere`), then run the action, then take the result. See `armNavigationOptions` and `armLoadEvent`.
+- **Lifecycle events can arrive in any order.** Never re-arm after a non-matching event: the next event can fire before the re-arm. Use an accept predicate on the waiter instead.
+- **Keep the `-Weverything` list clean.** New imports need explicit import lists (`-Wmissing-import-lists`). Unused imports are errors, so after moving helpers around, remove the imports the compiler reports.
+- **Add modules with `hpack --force` before `cabal build`**, or cabal reports a missing home module. Commit the regenerated `playwright.cabal`.
+- **Editing with Perl:** a `@` inside a double-quoted Perl string is interpolated. Use the Edit tool for Haskell that contains `@`.
+- **Process checks:** `pgrep -f PATTERN` matches the shell that runs it. Use a file-based marker (`grep -q '^exit=' log`) instead.
+- **Flaky tests:** when one fails only in a full run, rerun it alone 3 times before blaming the code. Record it in the TODO if it still fails.
+- **Gap hunting:** `scripts/upstream-gaps <dir> <spec>` lists upstream names with no Haskell match. Verify each against the upstream file before porting, because names drift.
+- **Skips are fine if they are documented.** A case that needs a JS-only hook, a Node-only API, or a type the Haskell API cannot express goes in the TODO with the reason.
+- **Commit after each batch that passes.** Use a semantic message, the `Co-Authored-By` trailer from the session, and never amend or push without being asked.

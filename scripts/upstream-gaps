@@ -1,0 +1,45 @@
+#!/usr/bin/env node
+// Lists upstream Playwright test cases that have no matching Haskell case yet.
+//
+//   scripts/upstream-gaps page                    # every spec in tests/page
+//   scripts/upstream-gaps library                 # every spec in tests/library
+//   SHOW=1 scripts/upstream-gaps page page-drag   # one spec, with the names
+//
+// Matching is by name (letters and digits only, "@tag" suffixes ignored), so
+// a missing name can be a rewording rather than a real gap. Check the upstream
+// file before porting. A spec with no Haskell file is reported as NO HS FILE.
+const fs = require('fs');
+const path = require('path');
+
+const ROOT = path.resolve(__dirname, '..');
+const norm = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+const hsDir = path.join(ROOT, 'test/Playwright');
+const hsByNorm = new Map(
+  fs.readdirSync(hsDir)
+    .filter((f) => f.endsWith('Spec.hs'))
+    .map((f) => [norm(f.replace(/Spec\.hs$/, '')), f])
+);
+
+const [dirname, only] = process.argv.slice(2);
+if (!dirname) {
+  console.error('usage: upstream-gaps <tests subdir> [spec-name-fragment]');
+  process.exit(2);
+}
+const d = path.join(ROOT, 'upstream-typescript-playwright/tests', dirname);
+for (const f of fs.readdirSync(d).sort()) {
+  if (!/\.spec\.ts$/.test(f)) continue;
+  if (only && !f.includes(only)) continue;
+  const base = f.replace(/\.spec\.ts$/, '');
+  const hsName = hsByNorm.get(norm(base));
+  const src = fs.readFileSync(path.join(d, f), 'utf8');
+  const re = /\b(?:it|test)\(\s*['"`]([^'"`]+)['"`]/g;
+  const names = [];
+  let m;
+  while ((m = re.exec(src))) names.push(m[1]);
+  if (!names.length) continue;
+  const hs = hsName ? fs.readFileSync(path.join(hsDir, hsName), 'utf8') : '';
+  const hsN = norm(hs);
+  const missing = names.filter((n) => !hsN.includes(norm(n.replace(/\s*@\w+/g, ''))));
+  console.log(`== ${f} -> ${hsName || 'NO HS FILE'}  missing ${missing.length}/${names.length}`);
+  if (process.env.SHOW) for (const n of missing) console.log(`   - ${n}`);
+}
