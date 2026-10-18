@@ -9,6 +9,7 @@ import Data.Maybe
 import Playwright
   ( evaluateOnElementText
   , querySelector
+  , querySelectorAll
   , selectorFromText
   , setContent
   )
@@ -80,4 +81,29 @@ tests =
           setContent page "<section><div>test</div></section>"
           handle <- querySelector page (selectorFromText "css=section >> css=div")
           assertEqual "found" True (isJust handle)
+    , testCase "should query existing elements" $
+        withChromiumPage $ \page -> do
+          setContent page "<div>A</div><br/><div>B</div>"
+          elements <- querySelectorAll page (selectorFromText "div")
+          assertEqual "count" 2 (length elements)
+          texts <- mapM (\element -> evaluateOnElementText element "e => e.textContent") elements
+          assertEqual "texts" ["A", "B"] texts
+    , testCase "should return empty array if nothing is found" $
+        withChromiumPage $ \page -> do
+          elements <- querySelectorAll page (selectorFromText "div")
+          assertEqual "count" 0 (length elements)
+    , testCase "xpath should query existing element" $
+        withChromiumPage $ \page -> do
+          setContent page "<section>test</section>"
+          elements <- querySelectorAll page (selectorFromText "xpath=/html/body/section")
+          assertEqual "count" 1 (length elements)
+    , testCase "xpath should return empty array for non-existing element" $
+        withChromiumPage $ \page -> do
+          elements <- querySelectorAll page (selectorFromText "//html/body/non-existing-element")
+          assertEqual "count" 0 (length elements)
+    , testCase "xpath should return multiple elements" $
+        withChromiumPage $ \page -> do
+          setContent page "<div></div><div></div>"
+          elements <- querySelectorAll page (selectorFromText "xpath=/html/body/div")
+          assertEqual "count" 2 (length elements)
     ]
