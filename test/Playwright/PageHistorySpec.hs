@@ -3,7 +3,8 @@ module Playwright.PageHistorySpec
   ) where
 
 import UnliftIO.Async
-  ( wait
+  ( race
+  , wait
   , withAsync
   )
 import UnliftIO.Exception
@@ -257,7 +258,13 @@ tests =
           swallow (evaluate page "() => { window.history.pushState({}, ''); }")
           withAsync (reload page) $ \pending -> do
             swallow (evaluate page "() => { window.history.pushState({}, ''); }")
-            takeMVar arrived
+            -- Bounded: if the reload never reaches the route, fail instead of hanging the run.
+            arrivedInTime <- race (liftIO (threadDelay 30000000)) (takeMVar arrived)
+            case arrivedInTime of
+              Left () ->
+                assertFailure "reload never reached the route"
+              Right () ->
+                pure ()
             putMVar release ()
             response <- wait pending
             case response of
