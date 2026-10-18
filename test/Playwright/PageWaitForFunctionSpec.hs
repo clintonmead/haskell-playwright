@@ -122,6 +122,15 @@ tests =
                   100
               delta <- jsonValueNumber handle
               assertBool "at least polling interval" (delta >= 100)
+    , testCase "should throw negative polling interval" $
+        withChromiumPage $ \page ->
+          case milliseconds 1000 of
+            Nothing ->
+              assertFailure "timeout"
+            Just timeout ->
+              assertProtocolContains
+                "Cannot poll with non-positive interval"
+                (waitForFunctionPolling page "() => !!document.body" timeout (-10))
     , testCase "should avoid side effects after timeout" $
         withChromiumPage $ \page ->
           case milliseconds 1000 of
