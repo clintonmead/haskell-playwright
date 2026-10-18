@@ -2,18 +2,13 @@ module Playwright.FrameFrameElementSpec
   ( tests
   ) where
 
-import Data.Text
-  ( Text
-  )
 import Playwright
   ( Frame
   , Page
-  , asElement
   , contentFrameHandle
   , defaultGotoOptions
   , elementArgument
   , evaluate
-  , evaluateHandle
   , evaluateOnElementBoolWith
   , frameElement
   , frames
@@ -27,7 +22,8 @@ import Playwright
   , Playwright
   )
 import Playwright.Harness
-  ( assertProtocolContains
+  ( attachFrame
+  , assertProtocolContains
   , requireHandle
   , withAssets
   , withChromiumPage
@@ -49,9 +45,9 @@ tests =
     [ testCase "should work" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-          frame1 <- attachFrame page prefix "frame1"
-          _ <- attachFrame page prefix "frame2"
-          frame3 <- attachFrame page prefix "frame3"
+          frame1 <- attachFrame page "frame1" (prefix <> "/empty.html")
+          _ <- attachFrame page "frame2" (prefix <> "/empty.html")
+          frame3 <- attachFrame page "frame3" (prefix <> "/empty.html")
           handle1 <- requireHandle =<< querySelector page (selectorFromText "#frame1")
           handle2 <- frameElement frame1
           handle3 <- requireHandle =<< querySelector page (selectorFromText "#frame3")
@@ -65,7 +61,7 @@ tests =
     , testCase "should work with contentFrame" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-          frame <- attachFrame page prefix "frame1"
+          frame <- attachFrame page "frame1" (prefix <> "/empty.html")
           handle <- frameElement frame
           content <- contentFrameHandle handle
           case content of
@@ -84,7 +80,7 @@ tests =
     , testCase "should throw when detached" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-          frame1 <- attachFrame page prefix "frame1"
+          frame1 <- attachFrame page "frame1" (prefix <> "/empty.html")
           _ <- evaluate page "() => document.getElementById('frame1').remove()"
           assertProtocolContains "Frame has been detached." (frameElement frame1)
     , testCase "should work inside closed shadow root" $
@@ -104,20 +100,6 @@ tests =
           element <- frameElement child
           assertEqual "name" (Just "myframe") =<< getAttributeHandle element "name"
     ]
-
-attachFrame :: Page -> Text -> Text -> Playwright Frame
-attachFrame page prefix frameId = do
-  handle <-
-    evaluateHandle
-      page
-      ( "async () => { const frame = document.createElement('iframe'); frame.src = '"
-          <> prefix
-          <> "/empty.html'; frame.id = '"
-          <> frameId
-          <> "'; document.body.appendChild(frame); await new Promise(x => frame.onload = x); return frame; }"
-      )
-  element <- requireHandle =<< asElement handle
-  requireFrame =<< contentFrameHandle element
 
 childFrame :: Page -> Playwright Frame
 childFrame page = do

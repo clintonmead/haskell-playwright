@@ -49,13 +49,10 @@ import Playwright
   , ViewportHeight (ViewportHeight)
   , ViewportSize (ViewportSize)
   , ViewportWidth (ViewportWidth)
-  , asElement
   , click
-  , contentFrameHandle
   , defaultGotoOptions
   , defaultNewContextOptions
   , evaluateBool
-  , evaluateHandle
   , evaluateText
   , goto
   , setContent
@@ -63,8 +60,8 @@ import Playwright
   , Playwright
   )
 import Playwright.Harness
-  ( locate
-  , requireHandle
+  ( attachFrame
+  , locate
   , withAssetsContextWith
   , withChromiumContext
   , withChromiumContextWith
@@ -118,7 +115,7 @@ userAgentSubframeTest = do
     assertBool "mozilla" ("Mozilla" `isInfixOf` ua)
   withHeaderCapture defaultNewContextOptions {newContextUserAgent = Just (UserAgent "foobar")} $
     \prefix captured page -> do
-      _ <- attachFrame page prefix "frame1"
+      _ <- attachFrame page "frame1" (prefix <> "/empty.html")
       headers <- liftIO (readChan captured)
       assertEqual "ua" (Just "foobar") (lookupHeader "user-agent" headers)
 
@@ -228,21 +225,6 @@ downloadApp captured request respond =
         )
     _ ->
       respond (responseLBS status200 [(hContentType, "text/html")] "<html></html>")
-
-attachFrame :: Page -> Text -> Text -> Playwright ()
-attachFrame page prefix frameId = do
-  handle <-
-    evaluateHandle
-      page
-      ( "async () => { const frame = document.createElement('iframe'); frame.src = '"
-          <> prefix
-          <> "/empty.html'; frame.id = '"
-          <> frameId
-          <> "'; document.body.appendChild(frame); await new Promise(x => frame.onload = x); return frame; }"
-      )
-  element <- requireHandle =<< asElement handle
-  _ <- contentFrameHandle element
-  pure ()
 
 lookupHeader :: HTTP.HeaderName -> RequestHeaders -> Maybe ByteString
 lookupHeader =

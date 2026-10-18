@@ -4,6 +4,7 @@ module Playwright.Harness
   , assertFailure
   , assertProtocolContains
   , assertWaitTimeout
+  , attachFrame
   , locate
   , readTestAsset
   , requireHandle
@@ -56,14 +57,18 @@ import Playwright
   ( Browser
   , BrowserContext
   , ElementHandle
+  , Frame
   , Locator
   , LaunchOptions
   , NewContextOptions
   , Page
   , Playwright
+  , asElement
   , closeContext
   , chromium
   , contextPages
+  , contentFrameHandle
+  , evaluateHandle
   , defaultGotoOptions
   , defaultLaunchOptions
   , defaultNewContextOptions
@@ -101,6 +106,27 @@ import UnliftIO.Temporary
 locate :: Page -> Text -> Locator
 locate page =
   locator page . selectorFromText
+
+-- | Appends an iframe with the given id and URL, waits for it to load, and
+-- returns its frame.
+attachFrame :: Page -> Text -> Text -> Playwright Frame
+attachFrame page frameId url = do
+  handle <-
+    evaluateHandle
+      page
+      ( "async () => { const frame = document.createElement('iframe'); frame.src = '"
+          <> url
+          <> "'; frame.id = '"
+          <> frameId
+          <> "'; document.body.appendChild(frame); await new Promise(x => frame.onload = x); return frame; }"
+      )
+  element <- requireHandle =<< asElement handle
+  found <- contentFrameHandle element
+  case found of
+    Nothing ->
+      assertFailure "expected frame"
+    Just frame ->
+      pure frame
 
 requireHandle :: Maybe ElementHandle -> Playwright ElementHandle
 requireHandle handle =

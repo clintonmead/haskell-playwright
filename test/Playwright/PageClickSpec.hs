@@ -44,7 +44,6 @@ import Playwright
   , ViewportWidth (ViewportWidth)
   , addInitScript
   , addStyleTag
-  , asElement
   , childFrameLocator
   , childLocator
   , click
@@ -60,7 +59,6 @@ import Playwright
   , evalOnSelector
   , evaluate
   , evaluateBool
-  , evaluateHandle
   , evaluateNumber
   , evaluateOnElement
   , evaluateOnFrameText
@@ -91,7 +89,8 @@ import Playwright
   , waitForPopup
   )
 import Playwright.Harness
-  ( assertProtocolContains
+  ( attachFrame
+  , assertProtocolContains
   , locate
   , requireHandle
   , withAssetPage
@@ -359,7 +358,7 @@ tests =
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           setContent page "<div style=\"width:100px;height:100px\">spacer</div>"
-          frame <- attachFrame page prefix "button-test" (prefix <> "/input/button.html")
+          frame <- attachFrame page "button-test" (prefix <> "/input/button.html")
           click (locatorOnFrame page frame (selectorFromText "button"))
           assertEqual "clicked" "Clicked" =<< evaluateOnFrameText frame "() => window.result"
     , testCase "should click the button behind sticky header" $
@@ -796,20 +795,6 @@ clickWithOffset border x y =
     assertEqual "clicked" "Clicked" =<< evaluateText page "() => window.result"
     assertEqual "offsetX" (fromIntegral x :: Double) =<< evaluateNumber page "() => window.offsetX"
     assertEqual "offsetY" (fromIntegral y :: Double) =<< evaluateNumber page "() => window.offsetY"
-
-attachFrame :: Page -> Text -> Text -> Text -> Playwright Frame
-attachFrame page _prefix frameId src = do
-  handle <-
-    evaluateHandle
-      page
-      ( "async () => { const frame = document.createElement('iframe'); frame.src = '"
-          <> src
-          <> "'; frame.id = '"
-          <> frameId
-          <> "'; document.body.appendChild(frame); await new Promise(x => frame.onload = x); return frame; }"
-      )
-  element <- requireHandle =<< asElement handle
-  requireFrame =<< contentFrameHandle element
 
 requireFrame :: Maybe Frame -> Playwright Frame
 requireFrame found =
