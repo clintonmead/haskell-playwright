@@ -267,3 +267,4 @@ These came from long sessions. Follow them unless the user says otherwise.
 - **Commit after each batch that passes.** Use a semantic message, the `Co-Authored-By` trailer from the session, and never amend or push without being asked.
 - `route` handlers see the request headers the route got, and a `setExtraHTTPHeaders` referer does not show up there for a navigation. The server does receive it. Test the server side (a local app that records the header) when the assertion is about the wire.
 - `armRequestFailed` registers the failed-request waiter now. `abortRouteWith` sends a protocol error code (for example `internetdisconnected`).
+- `addInitScript` (and other `Text` script sources) runs its text as a script. `() => {...}` only defines the function. Write `(() => {...})();` to run it. The upstream tests pass a function, which Playwright invokes.

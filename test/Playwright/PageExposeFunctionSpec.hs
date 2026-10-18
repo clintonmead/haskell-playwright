@@ -5,8 +5,30 @@ module Playwright.PageExposeFunctionSpec
 import UnliftIO.Exception
   ( throwIO
   )
+import Data.Text
+  ( isInfixOf
+  )
+import UnliftIO.MVar
+  ( newEmptyMVar
+  , takeMVar
+  , tryPutMVar
+  )
+import Control.Monad.IO.Class
+  ( liftIO
+  )
+import Data.Maybe
+  ( isJust
+  )
+import System.Timeout
+  ( timeout
+  )
 import Playwright
   ( BindingName (BindingName)
+  , SpecialJsValue (SpecialUndefined)
+  , addInitScript
+  , evaluateText
+  , reload
+  , specialArgument
   , defaultGotoOptions
   , dispose
   , evaluateNumber
@@ -26,6 +48,7 @@ import Playwright.Harness
   ( assertProtocolContains
   , withAssets
   , withChromiumPage
+  , assertBool
   , assertEqual
   )
 import Playwright.SerializedArgument
@@ -87,6 +110,27 @@ tests =
           _ <- exposeFunction page (BindingName "compute") multiply
           setContent page "<script>window.result = compute(3, 2)</script>"
           assertEqual "product" (6 :: Double) =<< evaluateNumber page "() => window.result"
+    , testCase "should throw exception in page context" $
+        withChromiumPage $ \page -> do
+          _ <- exposeFunction page (BindingName "woof") (\_ -> throwIO (userError "WOOF WOOF"))
+          message <-
+            evaluateText
+              page
+              "async () => { try { await window.woof(); return 'no error'; } catch (e) { return e.message; } }"
+          assertBool "message" ("WOOF WOOF" `isInfixOf` message)
+    , testCase "should be callable from-inside addInitScript" $
+        withChromiumPage $ \page -> do
+          called <- newEmptyMVar
+          _ <-
+            exposeFunction
+              page
+              (BindingName "woof")
+              (\_ -> tryPutMVar called () >> pure (specialArgument SpecialUndefined))
+          addInitScript page "(() => { window.woof(); })();"
+          _ <- reload page
+          reached <- liftIO (timeout 10000000 (takeMVar called))
+          assertBool "called from the init script" (isJust reached)
+
     ]
 
 multiply :: [SerializedValue] -> Playwright SerializedArgument
