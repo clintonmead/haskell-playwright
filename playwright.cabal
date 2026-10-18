@@ -377,6 +377,7 @@ test-suite playwright-test
       Playwright.PageWaitForNavigationSpec
       Playwright.PageWaitForRequestSpec
       Playwright.PageWaitForResponseSpec
+      Playwright.PageWaitForSelector1Spec
       Playwright.PageWaitForSelector2Spec
       Playwright.PageWaitForSelectorSpec
       Playwright.PageWaitForUrlSpec
