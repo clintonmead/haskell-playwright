@@ -2,9 +2,6 @@ module Playwright.PageDispatchEventSpec
   ( tests
   ) where
 
-import Control.Monad.IO.Class
-  ( MonadIO
-  )
 import UnliftIO.Async
   ( wait
   , withAsync
@@ -18,7 +15,6 @@ import Playwright
   , Frame
   , Page
   , Playwright
-  , Timeout
   , boolValue
   , childLocator
   , defaultGotoOptions
@@ -40,7 +36,6 @@ import Playwright
   , frames
   , goto
   , jsHandleObjectArgument
-  , milliseconds
   , numberValue
   , objectArgument
   , objectNumberArgument
@@ -53,7 +48,8 @@ import Playwright
   , waitForTimeout
   )
 import Playwright.Harness
-  ( assertProtocolContains
+  ( requireTimeout
+  , assertProtocolContains
   , locate
   , requireHandle
   , withAssetPage
@@ -311,10 +307,3 @@ dispatchEventEngine =
   \  }\n\
   \}))()"
 
-requireTimeout :: (MonadIO m) => Double -> m Timeout
-requireTimeout n =
-  case milliseconds n of
-    Nothing ->
-      assertFailure ("milliseconds " <> show n)
-    Just timeout ->
-      pure timeout

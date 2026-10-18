@@ -2,9 +2,6 @@ module Playwright.SelectorsMiscSpec
   ( tests
   ) where
 
-import Control.Monad.IO.Class
-  ( MonadIO
-  )
 import UnliftIO.Async
   ( wait
   , withAsync
@@ -26,7 +23,6 @@ import Data.Text
   )
 import Playwright
   ( Page
-  , Timeout
   , WaitForState (WaitForAttached, WaitForHidden, WaitForVisible)
   , click
   , evalOnSelector
@@ -41,7 +37,6 @@ import Playwright
   , isVisible
   , locator
   , locatorCount
-  , milliseconds
   , querySelector
   , querySelectorAll
   , selectorFromText
@@ -57,7 +52,8 @@ import Playwright.Error
   , ProtocolFailure (protocolFailureMessage)
   )
 import Playwright.Harness
-  ( assertProtocolContains
+  ( requireTimeout
+  , assertProtocolContains
   , locate
   , requireHandle
   , withAssetPage
@@ -450,14 +446,6 @@ layoutBoxes =
   , [150, -51, 50, 50]
   , [201, -101, 50, 50]
   ]
-
-requireTimeout :: (MonadIO m) => Double -> m Timeout
-requireTimeout n =
-  case milliseconds n of
-    Nothing ->
-      assertFailure ("milliseconds " <> show n)
-    Just timeout ->
-      pure timeout
 
 layoutScript :: Text
 layoutScript =

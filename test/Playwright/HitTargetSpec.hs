@@ -2,9 +2,6 @@ module Playwright.HitTargetSpec
   ( tests
   ) where
 
-import Control.Monad.IO.Class
-  ( MonadIO
-  )
 import Data.Text
   ( Text
   , isInfixOf
@@ -12,7 +9,6 @@ import Data.Text
 import Playwright
   ( ClickOptions (clickOptionsTimeout)
   , SpecialJsValue (SpecialUndefined)
-  , Timeout
   , asElement
   , childFrameLocator
   , childLocator
@@ -34,7 +30,6 @@ import Playwright
   , innerText
   , isVisible
   , locatorOnFrame
-  , milliseconds
   , selectorFromText
   , setContent
   , url
@@ -42,7 +37,8 @@ import Playwright
   , waitForTimeout
   )
 import Playwright.Harness
-  ( assertProtocolContains
+  ( requireTimeout
+  , assertProtocolContains
   , locate
   , requireHandle
   , withAssetPage
@@ -429,10 +425,3 @@ clickPaddedIframe boxSizing =
       )
     assertEqual "clicked" True =<< evaluateBool page "() => window._clicked"
 
-requireTimeout :: (MonadIO m) => Double -> m Timeout
-requireTimeout n =
-  case milliseconds n of
-    Nothing ->
-      assertFailure ("milliseconds " <> show n)
-    Just timeout ->
-      pure timeout

@@ -2,12 +2,15 @@ module Playwright.Harness
   ( assertBool
   , assertEqual
   , assertFailure
+  , assertStillPending
   , assertProtocolContains
   , assertWaitTimeout
   , attachFrame
   , locate
+  , rafraf
   , readTestAsset
   , requireHandle
+  , requireTimeout
   , withAssetPage
   , withAssets
   , withAssetsContextWith
@@ -29,6 +32,9 @@ module Playwright.Harness
   , withPersistentUserDataWith
   ) where
 
+import Control.Monad
+  ( forM_
+  )
 import Control.Monad.IO.Class
   ( MonadIO
   , liftIO
@@ -55,6 +61,7 @@ import Network.Wai.Handler.Warp
   )
 import Playwright
   ( Browser
+  , evaluate
   , BrowserContext
   , ElementHandle
   , Frame
@@ -63,7 +70,9 @@ import Playwright
   , NewContextOptions
   , Page
   , Playwright
+  , Timeout
   , asElement
+  , milliseconds
   , closeContext
   , chromium
   , contextPages
@@ -99,6 +108,10 @@ import UnliftIO
   , try
   , withRunInIO
   )
+import UnliftIO.Async
+  ( Async
+  , poll
+  )
 import UnliftIO.Temporary
   ( withSystemTempDirectory
   )
@@ -127,6 +140,36 @@ attachFrame page frameId url = do
       assertFailure "expected frame"
     Just frame ->
       pure frame
+
+-- | Converts a number of milliseconds into a timeout, failing on negative input.
+requireTimeout :: (MonadIO m) => Double -> m Timeout
+requireTimeout n =
+  case milliseconds n of
+    Nothing ->
+      assertFailure ("milliseconds " <> show n)
+    Just timeout ->
+      pure timeout
+
+-- | Waits for two animation frames, five times over, so in-flight work gets a
+-- chance to run without a sleep.
+rafraf :: Page -> Int -> Playwright ()
+rafraf page count =
+  forM_ [1 .. count :: Int] $ \_ -> do
+    _ <-
+      evaluate
+        page
+        "async () => { await new Promise(f => window.requestAnimationFrame(() => window.requestAnimationFrame(f))); }"
+    pure ()
+
+-- | Fails if the async action has already finished.
+assertStillPending :: Async a -> Playwright ()
+assertStillPending pending = do
+  status <- poll pending
+  case status of
+    Nothing ->
+      pure ()
+    Just _ ->
+      assertFailure "expected the operation to still be pending"
 
 requireHandle :: Maybe ElementHandle -> Playwright ElementHandle
 requireHandle handle =

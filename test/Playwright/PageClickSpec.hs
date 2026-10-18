@@ -3,9 +3,7 @@ module Playwright.PageClickSpec
   ) where
 
 import UnliftIO.Async
-  ( Async
-  , mapConcurrently_
-  , poll
+  ( mapConcurrently_
   , wait
   , withAsync
   )
@@ -38,7 +36,6 @@ import Playwright
   , Point (Point)
   , SpecialJsValue (SpecialNull, SpecialUndefined)
   , StyleTag (styleTagContent)
-  , Timeout
   , ViewportHeight (ViewportHeight)
   , ViewportSize (ViewportSize)
   , ViewportWidth (ViewportWidth)
@@ -74,7 +71,6 @@ import Playwright
   , keyboardDown
   , keyboardUp
   , locatorOnFrame
-  , milliseconds
   , mouseDown
   , mouseMove
   , mouseUp
@@ -89,7 +85,10 @@ import Playwright
   , waitForPopup
   )
 import Playwright.Harness
-  ( attachFrame
+  ( requireTimeout
+  , assertStillPending
+  , rafraf
+  , attachFrame
   , assertProtocolContains
   , locate
   , requireHandle
@@ -282,7 +281,7 @@ tests =
           _ <- evalOnSelector page (selectorFromText "button") "b => { b.parentElement.style.display = 'none'; }"
           withAsync (click (locate page "button")) $ \pending -> do
             rafraf page 5
-            stillPending pending
+            assertStillPending pending
             _ <- evalOnSelector page (selectorFromText "button") "b => { b.parentElement.style.display = 'block'; }"
             wait pending
           assertEqual "clicked" "Clicked" =<< evaluateText page "() => window.result"
@@ -434,10 +433,10 @@ tests =
         withAssetPage "input/button.html" $ \page -> do
           addFlyover page
           withAsync (click (locate page "button")) $ \pending -> do
-            stillPending pending
+            assertStillPending pending
             _ <- evalOnSelector page (selectorFromText ".flyover") "flyOver => { flyOver.style.left = '0'; }"
             rafraf page 5
-            stillPending pending
+            assertStillPending pending
             _ <- evalOnSelector page (selectorFromText ".flyover") "flyOver => { flyOver.style.left = '200px'; }"
             wait pending
           assertEqual "clicked" "Clicked" =<< evaluateText page "() => window.result"
@@ -445,10 +444,10 @@ tests =
         withAssetPage "input/button.html" $ \page -> do
           addFlyover page
           withAsync (clickWith (locate page "button") defaultClickOptions {clickOptionsTrial = Just True}) $ \pending -> do
-            stillPending pending
+            assertStillPending pending
             _ <- evalOnSelector page (selectorFromText ".flyover") "flyOver => { flyOver.style.left = '0'; }"
             rafraf page 5
-            stillPending pending
+            assertStillPending pending
             _ <- evalOnSelector page (selectorFromText ".flyover") "flyOver => { flyOver.style.left = '200px'; }"
             wait pending
           assertEqual "not clicked" "Was not clicked" =<< evaluateText page "() => window.result"
@@ -496,7 +495,7 @@ tests =
           withAsync (click (locate page "text=Click target")) $ \pending -> do
             rafraf page 5
             assertEqual "undefined" SpecialUndefined =<< evaluateSpecial page "() => window.__CLICKED"
-            stillPending pending
+            assertStillPending pending
             _ <- evaluate page "() => document.querySelector('button').style.removeProperty('pointer-events')"
             wait pending
           assertEqual "clicked" True =<< evaluateBool page "() => window.__CLICKED"
@@ -537,13 +536,13 @@ tests =
         withAssetPage "input/animating-button.html" $ \page -> do
           _ <- evaluate page "() => addButton()"
           withAsync (click (locate page "button")) $ \pending -> do
-            stillPending pending
+            assertStillPending pending
             _ <- evaluate page "() => stopButton(true)"
             _ <- evaluate page "() => addButton()"
-            stillPending pending
+            assertStillPending pending
             _ <- evaluate page "() => stopButton(true)"
             _ <- evaluate page "() => addButton()"
-            stillPending pending
+            assertStillPending pending
             _ <- evaluate page "() => stopButton(false)"
             wait pending
           assertEqual "clicked" True =<< evaluateBool page "() => window.clicked"
@@ -727,7 +726,7 @@ waitUntilEnabled markup selector tag =
     withAsync (click (locate page selector)) $ \pending -> do
       rafraf page 5
       assertEqual "undefined" SpecialUndefined =<< evaluateSpecial page "() => window.__CLICKED"
-      stillPending pending
+      assertStillPending pending
       _ <- evaluate page ("() => document.querySelector('" <> tag <> "').removeAttribute('disabled')")
       wait pending
     assertEqual "clicked" True =<< evaluateBool page "() => window.__CLICKED"
@@ -779,7 +778,7 @@ waitForStyleGone property hidden shown =
     timeout <- requireTimeout 0
     withAsync (clickWith (locate page "button") defaultClickOptions {clickOptionsTimeout = Just timeout}) $ \pending -> do
       rafraf page 5
-      stillPending pending
+      assertStillPending pending
       assertEqual "not clicked" "Was not clicked" =<< evaluateText page "() => window.result"
       _ <- evalOnSelector page (selectorFromText "button") ("b => { b.style." <> property <> " = '" <> shown <> "'; }")
       wait pending
@@ -803,30 +802,4 @@ requireFrame found =
       pure frame
     Nothing ->
       assertFailure "expected frame"
-
-requireTimeout :: Double -> Playwright Timeout
-requireTimeout n =
-  case milliseconds n of
-    Just timeout ->
-      pure timeout
-    Nothing ->
-      assertFailure ("timeout " <> show n)
-
-rafraf :: Page -> Int -> Playwright ()
-rafraf page count =
-  forM_ ([1 .. count] :: [Int]) $ \_ -> do
-    _ <-
-      evaluate
-        page
-        "async () => { await new Promise(f => window.requestAnimationFrame(() => window.requestAnimationFrame(f))); }"
-    pure ()
-
-stillPending :: Async a -> Playwright ()
-stillPending pending = do
-  status <- poll pending
-  case status of
-    Nothing ->
-      pure ()
-    Just _ ->
-      assertFailure "expected click still waiting"
 

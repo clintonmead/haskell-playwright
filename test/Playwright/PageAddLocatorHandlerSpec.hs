@@ -2,9 +2,6 @@ module Playwright.PageAddLocatorHandlerSpec
   ( tests
   ) where
 
-import Control.Monad.IO.Class
-  ( MonadIO
-  )
 import UnliftIO.Concurrent
   ( threadDelay
   )
@@ -40,7 +37,6 @@ import Playwright
   , LocatorHandlerTimes (LocatorHandlerTimes)
   , Page
   , SpecialJsValue (SpecialUndefined)
-  , Timeout
   , WaitForState (WaitForHidden, WaitForVisible)
   , addInitScript
   , addLocatorHandler
@@ -64,7 +60,6 @@ import Playwright
   , goto
   , hover
   , isVisible
-  , milliseconds
   , querySelector
   , removeLocatorHandler
   , selectorFromText
@@ -77,7 +72,8 @@ import Playwright.Error
   , ProtocolFailure (protocolFailureMessage)
   )
 import Playwright.Harness
-  ( assertProtocolContains
+  ( requireTimeout
+  , assertProtocolContains
   , locate
   , withAssetPage
   , withAssets
@@ -458,14 +454,6 @@ withHandleLocator action =
         (urlFromText (prefix <> "/input/handle-locator.html"))
         defaultGotoOptions
     action page
-
-requireTimeout :: (MonadIO m) => Double -> m Timeout
-requireTimeout n =
-  case milliseconds n of
-    Nothing ->
-      assertFailure ("milliseconds " <> show n)
-    Just timeout ->
-      pure timeout
 
 assertProtocolContainsAll :: [Text] -> Playwright a -> Playwright ()
 assertProtocolContainsAll needles action = do

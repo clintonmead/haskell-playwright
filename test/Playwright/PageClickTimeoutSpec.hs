@@ -5,9 +5,6 @@ module Playwright.PageClickTimeoutSpec
   , timeout4Tests
   ) where
 
-import Control.Monad.IO.Class
-  ( MonadIO
-  )
 import Control.Monad
   ( unless
   )
@@ -17,7 +14,6 @@ import Data.Text
 import Playwright
   ( ClickOptions (clickOptionsForce, clickOptionsTimeout)
   , SpecialJsValue (SpecialUndefined)
-  , Timeout
   , ViewportHeight (ViewportHeight)
   , ViewportSize (ViewportSize)
   , ViewportWidth (ViewportWidth)
@@ -29,14 +25,14 @@ import Playwright
   , evaluateNumber
   , evaluateOnElement
   , evaluateSpecial
-  , milliseconds
   , querySelector
   , selectorFromText
   , setContent
   , setViewportSize
   )
 import Playwright.Harness
-  ( assertProtocolContains
+  ( requireTimeout
+  , assertProtocolContains
   , locate
   , requireHandle
   , withAssetPage
@@ -184,14 +180,6 @@ hiddenButtonTimeout hide =
 withLongTimeout :: TestTree -> TestTree
 withLongTimeout =
   localOption (mkTimeout 30000000)
-
-requireTimeout :: (MonadIO m) => Double -> m Timeout
-requireTimeout n =
-  case milliseconds n of
-    Nothing ->
-      assertFailure ("milliseconds " <> show n)
-    Just timeout ->
-      pure timeout
 
 largeHeaderHtml :: Text
 largeHeaderHtml =

@@ -110,7 +110,6 @@ import Playwright
   , HttpUsername (HttpUsername)
   , NewRequestOptions (newRequestBaseURL, newRequestExtraHTTPHeaders, newRequestFailOnStatusCode, newRequestHttpCredentials, newRequestMaxRedirects, newRequestTimeout, newRequestUserAgent)
   , RemoteAddr (remoteAddrIpAddress, remoteAddrPort)
-  , Timeout
   , Url
   , UserAgent (UserAgent)
   , apiResponseBody
@@ -136,7 +135,6 @@ import Playwright
   , fetchPost
   , fetchPostWith
   , fetchPut
-  , milliseconds
   , newRequestContext
   , newRequestContextWith
   , urlFromText
@@ -149,7 +147,8 @@ import Playwright.Error
   , ProtocolFailure (protocolFailureMessage)
   )
 import Playwright.Harness
-  ( assertProtocolContains
+  ( requireTimeout
+  , assertProtocolContains
   , testAssetsDir
   , withAssetsPrefix
   , assertBool
@@ -1144,10 +1143,3 @@ headerValue name headers =
     _ ->
       Nothing
 
-requireTimeout :: (MonadIO m) => Double -> m Timeout
-requireTimeout n =
-  case milliseconds n of
-    Nothing ->
-      assertFailure ("milliseconds " <> show n)
-    Just timeout ->
-      pure timeout

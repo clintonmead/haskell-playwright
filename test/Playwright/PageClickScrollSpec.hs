@@ -2,9 +2,6 @@ module Playwright.PageClickScrollSpec
   ( tests
   ) where
 
-import Control.Monad.IO.Class
-  ( MonadIO
-  )
 import Data.Text
   ( Text
   , replace
@@ -12,7 +9,6 @@ import Data.Text
 import Playwright
   ( AriaRole (AriaRole)
   , ClickOptions (clickOptionsForce, clickOptionsTimeout)
-  , Timeout
   , clickWith
   , defaultClickOptions
   , defaultGetByRoleOptions
@@ -22,19 +18,18 @@ import Playwright
   , frameLocator
   , goto
   , locatorScrollIntoView
-  , milliseconds
   , selectorFromText
   , setContent
   , urlFromText
   )
 import Playwright.Harness
-  ( assertProtocolContains
+  ( requireTimeout
+  , assertProtocolContains
   , locate
   , withAssets
   , withChromiumPage
   , assertBool
   , assertEqual
-  , assertFailure
   )
 import Playwright.Locator
   ( getByRole
@@ -116,10 +111,3 @@ clickDisplayContents html =
       defaultClickOptions {clickOptionsTimeout = Just timeout}
     assertEqual "clicked" True =<< evaluateBool page "() => window._clicked"
 
-requireTimeout :: (MonadIO m) => Double -> m Timeout
-requireTimeout n =
-  case milliseconds n of
-    Nothing ->
-      assertFailure ("milliseconds " <> show n)
-    Just timeout ->
-      pure timeout

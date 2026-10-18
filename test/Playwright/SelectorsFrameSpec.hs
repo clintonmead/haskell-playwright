@@ -2,9 +2,6 @@ module Playwright.SelectorsFrameSpec
   ( tests
   ) where
 
-import Control.Monad.IO.Class
-  ( MonadIO
-  )
 import UnliftIO.Concurrent
   ( threadDelay
   )
@@ -32,7 +29,6 @@ import Playwright
   , FulfillOptions (fulfillBody, fulfillContentType)
   , Locator
   , Page
-  , Timeout
   , UrlGlob (UrlGlob)
   , WaitForState (WaitForVisible)
   , click
@@ -51,7 +47,6 @@ import Playwright
   , innerText
   , innerTextHandle
   , locator
-  , milliseconds
   , querySelector
   , querySelectorAll
   , querySelectorAllHandle
@@ -72,7 +67,8 @@ import Playwright.Error
   , ProtocolFailure (protocolFailureMessage)
   )
 import Playwright.Harness
-  ( assertProtocolContains
+  ( requireTimeout
+  , assertProtocolContains
   , locate
   , requireHandle
   , withAssets
@@ -402,14 +398,6 @@ addLazyIframe page = do
   threadDelay 500000
   _ <- evaluate page "() => document.querySelector('iframe').src = 'iframe.html'"
   pure ()
-
-requireTimeout :: (MonadIO m) => Double -> m Timeout
-requireTimeout n =
-  case milliseconds n of
-    Nothing ->
-      assertFailure ("milliseconds " <> show n)
-    Just timeout ->
-      pure timeout
 
 assertProtocolContainsAll :: [Text] -> Playwright a -> Playwright ()
 assertProtocolContainsAll needles action = do

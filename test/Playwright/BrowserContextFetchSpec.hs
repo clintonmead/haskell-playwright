@@ -132,7 +132,6 @@ import Playwright
   , NewContextOptions (newContextBaseURL, newContextHttpCredentials)
   , Page
   , StorageState (storageStateCookies)
-  , Timeout
   , Url
   , UrlGlob (UrlGlob)
   , addCookies
@@ -168,7 +167,6 @@ import Playwright
   , fetchPutWith
   , fetchRequestWith
   , goto
-  , milliseconds
   , newContextWith
   , pageRequest
   , sessionExpires
@@ -186,7 +184,8 @@ import Playwright.Error
   , ProtocolFailure (protocolFailureMessage)
   )
 import Playwright.Harness
-  ( assertProtocolContains
+  ( requireTimeout
+  , assertProtocolContains
   , readTestAsset
   , testAssetsDir
   , withAssetsContextWith
@@ -1880,14 +1879,6 @@ headerValue name headers =
       Just value
     _ ->
       Nothing
-
-requireTimeout :: (MonadIO m) => Double -> m Timeout
-requireTimeout n =
-  case milliseconds n of
-    Nothing ->
-      assertFailure ("milliseconds " <> show n)
-    Just timeout ->
-      pure timeout
 
 splitSemi :: Text -> [Text]
 splitSemi text =

@@ -2,9 +2,6 @@ module Playwright.PageWaitForSelector2Spec
   ( tests
   ) where
 
-import Control.Monad.IO.Class
-  ( MonadIO
-  )
 import UnliftIO.Async
   ( wait
   , withAsync
@@ -33,7 +30,6 @@ import Data.Text
 import Playwright
   ( Frame
   , Page
-  , Timeout
   , WaitForState (WaitForAttached, WaitForDetached, WaitForHidden, WaitForVisible)
   , asElement
   , contentFrameHandle
@@ -50,7 +46,6 @@ import Playwright
   , framesEqual
   , goto
   , locator
-  , milliseconds
   , ownerFrameHandle
   , pageTextContent
   , querySelector
@@ -73,7 +68,8 @@ import Playwright.Error
   , ProtocolFailure (protocolFailureMessage)
   )
 import Playwright.Harness
-  ( assertProtocolContains
+  ( requireTimeout
+  , assertProtocolContains
   , requireHandle
   , withAssets
   , withChromiumPage
@@ -374,14 +370,6 @@ tests =
             _ <- evaluate page "() => { document.body.innerText = ''; }"
             void (wait pending)
     ]
-
-requireTimeout :: (MonadIO m) => Double -> m Timeout
-requireTimeout n =
-  case milliseconds n of
-    Nothing ->
-      assertFailure ("milliseconds " <> show n)
-    Just timeout ->
-      pure timeout
 
 attachFrame :: Page -> Text -> Text -> Playwright Frame
 attachFrame page prefix frameId = do

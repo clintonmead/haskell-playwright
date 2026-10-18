@@ -2,9 +2,6 @@ module Playwright.PageRequestInterceptSpec
   ( tests
   ) where
 
-import Control.Monad.IO.Class
-  ( MonadIO
-  )
 import UnliftIO.Concurrent
   ( threadDelay
   )
@@ -78,7 +75,6 @@ import Playwright
   , HttpStatus (HttpStatus, httpStatusToInt)
   , Page
   , APIResponse
-  , Timeout
   , UrlGlob (UrlGlob)
   , apiResponseHeaders
   , apiResponseHeadersArray
@@ -99,7 +95,6 @@ import Playwright
   , fulfillRoute
   , getByTestId
   , goto
-  , milliseconds
   , pageRequest
   , requestMethod
   , requestPostData
@@ -117,7 +112,8 @@ import Playwright
   , Playwright
   )
 import Playwright.Harness
-  ( assertProtocolContains
+  ( requireTimeout
+  , assertProtocolContains
   , readTestAsset
   , testAssetsDir
   , withAssets
@@ -407,14 +403,6 @@ headerValue name headers =
       Just value
     _ ->
       Nothing
-
-requireTimeout :: (MonadIO m) => Double -> m Timeout
-requireTimeout n =
-  case milliseconds n of
-    Nothing ->
-      assertFailure ("milliseconds " <> show n)
-    Just timeout ->
-      pure timeout
 
 withEmptyFooApp :: (Text -> Page -> Playwright a) -> IO a
 withEmptyFooApp action =
