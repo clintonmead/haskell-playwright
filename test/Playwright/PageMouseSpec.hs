@@ -195,6 +195,20 @@ tests =
             mouseMove page (Point (cssPixelFromInt 50) (cssPixelFromInt 50))
             mouseDownWith page (Just button)
             mouseMove page (Point (cssPixelFromInt 100) (cssPixelFromInt 100))
+    , testCase "should report correct pointerType property" $
+        withChromiumPage $ \page -> do
+          mouseMove page (Point (cssPixelFromInt 50) (cssPixelFromInt 60))
+          _ <-
+            evaluate
+              page
+              "() => { window.__EVENTS = []; const handler = event => { window.__EVENTS.push({ type: event.type, pointerType: event.pointerType }); }; window.addEventListener('pointerdown', handler, false); window.addEventListener('pointermove', handler, false); window.addEventListener('pointerup', handler, false); }"
+          mouseMove page (Point (cssPixelFromInt 60) (cssPixelFromInt 50))
+          mouseDown page
+          mouseUp page
+          assertEqual
+            "events"
+            ("[{\"type\":\"pointermove\",\"pointerType\":\"mouse\"},{\"type\":\"pointerdown\",\"pointerType\":\"mouse\"},{\"type\":\"pointerup\",\"pointerType\":\"mouse\"}]" :: Text)
+            =<< evaluateText page "() => JSON.stringify(window.__EVENTS)"
     ]
 
 modifiers :: [(Text, Text)]
