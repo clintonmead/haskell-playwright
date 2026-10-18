@@ -16,6 +16,10 @@ import Playwright
   ( ConsoleMessage (consoleMessageArgs, consoleMessagePage, consoleMessageText)
   , Dialog (dialogMessage, dialogPage)
   , acceptDialogWith
+  , armContextDialog
+  , armContextPage
+  , armDialog
+  , armPopup
   , asElement
   , click
   , clickHandle
@@ -28,9 +32,6 @@ import Playwright
   , setContent
   , urlFromText
   , waitForContextConsole
-  , waitForContextDialog
-  , waitForContextPage
-  , waitForDialog
   , waitForFunction
   , waitForPopup
   , dialogsEqual
@@ -97,12 +98,12 @@ tests =
                 Just origin ->
                   assertEqual "popup" True (pagesEqual origin popup)
     , testCase "dialog event should work" $
-        withChromiumContext $ \ctx page ->
-          withAsync (waitForContextDialog ctx) $ \contextPending ->
-            withAsync (waitForDialog page) $ \pagePending ->
-              withAsync (evaluateText page "() => prompt('hey?')") $ \evalPending -> do
-                dialog1 <- wait contextPending
-                dialog2 <- wait pagePending
+        withChromiumContext $ \ctx page -> do
+          takeContextDialog <- armContextDialog ctx
+          takePageDialog <- armDialog page
+          withAsync (evaluateText page "() => prompt('hey?')") $ \evalPending -> do
+                dialog1 <- takeContextDialog
+                dialog2 <- takePageDialog
                 assertEqual "same" True (dialogsEqual dialog1 dialog2)
                 assertEqual "message" "hey?" (dialogMessage dialog1)
                 case dialogPage dialog1 of
@@ -114,14 +115,14 @@ tests =
                 result <- wait evalPending
                 assertEqual "hello" "hello" result
     , testCase "dialog event should work in popup" $
-        withChromiumContext $ \ctx page ->
-          withAsync (waitForContextDialog ctx) $ \dialogPending ->
-            withAsync (waitForPopup page) $ \popupPending ->
-              withAsync
-                (evaluateText page "() => { const win = window.open(''); return win.prompt('hey?'); }")
-                $ \evalPending -> do
-                  dialog <- wait dialogPending
-                  popup <- wait popupPending
+        withChromiumContext $ \ctx page -> do
+          takeDialog <- armContextDialog ctx
+          takePopup <- armPopup page
+          withAsync
+            (evaluateText page "() => { const win = window.open(''); return win.prompt('hey?'); }")
+            $ \evalPending -> do
+                  dialog <- takeDialog
+                  popup <- takePopup
                   assertEqual "message" "hey?" (dialogMessage dialog)
                   case dialogPage dialog of
                     Nothing ->
@@ -136,11 +137,12 @@ tests =
           withLocalApp popupPromptApp $ \prefix -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
             setContent page ("<a href='" <> prefix <> "/popup.html' target=_blank>Click me</a>")
-            withAsync (waitForContextDialog ctx) $ \dialogPending ->
-              withAsync (waitForContextPage ctx) $ \pagePending -> do
+            takeDialog <- armContextDialog ctx
+            takePage <- armContextPage ctx
+            do
                 click (locate page "a")
-                dialog <- wait dialogPending
-                popup <- wait pagePending
+                dialog <- takeDialog
+                popup <- takePage
                 assertEqual "message" "hey?" (dialogMessage dialog)
                 case dialogPage dialog of
                   Nothing ->

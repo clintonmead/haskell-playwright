@@ -31,6 +31,7 @@ module Playwright.BrowserContext
   , setStorageState
   , storageState
   , waitForContextClose
+  , armContextPage
   , waitForContextPage
   ) where
 
@@ -62,10 +63,12 @@ import Playwright.Connection
   , guidsOfType
   , lookupObject
   , registerEventHandler
+  , registerFutureEventWaiter
   , setTimeoutDefault
   , setTimeoutNavigation
   , waitForChannelEvent
   , waitForFutureChannelEventUnlessClosed
+  , waitForWaiter
   )
 import Playwright.Error
   ( PlaywrightError (DecodeFailure)
@@ -307,6 +310,15 @@ contextPages ctx = do
         )
         objects
     )
+
+-- | Registers for the next new page before the action that opens it runs.
+armContextPage :: BrowserContext -> Playwright (Playwright Page)
+armContextPage ctx = do
+  waitId <- registerFutureEventWaiter (channelGuid (browserContextChannel ctx)) (MethodName "page")
+  pure $ waitWithTimeout defaultTimeout $ do
+    params <- waitForWaiter waitId
+    event <- throwDecode params
+    pageFromRef (browserContextChannel ctx) (browserContextPageEventPage event)
 
 waitForContextPage :: BrowserContext -> Playwright Page
 waitForContextPage ctx =

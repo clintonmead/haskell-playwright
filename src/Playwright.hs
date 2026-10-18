@@ -663,7 +663,9 @@ module Playwright
   , waitForConsoleWhere
   , waitForContextClose
   , waitForContextConsole
+  , armContextDialog
   , waitForContextDialog
+  , armContextPage
   , waitForContextPage
   , waitForContextRequestFinished
   , waitForContextRequestWhere
@@ -835,6 +837,7 @@ import Playwright.BrowserContext
   , setStorageState
   , storageState
   , waitForContextClose
+  , armContextPage
   , waitForContextPage
   )
 import Playwright.BrowserName
@@ -1470,6 +1473,7 @@ import Playwright.BrowserContext.Network
   )
 import Playwright.BrowserContext.Wait
   ( waitForContextConsole
+  , armContextDialog
   , waitForContextDialog
   )
 import Playwright.PageError

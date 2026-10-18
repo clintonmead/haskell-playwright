@@ -1,5 +1,6 @@
 module Playwright.BrowserContext.Wait
-  ( waitForContextConsole
+  ( armContextDialog
+  , waitForContextConsole
   , waitForContextDialog
   ) where
 
@@ -16,7 +17,9 @@ import Playwright.Channel
   ( Channel (channelGuid)
   )
 import Playwright.Connection
-  ( waitForChannelEvent
+  ( registerEventWaiter
+  , waitForChannelEvent
+  , waitForWaiter
   )
 import Playwright.ConsoleMessage
   ( ConsoleMessage
@@ -56,11 +59,16 @@ waitForContextConsole ctx = do
 
 waitForContextDialog :: BrowserContext -> Playwright Dialog
 waitForContextDialog ctx = do
+  takeDialog <- armContextDialog ctx
+  takeDialog
+
+-- | Registers for the next dialog before the action that opens it runs. Two
+-- waiters only both see the event if both are registered before it fires.
+armContextDialog :: BrowserContext -> Playwright (Playwright Dialog)
+armContextDialog ctx = do
   subscribeBrowserContext ctx BrowserContextUpdateSubscriptionParamsEventDialog
-  waitWithTimeout defaultTimeout $ do
-    params <-
-      waitForChannelEvent
-        (channelGuid (browserContextChannel ctx))
-        (MethodName "dialog")
+  waitId <- registerEventWaiter (channelGuid (browserContextChannel ctx)) (MethodName "dialog")
+  pure $ waitWithTimeout defaultTimeout $ do
+    params <- waitForWaiter waitId
     event <- throwDecode params
     dialogFromRef (browserContextDialogEventDialog event)
