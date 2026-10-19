@@ -2,22 +2,33 @@ module Playwright.PageRequestFulfillSpec
   ( tests
   ) where
 
+import Data.ByteString.Lazy.Char8 qualified as LBS8
 import Data.Text
   ( Text
   , isSuffixOf
   , toLower
   )
+import Network.HTTP.Types
+  ( status200
+  )
+import Network.Wai
+  ( Application
+  , responseLBS
+  )
 import Playwright
   ( ContentType (ContentType)
-  , FulfillBody (FulfillText)
+  , FulfillBody (FulfillBytes, FulfillText)
   , FulfillOptions (fulfillBody, fulfillContentType, fulfillHeaders, fulfillStatus)
   , HeaderName (HeaderName, headerNameToText)
   , HeaderValue (HeaderValue, headerValueToText)
   , HttpHeader (HttpHeader, httpHeaderName, httpHeaderValue)
   , HttpStatus (HttpStatus, httpStatusToInt)
   , UrlGlob (UrlGlob)
+  , armResponse
   , defaultFulfillOptions
   , defaultGotoOptions
+  , evaluate
+  , evaluateBool
   , evaluateText
   , fulfillRoute
   , goto
@@ -31,7 +42,10 @@ import Playwright
   , urlToText
   )
 import Playwright.Harness
-  ( withAssets
+  ( readTestAsset
+  , withAssets
+  , withChromiumPage
+  , withLocalApp
   , assertEqual
   , assertFailure
   )
@@ -115,7 +129,50 @@ tests =
               page
               "async () => { const response = await fetch('https://example.com/cars?allow', { mode: 'cors' }); return JSON.stringify(await response.json()); }"
           assertEqual "allowed" "[\"electric\",\"gas\"]" allowed
+    , testCase "should allow mocking binary responses" $
+        withChromiumPage $ \page ->
+          withLocalApp emptyApp $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            image <- readTestAsset "pptr.png"
+            route page (UrlGlob "**/*") $ \handled ->
+              fulfillRoute
+                handled
+                defaultFulfillOptions
+                  { fulfillContentType = Just (ContentType "image/png")
+                  , fulfillBody = Just (FulfillBytes image)
+                  }
+            _ <-
+              evaluate
+                page
+                ( "() => new Promise(done => { const img = document.createElement('img'); img.src = '"
+                    <> prefix
+                    <> "/does-not-exist.png'; document.body.appendChild(img); img.onload = () => done(true); })"
+                )
+            assertEqual "loaded" True =<< evaluateBool page "() => document.querySelector('img').naturalWidth > 0"
+    , testCase "should fulfill json" $
+        withChromiumPage $ \page ->
+          withLocalApp emptyApp $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            route page (UrlGlob "**/data.json") $ \handled ->
+              fulfillRoute
+                handled
+                defaultFulfillOptions
+                  { fulfillStatus = Just (HttpStatus 201)
+                  , fulfillContentType = Just (ContentType "application/json")
+                  , fulfillHeaders = [HttpHeader (HeaderName "foo") (HeaderValue "bar")]
+                  , fulfillBody = Just (FulfillText "{\"bar\":\"baz\"}")
+                  }
+            takeResponse <- armResponse page (UrlGlob "**/*")
+            body <- evaluateText page "() => fetch('./data.json').then(r => r.text())"
+            response <- takeResponse
+            assertEqual "status" (HttpStatus 201) =<< responseStatus response
+            assertEqual "body" "{\"bar\":\"baz\"}" body
     ]
+
+-- | Answers every path with an empty 200, so the page can load.
+emptyApp :: Application
+emptyApp _ respond =
+  respond (responseLBS status200 [] LBS8.empty)
 
 headerValue :: Text -> [HttpHeader] -> Maybe Text
 headerValue name headers =
