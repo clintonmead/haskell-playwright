@@ -11,7 +11,9 @@ import Playwright
   , Page
   , Playwright
   , SetContentOptions (setContentOptionsWaitUntil)
+  , armLoadEvent
   , armPopup
+  , closePage
   , click
   , defaultGotoOptions
   , defaultSetContentOptions
@@ -30,6 +32,7 @@ import Playwright
   )
 import Playwright.Harness
   ( assertEqual
+  , assertFailure
   , locate
   , assertStillPending
   , assertWaitTimeout
@@ -49,9 +52,20 @@ import Test.Tasty
 import Test.Tasty.HUnit
   ( testCase
   )
+import Control.Concurrent
+  ( threadDelay
+  )
+import Control.Monad.IO.Class
+  ( liftIO
+  )
 import UnliftIO.Async
-  ( wait
+  ( race
+  , wait
   , withAsync
+  )
+import UnliftIO.Exception
+  ( SomeException
+  , try
   )
 import UnliftIO.MVar
   ( newEmptyMVar
@@ -183,7 +197,23 @@ tests =
           newPage' <- newPage (pageContext page)
           waitForLoadState newPage' LoadStateLoad
           assertEqual "ready state" "complete" =<< evaluateText newPage' "() => document.readyState"
+    , testCase "armed load event fails promptly when the page closes" $
+        withChromiumPage $ \page -> do
+          takeLoad <- armLoadEvent page
+          closePage page
+          outcome <- race (liftIO (threadDelay 10000000)) (failsArmed takeLoad)
+          case outcome of
+            Left () ->
+              assertFailure "armed load event hung after the page closed"
+            Right failed ->
+              assertEqual "failed" True failed
     ]
+
+-- | True when the action throws. A hang shows up as the race timing out instead.
+failsArmed :: Playwright () -> Playwright Bool
+failsArmed action = do
+  result <- try action :: Playwright (Either SomeException ())
+  pure (either (const True) (const False) result)
 
 -- | Navigates with waitUntil domcontentloaded, so the goto returns before the
 -- stylesheet finishes.

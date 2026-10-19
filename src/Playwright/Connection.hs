@@ -7,6 +7,7 @@ module Playwright.Connection
   , lookupObject
   , registerEventHandler
   , registerEventWaiter
+  , registerFreshEventWaiter
   , waitForChannelEvent
   , waitForChannelEventUnlessAborted
   , waitForChannelEventUnlessClosed
@@ -375,6 +376,10 @@ lookupRequestEndTiming guid =
 registerEventWaiter :: Guid -> MethodName -> Playwright WaitId
 registerEventWaiter guid method =
   inConnection $ \conn -> Wait.registerEventWaiter conn guid method
+
+registerFreshEventWaiter :: Guid -> MethodName -> Playwright WaitId
+registerFreshEventWaiter guid method =
+  inConnection $ \conn -> Wait.registerFreshEventWaiter conn guid method
 
 registerFutureEventWaiter :: Guid -> MethodName -> Playwright WaitId
 registerFutureEventWaiter guid method =

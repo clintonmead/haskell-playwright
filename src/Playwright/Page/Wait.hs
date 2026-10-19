@@ -78,6 +78,7 @@ import Playwright.Channel
 import Playwright.Connection
   ( registerEventHandler
   , registerEventWaiter
+  , registerFreshEventWaiter
   , registerFutureEventWaiter
   , registerFutureEventWaiterWhere
   , waitForChannelEvent
@@ -284,7 +285,8 @@ armLifecycleEvent page lifecycle = do
       (MethodName "loadstate")
       (isLifecycleEvent lifecycle)
   pure $ do
-    _ <- waitForWaiter waitId
+    -- Fails when the page closes, instead of waiting for a load that never comes.
+    _ <- waitForWaiterUnlessClosed waitId (channelGuid (pageChannel page))
     pure ()
 
 -- | Whether a loadstate event reports the lifecycle event being waited for.
@@ -534,8 +536,8 @@ armResponseWhere page predicate = do
 
 armResponseWhereWith :: Page -> (Response -> Playwright Bool) -> Timeout -> Playwright (Playwright Response)
 armResponseWhereWith page predicate timeout = do
+  firstWaiter <- registerFreshEventWaiter guid (MethodName "response")
   subscribeContext page BrowserContextUpdateSubscriptionParamsEventResponse
-  firstWaiter <- registerEventWaiter guid (MethodName "response")
   pure (waitWithTimeout timeout (collectResponse firstWaiter))
   where
     guid = channelGuid (pageContextChannel page)
@@ -587,8 +589,10 @@ armRequestWhere page predicate = do
 
 armRequestWhereWith :: Page -> (Request -> Playwright Bool) -> Timeout -> Playwright (Playwright Request)
 armRequestWhereWith page predicate timeout = do
+  -- Register before subscribing: events from before this call are dropped, and
+  -- every event after the subscription reaches the waiter.
+  firstWaiter <- registerFreshEventWaiter guid (MethodName "request")
   subscribeContext page BrowserContextUpdateSubscriptionParamsEventRequest
-  firstWaiter <- registerEventWaiter guid (MethodName "request")
   pure (waitWithTimeout timeout (collectRequest firstWaiter))
   where
     guid = channelGuid (pageContextChannel page)
@@ -600,7 +604,9 @@ armRequestWhereWith page predicate timeout = do
       if matched
         then pure request
         else do
-          -- Events that arrive between waiters are buffered, so none are lost.
+          -- Events that arrive while no waiter is registered are buffered. An
+          -- event that arrives while this loop evaluates the predicate is
+          -- handed to any other registered consumer on this key (see TODO).
           nextWaiter <- registerEventWaiter guid (MethodName "request")
           collectRequest nextWaiter
 

@@ -2,6 +2,7 @@ module Playwright.Connection.Wait
   ( EventAbort (EventAbort, eventAbortError, eventAbortGuid, eventAbortMethod)
   , deliverEvent
   , registerEventWaiter
+  , registerFreshEventWaiter
   , registerFutureEventWaiter
   , registerFutureEventWaiterWhere
   , waitForChannelEvent
@@ -139,6 +140,21 @@ registerEventWaiter conn guid method =
             )
           Seq.EmptyL ->
             insertWaitingWaiter session waitId guid method (const True)
+
+-- | Registers a waiter that takes only events arriving after this call. Any
+-- events already buffered for this method are discarded in the same
+-- transaction, so an armed consumer never receives something that happened
+-- before it was armed. Events buffered for other consumers are discarded too.
+registerFreshEventWaiter :: Connection -> Guid -> MethodName -> IO WaitId
+registerFreshEventWaiter conn guid method =
+  atomically $
+    stateSession conn $ \session ->
+      insertWaitingWaiter
+        session {sessionEventBuffer = Map.delete (guid, method) (sessionEventBuffer session)}
+        (sessionNextWaitId session)
+        guid
+        method
+        (const True)
 
 registerFutureEventWaiter :: Connection -> Guid -> MethodName -> IO WaitId
 registerFutureEventWaiter conn guid method =

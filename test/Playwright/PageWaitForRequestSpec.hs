@@ -16,6 +16,8 @@ import Playwright
   , urlToText
   , waitForRequest
   , waitForRequestWith
+  , onRequest
+  , onRequest
   , setDefaultTimeout
   )
 import Playwright.Harness
@@ -93,4 +95,15 @@ tests =
             Just timeout -> do
               setDefaultTimeout page timeout
               assertWaitTimeout (waitForRequest page (UrlGlob (prefix <> "/does-not-exist.png")))
+    , testCase "armRequest ignores a request made before it was armed" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          onRequest page (\_ -> pure ())
+          _ <- evaluate page "() => fetch('/digits/1.png').then(r => r.text())"
+          case milliseconds 500 of
+            Nothing ->
+              assertFailure "timeout"
+            Just timeout -> do
+              takeRequest <- armRequestWith page (UrlGlob (prefix <> "/digits/1.png")) timeout
+              assertWaitTimeout takeRequest
     ]
