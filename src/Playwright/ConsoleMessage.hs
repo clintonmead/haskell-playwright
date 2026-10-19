@@ -35,7 +35,7 @@ import Playwright.Page
   , pageFromRef
   )
 import Playwright.Protocol
-  ( BrowserContextConsoleEvent (browserContextConsoleEventArgs, browserContextConsoleEventPage, browserContextConsoleEventText, browserContextConsoleEventType, browserContextConsoleEventWorker)
+  ( BrowserContextConsoleEvent (browserContextConsoleEventArgs, browserContextConsoleEventPage, browserContextConsoleEventText, browserContextConsoleEventTimestamp, browserContextConsoleEventType, browserContextConsoleEventWorker)
   )
 
 data ConsoleMessage = ConsoleMessage
@@ -44,6 +44,8 @@ data ConsoleMessage = ConsoleMessage
   , consoleMessageArgs :: [JsHandle]
   , consoleMessagePage :: Maybe Page
   , consoleMessageWorkerRef :: Maybe ChannelRef
+  , -- | Milliseconds since the epoch, as in the JS client's message.timestamp().
+    consoleMessageTimestamp :: Double
   }
 
 consoleMessageFromEvent :: Channel BrowserContextTag -> BrowserContextConsoleEvent -> Playwright ConsoleMessage
@@ -67,4 +69,5 @@ consoleMessageFromEvent contextChannel event = do
       , consoleMessageArgs = fmap (jsHandleFromRef) (browserContextConsoleEventArgs event)
       , consoleMessagePage = matchedPage
       , consoleMessageWorkerRef = browserContextConsoleEventWorker event
+      , consoleMessageTimestamp = realToFrac (browserContextConsoleEventTimestamp event)
       }

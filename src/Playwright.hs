@@ -900,7 +900,7 @@ import Playwright.Contrast
   ( Contrast (ContrastMore, ContrastNoOverride, ContrastNoPreference)
   )
 import Playwright.ConsoleMessage
-  ( ConsoleMessage (ConsoleMessage, consoleMessageArgs, consoleMessagePage, consoleMessageText, consoleMessageType, consoleMessageWorkerRef)
+  ( ConsoleMessage (ConsoleMessage, consoleMessageArgs, consoleMessagePage, consoleMessageText, consoleMessageTimestamp, consoleMessageType, consoleMessageWorkerRef)
   )
 import Playwright.ConsoleType
   ( ConsoleType (ConsoleAssert, ConsoleClear, ConsoleCount, ConsoleDebug, ConsoleDir, ConsoleDirXml, ConsoleError, ConsoleInfo, ConsoleLog, ConsoleProfile, ConsoleProfileEnd, ConsoleTable, ConsoleTimeEnd, ConsoleTrace, ConsoleVerbose, ConsoleWarning)

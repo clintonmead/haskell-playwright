@@ -9,12 +9,13 @@ import Data.Text
   , isSuffixOf
   )
 import Playwright
-  ( ConsoleMessage (consoleMessageArgs, consoleMessageText, consoleMessageType)
+  ( ConsoleMessage (consoleMessageArgs, consoleMessageText, consoleMessageTimestamp, consoleMessageType)
   , ConsoleType (ConsoleDebug, ConsoleDir, ConsoleError, ConsoleInfo, ConsoleLog, ConsoleTimeEnd, ConsoleTrace, ConsoleWarning)
   , Page
   , Playwright
   , armConsole
   , evaluate
+  , evaluateNumber
   , evaluateWith
   , jsonValueNumber
   , jsonValueText
@@ -148,6 +149,26 @@ tests =
               assertEqual "type" ConsoleError (consoleMessageType message)
             [] ->
               assertFailure "expected a console message"
+    , testCase "should have timestamp" $
+        withChromiumPage $ \page -> do
+          -- Generous slack: the browser's clock and Date.now() are read on the same machine.
+          before <- evaluateNumber page "() => Date.now()"
+          takeMessage <- armConsole page
+          _ <- evaluate page "() => console.log('timestamp test')"
+          message <- takeMessage
+          after <- evaluateNumber page "() => Date.now()"
+          assertBool "timestamp in range" (consoleMessageTimestamp message >= before - 100 && consoleMessageTimestamp message <= after + 100)
+    , testCase "should have increasing timestamps" $
+        withChromiumPage $ \page -> do
+          messages <- collectConsole page
+          _ <-
+            evaluate
+              page
+              "() => { console.log('first'); console.log('second'); console.log('third'); }"
+          seen <- readMessages messages
+          assertEqual "count" 3 (length seen)
+          let stamps = map consoleMessageTimestamp seen
+          assertBool "non-decreasing" (and (zipWith (<=) stamps (drop 1 stamps)))
     ]
 
 -- | Collects every console message the page emits, in order. The handler runs
