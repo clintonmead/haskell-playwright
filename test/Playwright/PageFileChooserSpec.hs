@@ -190,7 +190,13 @@ tests =
             bytes <- readTestAsset "file-to-upload.txt"
             fileChooserSetFiles chooser [InputFile (InputFileName "file-to-upload.txt") bytes]
             assertEqual "content" "contents of the file" =<< wait content
-
+    , testCase "should respect timeout" $
+        withChromiumPage $ \page ->
+          case milliseconds 1 of
+            Nothing ->
+              assertFailure "timeout"
+            Just timeout ->
+              assertWaitTimeout (waitForFileChooserWith page timeout)
     ]
 
 -- | Clicks the file input, waits for the selection, and returns the file text.
