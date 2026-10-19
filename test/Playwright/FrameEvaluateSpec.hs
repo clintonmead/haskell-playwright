@@ -4,6 +4,7 @@ module Playwright.FrameEvaluateSpec
 
 import Playwright
   ( defaultGotoOptions
+  , evaluateHandle
   , evaluateOnFrameText
   , frames
   , goto
@@ -11,7 +12,8 @@ import Playwright
   , urlFromText
   )
 import Playwright.Harness
-  ( withAssets
+  ( attachFrame
+  , withAssets
   , assertEqual
   , assertFailure
   )
@@ -50,4 +52,22 @@ tests =
               assertEqual "child" "Hi, I'm frame" =<< evaluateOnFrameText childFrame "() => document.body.textContent.trim()"
             _ ->
               assertFailure ("expected 2 frames, got " <> show (length allFrames))
+    , testCase "should be isolated between frames" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          _ <- attachFrame page "frame1" (prefix <> "/empty.html")
+          allFrames <- frames page
+          case allFrames of
+            [first, second] -> do
+              _ <- evaluateOnFrameText first "() => { window.a = 1; return 'set'; }"
+              _ <- evaluateOnFrameText second "() => { window.a = 2; return 'set'; }"
+              assertEqual "first" "1" =<< evaluateOnFrameText first "() => String(window.a)"
+              assertEqual "second" "2" =<< evaluateOnFrameText second "() => String(window.a)"
+            _ ->
+              assertFailure ("expected 2 frames, got " <> show (length allFrames))
+    , testCase "evaluateHandle should work" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          _ <- evaluateHandle page "() => window"
+          pure ()
     ]
