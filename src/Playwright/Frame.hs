@@ -4,6 +4,7 @@ module Playwright.Frame
   , frameContent
   , currentName
   , currentUrl
+  , parentFrame
   , evalOnSelectorAllFrame
   , evalOnSelectorFrame
   , evalOnSelectorFrameStrict
@@ -145,6 +146,15 @@ currentName frame = do
   initializer <- frameInitializer frame
   pure (frameInitializerName initializer)
 
+-- | The frame that contains this one. The main frame has none.
+parentFrame :: Frame -> Playwright (Maybe Frame)
+parentFrame frame =
+  case frameParent frame of
+    Nothing ->
+      pure Nothing
+    Just parent ->
+      Just <$> frameFromRef parent
+
 frameInitializer :: Frame -> Playwright FrameInitializer
 frameInitializer frame = do
   obj <- lookupObject (channelGuid (frameChannel frame))
@@ -222,8 +232,8 @@ mainFrameGuid frame =
     Nothing ->
       pure (channelGuid (frameChannel frame))
     Just parent -> do
-      parentFrame <- frameFromRef parent
-      mainFrameGuid parentFrame
+      containing <- frameFromRef parent
+      mainFrameGuid containing
 
 titleFrame :: Frame -> Playwright Text
 titleFrame frame = do

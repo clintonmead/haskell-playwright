@@ -253,6 +253,7 @@ module Playwright
   , cssPixelFromDouble
   , cssPixelFromInt
   , currentName
+  , parentFrame
   , currentUrl
   , dblclick
   , defaultAddLocatorHandlerOptions
@@ -1118,6 +1119,7 @@ import Playwright.Frame
   , childFrames
   , frameContent
   , currentName
+  , parentFrame
   , currentUrl
   , framesEqual
   , gotoFrame

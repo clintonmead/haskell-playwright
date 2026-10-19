@@ -19,19 +19,24 @@ import Playwright
   , currentName
   , currentUrl
   , defaultGotoOptions
+  , evaluate
   , frameByName
   , frames
+  , framesEqual
   , goto
   , mainFrame
+  , parentFrame
   , setContent
   , urlFromText
   , urlToText
   , Playwright
   )
 import Playwright.Harness
-  ( withAssets
+  ( attachFrame
+  , withAssets
   , withChromiumPage
   , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
@@ -74,6 +79,30 @@ tests =
           urls <- traverse (fmap urlToText . currentUrl) allFrames
           let matching = filter ("empty.html" `isInfixOf`) urls
           assertEqual "iframe url" [prefix <> "/empty.html"] matching
+    , testCase "should report frame.name()" $
+        withAssets $ \prefix page -> do
+          _ <- attachFrame page "theFrameId" (prefix <> "/empty.html")
+          _ <-
+            evaluate
+              page
+              ( "() => new Promise(x => { const frame = document.createElement('iframe'); frame.name = 'theFrameName'; frame.src = '"
+                  <> prefix
+                  <> "/empty.html'; document.body.appendChild(frame); frame.onload = () => x(true); })"
+              )
+          -- frames lists children in no fixed order, so compare sorted names.
+          names <- traverse currentName =<< frames page
+          assertEqual "names" ["", "theFrameId", "theFrameName"] (sortBy (comparing id) names)
+    , testCase "should report frame.parent()" $
+        withAssets $ \prefix page -> do
+          _ <- attachFrame page "frame1" (prefix <> "/empty.html")
+          _ <- attachFrame page "frame2" (prefix <> "/empty.html")
+          parents <- traverse parentFrame =<< frames page
+          case parents of
+            [Nothing, Just first, Just second] -> do
+              assertEqual "frame1 parent" True (framesEqual first (mainFrame page))
+              assertEqual "frame2 parent" True (framesEqual second (mainFrame page))
+            _ ->
+              assertFailure ("unexpected parents: " <> show (length parents))
     ]
 
 dumpFrames :: Frame -> Text -> Playwright [Text]
