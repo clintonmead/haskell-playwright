@@ -372,6 +372,7 @@ test-suite playwright-test
       Playwright.PageSetExtraHTTPHeadersSpec
       Playwright.PageSetInputFilesSpec
       Playwright.PageStrictSpec
+      Playwright.PageTransitionSpec
       Playwright.PageWaitForFunctionSpec
       Playwright.PageWaitForLoadStateSpec
       Playwright.PageWaitForNavigationSpec

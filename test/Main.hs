@@ -144,6 +144,7 @@ import Playwright.PageRequestGcSpec qualified as PageRequestGcSpec
 import Playwright.PageRouteSpec qualified as PageRouteSpec
 import Playwright.PageScreenshotSpec qualified as PageScreenshotSpec
 import Playwright.PageSetContentSpec qualified as PageSetContentSpec
+import Playwright.PageTransitionSpec qualified as PageTransitionSpec
 import Playwright.PageSelectOptionSpec qualified as PageSelectOptionSpec
 import Playwright.PageSetExtraHTTPHeadersSpec qualified as PageSetExtraHTTPHeadersSpec
 import Playwright.PageSetInputFilesSpec qualified as PageSetInputFilesSpec
@@ -334,6 +335,7 @@ main =
         , PageSelectOptionSpec.tests
         , PageScreenshotSpec.tests
         , PageSetContentSpec.tests
+        , PageTransitionSpec.tests
         , PageSetExtraHTTPHeadersSpec.tests
         , PageSetInputFilesSpec.tests
         , PageStrictSpec.tests
