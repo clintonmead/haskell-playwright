@@ -133,7 +133,7 @@ Do not put artificial delays in tests, particularly when those artificial delays
 
 ### Run individual tests most of the time to test new functionality
 
-Most of the time, run individual tests to test new functionality. Occasionally run the full test suite, in particular before a commit. By default, tests should run in parallel. 
+Most of the time, run individual tests to test new functionality. Occasionally run the full test suite. You don't have to run the full test suite before the commit. By default, tests should run in parallel. You should be spending no more than 20% of your time running the full test suite.
 
 ## Implementation process
 
@@ -261,7 +261,7 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 These came from long sessions. Follow them unless the user says otherwise.
 
 - **Always wrap a test run in `timeout`.** Tasty has no per-test timeout, so one test that waits forever hangs the whole run. Use `timeout 400 $bin ...` and stream to a file, or use `--hide-successes` on small groups only.
-- **Test budget: full runs take at most ~10% of dev time.** The full suite is ~2.5 minutes. Commit after the new or changed group passes (`playwright-test -p '/group/'`, with a few reruns for anything timing-sensitive). Run the full suite about once every four or five commits, and before a wide change to shared library code (`Connection*`, `Frame*`, `Page*`, `Locator*`, `Harness`). Do not start a full run while a targeted loop still needs its result.
+- **Test budget: full runs take at most ~20% of dev time.** The full suite is ~2.5 minutes. Commit after the new or changed group passes (`playwright-test -p '/group/'`, with a few reruns for anything timing-sensitive). Run the full suite about once every four or five commits, and before a wide change to shared library code (`Connection*`, `Frame*`, `Page*`, `Locator*`, `Harness`). Do not start a full run while a targeted loop still needs its result.
 - **Prefer `armX` waiters over `withAsync`.** A `withAsync (wait...)` started after the action can miss an event that fires first. Register with `armX` (or `registerFutureEventWaiterWhere`), then run the action, then take the result. See `armNavigationOptions` and `armLoadEvent`.
 - **Lifecycle events can arrive in any order.** Never re-arm after a non-matching event: the next event can fire before the re-arm. Use an accept predicate on the waiter instead.
 - **Keep the `-Weverything` list clean.** New imports need explicit import lists (`-Wmissing-import-lists`). Unused imports are errors, so after moving helpers around, remove the imports the compiler reports.
