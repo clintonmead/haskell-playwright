@@ -135,6 +135,8 @@ Do not put artificial delays in tests, particularly when those artificial delays
 
 Most of the time, run individual tests to test new functionality. Occasionally run the full test suite. You don't have to run the full test suite before the commit. By default, tests should run in parallel. You should be spending no more than 20% of your time running the full test suite.
 
+Keep track of how long full tests runs are running and how frequently you're running them. If they're taking more than 20% of the time, run them less frequently and focus on running them only after significant refactors.
+
 ## Implementation process
 
 ### Go for it
