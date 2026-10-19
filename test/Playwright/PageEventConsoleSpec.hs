@@ -9,14 +9,18 @@ import Data.Text
   , isSuffixOf
   )
 import Playwright
-  ( ConsoleMessage (consoleMessageArgs, consoleMessageText, consoleMessageTimestamp, consoleMessageType)
+  ( ConsoleLocation (consoleLocationLineNumber, consoleLocationUrl)
+  , ConsoleMessage (consoleMessageArgs, consoleMessageLocation, consoleMessageText, consoleMessageTimestamp, consoleMessageType)
   , ConsoleType (ConsoleDebug, ConsoleDir, ConsoleError, ConsoleInfo, ConsoleLog, ConsoleTimeEnd, ConsoleTrace, ConsoleWarning)
   , Page
   , Playwright
   , armConsole
   , evaluate
+  , defaultGotoOptions
   , evaluateNumber
   , evaluateWith
+  , goto
+  , urlFromText
   , jsonValueNumber
   , jsonValueText
   , onConsole
@@ -158,6 +162,20 @@ tests =
           message <- takeMessage
           after <- evaluateNumber page "() => Date.now()"
           assertBool "timestamp in range" (consoleMessageTimestamp message >= before - 100 && consoleMessageTimestamp message <= after + 100)
+    , testCase "should have location for console API calls" $
+        withAssets $ \prefix page -> do
+          messages <- collectConsole page
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          _ <- goto page (urlFromText (prefix <> "/consolelog.html")) defaultGotoOptions
+          seen <- readMessages messages
+          case filter (("here:" `isPrefixOf`) . consoleMessageText) seen of
+            message : _ -> do
+              assertEqual "type" ConsoleLog (consoleMessageType message)
+              let location = consoleMessageLocation message
+              assertEqual "url" (prefix <> "/consolelog.html") (consoleLocationUrl location)
+              assertEqual "line" 7 (consoleLocationLineNumber location)
+            [] ->
+              assertFailure "expected a console message starting with here:"
     , testCase "should have increasing timestamps" $
         withChromiumPage $ \page -> do
           messages <- collectConsole page
