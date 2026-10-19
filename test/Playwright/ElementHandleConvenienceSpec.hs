@@ -4,7 +4,11 @@ module Playwright.ElementHandleConvenienceSpec
 
 import Playwright
   ( SelectOption (SelectValue)
+  , evaluate
   , fill
+  , isChecked
+  , isEditable
+  , isEditableHandle
   , getAttribute
   , getAttributeHandle
   , innerHtml
@@ -16,12 +20,14 @@ import Playwright
   , querySelector
   , selectOption
   , selectorFromText
+  , setContent
   )
 import Playwright.Harness
   ( assertProtocolContains
   , locate
   , requireHandle
   , withAssetPage
+  , withChromiumPage
   , assertEqual
   )
 import Test.Tasty
@@ -72,4 +78,24 @@ tests =
           handle <- requireHandle =<< querySelector page (selectorFromText "#inner")
           assertEqual "handle" "Text, more text" =<< innerTextHandle handle
           assertEqual "page" "Text, more text" =<< innerText (locate page "#inner")
+    , testCase "isEditable should work" $
+        withChromiumPage $ \page -> do
+          setContent page "<input id=input1 disabled><textarea></textarea><input id=input2>"
+          _ <- evaluate page "() => { document.querySelector('textarea').readOnly = true; }"
+          input1 <- requireHandle =<< querySelector page (selectorFromText "#input1")
+          assertEqual "input1 handle" False =<< isEditableHandle input1
+          assertEqual "input1 page" False =<< isEditable (locate page "#input1")
+          input2 <- requireHandle =<< querySelector page (selectorFromText "#input2")
+          assertEqual "input2 handle" True =<< isEditableHandle input2
+          assertEqual "input2 page" True =<< isEditable (locate page "#input2")
+          textarea <- requireHandle =<< querySelector page (selectorFromText "textarea")
+          assertEqual "textarea handle" False =<< isEditableHandle textarea
+          assertEqual "textarea page" False =<< isEditable (locate page "textarea")
+    , testCase "isChecked should work" $
+        withChromiumPage $ \page -> do
+          setContent page "<input type='checkbox' checked><div>Not a checkbox</div>"
+          assertEqual "checked" True =<< isChecked (locate page "input")
+          _ <- evaluate page "() => { document.querySelector('input').checked = false; }"
+          assertEqual "unchecked" False =<< isChecked (locate page "input")
+          assertProtocolContains "Not a checkbox or radio button" (isChecked (locate page "div"))
     ]
