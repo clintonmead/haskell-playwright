@@ -728,6 +728,7 @@ module Playwright
   , waitForURL
   , waitForURLWith
   , waitForWorker
+  , armWorkerConsole
   , waitForWorkerConsole
   , waitForServiceWorker
   , waitForWebSocket
@@ -1750,6 +1751,7 @@ import Playwright.Worker
   , serviceWorkers
   , waitForServiceWorker
   , waitForWorker
+  , armWorkerConsole
   , waitForWorkerConsole
   , workerUrl
   , workers

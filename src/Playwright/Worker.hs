@@ -8,6 +8,7 @@ module Playwright.Worker
   , serviceWorkers
   , waitForServiceWorker
   , waitForWorker
+  , armWorkerConsole
   , waitForWorkerConsole
   , workerFromRef
   , workersEqual
@@ -153,9 +154,18 @@ contextFromWorker worker = do
 
 waitForWorkerConsole :: Worker -> Playwright ConsoleMessage
 waitForWorkerConsole worker = do
+  takeMessage <- armWorkerConsole worker
+  takeMessage
+
+-- | Subscribes now and returns the wait for the next console message from this
+-- worker. Use it before the action that logs: messages logged before the
+-- subscription are never sent, and messages sent while no waiter is registered
+-- are buffered for the returned wait.
+armWorkerConsole :: Worker -> Playwright (Playwright ConsoleMessage)
+armWorkerConsole worker = do
   ctx <- contextFromWorker worker
   subscribeBrowserContext ctx BrowserContextUpdateSubscriptionParamsEventConsole
-  waitWithTimeout defaultTimeout collect
+  pure (waitWithTimeout defaultTimeout collect)
   where
     collect = do
       ctx' <- contextFromWorker worker
