@@ -10,9 +10,17 @@ import Data.Maybe
   ( fromMaybe
   , isJust
   )
+import Control.Concurrent
+  ( threadDelay
+  )
+import Control.Monad.IO.Class
+  ( liftIO
+  )
 import Data.Text
-  ( isSuffixOf
+  ( isInfixOf
+  , isSuffixOf
   , pack
+  , toLower
   , unpack
   )
 import Data.Text.Encoding
@@ -36,13 +44,17 @@ import Playwright
   , HeaderValue (HeaderValue)
   , HttpHeader (HttpHeader)
   , HttpMethod (HttpMethod)
+  , RequestFailure (requestFailureText)
   , UrlGlob (UrlGlob)
+  , armRequestFailed
   , continueRoute
   , continueRouteWith
   , defaultContinueOptions
   , defaultGotoOptions
+  , evaluate
   , evaluateText
   , goto
+  , requestFailure
   , requestHeaders
   , responseOk
   , responseUrl
@@ -59,11 +71,19 @@ import Playwright.Harness
   , assertEqual
   , assertFailure
   )
+import UnliftIO.Async
+  ( race
+  )
 import UnliftIO.IORef
   ( IORef
   , modifyIORef'
   , newIORef
   , readIORef
+  )
+import UnliftIO.MVar
+  ( newEmptyMVar
+  , putMVar
+  , takeMVar
   )
 import Test.Tasty
   ( TestTree
@@ -248,7 +268,34 @@ tests =
             _ <- evaluateText page "() => fetch('/sleep.zzz', { method: 'POST', body: 'original' }).then(r => r.text())"
             seen <- readIORef requests
             assertEqual "body" (Just "") (bodyOf "/sleep.zzz" seen)
-
+    , testCase "should not throw if request was cancelled by the page" $
+        withAssets $ \prefix page -> do
+          intercepted <- newEmptyMVar
+          route page (UrlGlob "**/data.json") $ \handled -> putMVar intercepted handled
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          _ <-
+            evaluate
+              page
+              "() => { globalThis.controller = new AbortController(); fetch('/data.json', { signal: globalThis.controller.signal }).catch(() => {}); }"
+          -- Bounded: a route that never fires must fail the test, not hang the run.
+          outcome <- race (liftIO (threadDelay 30000000)) (takeMVar intercepted)
+          case outcome of
+            Left () ->
+              assertFailure "route never intercepted data.json"
+            Right handled -> do
+              takeFailure <- armRequestFailed page
+              _ <- evaluate page "() => globalThis.controller.abort()"
+              failed <- takeFailure
+              failure <- requestFailure failed
+              case failure of
+                Nothing ->
+                  assertFailure "missing failure"
+                Just value ->
+                  assertBool
+                    "cancelled or aborted"
+                    (any (`isInfixOf` toLower (requestFailureText value)) ["cancelled", "aborted"])
+              -- Continuing a route whose request was cancelled must not throw.
+              continueRoute handled
     ]
 
 echoFooHeader :: Application
