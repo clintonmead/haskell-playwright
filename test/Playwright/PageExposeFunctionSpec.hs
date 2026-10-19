@@ -7,6 +7,7 @@ import UnliftIO.Exception
   )
 import Data.Text
   ( isInfixOf
+  , replace
   )
 import UnliftIO.MVar
   ( newEmptyMVar
@@ -130,7 +131,14 @@ tests =
           _ <- reload page
           reached <- liftIO (timeout 10000000 (takeMVar called))
           assertBool "called from the init script" (isJust reached)
-
+    , testCase "should work after cross origin navigation" $
+        withAssets $ \prefix page -> do
+          _ <- exposeFunction page (BindingName "compute") multiply
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          -- localhost is a different origin from 127.0.0.1, and the same server answers both.
+          _ <- goto page (urlFromText (replace "127.0.0.1" "localhost" prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "product" (36 :: Double)
+            =<< evaluateNumber page "async () => window.compute(9, 4)"
     ]
 
 multiply :: [SerializedValue] -> Playwright SerializedArgument
