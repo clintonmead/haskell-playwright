@@ -2,11 +2,26 @@ module Playwright.PageRequestFulfillSpec
   ( tests
   ) where
 
+import Control.Concurrent
+  ( threadDelay
+  )
+import Control.Monad.IO.Class
+  ( liftIO
+  )
 import Data.ByteString.Lazy.Char8 qualified as LBS8
 import Data.Text
   ( Text
+  , isInfixOf
   , isSuffixOf
   , toLower
+  )
+import UnliftIO.Async
+  ( race
+  )
+import UnliftIO.MVar
+  ( newEmptyMVar
+  , putMVar
+  , takeMVar
   )
 import Network.HTTP.Types
   ( status200
@@ -24,6 +39,8 @@ import Playwright
   , HttpHeader (HttpHeader, httpHeaderName, httpHeaderValue)
   , HttpStatus (HttpStatus, httpStatusToInt)
   , UrlGlob (UrlGlob)
+  , RequestFailure (requestFailureText)
+  , armRequestFailed
   , armResponse
   , defaultFulfillOptions
   , defaultGotoOptions
@@ -31,6 +48,7 @@ import Playwright
   , evaluateBool
   , evaluateText
   , fulfillRoute
+  , requestFailure
   , goto
   , requestUrl
   , responseHeaders
@@ -46,6 +64,7 @@ import Playwright.Harness
   , withAssets
   , withChromiumPage
   , withLocalApp
+  , assertBool
   , assertEqual
   , assertFailure
   )
@@ -167,6 +186,34 @@ tests =
             response <- takeResponse
             assertEqual "status" (HttpStatus 201) =<< responseStatus response
             assertEqual "body" "{\"bar\":\"baz\"}" body
+    , testCase "should not throw if request was cancelled by the page" $
+        withAssets $ \prefix page -> do
+          intercepted <- newEmptyMVar
+          route page (UrlGlob "**/data.json") $ \handled -> putMVar intercepted handled
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          _ <-
+            evaluate
+              page
+              "() => { globalThis.controller = new AbortController(); fetch('/data.json', { signal: globalThis.controller.signal }).catch(() => {}); }"
+          -- Bounded: a route that never fires must fail the test, not hang the run.
+          outcome <- race (liftIO (threadDelay 30000000)) (takeMVar intercepted)
+          case outcome of
+            Left () ->
+              assertFailure "route never intercepted data.json"
+            Right handled -> do
+              takeFailure <- armRequestFailed page
+              _ <- evaluate page "() => globalThis.controller.abort()"
+              failed <- takeFailure
+              failure <- requestFailure failed
+              case failure of
+                Nothing ->
+                  assertFailure "missing failure"
+                Just value ->
+                  assertBool
+                    "cancelled or aborted"
+                    (any (`isInfixOf` toLower (requestFailureText value)) ["cancelled", "aborted"])
+              -- Fulfilling a route whose request was cancelled must not throw.
+              fulfillRoute handled defaultFulfillOptions {fulfillStatus = Just (HttpStatus 200)}
     ]
 
 -- | Answers every path with an empty 200, so the page can load.
