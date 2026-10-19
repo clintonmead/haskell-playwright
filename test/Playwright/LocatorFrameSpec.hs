@@ -17,6 +17,8 @@ import Playwright
   , frameLocator
   , fulfillRoute
   , goto
+  , isHidden
+  , isVisible
   , innerText
   , route
   , selectorFromText
@@ -66,6 +68,17 @@ tests =
                 (selectorFromText "button")
           waitFor button WaitForVisible
           assertEqual "nested" "Hello nested iframe" =<< innerText button
+    , testCase "should not wait for frame" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          -- No frame exists, so the locator resolves to nothing and reports hidden at once.
+          let spanLocator = childLocator (frameLocator page (selectorFromText "iframe")) (selectorFromText "span")
+          assertEqual "hidden" True =<< isHidden spanLocator
+    , testCase "should not wait for frame 2" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let spanLocator = childLocator (frameLocator page (selectorFromText "iframe")) (selectorFromText "span")
+          assertEqual "not visible" False =<< isVisible spanLocator
     ]
 
 routeIframe :: Page -> Playwright ()
