@@ -27,8 +27,20 @@ import UnliftIO.Exception
   ( throwIO
   )
 import Data.Aeson
-  ( Value
+  ( Value (String)
   , eitherDecodeStrict
+  , object
+  , (.=)
+  )
+import Data.Aeson.Key qualified as Key
+import Data.ByteString.Char8 qualified as BS8
+import Data.Text
+  ( Text
+  )
+import Data.Text qualified as Text
+import Data.ByteString qualified as ByteString
+import Data.Word
+  ( Word8
   )
 import Data.ByteString
   ( ByteString
@@ -58,9 +70,9 @@ import Playwright.Connection
   , lookupRequestOverrides
   )
 import Playwright.HttpHeader
-  ( HeaderName (HeaderName)
-  , HeaderValue (HeaderValue)
-  , HttpHeader (HttpHeader)
+  ( HeaderName (HeaderName, headerNameToText)
+  , HeaderValue (HeaderValue, headerValueToText)
+  , HttpHeader (HttpHeader, httpHeaderName, httpHeaderValue)
   )
 import Playwright.HttpMethod
   ( HttpMethod (HttpMethod)
@@ -203,15 +215,61 @@ requestPostDataJSON request = do
   case payload of
     Nothing ->
       pure Nothing
-    Just bytes ->
-      case eitherDecodeStrict bytes of
-        Right value ->
-          pure (Just value)
-        Left _ ->
-          throwIO
-            ( DecodeFailure
-                ("POST data is not a valid JSON object: " <> decodeUtf8 bytes)
-            )
+    Just bytes -> do
+      headers <- requestHeaders request
+      if isFormPost headers
+        then pure (Just (formObject bytes))
+        else
+          case eitherDecodeStrict bytes of
+            Right value ->
+              pure (Just value)
+            Left _ ->
+              throwIO
+                ( DecodeFailure
+                    ("POST data is not a valid JSON object: " <> decodeUtf8 bytes)
+                )
+
+-- | Form posts are read as an object of their fields, as the JS client does.
+isFormPost :: [HttpHeader] -> Bool
+isFormPost headers =
+  any
+    (Text.isPrefixOf "application/x-www-form-urlencoded" . Text.toLower . headerValueToText . httpHeaderValue)
+    [header | header <- headers, Text.toLower (headerNameToText (httpHeaderName header)) == "content-type"]
+
+-- | The fields of a urlencoded body. A repeated field keeps its last value.
+formObject :: ByteString -> Value
+formObject bytes =
+  object [Key.fromText name .= String value | (name, value) <- formFields bytes]
+
+formFields :: ByteString -> [(Text, Text)]
+formFields bytes =
+  [ (decode key, decode (BS8.drop 1 rest))
+  | pair <- BS8.split '&' bytes
+  , not (BS8.null pair)
+  , let (key, rest) = BS8.break (== '=') pair
+  ]
+  where
+    decode = formDecode
+
+-- | Decodes one urlencoded name or value: '+' is a space, %XX is a byte.
+formDecode :: ByteString -> Text
+formDecode = decodeUtf8 . ByteString.pack . decodeBytes . ByteString.unpack
+
+decodeBytes :: [Word8] -> [Word8]
+decodeBytes (43 : rest) = 32 : decodeBytes rest
+decodeBytes (37 : high : low : rest)
+  | Just h <- hexDigit high
+  , Just l <- hexDigit low =
+      (h * 16 + l) : decodeBytes rest
+decodeBytes (byte : rest) = byte : decodeBytes rest
+decodeBytes [] = []
+
+hexDigit :: Word8 -> Maybe Word8
+hexDigit byte
+  | byte >= 48 && byte <= 57 = Just (byte - 48)
+  | byte >= 65 && byte <= 70 = Just (byte - 55)
+  | byte >= 97 && byte <= 102 = Just (byte - 87)
+  | otherwise = Nothing
 
 requestHeaders :: Request -> Playwright [HttpHeader]
 requestHeaders request = do
