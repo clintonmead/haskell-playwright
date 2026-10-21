@@ -577,6 +577,29 @@ tests =
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
             assertEqual "server cookie" (Just "foo=bar") . headerOf "/empty.html" "cookie" =<< readIORef requests
             assertEqual "server custom" (Just "value") . headerOf "/empty.html" "custom" =<< readIORef requests
+    , testCase "continue with headers should send fresh cookie after a redirect" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (cookieApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/set-cookie-v1")) defaultGotoOptions
+            assertEqual "document cookie" "foo=v1" =<< evaluateText page "() => document.cookie"
+            route page (UrlMatchGlob "**/fresh-redirect") $ \handled -> do
+              headers <- requestHeaders =<< routeRequest handled
+              continueRouteWith handled defaultContinueOptions {continueHeaders = Just headers}
+            _ <- goto page (urlFromText (prefix <> "/fresh-redirect")) defaultGotoOptions
+            assertEqual "server cookie" (Just "foo=v2") . headerOf "/empty.html" "cookie" =<< readIORef requests
+    , testCase "redirect after continue should be able to delete cookie" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (cookieApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/set-cookie")) defaultGotoOptions
+            assertEqual "document cookie" "foo=bar" =<< evaluateText page "() => document.cookie"
+            route page (UrlMatchGlob "**/delete-redirect") $ \handled -> do
+              headers <- requestHeaders =<< routeRequest handled
+              continueRouteWith handled defaultContinueOptions {continueHeaders = Just headers}
+            _ <- goto page (urlFromText (prefix <> "/delete-redirect")) defaultGotoOptions
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            assertEqual "server cookie" Nothing . headerOf "/empty.html" "cookie" =<< readIORef requests
     , testCase "propagate headers cross origin redirect" $ do
         requests <- newIORef []
         withChromiumPage $ \page ->
@@ -846,6 +869,14 @@ cookieApp requests request respond = do
   case pathInfo request of
     ["set-cookie"] ->
       respond (responseLBS status200 [(hContentType, "text/html"), ("Set-Cookie", "foo=bar;")] LBS8.empty)
+    ["fresh-redirect"] ->
+      respond (responseLBS status302 [("Set-Cookie", "foo=v2;"), (hLocation, "/empty.html")] LBS8.empty)
+    ["delete-redirect"] ->
+      respond (responseLBS status302 [(hLocation, "/delete-cookie")] LBS8.empty)
+    ["delete-cookie"] ->
+      respond (responseLBS status200 [(hContentType, "text/html"), ("Set-Cookie", "foo=bar; expires=Thu, 01 Jan 1970 00:00:00 GMT")] LBS8.empty)
+    ["set-cookie-v1"] ->
+      respond (responseLBS status200 [(hContentType, "text/html"), ("Set-Cookie", "foo=v1;")] LBS8.empty)
     ["set-cookie-redirect"] ->
       respond (responseLBS status302 [("Set-Cookie", "foo=bar;  max-age=36000"), (hLocation, "/empty.html")] LBS8.empty)
     ["redirect"] ->
