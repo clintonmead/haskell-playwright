@@ -7,6 +7,10 @@ import Data.ByteString.Lazy.Char8 qualified as LBS8
 import Data.Maybe
   ( fromMaybe
   )
+import UnliftIO.IORef
+  ( newIORef
+  , readIORef
+  )
 import Data.Text
   ( Text
   , pack
@@ -39,8 +43,10 @@ import Playwright
   , urlFromText
   )
 import Playwright.Harness
-  ( assertBool
+  ( Recorded (recordedHeaders, recordedPath)
+  , assertBool
   , withChromiumBrowser
+  , recordingPageApp
   , withChromiumContextWith
   , assertEqual
   )
@@ -125,6 +131,31 @@ tests =
           secondPage <- newPage second
           assertEqual "first" "1,000,000.5" =<< evaluateText firstPage "() => (1000000.50).toLocaleString()"
           assertBool "second differs" . (/= "1,000,000.5") =<< evaluateText secondPage "() => (1000000.50).toLocaleString()"
+    , testCase "should send user Accept-Language header" $ do
+        requests <- newIORef []
+        withApplication (pure (recordingPageApp requests)) $ \port ->
+          withChromiumContextWith
+            defaultNewContextOptions {newContextLocale = Just (Locale "en-GB")}
+            $ \_ page -> do
+              let
+                base = "http://127.0.0.1:" <> pack (show port)
+              _ <- goto page (urlFromText (base <> "/empty.html")) defaultGotoOptions
+              _ <-
+                evaluateText
+                  page
+                  ( "async () => { await fetch('" <> base <> "/empty.html', {headers: {'Content-Type': 'application/json', 'Accept-Language': 'de'}}); return 'done'; }"
+                  )
+              seenOverride <- readIORef requests
+              assertEqual "override" (Just "de") (lookup "accept-language" . recordedHeaders =<< latestRecorded seenOverride)
+              _ <-
+                evaluateText
+                  page
+                  ( "async () => { await fetch('" <> base <> "/empty.html', {headers: {'Content-Type': 'application/json'}}); return 'done'; }"
+                  )
+              seenDefault <- readIORef requests
+              let
+                defaultHeader = lookup "accept-language" . recordedHeaders =<< latestRecorded seenDefault
+              assertBool "context locale" (maybe False ("en-GB" `BS8.isInfixOf`) defaultHeader)
     ]
 
 echoAcceptLanguage :: Application
@@ -135,3 +166,10 @@ echoAcceptLanguage req respond =
         [(hContentType, BS8.pack "text/plain")]
         (LBS8.fromStrict (fromMaybe BS8.empty (lookup hAcceptLanguage (Wai.requestHeaders req))))
     )
+
+-- | The most recent request to /empty.html, if any.
+latestRecorded :: [Recorded] -> Maybe Recorded
+latestRecorded seen =
+  case filter ((== "/empty.html") . recordedPath) seen of
+    latest : _ -> Just latest
+    [] -> Nothing
