@@ -33,7 +33,12 @@ import Network.HTTP.Types
   )
 import Network.Wai
   ( Application
+  , pathInfo
   , responseLBS
+  )
+import Network.Wai.Application.Static
+  ( defaultFileServerSettings
+  , staticApp
   )
 import Playwright
   ( BrowserContext
@@ -52,6 +57,8 @@ import Playwright
   , abortRoute
   , contextRoute
   , contextRouteWith
+  , armResponse
+  , responseOk
   , Cookie (cookieName, cookieValue)
   , CookieName (cookieNameToText)
   , CookieValue (cookieValueToText)
@@ -101,6 +108,7 @@ import Playwright.Error
   )
 import Playwright.Harness
   ( Recorded (recordedBody, recordedHeaders, recordedMethod, recordedPath)
+  , testAssetsDir
   , recordRequest
   , withChromiumContext
   , withLocalApp
@@ -414,6 +422,24 @@ tests =
                 assertEqual "cookie" (Just "name=value") (lookup "cookie" (recordedHeaders latest))
               [] ->
                 assertFailure "the server saw no request for foo.html"
+    , testCase "should bypass disk cache when context interception is enabled" $ do
+        assets <- testAssetsDir
+        requests <- newIORef []
+        withChromiumContext $ \ctx page ->
+          withLocalApp (apiOrAssetsApp assets requests) $ \prefix -> do
+            contextRoute ctx (UrlMatchGlob "**/api*") continueRoute
+            _ <- goto page (urlFromText (prefix <> "/frames/one-frame.html")) defaultGotoOptions
+            mapM_
+              ( \count -> do
+                  takeResponse <- armResponse page (UrlMatchGlob "**/api")
+                  status <- evaluateText page "async () => String((await fetch('/api')).status)"
+                  assertEqual "status" "200" status
+                  response <- takeResponse
+                  assertEqual "ok" True =<< responseOk response
+                  seen <- readIORef requests
+                  assertEqual "api requests" (count :: Int) (length (filter ((== "/api") . recordedPath) seen))
+              )
+              [1, 2, 3]
     ]
 
 withAssetsContextWithDefault :: (Text -> BrowserContext -> Page -> Playwright a) -> IO a
@@ -439,3 +465,14 @@ recordingPageApp :: IORef [Recorded] -> Application
 recordingPageApp requests request respond = do
   recordRequest requests request
   respond (responseLBS status200 [(hContentType, "text/html")] "")
+
+-- | Answers /api with a cacheable body, recording each call, and serves every
+-- other path from the assets directory.
+apiOrAssetsApp :: FilePath -> IORef [Recorded] -> Application
+apiOrAssetsApp assets requests request respond =
+  case pathInfo request of
+    ["api"] -> do
+      recordRequest requests request
+      respond (responseLBS status200 [(hContentType, "text/plain"), ("Cache-Control", "public, max-age=31536000")] "Hello")
+    _ ->
+      staticApp (defaultFileServerSettings assets) request respond
