@@ -75,6 +75,7 @@ import Playwright
   , evaluateWith
   , fallbackRoute
   , framesEqual
+  , armResponse
   , fulfillRoute
   , requestAllHeaders
   , requestResponse
@@ -495,6 +496,26 @@ tests =
                 assertFailure ("expected ProtocolRpc, got: " <> show err)
               Right _ ->
                 assertFailure "expected the rejected fetch to fail"
+    , testCase "should add Access-Control-Allow-Origin by default when fulfill" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          route page (UrlMatchGlob "**/cars") $ \handled ->
+            fulfillRoute
+              handled
+              defaultFulfillOptions
+                { fulfillStatus = Just (HttpStatus 200)
+                , fulfillContentType = Just (ContentType "application/json")
+                , fulfillBody = Just (FulfillText "[\"electric\", \"gas\"]")
+                }
+          takeResponse <- armResponse page (UrlMatchGlob "https://example.com/cars")
+          result <-
+            evaluateText
+              page
+              "async () => JSON.stringify(await (await fetch('https://example.com/cars', {method: 'POST', headers: {'Content-Type': 'application/json'}, mode: 'cors', body: JSON.stringify({number: 1})})).json())"
+          assertEqual "result" "[\"electric\",\"gas\"]" result
+          response <- takeResponse
+          headers <- responseHeaders response
+          assertEqual "allow origin" (Just prefix) (headerValue "access-control-allow-origin" headers)
     , testCase "should pause intercepted XHR until continue" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
