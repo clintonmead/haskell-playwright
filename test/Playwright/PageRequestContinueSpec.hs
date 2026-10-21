@@ -543,6 +543,34 @@ tests =
             assertEqual "authorization" Nothing . headerOf "/something" "authorization" =<< readIORef requests
             assertEqual "cookie" Nothing . headerOf "/something" "cookie" =<< readIORef requests
             assertEqual "custom" (Just "foo") . headerOf "/something" "custom" =<< readIORef requests
+    , testCase "propagate headers cross origin redirect after interception" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (redirectingCorsCredentialsApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            _ <- evaluateText page "() => { document.cookie = 'a=b'; return document.cookie; }"
+            route page (UrlMatchGlob "**/redirect") $ \handled -> do
+              headers <- requestHeaders =<< routeRequest handled
+              continueRouteWith
+                handled
+                defaultContinueOptions
+                  { continueHeaders =
+                      Just
+                        ( filter (not . hasName "authorization") headers
+                            <> [ HttpHeader (HeaderName "authorization") (HeaderValue "credentials")
+                               , HttpHeader (HeaderName "custom") (HeaderValue "foo")
+                               ]
+                        )
+                  }
+            text <-
+              evaluateText
+                page
+                ( "async () => (await fetch('" <> prefix <> "/redirect', {headers: {authorization: 'none'}, credentials: 'include'})).text()"
+                )
+            assertEqual "text" "done" text
+            assertEqual "authorization" (Just "credentials") . headerOf "/something" "authorization" =<< readIORef requests
+            assertEqual "cookie" Nothing . headerOf "/something" "cookie" =<< readIORef requests
+            assertEqual "custom" (Just "foo") . headerOf "/something" "custom" =<< readIORef requests
     ]
 
 -- | Redirects /redirect to /something, which answers with a body another origin
