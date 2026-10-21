@@ -21,6 +21,8 @@ import Network.Wai
   )
 import Playwright
   ( ElementHandle
+  , addScriptTagOnFrame
+  , evaluateOnFrameText
   , NewContextOptions (newContextBypassCSP)
   , evaluateText
   , newContext
@@ -41,7 +43,8 @@ import Playwright.Error
   ( PlaywrightError
   )
 import Playwright.Harness
-  ( withAssetsWith
+  ( attachFrame
+  , withAssetsWith
   , withLocalApp
   , withLocalApp
   , withChromiumBrowser
@@ -114,6 +117,21 @@ tests =
                   assertEqual "injected" "42" =<< evaluateText page "() => String(window['__injected'])"
               )
               [base, cross]
+    , testCase "should bypass CSP in iframes as well" $
+        withChromiumBrowser $ \browser ->
+          withLocalApp cspInlineApp $ \base -> do
+            plain <- newContext browser
+            plainPage <- newPage plain
+            _ <- goto plainPage (urlFromText (base <> "/empty.html")) defaultGotoOptions
+            plainFrame <- attachFrame plainPage "frame1" (base <> "/csp.html")
+            assertEqual "plain inline" "undefined" =<< evaluateOnFrameText plainFrame "() => String(window['__inlineScriptValue'])"
+            bypassing <- newContextWith browser defaultNewContextOptions {newContextBypassCSP = Just True}
+            bypassingPage <- newPage bypassing
+            _ <- goto bypassingPage (urlFromText (base <> "/empty.html")) defaultGotoOptions
+            bypassingFrame <- attachFrame bypassingPage "frame1" (base <> "/csp.html")
+            assertEqual "bypass inline" "42" =<< evaluateOnFrameText bypassingFrame "() => String(window['__inlineScriptValue'])"
+            _ <- addScriptTagOnFrame bypassingFrame emptyScriptTag {scriptTagContent = Just "window['__injected'] = 42;"}
+            assertEqual "bypass injected" "42" =<< evaluateOnFrameText bypassingFrame "() => String(window['__injected'])"
     ]
 
 -- | Serves a page whose Content-Security-Policy forbids inline scripts, with an

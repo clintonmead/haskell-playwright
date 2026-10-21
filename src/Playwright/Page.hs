@@ -46,6 +46,7 @@ module Playwright.Page
   , mainFrame
   , addInitScript
   , addScriptTag
+  , addScriptTagOnFrame
   , addStyleTag
   , setExtraHTTPHeaders
   , waitForClose
@@ -632,11 +633,15 @@ addInitScript page source = do
   pure ()
 
 addScriptTag :: Page -> ScriptTag -> Playwright ElementHandle
-addScriptTag page tag = do
+addScriptTag page = addScriptTagOnFrame (pageMainFrame page)
+
+-- | Adds a script tag to a frame, as addScriptTag does for the main frame.
+addScriptTagOnFrame :: Frame -> ScriptTag -> Playwright ElementHandle
+addScriptTagOnFrame frame tag = do
   scriptContent <- scriptTagSource tag
   result <-
     frameSend
-      (pageMainFrame page)
+      frame
       "addScriptTag"
       mkFrameAddScriptTagParams
         { frameAddScriptTagParamsContent = scriptContent

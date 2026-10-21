@@ -158,6 +158,7 @@ module Playwright
   , addLocatorHandler
   , addLocatorHandlerWith
   , addScriptTag
+  , addScriptTagOnFrame
   , addStyleTag
   , allInnerTexts
   , allLocators
@@ -1357,6 +1358,7 @@ import Playwright.Page
   ( Page (Page, pageChannel, pageContextChannel, pageMainFrame)
   , addInitScript
   , addScriptTag
+  , addScriptTagOnFrame
   , addStyleTag
   , bringToFront
   , closePage
