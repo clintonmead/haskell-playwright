@@ -27,7 +27,7 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 
 ## Ported `tests/page` with remaining cases
 
-- **page-goto:** bad SSL (and after redirects / cross-origin); `networkidle2` invalid option (typed `LoadState` has no such constructor); Node `process` leak-listener tests; raw main-resource buffer (official Chromium fail); error message that includes HTTPS URL.
+- **page-goto:** bad SSL (and after redirects / cross-origin); `networkidle2` invalid option (typed `LoadState` has no such constructor); Node `process` leak-listener tests; raw main-resource buffer (official Chromium fail); error message that includes HTTPS URL. Already ported under a different name: "should fail when exceeding browser context navigation timeout" is "should fail when exceeding default maximum navigation timeout".
 - **page-autowaiting-no-hang:** first official case needs `httpsServer`. In-flight abort uses Warp throwing `ResourceVanished` (Node `socket.destroy()`).
 - **page-autowaiting-basic:** skip official internal hooks / expect call-log tests. The `waitForLoadState(load)` case timed out once at a6733b2. The lifecycle predicate waiter (f4d5253) fixed the re-arm race behind it. 5 of 5 reruns pass.
 - **page-click:** skip Chromium-fixme fixed-position iframe, Node `__testHook*` navigation/detachment/noAutoWaiting hooks, dblclick trial, and the racy geolocation permission-popup overlay.
