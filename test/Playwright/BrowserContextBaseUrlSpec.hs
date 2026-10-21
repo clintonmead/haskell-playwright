@@ -15,6 +15,8 @@ import Playwright
   , defaultNewContextOptions
   , newContextWith
   , newPage
+  , UrlMatch (UrlMatchGlob)
+  , waitForURL
   , evaluateText
   , goto
   , responseUrl
@@ -152,6 +154,15 @@ tests =
             assertEqual "absolute" (prefix <> "/mypage.html") =<< landedAt page "/mypage.html"
             assertEqual "directory" (prefix <> "/url-construction/") =<< landedAt page "."
             assertEqual "root" (prefix <> "/") =<< landedAt page "/"
+    , testCase "should not construct a new URL with baseURL when a glob was used" $ do
+        requests <- newIORef []
+        withChromiumBrowser $ \browser ->
+          withLocalApp (recordingPageApp requests) $ \prefix -> do
+            context <-
+              newContextWith browser defaultNewContextOptions {newContextBaseURL = Just (urlFromText (prefix <> "/foobar/"))}
+            page <- newPage context
+            _ <- goto page (urlFromText "./kek/index.html") defaultGotoOptions
+            waitForURL page (UrlMatchGlob "**/foobar/kek/index.html")
     ]
 
 expectGotoUrl :: Page -> Text -> Text -> Playwright ()
