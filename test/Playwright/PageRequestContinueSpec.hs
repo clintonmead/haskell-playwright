@@ -20,6 +20,7 @@ import Data.Text
   ( isInfixOf
   , isSuffixOf
   , pack
+  , replace
   , toLower
   , unpack
   )
@@ -34,6 +35,7 @@ import Network.HTTP.Types
   )
 import Network.Wai
   ( Application
+  , Request
   , pathInfo
   , responseLBS
   )
@@ -48,8 +50,8 @@ import Network.Wai.Handler.Warp
 import Playwright
   ( ContinueOptions (continueHeaders, continueMethod, continuePostData, continueUrl)
   , HeaderName (HeaderName, headerNameToText)
-  , HeaderValue (HeaderValue)
-  , HttpHeader (HttpHeader, httpHeaderName)
+  , HeaderValue (HeaderValue, headerValueToText)
+  , HttpHeader (HttpHeader, httpHeaderName, httpHeaderValue)
   , HttpMethod (HttpMethod)
   , RequestFailure (requestFailureText)
   , UrlMatch (UrlMatchGlob)
@@ -404,6 +406,23 @@ tests =
                 assertFailure ("expected ProtocolRpc, got: " <> show err)
               Right () ->
                 assertFailure "expected the override to fail"
+    , testCase "should not delete the origin header" $ do
+        requests <- newIORef []
+        origins <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (corsApp requests) $ \prefix -> do
+            let
+              cross = replace "127.0.0.1" "localhost" prefix
+              isOrigin = (== "origin") . toLower . headerNameToText . httpHeaderName
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            route page (UrlMatchGlob (cross <> "/something")) $ \handled -> do
+              headers <- requestHeaders =<< routeRequest handled
+              modifyIORef' origins (<> [headerValueToText (httpHeaderValue header) | header <- headers, isOrigin header])
+              continueRouteWith handled defaultContinueOptions {continueHeaders = Just (filter (not . isOrigin) headers)}
+            text <- evaluateText page ("async () => (await fetch('" <> cross <> "/something')).text()")
+            assertEqual "text" "done" text
+            assertEqual "intercepted origin" [prefix] =<< readIORef origins
+            assertEqual "server origin" (Just (encodeUtf8 prefix)) . headerOf "/something" "origin" =<< readIORef requests
     ]
 
 -- | Serves a page whose div takes its background from a CSS variable and an
@@ -440,6 +459,11 @@ data Recorded = Recorded
 -- empty page.
 recordingApp :: IORef [Recorded] -> Application
 recordingApp requests request respond = do
+  recordRequest requests request
+  respond (responseLBS status200 [(hContentType, "text/html")] "")
+
+recordRequest :: IORef [Recorded] -> Request -> IO ()
+recordRequest requests request = do
   body <- Wai.strictRequestBody request
   modifyIORef' requests
     ( Recorded
@@ -449,7 +473,12 @@ recordingApp requests request respond = do
         (map (\(name, value) -> (CI.foldedCase name, value)) (Wai.requestHeaders request))
         :
     )
-  respond (responseLBS status200 [(hContentType, "text/html")] "")
+
+-- | Records every request, and answers with a body another origin may read.
+corsApp :: IORef [Recorded] -> Application
+corsApp requests request respond = do
+  recordRequest requests request
+  respond (responseLBS status200 [(hContentType, "text/html"), ("Access-Control-Allow-Origin", "*")] "done")
 
 -- | A header the last request to the path carried.
 headerOf :: BS8.ByteString -> BS8.ByteString -> [Recorded] -> Maybe BS8.ByteString
