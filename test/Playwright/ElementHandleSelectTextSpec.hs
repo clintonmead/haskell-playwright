@@ -2,6 +2,20 @@ module Playwright.ElementHandleSelectTextSpec
   ( tests
   ) where
 
+import Control.Concurrent
+  ( threadDelay
+  )
+import Control.Monad.IO.Class
+  ( liftIO
+  )
+import Data.Maybe
+  ( isNothing
+  )
+import UnliftIO.Async
+  ( poll
+  , wait
+  , withAsync
+  )
 import Playwright
   ( evaluateOnElement
   , evaluateText
@@ -12,7 +26,8 @@ import Playwright
   , selectorFromText
   )
 import Playwright.Harness
-  ( assertProtocolContains
+  ( assertBool
+  , assertProtocolContains
   , requireHandle
   , withAssetPage
   , assertEqual
@@ -56,4 +71,19 @@ tests =
               assertFailure "milliseconds 3000"
             Just timeout ->
               assertProtocolContains "Timeout 3000ms exceeded" (selectTextWith textarea timeout)
+    , testCase "should wait for visible" $
+        withAssetPage "input/textarea.html" $ \page -> do
+          textarea <- requireHandle =<< querySelector page (selectorFromText "textarea")
+          _ <- evaluateOnElement textarea "e => { e.value = 'some value'; e.style.display = 'none'; return true; }"
+          case milliseconds 3000 of
+            Nothing ->
+              assertFailure "milliseconds 3000"
+            Just timeout ->
+              withAsync (selectTextWith textarea timeout) $ \pending -> do
+                liftIO (threadDelay 1000000)
+                finished <- poll pending
+                assertBool "still waiting" (isNothing finished)
+                _ <- evaluateOnElement textarea "e => { e.style.display = 'block'; return true; }"
+                wait pending
+          assertEqual "selected" "some value" =<< evaluateText page "() => window.getSelection().toString()"
     ]
