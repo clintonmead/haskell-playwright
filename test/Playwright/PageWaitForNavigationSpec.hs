@@ -19,12 +19,14 @@ import Network.Wai
   )
 import Playwright
   ( LoadState (LoadStateCommit, LoadStateDomContentLoaded)
-  , UrlMatch (UrlMatchGlob)
-  , WaitForNavigationOptions (waitForNavigationOptionsWaitUntil)
+  , UrlMatch (UrlMatchGlob, UrlMatchRegex)
+  , WaitForNavigationOptions (waitForNavigationOptionsUrl, waitForNavigationOptionsWaitUntil)
+  , waitForNavigationOptions
   , armNavigationOptions
   , click
   , defaultGotoOptions
   , defaultWaitForNavigationOptions
+  , evaluate
   , evaluateTextWith
   , goto
   , milliseconds
@@ -189,6 +191,19 @@ tests =
           assertEqual "forward response" True (isNothing forwardResponse)
           afterForward <- url page
           assertEqual "after forward" (prefix <> "/second.html") (urlToText afterForward)
+    , testCase "should work with url match for same document navigations" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let options = defaultWaitForNavigationOptions {waitForNavigationOptionsUrl = Just (UrlMatchRegex "third\\.html" "")}
+          withAsync (waitForNavigationOptions page options) $ \pending -> do
+            assertStillPending pending
+            _ <- evaluate page "() => { history.pushState({}, '', '/first.html'); }"
+            assertStillPending pending
+            _ <- evaluate page "() => { history.pushState({}, '', '/second.html'); }"
+            assertStillPending pending
+            _ <- evaluate page "() => { history.pushState({}, '', '/third.html'); }"
+            _ <- wait pending
+            pure ()
     ]
 
 -- | Serves a page whose script never finishes until the test releases it.
