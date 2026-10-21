@@ -2,6 +2,9 @@ module Playwright.PageWaitForLoadStateSpec
   ( tests
   ) where
 
+import Data.Maybe
+  ( isNothing
+  )
 import Data.Text
   ( Text
   )
@@ -13,6 +16,12 @@ import Playwright
   , SetContentOptions (setContentOptionsWaitUntil)
   , armLoadEvent
   , armPopup
+  , continueRoute
+  , frames
+  , gotoFrame
+  , route
+  , waitForLoadStateFrame
+  , UrlMatch (UrlMatchGlob)
   , closePage
   , click
   , defaultGotoOptions
@@ -31,7 +40,8 @@ import Playwright
   , waitForLoadStateWith
   )
 import Playwright.Harness
-  ( assertEqual
+  ( assertBool
+  , assertEqual
   , assertFailure
   , locate
   , assertStillPending
@@ -59,7 +69,8 @@ import Control.Monad.IO.Class
   ( liftIO
   )
 import UnliftIO.Async
-  ( race
+  ( poll
+  , race
   , wait
   , withAsync
   )
@@ -207,6 +218,28 @@ tests =
               assertFailure "armed load event hung after the page closed"
             Right failed ->
               assertEqual "failed" True failed
+    , testCase "should work for frame" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/frames/one-frame.html")) defaultGotoOptions
+          allFrames <- frames page
+          case drop 1 allFrames of
+            [] ->
+              assertFailure "expected a child frame"
+            frame : _ -> do
+              requested <- newEmptyMVar
+              route page (UrlMatchGlob (prefix <> "/one-style.css")) $ \handled -> putMVar requested handled
+              _ <-
+                gotoFrame
+                  frame
+                  (urlFromText (prefix <> "/one-style.html"))
+                  defaultGotoOptions {gotoOptionsWaitUntil = Just LoadStateDomContentLoaded}
+              held <- takeMVar requested
+              withAsync (waitForLoadStateFrame frame LoadStateLoad) $ \pending -> do
+                liftIO (threadDelay 500000)
+                finished <- poll pending
+                assertBool "still waiting for the held stylesheet" (isNothing finished)
+                continueRoute held
+                wait pending
     ]
 
 -- | True when the action throws. A hang shows up as the race timing out instead.
