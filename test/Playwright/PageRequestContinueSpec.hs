@@ -74,6 +74,10 @@ import Playwright
   , urlFromText
   , urlToText
   )
+import Playwright.Error
+  ( PlaywrightError (ProtocolRpc)
+  , ProtocolFailure (protocolFailureMessage)
+  )
 import Playwright.Harness
   ( assertBool
   , requireTimeout
@@ -84,8 +88,12 @@ import Playwright.Harness
   , assertEqual
   , assertFailure
   )
+import UnliftIO.Exception
+  ( try
+  )
 import UnliftIO.Async
   ( race
+  , withAsync
   )
 import UnliftIO.IORef
   ( IORef
@@ -377,6 +385,25 @@ tests =
             _ <- goto page (urlFromText (prefix <> "/redirect")) defaultGotoOptions
             seen <- readIORef requests
             assertBool "redirected to the localhost origin" (maybe False ("localhost" `BS8.isPrefixOf`) (headerOf "/final" "host" seen))
+    , testCase "should not allow changing protocol when overriding url" $
+        withAssets $ \prefix page -> do
+          results <- newEmptyMVar
+          route page (UrlMatchGlob "**/*") $ \handled -> do
+            result <-
+              try (continueRouteWith handled defaultContinueOptions {continueUrl = Just (urlFromText "file:///tmp/foo")})
+                :: Playwright (Either PlaywrightError ())
+            putMVar results result
+          withAsync (goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions) $ \_ -> do
+            result <- takeMVar results
+            case result of
+              Left (ProtocolRpc err) ->
+                assertBool
+                  "message"
+                  ("New URL must have same protocol as overridden URL" `isInfixOf` protocolFailureMessage err)
+              Left err ->
+                assertFailure ("expected ProtocolRpc, got: " <> show err)
+              Right () ->
+                assertFailure "expected the override to fail"
     ]
 
 -- | Serves a page whose div takes its background from a CSS variable and an
