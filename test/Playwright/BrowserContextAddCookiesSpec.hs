@@ -17,17 +17,19 @@ import Network.Wai
   , responseLBS
   )
 import Playwright
-  ( Cookie (cookieExpires, cookieHttpOnly, cookieName, cookiePath, cookieSecure, cookieValue)
+  ( Cookie (cookieDomain, cookieExpires, cookieHttpOnly, cookieName, cookiePath, cookieSameSite, cookieSecure, cookieValue)
   , CookieExpires (cookieExpiresToScientific)
   , CookieHttpOnly (cookieHttpOnlyToBool)
   , CookieDomain (CookieDomain)
   , CookieName (CookieName, cookieNameToText)
   , CookiePath (CookiePath, cookiePathToText)
   , CookieSecure (cookieSecureToBool)
+  , CookieToSet (CookieToSet, cookieToSetDomain, cookieToSetExpires, cookieToSetHttpOnly, cookieToSetName, cookieToSetPath, cookieToSetSameSite, cookieToSetSecure, cookieToSetUrl, cookieToSetValue)
   , CookieValue (CookieValue, cookieValueToText)
   , Playwright
   , addCookies
   , clearCookies
+  , cookiesFor
   , cookieForHost
   , cookieForUrl
   , cookies
@@ -255,6 +257,32 @@ tests =
             _ <- goto otherPage (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
             secondSeen <- readIORef requests
             assertEqual "not sent" Nothing . lookup "cookie" . recordedHeaders =<< latestFor "/empty.html" secondSeen
+    , testCase "should default to setting secure cookie for HTTPS websites" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          addCookies (pageContext page) [cookieForUrl (urlFromText "https://example.com") (CookieName "foo") (CookieValue "bar")]
+          jar <- cookiesFor (pageContext page) [urlFromText "https://example.com"]
+          assertEqual "secure" [True] (fmap (cookieSecureToBool . cookieSecure) jar)
+    , testCase "should be able to set unsecure cookie for HTTP website" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          addCookies (pageContext page) [cookieForUrl (urlFromText "http://example.com") (CookieName "foo") (CookieValue "bar")]
+          jar <- cookiesFor (pageContext page) [urlFromText "http://example.com"]
+          assertEqual "secure" [False] (fmap (cookieSecureToBool . cookieSecure) jar)
+    , testCase "should roundtrip cookie" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "document" "username=John Doe"
+            =<< evaluateText
+              page
+              "() => { const date = new Date('1/1/2038'); document.cookie = `username=John Doe;expires=${date.toUTCString()}`; return document.cookie; }"
+          jar <- cookies (pageContext page)
+          clearCookies (pageContext page)
+          assertBool "cleared" . null =<< cookies (pageContext page)
+          addCookies (pageContext page) (fmap cookieToSetFrom jar)
+          jar2 <- cookies (pageContext page)
+          assertEqual "names" (fmap (cookieNameToText . cookieName) jar) (fmap (cookieNameToText . cookieName) jar2)
+          assertEqual "values" (fmap (cookieValueToText . cookieValue) jar) (fmap (cookieValueToText . cookieValue) jar2)
     ]
 
 -- | Records every request. Sets a session cookie on /setsession.html and a
@@ -277,3 +305,17 @@ latestFor path seen =
   case filter ((== path) . recordedPath) seen of
     latest : _ -> pure latest
     [] -> assertFailure ("the server saw no request for " <> show path)
+
+cookieToSetFrom :: Cookie -> CookieToSet
+cookieToSetFrom cookie =
+  CookieToSet
+    { cookieToSetName = cookieName cookie
+    , cookieToSetValue = cookieValue cookie
+    , cookieToSetUrl = Nothing
+    , cookieToSetDomain = Just (cookieDomain cookie)
+    , cookieToSetPath = Just (cookiePath cookie)
+    , cookieToSetExpires = Just (cookieExpires cookie)
+    , cookieToSetHttpOnly = Just (cookieHttpOnly cookie)
+    , cookieToSetSecure = Just (cookieSecure cookie)
+    , cookieToSetSameSite = Just (cookieSameSite cookie)
+    }
