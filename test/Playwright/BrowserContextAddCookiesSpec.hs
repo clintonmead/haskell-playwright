@@ -6,6 +6,16 @@ import Data.Text
   ( isInfixOf
   )
 import Data.Text qualified as Text
+import Data.ByteString.Char8 qualified as BS8
+import Network.HTTP.Types
+  ( hContentType
+  , status200
+  )
+import Network.Wai
+  ( Application
+  , pathInfo
+  , responseLBS
+  )
 import Playwright
   ( Cookie (cookieExpires, cookieHttpOnly, cookieName, cookiePath, cookieSecure, cookieValue)
   , CookieExpires (cookieExpiresToScientific)
@@ -22,6 +32,7 @@ import Playwright
   , cookieForUrl
   , cookies
   , defaultGotoOptions
+  , newPage
   , newContext
   , evaluateOnFrameText
   , evaluateText
@@ -42,11 +53,13 @@ import Playwright.Harness
   , recordingPageApp
   , withAssets
   , withChromiumBrowser
+  , recordRequest
   , withChromiumContext
   , withLocalApp
   )
 import UnliftIO.IORef
-  ( newIORef
+  ( IORef
+  , newIORef
   , readIORef
   )
 import Test.Tasty
@@ -198,4 +211,69 @@ tests =
             jar2 <- cookies other
             assertEqual "lengths" [1, 1] [length jar1, length jar2]
             assertEqual "values" ["page1value", "page2value"] (fmap (cookieValueToText . cookieValue) jar1 <> fmap (cookieValueToText . cookieValue) jar2)
+    , testCase "should isolate session cookies" $ do
+        requests <- newIORef []
+        withChromiumBrowser $ \browser -> do
+          ctx <- newContext browser
+          page <- newPage ctx
+          withLocalApp (setCookieApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/setsession.html")) defaultGotoOptions
+            jar1 <- cookies ctx
+            assertEqual "session" ["value"] (fmap (cookieValueToText . cookieValue) jar1)
+            other <- newContext browser
+            otherPage <- newPage other
+            _ <- goto otherPage (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            jar2 <- cookies other
+            assertEqual "isolated" 0 (length jar2)
+    , testCase "should isolate persistent cookies" $ do
+        requests <- newIORef []
+        withChromiumBrowser $ \browser -> do
+          ctx <- newContext browser
+          page <- newPage ctx
+          withLocalApp (setCookieApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/setpersistent.html")) defaultGotoOptions
+            jar1 <- cookies ctx
+            assertEqual "persistent" ["persistent"] (fmap (cookieNameToText . cookieName) jar1)
+            assertEqual "persistent value" ["persistent-value"] (fmap (cookieValueToText . cookieValue) jar1)
+            other <- newContext browser
+            otherPage <- newPage other
+            _ <- goto otherPage (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            jar2 <- cookies other
+            assertEqual "isolated" 0 (length jar2)
+    , testCase "should isolate send cookie header" $ do
+        requests <- newIORef []
+        withChromiumBrowser $ \browser -> do
+          ctx <- newContext browser
+          withLocalApp (setCookieApp requests) $ \prefix -> do
+            addCookies ctx [cookieForUrl (urlFromText (prefix <> "/empty.html")) (CookieName "sendcookie") (CookieValue "value")]
+            page <- newPage ctx
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            firstSeen <- readIORef requests
+            assertEqual "sent" (Just "sendcookie=value") . lookup "cookie" . recordedHeaders =<< latestFor "/empty.html" firstSeen
+            other <- newContext browser
+            otherPage <- newPage other
+            _ <- goto otherPage (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            secondSeen <- readIORef requests
+            assertEqual "not sent" Nothing . lookup "cookie" . recordedHeaders =<< latestFor "/empty.html" secondSeen
     ]
+
+-- | Records every request. Sets a session cookie on /setsession.html and a
+-- persistent cookie on /setpersistent.html, and answers every path with an
+-- empty page.
+setCookieApp :: IORef [Recorded] -> Application
+setCookieApp requests request respond = do
+  recordRequest requests request
+  case pathInfo request of
+    ["setsession.html"] ->
+      respond (responseLBS status200 [(hContentType, "text/html"), ("Set-Cookie", "session=value")] "")
+    ["setpersistent.html"] ->
+      respond (responseLBS status200 [(hContentType, "text/html"), ("Set-Cookie", "persistent=persistent-value; max-age=3600")] "")
+    _ ->
+      respond (responseLBS status200 [(hContentType, "text/html")] "")
+
+-- | The most recent request to the path, if any.
+latestFor :: BS8.ByteString -> [Recorded] -> Playwright Recorded
+latestFor path seen =
+  case filter ((== path) . recordedPath) seen of
+    latest : _ -> pure latest
+    [] -> assertFailure ("the server saw no request for " <> show path)
