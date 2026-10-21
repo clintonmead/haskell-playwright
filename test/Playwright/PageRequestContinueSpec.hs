@@ -62,6 +62,7 @@ import Playwright
   , Page
   , Playwright
   , defaultGotoOptions
+  , waitForFunction
   , waitForTimeout
   , evaluate
   , evaluateNumber
@@ -423,6 +424,21 @@ tests =
             assertEqual "text" "done" text
             assertEqual "intercepted origin" [prefix] =<< readIORef origins
             assertEqual "server origin" (Just (encodeUtf8 prefix)) . headerOf "/something" "origin" =<< readIORef requests
+    , testCase "should continue preload link requests" $ do
+        requests <- newIORef []
+        assets <- testAssetsDir
+        withChromiumPage $ \page ->
+          withLocalApp (recordingAssetsApp assets requests) $ \prefix -> do
+            route page (UrlMatchGlob "**/one-style.css") $ \handled -> do
+              headers <- requestHeaders =<< routeRequest handled
+              continueRouteWith
+                handled
+                defaultContinueOptions
+                  {continueHeaders = Just (headers <> [HttpHeader (HeaderName "custom") (HeaderValue "value")])}
+            _ <- goto page (urlFromText (prefix <> "/preload.html")) defaultGotoOptions
+            _ <- waitForFunction page "() => window.preloadedStyles"
+            assertEqual "custom header" (Just "value") . headerOf "/one-style.css" "custom" =<< readIORef requests
+            assertEqual "color" "rgb(255, 192, 203)" =<< evaluateText page "() => window.getComputedStyle(document.body).backgroundColor"
     ]
 
 -- | Serves a page whose div takes its background from a CSS variable and an
@@ -479,6 +495,12 @@ corsApp :: IORef [Recorded] -> Application
 corsApp requests request respond = do
   recordRequest requests request
   respond (responseLBS status200 [(hContentType, "text/html"), ("Access-Control-Allow-Origin", "*")] "done")
+
+-- | Records every request, then serves the file from the assets directory.
+recordingAssetsApp :: FilePath -> IORef [Recorded] -> Application
+recordingAssetsApp assets requests request respond = do
+  recordRequest requests request
+  staticApp (defaultFileServerSettings assets) request respond
 
 -- | A header the last request to the path carried.
 headerOf :: BS8.ByteString -> BS8.ByteString -> [Recorded] -> Maybe BS8.ByteString
