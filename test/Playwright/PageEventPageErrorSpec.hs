@@ -6,6 +6,18 @@ import UnliftIO.Async
   ( wait
   , withAsync
   )
+import Data.ByteString.Lazy qualified as LBS
+import Data.Text.Encoding
+  ( encodeUtf8
+  )
+import Network.HTTP.Types
+  ( hContentType
+  , status200
+  )
+import Network.Wai
+  ( Application
+  , responseLBS
+  )
 import Data.Text
   ( Text
   , isInfixOf
@@ -36,6 +48,7 @@ import Playwright.SerializedArgument
 import Playwright.Harness
   ( requireTimeout
   , withAssets
+  , withLocalApp
   , withChromiumPage
   , assertBool
   , assertEqual
@@ -59,6 +72,13 @@ tests =
             err <- wait handle
             assertEqual "name" "Error" (pageErrorName err)
             assertEqual "message" "Fancy error!" (pageErrorMessage err)
+    , testCase "should fire illegal character error" $
+        withChromiumPage $ \page ->
+          withLocalApp illegalCharacterApp $ \prefix ->
+            withAsync (waitForPageError page) $ \handle -> do
+              _ <- goto page (urlFromText (prefix <> "/error.html")) defaultGotoOptions
+              err <- wait handle
+              assertBool "illegal character" ("Invalid or unexpected token" `isInfixOf` pageErrorMessage err)
     , testCase "should contain sourceURL" $
         withAssets $ \prefix page ->
           withAsync (waitForPageError page) $ \handle -> do
@@ -141,3 +161,18 @@ oddValueMessage page value expected = do
   _ <- evaluateWith page "value => { setTimeout(() => { throw value; }, 0); }" value
   err <- waitForPageError page
   assertEqual "message" expected (pageErrorMessage err)
+
+-- | Serves a page whose script has a full-width semicolon, which is an illegal
+-- character, so the page raises a syntax error.
+illegalCharacterApp :: Application
+illegalCharacterApp _ respond =
+  respond
+    ( responseLBS
+        status200
+        [(hContentType, "text/html; charset=utf-8")]
+        (LBS.fromStrict (encodeUtf8 illegalCharacterPage))
+    )
+
+illegalCharacterPage :: Text
+illegalCharacterPage =
+  "<!doctype html>\n<html lang=\"en\">\n<head><meta charset=\"UTF-8\"><title>vite-project</title></head>\n<body>\n<div id=\"app\"></div>\n<script>\n  let a=10；//   !!!note: ； not ;\n</script>\n</body>\n</html>\n"
