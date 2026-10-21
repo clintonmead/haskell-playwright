@@ -2,6 +2,12 @@ module Playwright.BrowserContextRouteSpec
   ( tests
   ) where
 
+import Control.Concurrent
+  ( threadDelay
+  )
+import Control.Monad.IO.Class
+  ( liftIO
+  )
 import UnliftIO.Exception
   ( try
   )
@@ -32,7 +38,8 @@ import Network.Wai
 import Playwright
   ( BrowserContext
   , FulfillBody (FulfillText)
-  , FulfillOptions (fulfillBody)
+  , ContentType (ContentType)
+  , FulfillOptions (fulfillBody, fulfillContentType)
   , HeaderName (headerNameToText)
   , HeaderValue (headerValueToText)
   , HttpHeader (httpHeaderName, httpHeaderValue)
@@ -297,6 +304,20 @@ tests =
                 assertEqual "body" "" (recordedBody latest)
               [] ->
                 assertFailure "the server saw no request"
+    , testCase "should support async handler w/ times" $
+        withAssetsContextWithDefault $ \prefix ctx page -> do
+          contextRouteWith ctx (UrlMatchGlob "**/empty.html") defaultRouteOptions {routeTimes = Just (RouteTimes 1)} $ \handled -> do
+            liftIO (threadDelay 100000)
+            fulfillRoute
+              handled
+              defaultFulfillOptions
+                { fulfillBody = Just (FulfillText "<html>intercepted</html>")
+                , fulfillContentType = Just (ContentType "text/html")
+                }
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "first" "intercepted" =<< evaluateText page "() => document.body.innerText"
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertBool "second" . (/= "intercepted") =<< evaluateText page "() => document.body.innerText"
     ]
 
 withAssetsContextWithDefault :: (Text -> BrowserContext -> Page -> Playwright a) -> IO a
