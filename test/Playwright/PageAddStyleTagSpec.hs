@@ -2,8 +2,23 @@ module Playwright.PageAddStyleTagSpec
   ( tests
   ) where
 
+import Data.Text
+  ( replace
+  )
+import UnliftIO.Exception
+  ( try
+  )
+import Playwright.Error
+  ( PlaywrightError
+  )
 import Playwright
-  ( StyleTag (styleTagContent, styleTagUrl)
+  ( ElementHandle
+  , Playwright
+  , StyleTag (styleTagContent, styleTagUrl)
+  , emptyStyleTag
+  , url
+  , urlFromText
+  , urlToText
   , addStyleTag
   , defaultGotoOptions
   , emptyStyleTag
@@ -14,6 +29,7 @@ import Playwright
 import Playwright.Harness
   ( assertProtocolContains
   , withAssetPage
+  , assertFailure
   , withAssets
   , assertEqual
   )
@@ -63,4 +79,27 @@ tests =
                 page
                 emptyStyleTag {styleTagUrl = Just (urlFromText (prefix <> "/nonexistfile.js"))}
             )
+    , testCase "should throw when added with content to the CSP page" $
+        withAssetPage "csp.html" $ \page -> do
+          result <-
+            try (addStyleTag page emptyStyleTag {styleTagContent = Just "body { background-color: green; }"})
+              :: Playwright (Either PlaywrightError ElementHandle)
+          case result of
+            Left _ ->
+              pure ()
+            Right _ ->
+              assertFailure "expected the inline style to be refused"
+    , testCase "should throw when added with URL to the CSP page" $
+        withAssetPage "csp.html" $ \page -> do
+          here <- urlToText <$> url page
+          let
+            cross = replace "127.0.0.1" "localhost" here <> "/injectedstyle.css"
+          result <-
+            try (addStyleTag page emptyStyleTag {styleTagUrl = Just (urlFromText cross)})
+              :: Playwright (Either PlaywrightError ElementHandle)
+          case result of
+            Left _ ->
+              pure ()
+            Right _ ->
+              assertFailure "expected the linked style to be refused"
     ]
