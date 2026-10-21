@@ -535,6 +535,54 @@ tests =
           response <- takeResponse
           headers <- responseHeaders response
           assertEqual "allow origin" (Just "null") (headerValue "access-control-allow-origin" headers)
+    , testCase "should support cors with POST" $
+        withAssets $ \_ page -> do
+          route page (UrlMatchGlob "**/cars") $ \handled ->
+            fulfillRoute
+              handled
+              defaultFulfillOptions
+                { fulfillStatus = Just (HttpStatus 200)
+                , fulfillContentType = Just (ContentType "application/json")
+                , fulfillHeaders = [HttpHeader (HeaderName "Access-Control-Allow-Origin") (HeaderValue "*")]
+                , fulfillBody = Just (FulfillText "[\"electric\", \"gas\"]")
+                }
+          result <- evaluateText page (postCarsScript "")
+          assertEqual "result" "[\"electric\",\"gas\"]" result
+    , testCase "should support cors with credentials" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          route page (UrlMatchGlob "**/cars") $ \handled ->
+            fulfillRoute
+              handled
+              defaultFulfillOptions
+                { fulfillStatus = Just (HttpStatus 200)
+                , fulfillContentType = Just (ContentType "application/json")
+                , fulfillHeaders =
+                    [ HttpHeader (HeaderName "Access-Control-Allow-Origin") (HeaderValue prefix)
+                    , HttpHeader (HeaderName "Access-Control-Allow-Credentials") (HeaderValue "true")
+                    ]
+                , fulfillBody = Just (FulfillText "[\"electric\", \"gas\"]")
+                }
+          result <- evaluateText page (postCarsScript "credentials: 'include'")
+          assertEqual "result" "[\"electric\",\"gas\"]" result
+    , testCase "should reject cors with disallowed credentials" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          route page (UrlMatchGlob "**/cars") $ \handled ->
+            fulfillRoute
+              handled
+              defaultFulfillOptions
+                { fulfillStatus = Just (HttpStatus 200)
+                , fulfillContentType = Just (ContentType "application/json")
+                , fulfillHeaders = [HttpHeader (HeaderName "Access-Control-Allow-Origin") (HeaderValue prefix)]
+                , fulfillBody = Just (FulfillText "[\"electric\", \"gas\"]")
+                }
+          rejected <- try (evaluateText page (postCarsScript "credentials: 'include'")) :: Playwright (Either PlaywrightError Text)
+          case rejected of
+            Left _ ->
+              pure ()
+            Right _ ->
+              assertFailure "expected the credentialed fetch to be rejected"
     , testCase "should pause intercepted XHR until continue" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
@@ -672,3 +720,11 @@ assertContentTypeOfResponse recorded =
           assertFailure "no response"
         Just value ->
           assertBool "content-type" . isJust . headerValue "content-type" =<< responseHeaders value
+
+-- | A POST to example.com/cars with a JSON body, which resolves to the parsed
+-- JSON, with extra fetch options such as credentials.
+postCarsScript :: Text -> Text
+postCarsScript options =
+  "async () => JSON.stringify(await (await fetch('https://example.com/cars', {method: 'POST', headers: {'Content-Type': 'application/json'}, mode: 'cors', body: JSON.stringify({number: 1}), "
+    <> options
+    <> "})).json())"
