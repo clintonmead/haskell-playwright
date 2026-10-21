@@ -5,7 +5,18 @@ module Playwright.BrowserContextNetworkEventSpec
 import Data.ByteString
   ( ByteString
   )
+import Data.ByteString.Builder qualified as B
 import Data.ByteString.Lazy qualified as LBS
+import Control.Concurrent
+  ( threadDelay
+  )
+import UnliftIO.Async
+  ( wait
+  , withAsync
+  )
+import UnliftIO.Exception
+  ( try
+  )
 import Data.Text
   ( Text
   , isInfixOf
@@ -20,10 +31,17 @@ import Network.Wai
   ( Application
   , pathInfo
   , responseLBS
+  , responseStream
   , responseRaw
   )
 import Playwright
   ( LoadState (LoadStateLoad)
+  , Playwright
+  , UrlMatch (UrlMatchGlob)
+  , armResponse
+  , closeContext
+  , evaluateText
+  , responseFinished
   , Request
   , RequestFailure (requestFailureText)
   , ResourceType (resourceTypeToText)
@@ -67,16 +85,16 @@ import Playwright.Harness
   , assertEqual
   , assertFailure
   )
+import Playwright.Error
+  ( PlaywrightError (ProtocolRpc)
+  , ProtocolFailure (protocolFailureMessage)
+  )
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
   ( testCase
-  )
-import UnliftIO.Async
-  ( wait
-  , withAsync
   )
 import UnliftIO.IORef
   ( modifyIORef'
@@ -202,6 +220,23 @@ tests =
             _ <- wait pending
             pure ()
           assertEqual "order" ["request", "response", "requestfinished"] =<< readIORef events
+    , testCase "should reject response.finished if context closes" $
+        withChromiumContext $ \ctx page ->
+          withLocalApp streamingGetApp $ \base -> do
+            _ <- goto page (urlFromText (base <> "/empty.html")) defaultGotoOptions
+            takeResponse <- armResponse page (UrlMatchGlob "**/get")
+            _ <- evaluateText page "() => { fetch('./get'); return 'sent'; }"
+            response <- takeResponse
+            withAsync (try (responseFinished response)) $ \finishing -> do
+              closeContext ctx
+              result <- wait finishing :: Playwright (Either PlaywrightError ())
+              case result of
+                Left (ProtocolRpc failure) ->
+                  assertBool "closed" ("closed" `isInfixOf` protocolFailureMessage failure)
+                Left err ->
+                  assertFailure ("expected ProtocolRpc, got: " <> show err)
+                Right _ ->
+                  assertFailure "expected response.finished to fail"
     ]
 
 failedCssApp :: ByteString -> Application
@@ -213,3 +248,22 @@ failedCssApp html request respond =
       respond (responseRaw (\_ _ -> pure ()) (responseLBS status500 [] ""))
     _ ->
       respond (responseLBS status404 [] "")
+
+-- | Answers /get with the start of a body and then waits, so the response never
+-- finishes. Every other path answers with an empty page.
+streamingGetApp :: Application
+streamingGetApp request respond =
+  case pathInfo request of
+    ["get"] ->
+      respond
+        ( responseStream
+            status200
+            [(hContentType, "text/plain; charset=utf-8")]
+            ( \write flush -> do
+                write (B.byteString "hello ")
+                flush
+                threadDelay 30000000
+            )
+        )
+    _ ->
+      respond (responseLBS status200 [(hContentType, "text/html")] "")
