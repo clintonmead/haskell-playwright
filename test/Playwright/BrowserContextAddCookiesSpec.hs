@@ -23,7 +23,7 @@ import Playwright
   ( Cookie (cookieDomain, cookieExpires, cookieHttpOnly, cookieName, cookiePath, cookieSameSite, cookieSecure, cookieValue)
   , CookieExpires (cookieExpiresToScientific)
   , CookieHttpOnly (cookieHttpOnlyToBool)
-  , CookieDomain (CookieDomain)
+  , CookieDomain (CookieDomain, cookieDomainToText)
   , CookieName (CookieName, cookieNameToText)
   , CookiePath (CookiePath, cookiePathToText)
   , CookieSecure (cookieSecureToBool)
@@ -300,6 +300,15 @@ tests =
             ]
           jar <- cookiesFor (pageContext page) [urlFromText "https://foo.com"]
           assertEqual "names" ["same-site-lax", "same-site-strict", "same-site-unset"] (sort (fmap (cookieNameToText . cookieName) jar))
+    , testCase "should set a cookie on a different domain" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          addCookies (pageContext page) [cookieForUrl (urlFromText "https://www.example.com") (CookieName "example-cookie") (CookieValue "best")]
+          assertEqual "page" "" =<< evaluateText page "() => document.cookie"
+          jar <- cookiesFor (pageContext page) [urlFromText "https://www.example.com"]
+          assertEqual "names" ["example-cookie"] (fmap (cookieNameToText . cookieName) jar)
+          assertEqual "domains" ["www.example.com"] (fmap (cookieDomainToText . cookieDomain) jar)
+          assertEqual "secure" [True] (fmap (cookieSecureToBool . cookieSecure) jar)
     ]
 
 -- | Records every request. Sets a session cookie on /setsession.html and a
