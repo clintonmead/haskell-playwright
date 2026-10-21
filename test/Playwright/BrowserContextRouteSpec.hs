@@ -100,7 +100,7 @@ import Playwright.Error
   ( PlaywrightError
   )
 import Playwright.Harness
-  ( Recorded (recordedBody, recordedMethod)
+  ( Recorded (recordedBody, recordedHeaders, recordedMethod, recordedPath)
   , recordRequest
   , withChromiumContext
   , withLocalApp
@@ -392,6 +392,28 @@ tests =
           _ <- goto page (urlFromText "http://example.com") defaultGotoOptions
           jar <- cookies ctx
           assertBool "no cookies" (null jar)
+    , testCase "should use Set-Cookie header in future requests" $ do
+        requests <- newIORef []
+        withChromiumContext $ \ctx page ->
+          withLocalApp (recordingPageApp requests) $ \prefix -> do
+            route page (UrlMatchGlob (prefix <> "/empty.html")) $ \handled ->
+              fulfillRoute
+                handled
+                defaultFulfillOptions
+                  { fulfillHeaders = [HttpHeader (HeaderName "Set-Cookie") (HeaderValue "name=value")]
+                  , fulfillContentType = Just (ContentType "text/html")
+                  , fulfillBody = Just (FulfillText "done")
+                  }
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            jar <- cookies ctx
+            assertEqual "names" ["name"] (fmap (cookieNameToText . cookieName) jar)
+            _ <- goto page (urlFromText (prefix <> "/foo.html")) defaultGotoOptions
+            seen <- readIORef requests
+            case filter ((== "/foo.html") . recordedPath) seen of
+              latest : _ ->
+                assertEqual "cookie" (Just "name=value") (lookup "cookie" (recordedHeaders latest))
+              [] ->
+                assertFailure "the server saw no request for foo.html"
     ]
 
 withAssetsContextWithDefault :: (Text -> BrowserContext -> Page -> Playwright a) -> IO a
