@@ -78,6 +78,17 @@ import Playwright
   , framesEqual
   , armResponse
   , fulfillRoute
+  , ContinueOptions (continueHeaders)
+  , CookieName (CookieName)
+  , CookieValue (CookieValue)
+  , addCookies
+  , cookieForUrl
+  , continueRouteWith
+  , defaultContinueOptions
+  , pageContext
+  , reload
+  , responseOk
+  , setExtraHTTPHeaders
   , requestAllHeaders
   , requestResponse
   , responseHeaders
@@ -92,7 +103,6 @@ import Playwright
   , requestRedirectedFrom
   , requestResourceType
   , requestUrl
-  , responseOk
   , responseRequest
   , responseUrl
   , route
@@ -110,7 +120,7 @@ import Playwright.Error
   , ProtocolFailure (protocolFailureMessage)
   )
 import Playwright.Harness
-  ( Recorded (recordedMethod, recordedPath)
+  ( Recorded (recordedHeaders, recordedMethod, recordedPath)
   , recordRequest
   , assertBool
   , assertEqual
@@ -657,6 +667,63 @@ tests =
             assertEqual "texts" "[\"Hello\",\"World\"]" texts
             seen <- readIORef requests
             assertEqual "requests" [("OPTIONS", "/something"), ("GET", "/something")] (map (\request -> (recordedMethod request, recordedPath request)) (reverse seen))
+    , testCase "should properly return navigation response when URL has cookies" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          addCookies
+            (pageContext page)
+            [cookieForUrl (urlFromText (prefix <> "/empty.html")) (CookieName "foo") (CookieValue "bar")]
+          route page (UrlMatchGlob "**/*") continueRoute
+          response <- reload page
+          case response of
+            Nothing ->
+              assertFailure "missing response"
+            Just value ->
+              assertEqual "ok" True =<< responseOk value
+    , testCase "should not override cookie header" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (recordingOkApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            _ <- evaluateText page "() => { document.cookie = 'original=value'; return document.cookie; }"
+            seen <- newIORef Nothing
+            route page (UrlMatchGlob "**") $ \handled -> do
+              request <- routeRequest handled
+              headers <- requestAllHeaders request
+              writeIORef seen (headerValue "cookie" headers)
+              continueRouteWith
+                handled
+                defaultContinueOptions
+                  { continueHeaders =
+                      Just
+                        ( filter ((/= "cookie") . toLower . headerNameToText . httpHeaderName) headers
+                            <> [HttpHeader (HeaderName "cookie") (HeaderValue "overridden=value")]
+                        )
+                  }
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            assertEqual "route cookie" (Just "original=value") =<< readIORef seen
+            recorded <- readIORef requests
+            case recorded of
+              latest : _ ->
+                assertEqual "server cookie" (Just "original=value") (lookup "cookie" (recordedHeaders latest))
+              [] ->
+                assertFailure "the server saw no request"
+    , testCase "should show custom HTTP headers" $
+        withAssets $ \prefix page -> do
+          setExtraHTTPHeaders page [HttpHeader (HeaderName "foo") (HeaderValue "bar")]
+          seen <- newIORef Nothing
+          route page (UrlMatchGlob "**/*") $ \handled -> do
+            request <- routeRequest handled
+            headers <- requestHeaders request
+            writeIORef seen (headerValue "foo" headers)
+            continueRoute handled
+          response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "foo" (Just "bar") =<< readIORef seen
+          case response of
+            Nothing ->
+              assertFailure "missing response"
+            Just value ->
+              assertEqual "ok" True =<< responseOk value
     , testCase "should pause intercepted XHR until continue" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
@@ -826,3 +893,9 @@ optionsApp requests request respond = do
             "Hello"
         )
     else respond (responseLBS status200 [("Access-Control-Allow-Origin", "*")] "World")
+
+-- | Records every request, and answers with an empty page.
+recordingOkApp :: IORef [Recorded] -> Application
+recordingOkApp requests request respond = do
+  recordRequest requests request
+  respond (responseLBS status200 [(hContentType, "text/html")] "")
