@@ -32,6 +32,7 @@ import Data.Text.Encoding
 import Network.HTTP.Types
   ( hContentType
   , status204
+  , status301
   , hLocation
   , status302
   , status200
@@ -527,6 +528,21 @@ tests =
             assertEqual "text" "done" text
             assertEqual "authorization" (Just "credentials") . headerOf "/something" "authorization" =<< readIORef requests
             assertEqual "custom" (Just "foo") . headerOf "/something" "custom" =<< readIORef requests
+    , testCase "propagate headers cross origin redirect" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (redirectingCorsCredentialsApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            _ <- evaluateText page "() => { document.cookie = 'a=b'; return document.cookie; }"
+            text <-
+              evaluateText
+                page
+                ( "async () => (await fetch('" <> prefix <> "/redirect', {headers: {authorization: 'credentials', custom: 'foo'}, credentials: 'include'})).text()"
+                )
+            assertEqual "text" "done" text
+            assertEqual "authorization" Nothing . headerOf "/something" "authorization" =<< readIORef requests
+            assertEqual "cookie" Nothing . headerOf "/something" "cookie" =<< readIORef requests
+            assertEqual "custom" (Just "foo") . headerOf "/something" "custom" =<< readIORef requests
     ]
 
 -- | Redirects /redirect to /something, which answers with a body another origin
@@ -731,3 +747,16 @@ otherOrigin host
   | "127.0.0.1" `BS8.isPrefixOf` host = "localhost" <> BS8.drop 9 host
   | "localhost" `BS8.isPrefixOf` host = "127.0.0.1" <> BS8.drop 9 host
   | otherwise = host
+
+-- | Redirects /redirect with a 301 to /something on the other origin. Every other
+-- request goes to 'corsCredentialsApp'.
+redirectingCorsCredentialsApp :: IORef [Recorded] -> Application
+redirectingCorsCredentialsApp requests request respond =
+  case pathInfo request of
+    ["redirect"] -> do
+      recordRequest requests request
+      respond (responseLBS status301 [(hLocation, "http://" <> otherOrigin host <> "/something")] LBS8.empty)
+    _ ->
+      corsCredentialsApp requests request respond
+  where
+    host = fromMaybe BS8.empty (lookup "host" (Wai.requestHeaders request))
