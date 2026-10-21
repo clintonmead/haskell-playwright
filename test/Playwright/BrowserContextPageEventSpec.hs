@@ -49,6 +49,7 @@ import Playwright.Harness
   )
 import UnliftIO.IORef
   ( IORef
+  , writeIORef
   , modifyIORef'
   , newIORef
   , readIORef
@@ -186,17 +187,21 @@ tests =
         withChromiumContext $ \ctx _ ->
           withLocalApp (recordingPageApp requests) $ \prefix -> do
             events <- newIORef []
+            -- The close listener reads the URL recorded after goto, because asking
+            -- a page that is closing for its URL can fail and drop the event.
+            lastUrl <- newIORef ""
             onContextPage ctx $ \created -> do
               createdUrl <- urlToText <$> url created
               modifyIORef' events (<> ["CREATED: " <> createdUrl])
               onPageClose created $ do
-                closedUrl <- urlToText <$> url created
+                closedUrl <- readIORef lastUrl
                 modifyIORef' events (<> ["DESTROYED: " <> closedUrl])
             page <- newPage ctx
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            writeIORef lastUrl =<< urlToText <$> url page
             closePage page
             assertEqual "events" ["CREATED: about:blank", "DESTROYED: " <> prefix <> "/empty.html"]
-              =<< awaitEvents events ["CREATED: about:blank", "DESTROYED: " <> prefix <> "/empty.html"] 100
+              =<< awaitEvents events ["CREATED: about:blank", "DESTROYED: " <> prefix <> "/empty.html"] 200
     ]
 
 -- | Polls the recorded events until they match the expected list, or the
