@@ -401,6 +401,7 @@ module Playwright
   , focus
   , focusHandle
   , frameByName
+  , frameByUrl
   , frameContent
   , frameElement
   , frameLocator
@@ -1410,6 +1411,7 @@ import Playwright.Page
   , onPageClose
   , onPageCrash
   , frameByName
+  , frameByUrl
   , frames
   , mainFrame
   )

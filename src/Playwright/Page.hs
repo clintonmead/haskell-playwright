@@ -40,6 +40,7 @@ module Playwright.Page
   , querySelectorStrict
   , setViewportSize
   , frameByName
+  , frameByUrl
   , frameLocator
   , frames
   , mainFrame
@@ -69,6 +70,12 @@ import Playwright.Monad
 import UnliftIO.Exception
   ( try
   , throwIO
+  )
+import Control.Monad
+  ( filterM
+  )
+import Data.Maybe
+  ( listToMaybe
   )
 import Data.List
   ( find
@@ -260,6 +267,10 @@ import Playwright.Selector
   )
 import Playwright.Timeout
   ( Timeout
+  )
+import Playwright.UrlMatch
+  ( UrlMatch
+  , matchesUrlMatch
   )
 import Playwright.Url
   ( Url
@@ -695,6 +706,13 @@ frameByName page name = do
       frameName <- currentName frame
       pure (frame, frameName)
 
+
+-- | The first frame whose URL matches, searching the main frame and its children.
+frameByUrl :: Page -> UrlMatch -> Playwright (Maybe Frame)
+frameByUrl page match = do
+  allFrames <- frames page
+  matching <- filterM (\frame -> matchesUrlMatch match <$> currentUrl frame) allFrames
+  pure (listToMaybe matching)
 
 subscribeContext :: Page -> BrowserContextUpdateSubscriptionParamsEvent -> Playwright ()
 subscribeContext page event = do

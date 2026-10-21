@@ -26,7 +26,10 @@ import Playwright
   , evaluateOnFrameText
   , evaluateText
   , frameByName
+  , frameByUrl
+  , UrlMatch (UrlMatchRegex)
   , frames
+  , currentUrl
   , framesEqual
   , goto
   , locatorOnFrame
@@ -161,6 +164,13 @@ tests =
               assertEqual "same frame" True (framesEqual frame child)
             _ ->
               assertFailure "expected the named frame"
+    , testCase "page.frame should respect url" $
+        withChromiumPage $ \page -> do
+          setContent page "<iframe src=\"about:blank\"></iframe>"
+          missing <- frameByUrl page (UrlMatchRegex "bogus" "")
+          assertEqual "bogus" True (isNothing missing)
+          found <- frameByUrl page (UrlMatchRegex "blank" "")
+          assertEqual "blank" (Just "about:blank") . fmap urlToText =<< traverse currentUrl found
     ]
 
 -- | Opens a popup with the script and returns it once it exists.
