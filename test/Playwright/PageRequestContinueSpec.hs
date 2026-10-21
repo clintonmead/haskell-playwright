@@ -600,6 +600,21 @@ tests =
             _ <- goto page (urlFromText (prefix <> "/delete-redirect")) defaultGotoOptions
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
             assertEqual "server cookie" Nothing . headerOf "/empty.html" "cookie" =<< readIORef requests
+    , testCase "propagate headers same origin redirect" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (sameOriginRedirectCredentialsApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            _ <- evaluateText page "() => { document.cookie = 'a=b'; return document.cookie; }"
+            text <-
+              evaluateText
+                page
+                ( "async () => (await fetch('" <> prefix <> "/redirect', {headers: {authorization: 'credentials', custom: 'foo'}, credentials: 'include'})).text()"
+                )
+            assertEqual "text" "done" text
+            assertEqual "authorization" (Just "credentials") . headerOf "/something" "authorization" =<< readIORef requests
+            assertEqual "cookie" (Just "a=b") . headerOf "/something" "cookie" =<< readIORef requests
+            assertEqual "custom" (Just "foo") . headerOf "/something" "custom" =<< readIORef requests
     , testCase "propagate headers cross origin redirect" $ do
         requests <- newIORef []
         withChromiumPage $ \page ->
@@ -883,3 +898,14 @@ cookieApp requests request respond = do
       respond (responseLBS status302 [(hLocation, "/empty.html")] LBS8.empty)
     _ ->
       respond (responseLBS status200 [(hContentType, "text/html")] LBS8.empty)
+
+-- | Redirects /redirect to /something on the same origin. Every other request goes
+-- to 'corsCredentialsApp'.
+sameOriginRedirectCredentialsApp :: IORef [Recorded] -> Application
+sameOriginRedirectCredentialsApp requests request respond =
+  case pathInfo request of
+    ["redirect"] -> do
+      recordRequest requests request
+      respond (responseLBS status302 [(hLocation, "/something")] LBS8.empty)
+    _ ->
+      corsCredentialsApp requests request respond
