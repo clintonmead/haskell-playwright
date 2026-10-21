@@ -20,6 +20,13 @@ import Playwright.Error
   )
 import Playwright
   ( BrowserContext
+  , FulfillBody (FulfillText)
+  , FulfillOptions (fulfillBody)
+  , UrlMatch (UrlMatchGlob)
+  , defaultFulfillOptions
+  , fulfillRoute
+  , newPage
+  , route
   , NewContextOptions (newContextStorageState)
   , OriginStorageState (OriginStorageState)
   , StorageItem (StorageItem)
@@ -140,6 +147,27 @@ tests =
               assertFailure ("expected ProtocolRpc, got: " <> show err)
             Right _ ->
               assertFailure "expected the storage state to be refused"
+    , testCase "should not restore localStorage twice" $
+        withChromiumBrowser $ \browser -> do
+          context <-
+            newContextWith
+              browser
+              defaultNewContextOptions
+                { newContextStorageState =
+                    Just
+                      ( StorageState
+                          []
+                          [OriginStorageState (urlFromText "https://www.example.com") [StorageItem (StorageName "name1") (StorageValue "value1")]]
+                      )
+                }
+          page <- newPage context
+          route page (UrlMatchGlob "**/*") $ \handled ->
+            fulfillRoute handled defaultFulfillOptions {fulfillBody = Just (FulfillText "<html></html>")}
+          _ <- goto page (urlFromText "https://www.example.com") defaultGotoOptions
+          assertEqual "first" "value1" =<< evaluateText page "() => localStorage.getItem('name1')"
+          _ <- evaluateText page "() => { localStorage.setItem('name1', 'value2'); return 'set'; }"
+          _ <- goto page (urlFromText "https://www.example.com") defaultGotoOptions
+          assertEqual "second" "value2" =<< evaluateText page "() => localStorage.getItem('name1')"
     ]
 
 seeded :: StorageState
