@@ -39,7 +39,7 @@ import Playwright
   ( BrowserContext
   , FulfillBody (FulfillText)
   , ContentType (ContentType)
-  , FulfillOptions (fulfillBody, fulfillContentType)
+  , FulfillOptions (fulfillBody, fulfillContentType, fulfillHeaders)
   , HeaderName (headerNameToText)
   , HeaderValue (headerValueToText)
   , HttpHeader (httpHeaderName, httpHeaderValue)
@@ -52,6 +52,13 @@ import Playwright
   , abortRoute
   , contextRoute
   , contextRouteWith
+  , Cookie (cookieName, cookieValue)
+  , CookieName (cookieNameToText)
+  , CookieValue (cookieValueToText)
+  , HeaderName (HeaderName)
+  , HeaderValue (HeaderValue)
+  , HttpHeader (HttpHeader)
+  , cookies
   , continueRoute
   , currentUrl
   , defaultFulfillOptions
@@ -358,6 +365,33 @@ tests =
             fallbackRoute handled
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           assertEqual "order" [3, 2, 1] =<< readIORef intercepted
+    , testCase "should support Set-Cookie header" $
+        withChromiumContext $ \ctx page -> do
+          route page (UrlMatchGlob "https://example.com/") $ \handled ->
+            fulfillRoute
+              handled
+              defaultFulfillOptions
+                { fulfillHeaders = [HttpHeader (HeaderName "Set-Cookie") (HeaderValue "name=value; domain=.example.com; Path=/")]
+                , fulfillContentType = Just (ContentType "text/html")
+                , fulfillBody = Just (FulfillText "done")
+                }
+          _ <- goto page (urlFromText "https://example.com") defaultGotoOptions
+          jar <- cookies ctx
+          assertEqual "names" ["name"] (fmap (cookieNameToText . cookieName) jar)
+          assertEqual "values" ["value"] (fmap (cookieValueToText . cookieValue) jar)
+    , testCase "should ignore secure Set-Cookie header for insecure requests" $
+        withChromiumContext $ \ctx page -> do
+          route page (UrlMatchGlob "http://example.com/") $ \handled ->
+            fulfillRoute
+              handled
+              defaultFulfillOptions
+                { fulfillHeaders = [HttpHeader (HeaderName "Set-Cookie") (HeaderValue "name=value; domain=.example.com; Path=/; Secure")]
+                , fulfillContentType = Just (ContentType "text/html")
+                , fulfillBody = Just (FulfillText "done")
+                }
+          _ <- goto page (urlFromText "http://example.com") defaultGotoOptions
+          jar <- cookies ctx
+          assertBool "no cookies" (null jar)
     ]
 
 withAssetsContextWithDefault :: (Text -> BrowserContext -> Page -> Playwright a) -> IO a
