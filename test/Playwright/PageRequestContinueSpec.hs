@@ -73,6 +73,8 @@ import Playwright
   , requestFailure
   , requestHeaders
   , requestUrl
+  , requestAllHeaders
+  , fallbackRouteWith
   , url
   , onRequest
   , onRequestFailed
@@ -478,7 +480,57 @@ tests =
                 assertEqual "events" ["request", "response", "requestfinished"] =<< readIORef events
                 failure <- requestFailure =<< responseRequest value
                 assertBool "no failure" (isNothing failure)
+    , testCase "redirected requests should report overridden headers" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (redirectingApp requests) $ \prefix -> do
+            route page (UrlMatchGlob "**/redirect") $ \handled -> do
+              headers <- requestHeaders =<< routeRequest handled
+              fallbackRouteWith
+                handled
+                defaultContinueOptions
+                  {continueHeaders = Just (headers <> [HttpHeader (HeaderName "custom") (HeaderValue "value")])}
+            response <- goto page (urlFromText (prefix <> "/redirect")) defaultGotoOptions
+            case response of
+              Nothing ->
+                assertFailure "missing response"
+              Just value -> do
+                assertEqual "server custom" (Just "value") . headerOf "/empty.html" "custom" =<< readIORef requests
+                request <- responseRequest value
+                assertEqual "url" (prefix <> "/empty.html") . urlToText =<< requestUrl request
+                assertBool "custom header" . any (headerIs "custom" "value") =<< requestHeaders request
+                assertBool "all headers" . any (headerIs "custom" "value") =<< requestAllHeaders request
+    , testCase "continue should delete headers on redirects" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (redirectingCorsApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            route page (UrlMatchGlob "**/redirect") $ \handled -> do
+              headers <- requestHeaders =<< routeRequest handled
+              continueRouteWith handled defaultContinueOptions {continueHeaders = Just (filter (not . hasName "foo") headers)}
+            text <- evaluateText page ("async () => (await fetch('" <> prefix <> "/redirect', {headers: {foo: 'a'}})).text()")
+            assertEqual "text" "done" text
+            assertEqual "server foo" Nothing . headerOf "/something" "foo" =<< readIORef requests
     ]
+
+-- | Redirects /redirect to /something, which answers with a body another origin
+-- may read. Every request is recorded.
+redirectingCorsApp :: IORef [Recorded] -> Application
+redirectingCorsApp requests request respond = do
+  recordRequest requests request
+  case pathInfo request of
+    ["redirect"] ->
+      respond (responseLBS status302 [(hLocation, "/something")] LBS8.empty)
+    _ ->
+      respond (responseLBS status200 [(hContentType, "text/plain"), ("Access-Control-Allow-Origin", "*")] "done")
+
+hasName :: Text -> HttpHeader -> Bool
+hasName name header =
+  toLower (headerNameToText (httpHeaderName header)) == name
+
+headerIs :: Text -> Text -> HttpHeader -> Bool
+headerIs name value header =
+  hasName name header && headerValueToText (httpHeaderValue header) == value
 
 -- | Serves a page with a Cross-Origin-Opener-Policy header, recording requests.
 coopApp :: IORef [Recorded] -> Application
