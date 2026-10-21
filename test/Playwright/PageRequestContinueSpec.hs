@@ -135,7 +135,8 @@ tests =
                 page
                 (urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/empty.html"))
                 defaultGotoOptions
-            assertEqual "foo" "bar" =<< evaluateText page "() => document.body.innerText"    , testCase "should amend method" $ do
+            assertEqual "foo" "bar" =<< evaluateText page "() => document.body.innerText"
+    , testCase "should amend method" $ do
         requests <- newIORef []
         withChromiumPage $ \page ->
           withLocalApp (recordingApp requests) $ \prefix -> do
