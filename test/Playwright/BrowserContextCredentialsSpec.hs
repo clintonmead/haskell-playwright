@@ -13,6 +13,10 @@ import Network.HTTP.Types
   , status200
   , status401
   )
+import Network.Wai.Application.Static
+  ( defaultFileServerSettings
+  , staticApp
+  )
 import Network.Wai
   ( Application
   , responseLBS
@@ -30,6 +34,7 @@ import Playwright
   , Response
   , defaultGotoOptions
   , defaultNewContextOptions
+  , evaluateText
   , goto
   , reload
   , responseStatus
@@ -38,7 +43,8 @@ import Playwright
   , Playwright
   )
 import Playwright.Harness
-  ( withChromiumContextWith
+  ( testAssetsDir
+  , withChromiumContextWith
   , assertEqual
   , assertFailure
   )
@@ -111,6 +117,19 @@ tests =
                   (urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/empty.html"))
                   defaultGotoOptions
               assertEqual "status" 401 =<< statusCode response
+    , testCase "should return resource body" $ do
+        assets <- testAssetsDir
+        withApplication (pure (authAssetsApp assets "Basic dXNlcjpwYXNz")) $ \port ->
+          withChromiumContextWith
+            defaultNewContextOptions {newContextHttpCredentials = Just validCredentials}
+            $ \_ page -> do
+              response <-
+                goto
+                  page
+                  (urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/playground.html"))
+                  defaultGotoOptions
+              assertEqual "status" 200 =<< statusCode response
+              assertEqual "title" "Playground" =<< evaluateText page "() => document.title"
     ]
 
 validCredentials :: HttpCredentials
@@ -152,3 +171,19 @@ basicAuthApp expected req respond =
                 [("WWW-Authenticate", BS8.pack "Basic realm=\"test\"")]
                 LBS8.empty
             )
+
+-- | Checks the Authorization header, then serves the file from the assets
+-- directory, or answers 401 without the expected credentials.
+authAssetsApp :: FilePath -> BS8.ByteString -> Application
+authAssetsApp assets expected req respond =
+  case lookup hAuthorization (Wai.requestHeaders req) of
+    Just value
+      | value == expected ->
+          staticApp (defaultFileServerSettings assets) req respond
+    _ ->
+      respond
+        ( responseLBS
+            status401
+            [("WWW-Authenticate", BS8.pack "Basic realm=\"test\"")]
+            LBS8.empty
+        )
