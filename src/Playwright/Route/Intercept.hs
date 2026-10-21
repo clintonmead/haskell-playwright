@@ -29,6 +29,7 @@ import Control.Monad.IO.Class
 import Data.Aeson
   ( Value
   )
+import Data.Text qualified as Text
 import Data.Text
   ( Text
   )
@@ -240,7 +241,8 @@ protocolPattern match =
     UrlMatchGlob glob ->
       (Just glob, Nothing)
     UrlMatchRegex source flags ->
-      (Nothing, Just (source, flags))
+      -- g and y make a stateful test, so the driver can miss the second URL it checks.
+      (Nothing, Just (source, Text.filter (`notElem` ("gy" :: String)) flags))
     UrlMatchPredicate _ ->
       (Just "**/*", Nothing)
 

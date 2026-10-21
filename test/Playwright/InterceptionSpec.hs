@@ -50,7 +50,7 @@ import Playwright
   , HttpStatus (HttpStatus)
   , Page
   , Request
-  , UrlMatch (UrlMatchGlob)
+  , UrlMatch (UrlMatchGlob, UrlMatchRegex)
   , WaitForState (WaitForVisible)
   , continueRoute
   , defaultFulfillOptions
@@ -267,6 +267,15 @@ tests =
           _ <- goBack page
           count2 <- readIORef intercepted
           assertEqual "back" 2 count2
+    , testCase "should intercept every request matching a global regexp" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          intercepted <- newIORef (0 :: Int)
+          route page (UrlMatchRegex "/intercept-me" "g") $ \handled -> do
+            modifyIORef' intercepted (+ 1)
+            fulfillRoute handled defaultFulfillOptions {fulfillBody = Just (FulfillText "intercepted")}
+          mapM_ (\_ -> assertEqual "body" "intercepted" =<< evaluateText page "() => fetch('/intercept-me', { cache: 'no-store' }).then(r => r.text())") [1 :: Int, 2, 3]
+          assertEqual "count" 3 =<< readIORef intercepted
     ]
 
 containedIn :: Text -> Text -> Bool

@@ -26,3 +26,11 @@ Decisions made without waiting for an answer. Each entry gives the question, the
 
 **Guess taken:** Register the route with the glob `**/*` and check the predicate in the handler. Requests that don't match are continued unchanged. This matches how the TypeScript client behaves.
 </content>
+
+## Regex flags `g` and `y` are not sent to the driver
+
+**Question:** Should a regex route send the `g` and `y` flags to the driver?
+
+**Guess taken:** No. With `g`, the driver's stateful `test` misses the URL it checks second, so the route is skipped. Those two flags only affect stateful matching, and this library always wants a fresh test. `src/Playwright/Route/Intercept.hs` drops them before sending. Other flags are sent unchanged.
+
+**To change:** If the driver is later fixed to reset `lastIndex`, the filter can go.
