@@ -32,7 +32,12 @@ import Network.HTTP.Types
   )
 import Network.Wai
   ( Application
+  , pathInfo
   , responseLBS
+  )
+import Network.Wai.Application.Static
+  ( defaultFileServerSettings
+  , staticApp
   )
 import Network.Wai qualified as Wai
 import Network.Wai.Handler.Warp
@@ -51,6 +56,7 @@ import Playwright
   , continueRouteWith
   , defaultContinueOptions
   , defaultGotoOptions
+  , waitForTimeout
   , evaluate
   , evaluateText
   , goto
@@ -65,6 +71,8 @@ import Playwright
   )
 import Playwright.Harness
   ( assertBool
+  , requireTimeout
+  , testAssetsDir
   , withLocalApp
   , withAssets
   , withChromiumPage
@@ -296,7 +304,32 @@ tests =
                     (any (`isInfixOf` toLower (requestFailureText value)) ["cancelled", "aborted"])
               -- Continuing a route whose request was cancelled must not throw.
               continueRoute handled
+    , testCase "should intercept css variable with background url" $
+        withChromiumPage $ \page -> do
+          assets <- testAssetsDir
+          withLocalApp (cssVariableApp assets) $ \prefix -> do
+            counter <- newIORef (0 :: Int)
+            route page (UrlMatchGlob (prefix <> "/pptr.png")) $ \handled -> do
+              modifyIORef' counter (+ 1)
+              continueRoute handled
+            _ <- goto page (urlFromText (prefix <> "/test.html")) defaultGotoOptions
+            assertEqual "text" "Yo!" =<< evaluateText page "() => document.querySelector('div').textContent"
+            waitForTimeout page =<< requireTimeout 1000
+            assertEqual "intercepted once" 1 =<< readIORef counter
     ]
+
+-- | Serves a page whose div takes its background from a CSS variable and an
+-- animation, and serves every other path from the assets directory.
+cssVariableApp :: FilePath -> Application
+cssVariableApp assets request respond =
+  case pathInfo request of
+    ["test.html"] ->
+      respond (responseLBS status200 [(hContentType, "text/html")] cssPage)
+    _ ->
+      staticApp (defaultFileServerSettings assets) request respond
+  where
+    cssPage =
+      LBS8.pack "<style>@keyframes JNDzq { 0% { background-position: 0 0 } to { background-position: 100 0 } } div { --background: url(/pptr.png); background-image: var(--background); animation: JNDzq 1s linear infinite; }</style><div>Yo!</div>"
 
 echoFooHeader :: Application
 echoFooHeader req respond =
