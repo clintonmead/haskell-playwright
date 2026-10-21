@@ -5,11 +5,16 @@ module Playwright.BrowserContextBaseUrlSpec
 import Data.Text
   ( Text
   )
+import UnliftIO.IORef
+  ( newIORef
+  )
 import Playwright
   ( NewContextOptions (newContextBaseURL)
   , Page
   , defaultGotoOptions
   , defaultNewContextOptions
+  , newContextWith
+  , newPage
   , evaluateText
   , goto
   , responseUrl
@@ -19,7 +24,10 @@ import Playwright
   , Playwright
   )
 import Playwright.Harness
-  ( withAssetsPrefix
+  ( recordingPageApp
+  , withChromiumBrowser
+  , withLocalApp
+  , withAssetsPrefix
   , withChromiumContextWith
   , assertEqual
   , assertFailure
@@ -107,6 +115,43 @@ tests =
               assertEqual "blank" "about:blank" =<< evaluateText page "() => window.location.href"
               current <- urlToText <$> url page
               assertEqual "page url" "about:blank" current
+    , testCase "should construct a new URL when a baseURL in browser.newPage is passed to page.goto" $ do
+        requests <- newIORef []
+        withChromiumBrowser $ \browser ->
+          withLocalApp (recordingPageApp requests) $ \prefix -> do
+            context <-
+              newContextWith
+                browser
+                defaultNewContextOptions {newContextBaseURL = Just (urlFromText prefix)}
+            page <- newPage context
+            response <- goto page (urlFromText "/empty.html") defaultGotoOptions
+            case response of
+              Nothing ->
+                assertFailure "missing response"
+              Just value ->
+                assertEqual "url" (prefix <> "/empty.html") . urlToText =<< responseUrl value
+    , testCase "should construct the URLs correctly when a baseURL without a trailing slash in browser.newPage is passed to page.goto" $ do
+        requests <- newIORef []
+        withChromiumBrowser $ \browser ->
+          withLocalApp (recordingPageApp requests) $ \prefix -> do
+            context <-
+              newContextWith browser defaultNewContextOptions {newContextBaseURL = Just (urlFromText (prefix <> "/url-construction"))}
+            page <- newPage context
+            assertEqual "relative" (prefix <> "/mypage.html") =<< landedAt page "mypage.html"
+            assertEqual "dot" (prefix <> "/mypage.html") =<< landedAt page "./mypage.html"
+            assertEqual "absolute" (prefix <> "/mypage.html") =<< landedAt page "/mypage.html"
+    , testCase "should construct the URLs correctly when a baseURL with a trailing slash in browser.newPage is passed to page.goto" $ do
+        requests <- newIORef []
+        withChromiumBrowser $ \browser ->
+          withLocalApp (recordingPageApp requests) $ \prefix -> do
+            context <-
+              newContextWith browser defaultNewContextOptions {newContextBaseURL = Just (urlFromText (prefix <> "/url-construction/"))}
+            page <- newPage context
+            assertEqual "relative" (prefix <> "/url-construction/mypage.html") =<< landedAt page "mypage.html"
+            assertEqual "dot" (prefix <> "/url-construction/mypage.html") =<< landedAt page "./mypage.html"
+            assertEqual "absolute" (prefix <> "/mypage.html") =<< landedAt page "/mypage.html"
+            assertEqual "directory" (prefix <> "/url-construction/") =<< landedAt page "."
+            assertEqual "root" (prefix <> "/") =<< landedAt page "/"
     ]
 
 expectGotoUrl :: Page -> Text -> Text -> Playwright ()
@@ -117,3 +162,13 @@ expectGotoUrl page target expected = do
       assertFailure "expected navigation response"
     Just value ->
       assertEqual "response url" expected . urlToText =<< responseUrl value
+
+-- | Navigates to the path, and returns the URL the page lands on.
+landedAt :: Page -> Text -> Playwright Text
+landedAt page path = do
+  response <- goto page (urlFromText path) defaultGotoOptions
+  case response of
+    Nothing ->
+      pure "missing response"
+    Just value ->
+      urlToText <$> responseUrl value
