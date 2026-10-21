@@ -8,7 +8,8 @@ import Data.Maybe
   ( fromMaybe
   )
 import Data.Text
-  ( pack
+  ( Text
+  , pack
   )
 import Data.Text qualified as Text
 import Network.HTTP.Types
@@ -26,7 +27,11 @@ import Network.Wai.Handler.Warp
   )
 import Playwright
   ( Locale (Locale)
-  , NewContextOptions (newContextLocale)
+  , NewContextOptions (newContextLocale, newContextTimezoneId)
+  , TimezoneId (TimezoneId)
+  , newContext
+  , newContextWith
+  , newPage
   , defaultGotoOptions
   , defaultNewContextOptions
   , evaluateText
@@ -34,7 +39,9 @@ import Playwright
   , urlFromText
   )
 import Playwright.Harness
-  ( withChromiumContextWith
+  ( assertBool
+  , withChromiumBrowser
+  , withChromiumContextWith
   , assertEqual
   )
 import Test.Tasty
@@ -72,6 +79,52 @@ tests =
           $ \_ page ->
             assertEqual "en-US" "1,000,000.5"
               =<< evaluateText page "() => (1000000.50).toLocaleString()"
+    , testCase "should format date" $
+        withChromiumBrowser $ \browser -> do
+          english <-
+            newContextWith
+              browser
+              defaultNewContextOptions
+                { newContextLocale = Just (Locale "en-US")
+                , newContextTimezoneId = Just (TimezoneId "America/Los_Angeles")
+                }
+          englishPage <- newPage english
+          assertEqual "en-US" "Sat Nov 19 2016 10:12:34 GMT-0800 (Pacific Standard Time)"
+            =<< evaluateText englishPage "() => new Date(1479579154987).toString()"
+          german <-
+            newContextWith
+              browser
+              defaultNewContextOptions
+                { newContextLocale = Just (Locale "de-DE")
+                , newContextTimezoneId = Just (TimezoneId "Europe/Berlin")
+                }
+          germanPage <- newPage german
+          assertEqual "de-DE" "Sat Nov 19 2016 19:12:34 GMT+0100 (Mitteleuropäische Normalzeit)"
+            =<< evaluateText germanPage "() => new Date(1479579154987).toString()"
+    , testCase "should not change default locale in another context" $
+        withChromiumBrowser $ \browser -> do
+          defaultContext <- newContext browser
+          defaultPage <- newPage defaultContext
+          defaultLocale <- evaluateText defaultPage "() => new Intl.NumberFormat().resolvedOptions().locale"
+          let
+            override = if defaultLocale == ("es-MX" :: Text) then "de-DE" else "es-MX" :: Text
+          overridden <-
+            newContextWith
+              browser
+              defaultNewContextOptions {newContextLocale = Just (Locale override)}
+          overriddenPage <- newPage overridden
+          assertEqual "override" override
+            =<< evaluateText overriddenPage "() => new Intl.NumberFormat().resolvedOptions().locale"
+    , testCase "should be isolated between contexts" $
+        withChromiumBrowser $ \browser -> do
+          first <-
+            newContextWith browser defaultNewContextOptions {newContextLocale = Just (Locale "en-US")}
+          firstPage <- newPage first
+          second <-
+            newContextWith browser defaultNewContextOptions {newContextLocale = Just (Locale "ru-RU")}
+          secondPage <- newPage second
+          assertEqual "first" "1,000,000.5" =<< evaluateText firstPage "() => (1000000.50).toLocaleString()"
+          assertBool "second differs" . (/= "1,000,000.5") =<< evaluateText secondPage "() => (1000000.50).toLocaleString()"
     ]
 
 echoAcceptLanguage :: Application
