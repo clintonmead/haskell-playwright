@@ -102,4 +102,13 @@ tests =
               pure ()
             Right _ ->
               assertFailure "expected the linked style to be refused"
+    , testCase "should throw an error if no options are provided" $
+        withAssetPage "empty.html" $ \page -> do
+          result <-
+            try (addStyleTag page emptyStyleTag) :: Playwright (Either PlaywrightError ElementHandle)
+          case result of
+            Left _ ->
+              pure ()
+            Right _ ->
+              assertFailure "expected an error without options"
     ]
