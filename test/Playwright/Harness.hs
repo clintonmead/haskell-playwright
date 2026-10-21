@@ -1,5 +1,6 @@
 module Playwright.Harness
-  ( assertBool
+  ( Recorded (..)
+  , assertBool
   , assertEqual
   , assertFailure
   , assertStillPending
@@ -9,6 +10,7 @@ module Playwright.Harness
   , locate
   , rafraf
   , readTestAsset
+  , recordRequest
   , requireHandle
   , requireTimeout
   , withAssetPage
@@ -40,6 +42,9 @@ import Control.Monad.IO.Class
   ( MonadIO
   , liftIO
   )
+import Data.ByteString.Char8 qualified as BS8
+import Data.ByteString.Lazy.Char8 qualified as LBS8
+import Data.CaseInsensitive qualified as CI
 import Data.ByteString
   ( ByteString
   )
@@ -59,6 +64,7 @@ import Network.Wai
   , pathInfo
   , responseLBS
   )
+import Network.Wai qualified as Wai
 import Network.Wai.Application.Static
   ( defaultFileServerSettings
   , staticApp
@@ -111,7 +117,9 @@ import System.Environment
   )
 import Test.Tasty.HUnit qualified as HUnit
 import UnliftIO
-  ( bracket
+  ( IORef
+  , bracket
+  , modifyIORef'
   , try
   , withRunInIO
   )
@@ -391,3 +399,24 @@ requireNonEmptyEnv name = do
       HUnit.assertFailure (name <> " is empty")
     Just path ->
       pure path
+
+-- | One request a recording server saw: method, path, body, and headers with
+-- their names folded to lower case.
+data Recorded = Recorded
+  { recordedMethod :: BS8.ByteString
+  , recordedPath :: BS8.ByteString
+  , recordedBody :: BS8.ByteString
+  , recordedHeaders :: [(BS8.ByteString, BS8.ByteString)]
+  }
+
+recordRequest :: IORef [Recorded] -> Wai.Request -> IO ()
+recordRequest requests request = do
+  body <- Wai.strictRequestBody request
+  modifyIORef' requests
+    ( Recorded
+        (Wai.requestMethod request)
+        (Wai.rawPathInfo request)
+        (LBS8.toStrict body)
+        (map (\(name, value) -> (CI.foldedCase name, value)) (Wai.requestHeaders request))
+        :
+    )

@@ -3,7 +3,6 @@ module Playwright.PageRequestContinueSpec
   ) where
 
 import Data.ByteString qualified as BS
-import Data.CaseInsensitive qualified as CI
 import Data.ByteString.Char8 qualified as BS8
 import Data.ByteString.Lazy.Char8 qualified as LBS8
 import Data.Maybe
@@ -39,7 +38,6 @@ import Network.HTTP.Types
   )
 import Network.Wai
   ( Application
-  , Request
   , pathInfo
   , responseLBS
   )
@@ -97,7 +95,9 @@ import Playwright.Error
   , ProtocolFailure (protocolFailureMessage)
   )
 import Playwright.Harness
-  ( assertBool
+  ( Recorded (recordedBody, recordedHeaders, recordedMethod, recordedPath)
+  , recordRequest
+  , assertBool
   , requireTimeout
   , testAssetsDir
   , withLocalApp
@@ -716,33 +716,12 @@ echoFooHeader req respond =
         [(hContentType, BS8.pack "text/plain")]
         (LBS8.fromStrict (fromMaybe BS8.empty (lookup "foo" (Wai.requestHeaders req))))
     )
-
--- | One request the recording server saw: method, path, and body.
-data Recorded = Recorded
-  { recordedMethod :: BS8.ByteString
-  , recordedPath :: BS8.ByteString
-  , recordedBody :: BS8.ByteString
-  , recordedHeaders :: [(BS8.ByteString, BS8.ByteString)]
-  }
-
 -- | Records every request's method, path, and body, and answers with an
 -- empty page.
 recordingApp :: IORef [Recorded] -> Application
 recordingApp requests request respond = do
   recordRequest requests request
   respond (responseLBS status200 [(hContentType, "text/html")] "")
-
-recordRequest :: IORef [Recorded] -> Request -> IO ()
-recordRequest requests request = do
-  body <- Wai.strictRequestBody request
-  modifyIORef' requests
-    ( Recorded
-        (Wai.requestMethod request)
-        (Wai.rawPathInfo request)
-        (LBS8.toStrict body)
-        (map (\(name, value) -> (CI.foldedCase name, value)) (Wai.requestHeaders request))
-        :
-    )
 
 -- | Records every request, and answers with a body another origin may read.
 corsApp :: IORef [Recorded] -> Application

@@ -24,6 +24,7 @@ import Data.Maybe
 import Data.Text
   ( Text
   , isInfixOf
+  , replace
   , isSuffixOf
   , takeWhileEnd
   , toLower
@@ -109,7 +110,9 @@ import Playwright.Error
   , ProtocolFailure (protocolFailureMessage)
   )
 import Playwright.Harness
-  ( assertBool
+  ( Recorded (recordedMethod, recordedPath)
+  , recordRequest
+  , assertBool
   , assertEqual
   , assertFailure
   , assertProtocolContains
@@ -604,6 +607,56 @@ tests =
               page
               "async () => JSON.stringify(await (await fetch('https://example.com/cars', {method: 'DELETE', headers: {}, mode: 'cors', body: ''})).json())"
           assertEqual "delete" "[\"DELETE\",\"electric\",\"gas\"]" deleted
+    , testCase "should respect cors overrides" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          route page (UrlMatchGlob "**/something") $ \handled ->
+            fulfillRoute
+              handled
+              defaultFulfillOptions
+                { fulfillStatus = Just (HttpStatus 200)
+                , fulfillContentType = Just (ContentType "text/plain")
+                , fulfillHeaders = [HttpHeader (HeaderName "Access-Control-Allow-Origin") (HeaderValue "http://non-existent")]
+                , fulfillBody = Just (FulfillText "done")
+                }
+          let
+            cross = replace "127.0.0.1" "localhost" prefix <> "/something"
+          rejected <-
+            try
+              ( evaluateText
+                  page
+                  ( "async () => (await (await fetch('" <> cross <> "', {method: 'GET', headers: {'X-PINGOTHER': 'pingpong'}})).text())"
+                  )
+              )
+              :: Playwright (Either PlaywrightError Text)
+          case rejected of
+            Left (ProtocolRpc failure) ->
+              assertBool "failed to fetch" ("Failed to fetch" `isInfixOf` protocolFailureMessage failure)
+            Left err ->
+              assertFailure ("expected ProtocolRpc, got: " <> show err)
+            Right _ ->
+              assertFailure "expected the fetch to be rejected"
+    , testCase "should not auto-intercept non-preflight OPTIONS without network interception" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (optionsApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            writeIORef requests []
+            texts <- evaluateText page (optionsScript (replace "127.0.0.1" "localhost" prefix <> "/something"))
+            assertEqual "texts" "[\"Hello\",\"World\"]" texts
+            seen <- readIORef requests
+            assertEqual "requests" [("OPTIONS", "/something"), ("OPTIONS", "/something"), ("GET", "/something")] (map (\request -> (recordedMethod request, recordedPath request)) (reverse seen))
+    , testCase "should not auto-intercept non-preflight OPTIONS with network interception" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (optionsApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            route page (UrlMatchGlob "**/something") continueRoute
+            writeIORef requests []
+            texts <- evaluateText page (optionsScript (replace "127.0.0.1" "localhost" prefix <> "/something"))
+            assertEqual "texts" "[\"Hello\",\"World\"]" texts
+            seen <- readIORef requests
+            assertEqual "requests" [("OPTIONS", "/something"), ("GET", "/something")] (map (\request -> (recordedMethod request, recordedPath request)) (reverse seen))
     , testCase "should pause intercepted XHR until continue" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
@@ -749,3 +802,27 @@ postCarsScript options =
   "async () => JSON.stringify(await (await fetch('https://example.com/cars', {method: 'POST', headers: {'Content-Type': 'application/json'}, mode: 'cors', body: JSON.stringify({number: 1}), "
     <> options
     <> "})).json())"
+
+-- | Fetches the URL with an OPTIONS and then a GET, and returns both bodies as JSON.
+optionsScript :: Text -> Text
+optionsScript url =
+  "async () => { const url = '" <> url <> "'; const first = await (await fetch(url, {method: 'OPTIONS'})).text(); const second = await (await fetch(url, {method: 'GET'})).text(); return JSON.stringify([first, second]); }"
+
+-- | Answers an OPTIONS with a body of Hello and everything else with World, both
+-- allowing any origin. Every request is recorded.
+optionsApp :: IORef [Recorded] -> Application
+optionsApp requests request respond = do
+  recordRequest requests request
+  if Wai.requestMethod request == "OPTIONS"
+    then
+      respond
+        ( responseLBS
+            status200
+            [ ("Access-Control-Allow-Origin", "*")
+            , ("Access-Control-Allow-Methods", "POST, GET, OPTIONS, DELETE")
+            , ("Access-Control-Allow-Headers", "*")
+            , ("Cache-Control", "no-cache")
+            ]
+            "Hello"
+        )
+    else respond (responseLBS status200 [("Access-Control-Allow-Origin", "*")] "World")
