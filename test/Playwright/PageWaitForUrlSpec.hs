@@ -2,10 +2,15 @@ module Playwright.PageWaitForUrlSpec
   ( tests
   ) where
 
+import UnliftIO.Async
+  ( wait
+  , withAsync
+  )
 import Playwright
-  ( UrlMatch (UrlMatchGlob)
+  ( UrlMatch (UrlMatchGlob, UrlMatchRegex)
   , click
   , defaultGotoOptions
+  , evaluate
   , evaluateTextWith
   , goto
   , milliseconds
@@ -24,6 +29,7 @@ import Playwright.Harness
   , withAssets
   , assertEqual
   , assertFailure
+  , assertStillPending
   )
 import Test.Tasty
   ( TestTree
@@ -89,4 +95,15 @@ tests =
           click (locate page "a#forward")
           waitForURL page (UrlMatchGlob "**/second.html")
           assertEqual "second again" (prefix <> "/second.html") . urlToText =<< url page
+    , testCase "should work with url match for same document navigations" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          withAsync (waitForURL page (UrlMatchRegex "third\\.html" "")) $ \pending -> do
+            assertStillPending pending
+            _ <- evaluate page "() => { history.pushState({}, '', '/first.html'); }"
+            assertStillPending pending
+            _ <- evaluate page "() => { history.pushState({}, '', '/second.html'); }"
+            assertStillPending pending
+            _ <- evaluate page "() => { history.pushState({}, '', '/third.html'); }"
+            wait pending
     ]
