@@ -8,6 +8,7 @@ import Data.Text
   )
 import Playwright
   ( Locale (Locale)
+  , newContext
   , NewContextOptions (newContextLocale, newContextTimezoneId)
   , TimezoneId (TimezoneId)
   , defaultNewContextOptions
@@ -57,6 +58,24 @@ tests =
           $ \_ page ->
             assertEqual "zone" "America/Jamaica"
               =<< evaluateText page "() => (new Intl.DateTimeFormat()).resolvedOptions().timeZone"
+    , testCase "should not change default timezone in another context" $
+        withChromiumBrowser $ \browser -> do
+          defaultContext <- newContext browser
+          defaultPage <- newPage defaultContext
+          defaultZone <- evaluateText defaultPage "() => Intl.DateTimeFormat().resolvedOptions().timeZone"
+          let
+            override = overrideZone defaultZone
+          overridden <-
+            newContextWith
+              browser
+              defaultNewContextOptions {newContextTimezoneId = Just (TimezoneId override)}
+          overriddenPage <- newPage overridden
+          assertEqual "override" override
+            =<< evaluateText overriddenPage "() => Intl.DateTimeFormat().resolvedOptions().timeZone"
+          again <- newContext browser
+          againPage <- newPage again
+          assertEqual "default again" defaultZone
+            =<< evaluateText againPage "() => Intl.DateTimeFormat().resolvedOptions().timeZone"
     ]
 
 assertTimezone :: TimezoneId -> Text -> IO ()
@@ -69,3 +88,8 @@ assertTimezone zone needle =
     $ \_ page -> do
       rendered <- evaluateText page "() => new Date(1479579154987).toString()"
       assertBool (show needle) (needle `isInfixOf` rendered)
+
+-- | A timezone other than the given default one.
+overrideZone :: Text -> Text
+overrideZone zone =
+  if zone == "Europe/Moscow" then "America/Los_Angeles" else "Europe/Moscow"
