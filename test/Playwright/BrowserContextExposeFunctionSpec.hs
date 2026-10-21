@@ -2,11 +2,16 @@ module Playwright.BrowserContextExposeFunctionSpec
   ( tests
   ) where
 
+import Data.Text
+  ( isInfixOf
+  )
 import UnliftIO.Exception
   ( throwIO
+  , try
   )
 import Playwright
   ( BindingName (BindingName)
+  , dispose
   , contextExposeFunction
   , defaultGotoOptions
   , defaultNewContextOptions
@@ -18,10 +23,13 @@ import Playwright
   , Playwright
   )
 import Playwright.Error
-  ( PlaywrightError (EvaluateUnexpected)
+  ( PlaywrightError (EvaluateUnexpected, ProtocolRpc)
+  , ProtocolFailure (protocolFailureMessage)
   )
 import Playwright.Harness
-  ( assertProtocolContains
+  ( assertBool
+  , assertFailure
+  , assertProtocolContains
   , withAssetsContextWith
   , withChromiumContext
   , assertEqual
@@ -70,6 +78,19 @@ tests =
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           assertEqual "sum" (11 :: Double)
             =<< evaluateNumber page "async () => window.add(5, 6)"
+    , testCase "should dispose" $
+        withChromiumContext $ \ctx page -> do
+          binding <- contextExposeFunction ctx (BindingName "compute") multiply
+          assertEqual "before" (36 :: Double) =<< evaluateNumber page "async () => window.compute(9, 4)"
+          dispose binding
+          result <- try (evaluateNumber page "async () => window.compute(9, 4)") :: Playwright (Either PlaywrightError Double)
+          case result of
+            Left (ProtocolRpc failure) ->
+              assertBool "removed" ("is not a function" `isInfixOf` protocolFailureMessage failure)
+            Left err ->
+              assertFailure ("expected ProtocolRpc, got: " <> show err)
+            Right _ ->
+              assertFailure "expected the disposed function to be gone"
     ]
 
 add :: [SerializedValue] -> Playwright SerializedArgument
