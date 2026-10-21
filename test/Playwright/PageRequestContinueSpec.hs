@@ -9,6 +9,7 @@ import Data.ByteString.Lazy.Char8 qualified as LBS8
 import Data.Maybe
   ( fromMaybe
   , isJust
+  , isNothing
   )
 import Control.Concurrent
   ( threadDelay
@@ -20,6 +21,7 @@ import Data.Text
   ( isInfixOf
   , isSuffixOf
   , pack
+  , Text
   , replace
   , toLower
   , unpack
@@ -70,6 +72,14 @@ import Playwright
   , goto
   , requestFailure
   , requestHeaders
+  , requestUrl
+  , url
+  , onRequest
+  , onRequestFailed
+  , onRequestFinished
+  , onResponse
+  , responseRequest
+  , responseFinished
   , responseOk
   , responseUrl
   , route
@@ -439,7 +449,52 @@ tests =
             _ <- waitForFunction page "() => window.preloadedStyles"
             assertEqual "custom header" (Just "value") . headerOf "/one-style.css" "custom" =<< readIORef requests
             assertEqual "color" "rgb(255, 192, 203)" =<< evaluateText page "() => window.getComputedStyle(document.body).backgroundColor"
+    , testCase "should work with Cross-Origin-Opener-Policy" $ do
+        requests <- newIORef []
+        intercepted <- newIORef []
+        events <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (coopApp requests) $ \prefix -> do
+            let
+              pageUrl = prefix <> "/empty.html"
+            route page (UrlMatchGlob "**/*") $ \handled -> do
+              request <- routeRequest handled
+              modifyIORef' intercepted . (<>) . pure . urlToText =<< requestUrl request
+              continueRouteWith handled defaultContinueOptions {continueHeaders = Just [HttpHeader (HeaderName "foo") (HeaderValue "bar")]}
+            onRequest page (eventRecorder events "request")
+            onResponse page (eventRecorder events "response")
+            onRequestFailed page (eventRecorder events "requestfailed")
+            onRequestFinished page (eventRecorder events "requestfinished")
+            response <- goto page (urlFromText pageUrl) defaultGotoOptions
+            case response of
+              Nothing ->
+                assertFailure "missing response"
+              Just value -> do
+                responseFinished value
+                assertEqual "intercepted" [pageUrl] =<< readIORef intercepted
+                assertEqual "server requests" ["/empty.html"] . map recordedPath =<< readIORef requests
+                assertEqual "server header" (Just "bar") . headerOf "/empty.html" "foo" =<< readIORef requests
+                assertEqual "url" pageUrl . urlToText =<< url page
+                assertEqual "events" ["request", "response", "requestfinished"] =<< readIORef events
+                failure <- requestFailure =<< responseRequest value
+                assertBool "no failure" (isNothing failure)
     ]
+
+-- | Serves a page with a Cross-Origin-Opener-Policy header, recording requests.
+coopApp :: IORef [Recorded] -> Application
+coopApp requests request respond = do
+  recordRequest requests request
+  respond
+    ( responseLBS
+        status200
+        [(hContentType, "text/html"), ("Cross-Origin-Opener-Policy", "same-origin")]
+        "<div>Hello there!</div><script>window.onload = () => console.log('onload')</script>"
+    )
+
+-- | Appends the name of each event to the list, in the order they arrive.
+eventRecorder :: IORef [Text] -> Text -> a -> Playwright ()
+eventRecorder events name _ =
+  modifyIORef' events (<> [name])
 
 -- | Serves a page whose div takes its background from a CSS variable and an
 -- animation, and serves every other path from the assets directory.
