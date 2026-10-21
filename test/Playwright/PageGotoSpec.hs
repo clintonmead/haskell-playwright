@@ -91,7 +91,7 @@ import Playwright
   , Request
   , Response
   , Timeout
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , armFrameDetached
   , continueRoute
   , defaultGotoOptions
@@ -660,7 +660,7 @@ coopTest intercept =
     (events, seen) <- listenNetwork page
     if intercept
       then
-        route page (UrlGlob "**/*") $ \handled -> do
+        route page (UrlMatchGlob "**/*") $ \handled -> do
           threadDelay 100000
           continueRoute handled
       else

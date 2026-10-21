@@ -137,7 +137,7 @@ module Playwright
   , Timeout
   , TimezoneId (..)
   , Url
-  , UrlGlob (..)
+  , UrlMatch (..)
   , UserAgent (..)
   , ViewportHeight (..)
   , ViewportSize (..)
@@ -1698,8 +1698,8 @@ import Playwright.Url
   , urlFromText
   , urlToText
   )
-import Playwright.UrlGlob
-  ( UrlGlob (UrlGlob)
+import Playwright.UrlMatch
+  ( UrlMatch (UrlMatchGlob, UrlMatchPredicate, UrlMatchRegex)
   )
 import Playwright.UserAgent
   ( UserAgent (UserAgent, userAgentToText)

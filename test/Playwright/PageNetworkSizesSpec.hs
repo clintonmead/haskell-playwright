@@ -54,7 +54,7 @@ import Playwright
   , HttpStatus (HttpStatus)
   , NetworkSizes (networkRequestBodySize, networkRequestHeadersSize, networkResponseBodySize, networkResponseHeadersSize)
   , Page
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , defaultGotoOptions
   , evaluate
   , armRequest
@@ -94,7 +94,7 @@ tests =
     "page-network-sizes"
     [ testCase "should set bodySize and headersSize" $
         withServerPage emptyGetApp $ \prefix page -> do
-          awaitRequest <- armRequest page (UrlGlob (prefix <> "/get"))
+          awaitRequest <- armRequest page (UrlMatchGlob (prefix <> "/get"))
           withAsync awaitRequest $ \pending -> do
             _ <-
               evaluate
@@ -106,7 +106,7 @@ tests =
             assertBool "headers" (headersSizeToInt (networkRequestHeadersSize sizes) >= 250)
     , testCase "should set bodySize to 0 if there was no body" $
         withServerPage emptyGetApp $ \prefix page -> do
-          awaitRequest <- armRequest page (UrlGlob (prefix <> "/get"))
+          awaitRequest <- armRequest page (UrlMatchGlob (prefix <> "/get"))
           withAsync awaitRequest $ \pending -> do
             _ <- evaluate page "() => fetch('./get').then(r => r.text())"
             request <- wait pending
@@ -115,7 +115,7 @@ tests =
             assertBool "headers" (headersSizeToInt (networkRequestHeadersSize sizes) >= 190)
     , testCase "should set bodySize, headersSize, and transferSize" $
         withServerPage emptyGetApp $ \prefix page -> do
-          awaitRequest <- armRequest page (UrlGlob (prefix <> "/get"))
+          awaitRequest <- armRequest page (UrlMatchGlob (prefix <> "/get"))
           withAsync awaitRequest $ \pending -> do
             _ <- evaluate page "() => fetch('./get').then(r => r.text())"
             request <- wait pending
@@ -162,7 +162,7 @@ tests =
           let compressed = compress (LBS.fromStrict asset)
           withLocalApp (gzipApp compressed) $ \prefix -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-            awaitRequest <- armRequest page (UrlGlob (prefix <> "/simplezip.json"))
+            awaitRequest <- armRequest page (UrlMatchGlob (prefix <> "/simplezip.json"))
             withAsync awaitRequest $ \pending -> do
               _ <- evaluate page "() => fetch('./simplezip.json').then(r => r.text())"
               request <- wait pending
@@ -173,7 +173,7 @@ tests =
                 (bodySizeToInt (networkResponseBodySize sizes))
     , testCase "should handle redirects" $
         withServerPage redirectApp $ \prefix page -> do
-          awaitRequest <- armRequest page (UrlGlob (prefix <> "/foo"))
+          awaitRequest <- armRequest page (UrlMatchGlob (prefix <> "/foo"))
           withAsync awaitRequest $ \pending -> do
             _ <-
               evaluate
@@ -217,7 +217,7 @@ statusCodeTest :: Int -> Status -> TestTree
 statusCodeTest code status =
   testCase ("should work with " <> show code <> " status code") $
     withServerPage (statusApp status) $ \prefix page -> do
-      awaitRequest <- armRequest page (UrlGlob (prefix <> "/foo"))
+      awaitRequest <- armRequest page (UrlMatchGlob (prefix <> "/foo"))
       withAsync awaitRequest $ \pending -> do
         _ <-
           evaluate

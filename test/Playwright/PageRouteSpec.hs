@@ -55,7 +55,7 @@ import Playwright
   , ResourceType (resourceTypeToText)
   , RouteOptions (routeTimes)
   , RouteTimes (RouteTimes)
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob, UrlMatchPredicate, UrlMatchRegex)
   , abortRoute
   , abortRouteWith
   , armRequestFailed
@@ -140,7 +140,7 @@ tests =
     [ testCase "should intercept" $
         withAssets $ \prefix page -> do
           captured <- newIORef False
-          route page (UrlGlob "**/empty.html") $ \handled -> do
+          route page (UrlMatchGlob "**/empty.html") $ \handled -> do
             request <- routeRequest handled
             url <- requestUrl request
             assertBool "empty.html" ("empty.html" `isInfixOf` urlToText url)
@@ -176,7 +176,7 @@ tests =
           setExtraHTTPHeaders
             page
             [HttpHeader (HeaderName "foo") (HeaderValue "bar")]
-          route page (UrlGlob "**/*") $ \handled -> do
+          route page (UrlMatchGlob "**/*") $ \handled -> do
             request <- routeRequest handled
             headers <- requestHeaders request
             assertEqual "foo" (Just "bar") (headerValue "foo" headers)
@@ -190,7 +190,7 @@ tests =
     , testCase "should contain referer header" $
         withAssets $ \prefix page -> do
           captured <- newIORef []
-          route page (UrlGlob "**/*") $ \handled -> do
+          route page (UrlMatchGlob "**/*") $ \handled -> do
             request <- routeRequest handled
             modifyIORef' captured (request :)
             continueRoute handled
@@ -211,25 +211,25 @@ tests =
     , testCase "should unroute" $
         withAssets $ \prefix page -> do
           intercepted <- newIORef ([] :: [Int])
-          route page (UrlGlob "**/*") $ \handled -> do
+          route page (UrlMatchGlob "**/*") $ \handled -> do
             modifyIORef' intercepted (1 :)
             fallbackRoute handled
-          route page (UrlGlob "**/empty.html") $ \handled -> do
+          route page (UrlMatchGlob "**/empty.html") $ \handled -> do
             modifyIORef' intercepted (2 :)
             fallbackRoute handled
-          route page (UrlGlob "**/empty.html") $ \handled -> do
+          route page (UrlMatchGlob "**/empty.html") $ \handled -> do
             modifyIORef' intercepted (3 :)
             fallbackRoute handled
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           assertEqual "before" [3, 2, 1] . reverse =<< readIORef intercepted
           writeIORef intercepted []
-          unroute page (UrlGlob "**/empty.html")
+          unroute page (UrlMatchGlob "**/empty.html")
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           assertEqual "after" [1] . reverse =<< readIORef intercepted
     , testCase "page.unrouteAll removes all routes" $
         withAssets $ \prefix page -> do
-          route page (UrlGlob "**/*") abortRoute
-          route page (UrlGlob "**/empty.html") abortRoute
+          route page (UrlMatchGlob "**/*") abortRoute
+          route page (UrlMatchGlob "**/empty.html") abortRoute
           unrouteAll page
           response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           case response of
@@ -239,7 +239,7 @@ tests =
               assertEqual "ok" True =<< responseOk value
     , testCase "should be abortable" $
         withAssets $ \prefix page -> do
-          route page (UrlGlob "**/*.css") abortRoute
+          route page (UrlMatchGlob "**/*.css") abortRoute
           takeFailed <- armRequestFailed page
           response <- goto page (urlFromText (prefix <> "/one-style.html")) defaultGotoOptions
           case response of
@@ -255,7 +255,7 @@ tests =
           assertBool "stylesheet failed" (".css" `isInfixOf` urlToText url)
     , testCase "should be abortable with custom error codes" $
         withAssets $ \prefix page -> do
-          route page (UrlGlob "**/*") (\handled -> abortRouteWith handled "internetdisconnected")
+          route page (UrlMatchGlob "**/*") (\handled -> abortRouteWith handled "internetdisconnected")
           takeFailed <- armRequestFailed page
           attempt (goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions)
           failed <- takeFailed
@@ -263,7 +263,7 @@ tests =
           assertEqual "error text" (Just "net::ERR_INTERNET_DISCONNECTED") (requestFailureText <$> reason)
     , testCase "should fail navigation when aborting main resource" $
         withAssets $ \prefix page -> do
-          route page (UrlGlob "**/*") abortRoute
+          route page (UrlMatchGlob "**/*") abortRoute
           assertProtocolContains
             "net::ERR_FAILED"
             (goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions)
@@ -271,7 +271,7 @@ tests =
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           captured <- newEmptyMVar
-          route page (UrlGlob "**/data.json") (putMVar captured)
+          route page (UrlMatchGlob "**/data.json") (putMVar captured)
           withAsync
             ( attempt
                 ( evaluateWith
@@ -296,7 +296,7 @@ tests =
             setExtraHTTPHeaders
               page
               [HttpHeader (HeaderName "referer") (HeaderValue "http://google.com/")]
-            route page (UrlGlob "**/*") continueRoute
+            route page (UrlMatchGlob "**/*") continueRoute
             _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
             assertEqual "server referer" (Just "http://google.com/") =<< readIORef captured
     , testCase "should support the times parameter with route matching" $
@@ -304,7 +304,7 @@ tests =
           intercepted <- newIORef (0 :: Int)
           routeWith
             page
-            (UrlGlob "**/empty.html")
+            (UrlMatchGlob "**/empty.html")
             defaultRouteOptions {routeTimes = Just (RouteTimes 1)}
             $ \handled -> do
               modifyIORef' intercepted (+ 1)
@@ -315,7 +315,7 @@ tests =
         withAssets $ \prefix page -> do
           routeWith
             page
-            (UrlGlob "**/empty.html")
+            (UrlMatchGlob "**/empty.html")
             defaultRouteOptions {routeTimes = Just (RouteTimes 1)}
             $ \handled -> do
               liftIO (threadDelay 100000)
@@ -333,7 +333,7 @@ tests =
     , testCase "should navigate to dataURL and not fire dataURL requests" $
         withChromiumPage $ \page -> do
           seen <- newIORef (0 :: Int)
-          route page (UrlGlob "**/*") $ \handled -> do
+          route page (UrlMatchGlob "**/*") $ \handled -> do
             modifyIORef' seen (+ 1)
             continueRoute handled
           response <- goto page (urlFromText "data:text/html,<div>yo</div>") defaultGotoOptions
@@ -345,7 +345,7 @@ tests =
           withLocalApp (countingApp counter) $ \prefix -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
             alternate <- newIORef False
-            route page (UrlGlob "**/*") $ \handled -> do
+            route page (UrlMatchGlob "**/*") $ \handled -> do
               cancel <- readIORef alternate
               writeIORef alternate (not cancel)
               if cancel
@@ -358,7 +358,7 @@ tests =
         withChromiumPage $ \page ->
           withLocalApp redirectChainApp $ \prefix -> do
             intercepted <- newIORef (0 :: Int)
-            route page (UrlGlob "**/*") $ \handled -> do
+            route page (UrlMatchGlob "**/*") $ \handled -> do
               modifyIORef' intercepted (+ 1)
               continueRoute handled
             response <- goto page (urlFromText (prefix <> "/non-existing-page.html")) defaultGotoOptions
@@ -382,6 +382,26 @@ tests =
                   , "/non-existing-page.html"
                   ]
                   paths
+    , testCase "should work with regular expression" $
+        withAssets $ \prefix page -> do
+          route page (UrlMatchRegex "empty\\.html$" "") $ \handled ->
+            fulfillRoute
+              handled
+              defaultFulfillOptions {fulfillBody = Just (FulfillText "intercepted")}
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "body" "intercepted" =<< evaluateText page "() => document.body.textContent"
+    , testCase "should work with predicate" $
+        withAssets $ \prefix page -> do
+          let wanted = prefix <> "/digits/2.png"
+          route page (UrlMatchPredicate (\url -> urlToText url == wanted)) $ \handled ->
+            fulfillRoute
+              handled
+              defaultFulfillOptions {fulfillBody = Just (FulfillText "intercepted")}
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "matched" "intercepted"
+            =<< evaluateText page "() => fetch('/digits/2.png').then(r => r.text())"
+          other <- evaluateText page "() => fetch('/digits/1.png').then(r => r.text())"
+          assertBool "other request not intercepted" (other /= "intercepted")
     ]
 
 -- | A Playwright error from an action that is expected to fail, ignored here.

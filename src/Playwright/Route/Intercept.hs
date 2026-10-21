@@ -29,6 +29,9 @@ import Control.Monad.IO.Class
 import Data.Aeson
   ( Value
   )
+import Data.Text
+  ( Text
+  )
 import Playwright.BrowserContext
   ( BrowserContext (browserContextChannel)
   )
@@ -67,10 +70,10 @@ import Playwright.Page
   )
 import Playwright.Protocol
   ( BrowserContextRouteEvent (browserContextRouteEventRoute)
-  , BrowserContextSetNetworkInterceptionPatternsParamsPatterns (browserContextSetNetworkInterceptionPatternsParamsPatternsGlob)
+  , BrowserContextSetNetworkInterceptionPatternsParamsPatterns (browserContextSetNetworkInterceptionPatternsParamsPatternsGlob, browserContextSetNetworkInterceptionPatternsParamsPatternsRegexFlags, browserContextSetNetworkInterceptionPatternsParamsPatternsRegexSource)
   , BrowserContextSetNetworkInterceptionPatternsResult
   , PageRouteEvent (pageRouteEventRoute)
-  , PageSetNetworkInterceptionPatternsParamsPatterns (pageSetNetworkInterceptionPatternsParamsPatternsGlob)
+  , PageSetNetworkInterceptionPatternsParamsPatterns (pageSetNetworkInterceptionPatternsParamsPatternsGlob, pageSetNetworkInterceptionPatternsParamsPatternsRegexFlags, pageSetNetworkInterceptionPatternsParamsPatternsRegexSource)
   , PageSetNetworkInterceptionPatternsResult
   , mkBrowserContextSetNetworkInterceptionPatternsParams
   , mkBrowserContextSetNetworkInterceptionPatternsParamsPatterns
@@ -91,16 +94,16 @@ import Playwright.RouteOptions
   , RouteTimes (routeTimesToInt)
   , defaultRouteOptions
   )
-import Playwright.UrlGlob
-  ( UrlGlob (urlGlobToText)
-  , matchesUrlGlob
+import Playwright.UrlMatch
+  ( UrlMatch (UrlMatchGlob, UrlMatchPredicate, UrlMatchRegex)
+  , matchesUrlMatch
   )
 
-route :: Page -> UrlGlob -> (Route -> Playwright ()) -> Playwright ()
+route :: Page -> UrlMatch -> (Route -> Playwright ()) -> Playwright ()
 route page glob =
   routeWith page glob defaultRouteOptions
 
-routeWith :: Page -> UrlGlob -> RouteOptions -> (Route -> Playwright ()) -> Playwright ()
+routeWith :: Page -> UrlMatch -> RouteOptions -> (Route -> Playwright ()) -> Playwright ()
 routeWith page glob opts handler = do
   let
     guid = channelGuid (pageChannel page)
@@ -108,11 +111,11 @@ routeWith page glob opts handler = do
   when first (registerEventHandler guid (MethodName "route") (dispatchPageRoute page))
   updateInterceptionPatterns page
 
-contextRoute :: BrowserContext -> UrlGlob -> (Route -> Playwright ()) -> Playwright ()
+contextRoute :: BrowserContext -> UrlMatch -> (Route -> Playwright ()) -> Playwright ()
 contextRoute ctx glob =
   contextRouteWith ctx glob defaultRouteOptions
 
-contextRouteWith :: BrowserContext -> UrlGlob -> RouteOptions -> (Route -> Playwright ()) -> Playwright ()
+contextRouteWith :: BrowserContext -> UrlMatch -> RouteOptions -> (Route -> Playwright ()) -> Playwright ()
 contextRouteWith ctx glob opts handler = do
   let
     guid = channelGuid (browserContextChannel ctx)
@@ -120,7 +123,7 @@ contextRouteWith ctx glob opts handler = do
   when first (registerEventHandler guid (MethodName "route") (dispatchContextRoute ctx))
   updateContextInterceptionPatterns ctx
 
-installRouteHandler :: Guid -> UrlGlob -> RouteOptions -> (Route -> Playwright ()) -> Playwright Bool
+installRouteHandler :: Guid -> UrlMatch -> RouteOptions -> (Route -> Playwright ()) -> Playwright Bool
 installRouteHandler guid glob opts handler = do
   conn <- askConnection
   remaining <- liftIO (newTVarIO (fmap routeTimesToInt (routeTimes opts)))
@@ -153,7 +156,7 @@ consumeRouteTime remaining = do
           writeTVar remaining (Just (count - 1))
           pure True
 
-unroute :: Page -> UrlGlob -> Playwright ()
+unroute :: Page -> UrlMatch -> Playwright ()
 unroute page glob = do
   removeRouteHandlers (channelGuid (pageChannel page)) glob
   updateInterceptionPatterns page
@@ -163,7 +166,7 @@ unrouteAll page = do
   clearRouteHandlers (channelGuid (pageChannel page))
   updateInterceptionPatterns page
 
-unrouteContext :: BrowserContext -> UrlGlob -> Playwright ()
+unrouteContext :: BrowserContext -> UrlMatch -> Playwright ()
 unrouteContext ctx glob = do
   removeRouteHandlers (channelGuid (browserContextChannel ctx)) glob
   updateContextInterceptionPatterns ctx
@@ -194,7 +197,7 @@ dispatchContextRoute ctx params = do
   handlers <- routeHandlersFor (channelGuid (browserContextChannel ctx))
   chainRoutes chan request handlers
 
-chainRoutes :: Channel RouteTag -> Request -> [(UrlGlob, ChannelRef -> IO Bool)] -> Playwright ()
+chainRoutes :: Channel RouteTag -> Request -> [(UrlMatch, ChannelRef -> IO Bool)] -> Playwright ()
 chainRoutes chan request handlers =
   case handlers of
     [] -> do
@@ -202,7 +205,7 @@ chainRoutes chan request handlers =
       sendContinue chan True overrides
     (glob, run) : rest -> do
       current <- requestUrl request
-      if matchesUrlGlob glob current
+      if matchesUrlMatch glob current
         then do
           done <- liftIO (run (ChannelRef (channelGuid chan)))
           unless done (chainRoutes chan request rest)
@@ -229,14 +232,34 @@ updateContextInterceptionPatterns ctx = do
       (mkBrowserContextSetNetworkInterceptionPatternsParams (fmap (contextGlobPattern . fst) handlers))
   pure ()
 
-globPattern :: UrlGlob -> PageSetNetworkInterceptionPatternsParamsPatterns
-globPattern glob =
-  mkPageSetNetworkInterceptionPatternsParamsPatterns
-    { pageSetNetworkInterceptionPatternsParamsPatternsGlob = Just (urlGlobToText glob)
-    }
+-- | What the protocol receives for a route. A predicate cannot be sent, so it
+-- is registered as @**\/*@ and the handler filters the requests itself.
+protocolPattern :: UrlMatch -> (Maybe Text, Maybe (Text, Text))
+protocolPattern match =
+  case match of
+    UrlMatchGlob glob ->
+      (Just glob, Nothing)
+    UrlMatchRegex source flags ->
+      (Nothing, Just (source, flags))
+    UrlMatchPredicate _ ->
+      (Just "**/*", Nothing)
 
-contextGlobPattern :: UrlGlob -> BrowserContextSetNetworkInterceptionPatternsParamsPatterns
-contextGlobPattern glob =
-  mkBrowserContextSetNetworkInterceptionPatternsParamsPatterns
-    { browserContextSetNetworkInterceptionPatternsParamsPatternsGlob = Just (urlGlobToText glob)
+globPattern :: UrlMatch -> PageSetNetworkInterceptionPatternsParamsPatterns
+globPattern match =
+  mkPageSetNetworkInterceptionPatternsParamsPatterns
+    { pageSetNetworkInterceptionPatternsParamsPatternsGlob = glob
+    , pageSetNetworkInterceptionPatternsParamsPatternsRegexSource = fmap fst regex
+    , pageSetNetworkInterceptionPatternsParamsPatternsRegexFlags = fmap snd regex
     }
+  where
+    (glob, regex) = protocolPattern match
+
+contextGlobPattern :: UrlMatch -> BrowserContextSetNetworkInterceptionPatternsParamsPatterns
+contextGlobPattern match =
+  mkBrowserContextSetNetworkInterceptionPatternsParamsPatterns
+    { browserContextSetNetworkInterceptionPatternsParamsPatternsGlob = glob
+    , browserContextSetNetworkInterceptionPatternsParamsPatternsRegexSource = fmap fst regex
+    , browserContextSetNetworkInterceptionPatternsParamsPatternsRegexFlags = fmap snd regex
+    }
+  where
+    (glob, regex) = protocolPattern match

@@ -29,7 +29,7 @@ import Playwright
   , ResourceType (resourceTypeToText)
   , RouteOptions (routeTimes)
   , RouteTimes (RouteTimes)
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , abortRoute
   , contextRoute
   , contextRouteWith
@@ -82,7 +82,7 @@ tests =
     [ testCase "should intercept" $
         withAssetsContextWithDefault $ \prefix ctx page -> do
           captured <- newIORef False
-          contextRoute ctx (UrlGlob "**/empty.html") $ \handled -> do
+          contextRoute ctx (UrlMatchGlob "**/empty.html") $ \handled -> do
             request <- routeRequest handled
             url <- requestUrl request
             assertBool "empty.html" ("empty.html" `isInfixOf` urlToText url)
@@ -116,26 +116,26 @@ tests =
     , testCase "should unroute" $
         withAssetsContextWithDefault $ \prefix ctx page -> do
           intercepted <- newIORef ([] :: [Int])
-          contextRoute ctx (UrlGlob "**/*") $ \handled -> do
+          contextRoute ctx (UrlMatchGlob "**/*") $ \handled -> do
             modifyIORef' intercepted (1 :)
             fallbackRoute handled
-          contextRoute ctx (UrlGlob "**/empty.html") $ \handled -> do
+          contextRoute ctx (UrlMatchGlob "**/empty.html") $ \handled -> do
             modifyIORef' intercepted (2 :)
             fallbackRoute handled
-          contextRoute ctx (UrlGlob "**/empty.html") $ \handled -> do
+          contextRoute ctx (UrlMatchGlob "**/empty.html") $ \handled -> do
             modifyIORef' intercepted (3 :)
             fallbackRoute handled
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           assertEqual "before" [3, 2, 1] . reverse =<< readIORef intercepted
           writeIORef intercepted []
-          unrouteContext ctx (UrlGlob "**/empty.html")
+          unrouteContext ctx (UrlMatchGlob "**/empty.html")
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           assertEqual "after" [1] . reverse =<< readIORef intercepted
     , testCase "should yield to page.route" $
         withAssetsContextWithDefault $ \prefix ctx page -> do
-          contextRoute ctx (UrlGlob "**/empty.html") $ \handled ->
+          contextRoute ctx (UrlMatchGlob "**/empty.html") $ \handled ->
             fulfillRoute handled defaultFulfillOptions {fulfillBody = Just (FulfillText "context")}
-          route page (UrlGlob "**/empty.html") $ \handled ->
+          route page (UrlMatchGlob "**/empty.html") $ \handled ->
             fulfillRoute handled defaultFulfillOptions {fulfillBody = Just (FulfillText "page")}
           response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           case response of
@@ -145,9 +145,9 @@ tests =
               assertEqual "body" "page" =<< responseText value
     , testCase "should fall back to context.route" $
         withAssetsContextWithDefault $ \prefix ctx page -> do
-          contextRoute ctx (UrlGlob "**/empty.html") $ \handled ->
+          contextRoute ctx (UrlMatchGlob "**/empty.html") $ \handled ->
             fulfillRoute handled defaultFulfillOptions {fulfillBody = Just (FulfillText "context")}
-          route page (UrlGlob "**/non-empty.html") $ \handled ->
+          route page (UrlMatchGlob "**/non-empty.html") $ \handled ->
             fulfillRoute handled defaultFulfillOptions {fulfillBody = Just (FulfillText "page")}
           response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           case response of
@@ -157,9 +157,9 @@ tests =
               assertEqual "body" "context" =<< responseText value
     , testCase "should chain page fallback into context.route" $
         withAssetsContextWithDefault $ \prefix ctx page -> do
-          contextRoute ctx (UrlGlob "**/empty.html") $ \handled ->
+          contextRoute ctx (UrlMatchGlob "**/empty.html") $ \handled ->
             fulfillRoute handled defaultFulfillOptions {fulfillBody = Just (FulfillText "context")}
-          route page (UrlGlob "**/empty.html") fallbackRoute
+          route page (UrlMatchGlob "**/empty.html") fallbackRoute
           response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           case response of
             Nothing ->
@@ -171,7 +171,7 @@ tests =
           intercepted <- newIORef ([] :: [Int])
           contextRouteWith
             ctx
-            (UrlGlob "**/empty.html")
+            (UrlMatchGlob "**/empty.html")
             defaultRouteOptions {routeTimes = Just (RouteTimes 1)}
             $ \handled -> do
               modifyIORef' intercepted (1 :)
@@ -182,8 +182,8 @@ tests =
           assertEqual "once" [1] . reverse =<< readIORef intercepted
     , testCase "context.unrouteAll removes all handlers" $
         withAssetsContextWithDefault $ \prefix ctx page -> do
-          contextRoute ctx (UrlGlob "**/*") abortRoute
-          contextRoute ctx (UrlGlob "**/empty.html") abortRoute
+          contextRoute ctx (UrlMatchGlob "**/*") abortRoute
+          contextRoute ctx (UrlMatchGlob "**/empty.html") abortRoute
           unrouteContextAll ctx
           response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           case response of

@@ -27,7 +27,7 @@ import Playwright
   , Request
   , RequestFailure (requestFailureText)
   , ResourceType (resourceTypeToText)
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , click
   , currentUrl
   , defaultGotoOptions
@@ -98,7 +98,7 @@ tests =
           _ <- goto page (urlFromText empty) defaultGotoOptions
           setContent page "<a target=_blank rel=noopener href=\"/one-style.html\">yo</a>"
           withAsync (waitForContextPage ctx) $ \pending ->
-            withAsync (waitForRequest page (UrlGlob "**/one-style.css")) $ \cssPending -> do
+            withAsync (waitForRequest page (UrlMatchGlob "**/one-style.css")) $ \cssPending -> do
               click (locate page "a")
               other <- wait pending
               waitForLoadState other LoadStateLoad
@@ -120,7 +120,7 @@ tests =
           _ <- goto page (urlFromText empty) defaultGotoOptions
           setContent page "<a target=_blank rel=noopener href=\"/one-style.html\">yo</a>"
           withAsync (waitForContextPage ctx) $ \pending ->
-            withAsync (waitForResponse page (UrlGlob "**/one-style.css")) $ \cssPending -> do
+            withAsync (waitForResponse page (UrlMatchGlob "**/one-style.css")) $ \cssPending -> do
               click (locate page "a")
               other <- wait pending
               waitForLoadState other LoadStateLoad

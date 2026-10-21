@@ -31,7 +31,7 @@ import Playwright
   , Playwright
   , ReducedMotion (ReducedMotionReduce)
   , TimezoneId (TimezoneId)
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , ViewportHeight (ViewportHeight)
   , ViewportSize (ViewportSize)
   , ViewportWidth (ViewportWidth)
@@ -198,7 +198,7 @@ tests =
                   Just [HttpHeader (HeaderName "foo") (HeaderValue "bar")]
               }
             $ \_ page ->
-              withAsync (waitForRequest page (UrlGlob "**/empty.html")) $ \pending -> do
+              withAsync (waitForRequest page (UrlMatchGlob "**/empty.html")) $ \pending -> do
                 _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
                 request <- wait pending
                 headers <- requestHeaders request

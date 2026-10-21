@@ -9,13 +9,13 @@ import Playwright.LoadState
 import Playwright.Timeout
   ( Timeout
   )
-import Playwright.UrlGlob
-  ( UrlGlob
+import Playwright.UrlMatch
+  ( UrlMatch
   )
 
 data WaitForNavigationOptions = WaitForNavigationOptions
   { waitForNavigationOptionsTimeout :: Maybe Timeout
-  , waitForNavigationOptionsUrl :: Maybe UrlGlob
+  , waitForNavigationOptionsUrl :: Maybe UrlMatch
   , waitForNavigationOptionsWaitUntil :: Maybe LoadState
   }
   deriving stock (Eq, Show)

@@ -66,8 +66,8 @@ import Playwright.TimeoutDefaults
 import Playwright.Url
   ( Url
   )
-import Playwright.UrlGlob
-  ( UrlGlob
+import Playwright.UrlMatch
+  ( UrlMatch
   )
 import Playwright.WaitId
   ( WaitId (WaitId)
@@ -85,7 +85,7 @@ data Session = Session
   , sessionEventBuffer :: Map (Guid, MethodName) (Seq Aeson.Value)
   , sessionClosedGuids :: Set Guid
   , sessionEventHandlers :: [EventHandler]
-  , sessionRouteHandlers :: Map Guid [(UrlGlob, ChannelRef -> IO Bool)]
+  , sessionRouteHandlers :: Map Guid [(UrlMatch, ChannelRef -> IO Bool)]
   , sessionRouteListening :: Set Guid
   , sessionRequestOverrides :: Map Guid RequestOverrides
   , sessionContextBaseUrls :: Map Guid Url

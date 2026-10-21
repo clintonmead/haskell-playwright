@@ -3,7 +3,7 @@ module Playwright.PageRequestAbortSpec
   ) where
 
 import Playwright
-  ( UrlGlob (UrlGlob)
+  ( UrlMatch (UrlMatchGlob)
   , abortRoute
   , defaultGotoOptions
   , goto
@@ -28,7 +28,7 @@ tests =
     "page-route-abort"
     [ testCase "should fail navigation when aborting main resource" $
         withAssets $ \prefix page -> do
-          route page (UrlGlob "**/*") abortRoute
+          route page (UrlMatchGlob "**/*") abortRoute
           assertProtocolContains
             "net::ERR_FAILED"
             (goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions)

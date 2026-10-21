@@ -25,7 +25,7 @@ import Data.Text
 import Playwright
   ( Page
   , Request
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , defaultGotoOptions
   , evaluate
   , goto
@@ -117,6 +117,6 @@ tests =
 postTitle :: Page -> Text -> Text -> Playwright Request
 postTitle page prefix script = do
   _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-  withAsync (waitForRequest page (UrlGlob (prefix <> "/title.html"))) $ \pending -> do
+  withAsync (waitForRequest page (UrlMatchGlob (prefix <> "/title.html"))) $ \pending -> do
     _ <- evaluate page script
     wait pending

@@ -38,7 +38,7 @@ import Playwright
   , Playwright
   , Point (Point)
   , Response
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , bringToFront
   , click
   , closePage
@@ -168,7 +168,7 @@ tests =
     , testCase "should terminate network waiters" $
         withAssets $ \prefix page -> do
           let
-            empty = UrlGlob (prefix <> "/empty.html")
+            empty = UrlMatchGlob (prefix <> "/empty.html")
           withAsync (waitForRequest page empty) $ \reqHandle ->
             withAsync (waitForResponse page empty) $ \respHandle -> do
               closePage page
@@ -194,7 +194,7 @@ tests =
     , testCase "interrupt request.response() and request.allHeaders() on page.close" $
         withChromiumPage $ \page ->
           withLocalApp hangingStyleApp $ \prefix -> do
-            withAsync (waitForRequest page (UrlGlob "**/one-style.css")) $ \pending -> do
+            withAsync (waitForRequest page (UrlMatchGlob "**/one-style.css")) $ \pending -> do
               _ <-
                 goto
                   page
@@ -235,7 +235,7 @@ tests =
         withChromiumPage $ \page ->
           withLocalApp hangingGetApp $ \prefix -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-            withAsync (waitForResponse page (UrlGlob "**/get")) $ \pending -> do
+            withAsync (waitForResponse page (UrlMatchGlob "**/get")) $ \pending -> do
               _ <- evaluate page "() => fetch('./get', { method: 'GET' })"
               response <- wait pending
               withAsync (responseFinished response) $ \finishHandle -> do
@@ -251,7 +251,7 @@ tests =
     , testCase "should not throw when continuing while page is closing" $
         withAssets $ \prefix page -> do
           done <- newEmptyMVar
-          route page (UrlGlob "**/*") $ \handled -> do
+          route page (UrlMatchGlob "**/*") $ \handled -> do
             concurrently_ (continueRoute handled) (closePage page)
             putMVar done ()
           _ <-
@@ -261,7 +261,7 @@ tests =
     , testCase "should not throw when continuing after page is closed" $
         withAssets $ \prefix page -> do
           done <- newEmptyMVar
-          route page (UrlGlob "**/*") $ \handled -> do
+          route page (UrlMatchGlob "**/*") $ \handled -> do
             closePage page
             continueRoute handled
             putMVar done ()

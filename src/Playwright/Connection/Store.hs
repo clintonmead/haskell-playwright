@@ -98,8 +98,8 @@ import Playwright.TimeoutDefaults
 import Playwright.Url
   ( Url
   )
-import Playwright.UrlGlob
-  ( UrlGlob
+import Playwright.UrlMatch
+  ( UrlMatch
   )
 
 lookupObject :: Connection -> Guid -> IO RemoteObject
@@ -124,7 +124,7 @@ closedGuids :: Connection -> IO (Set Guid)
 closedGuids conn =
   atomically (sessionClosedGuids <$> readSession conn)
 
-pushRouteHandler :: Connection -> Guid -> UrlGlob -> (ChannelRef -> IO Bool) -> IO Bool
+pushRouteHandler :: Connection -> Guid -> UrlMatch -> (ChannelRef -> IO Bool) -> IO Bool
 pushRouteHandler conn guid glob run =
   atomically $
     stateSession conn $ \session ->
@@ -143,7 +143,7 @@ pushRouteHandler conn guid glob run =
             }
         )
 
-removeRouteHandlers :: Connection -> Guid -> UrlGlob -> IO ()
+removeRouteHandlers :: Connection -> Guid -> UrlMatch -> IO ()
 removeRouteHandlers conn guid glob =
   atomically $
     modifySession conn $ \session ->
@@ -158,7 +158,7 @@ clearRouteHandlers conn guid =
     modifySession conn $ \session ->
       session {sessionRouteHandlers = Map.delete guid (sessionRouteHandlers session)}
 
-routeHandlersFor :: Connection -> Guid -> IO [(UrlGlob, ChannelRef -> IO Bool)]
+routeHandlersFor :: Connection -> Guid -> IO [(UrlMatch, ChannelRef -> IO Bool)]
 routeHandlersFor conn guid = do
   session <- atomically (readSession conn)
   pure (Map.findWithDefault [] guid (sessionRouteHandlers session))

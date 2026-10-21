@@ -36,7 +36,7 @@ import Playwright
   , FulfillBody (FulfillText)
   , FulfillOptions (fulfillBody, fulfillContentType)
   , LoadState (LoadStateLoad)
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , WaitForState (WaitForVisible)
   , childLocator
   , click
@@ -217,7 +217,7 @@ tests =
           assertEqual "after" True =<< isVisible input
     , testCase "should not auto play audio" $
         withChromiumPage $ \page -> do
-          route page (UrlGlob "**/*") $ \handled ->
+          route page (UrlMatchGlob "**/*") $ \handled ->
             fulfillRoute
               handled
               defaultFulfillOptions

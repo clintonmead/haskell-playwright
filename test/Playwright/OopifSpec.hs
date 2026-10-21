@@ -42,7 +42,7 @@ import Playwright
   , Playwright
   , Request
   , TimezoneId (TimezoneId)
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , UserAgent (UserAgent)
   , ViewportHeight (ViewportHeight)
   , ViewportSize (ViewportSize)
@@ -195,7 +195,7 @@ tests =
           assertEqual "offline" False =<< evaluateOnFrameBool oopif "() => navigator.onLine"
     , testCase "should support context options" $
         withAssetsLaunchWith sitePerProcess iPhoneOopif $ \prefix _ctx page -> do
-          withAsync (waitForRequest page (UrlGlob "**/grid.html")) $ \pending -> do
+          withAsync (waitForRequest page (UrlMatchGlob "**/grid.html")) $ \pending -> do
             _ <- goto page (urlFromText (prefix <> "/dynamic-oopif.html")) defaultGotoOptions
             request <- wait pending
             oopif <- requireOopif page
@@ -217,7 +217,7 @@ tests =
     , testCase "should respect route" $
         withOopif $ \prefix page -> do
           intercepted <- newIORef False
-          route page (UrlGlob "**/digits/0.png") $ \handled -> do
+          route page (UrlMatchGlob "**/digits/0.png") $ \handled -> do
             modifyIORef' intercepted (const True)
             continueRoute handled
           _ <- goto page (urlFromText (prefix <> "/dynamic-oopif.html")) defaultGotoOptions
@@ -225,7 +225,7 @@ tests =
           assertEqual "intercepted" True =<< readIORef intercepted
     , testCase "should load oopif iframes with subresources and route" $
         withOopif $ \prefix page -> do
-          route page (UrlGlob "**/*") continueRoute
+          route page (UrlMatchGlob "**/*") continueRoute
           _ <- goto page (urlFromText (prefix <> "/dynamic-oopif.html")) defaultGotoOptions
           assertEqual "frames" 2 . length =<< frames page
     , testCase "should report main requests" $
@@ -377,7 +377,7 @@ tests =
           assertEqual "result" (2022 :: Double) =<< evaluateNumber page "() => window.myFunc()"
     , testCase "should intercept response body from oopif" $
         withOopif $ \prefix page -> do
-          withAsync (waitForResponse page (UrlGlob "**/grid.html")) $ \pending -> do
+          withAsync (waitForResponse page (UrlMatchGlob "**/grid.html")) $ \pending -> do
             _ <- goto page (urlFromText (prefix <> "/dynamic-oopif.html")) defaultGotoOptions
             body <- responseText =<< wait pending
             assertBool "body" (not (Text.null body))

@@ -19,7 +19,7 @@ import Network.Wai
   )
 import Playwright
   ( LoadState (LoadStateCommit, LoadStateDomContentLoaded)
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , WaitForNavigationOptions (waitForNavigationOptionsWaitUntil)
   , armNavigationOptions
   , click
@@ -98,7 +98,7 @@ tests =
             Nothing ->
               assertFailure "timeout"
             Just timeout ->
-              assertWaitTimeout (waitForNavigationWith page timeout (Just (UrlGlob "**/frame.html")))
+              assertWaitTimeout (waitForNavigationWith page timeout (Just (UrlMatchGlob "**/frame.html")))
     , testCase "should work with both domcontentloaded and load" $ do
         assets <- testAssetsDir
         arrived <- newEmptyMVar

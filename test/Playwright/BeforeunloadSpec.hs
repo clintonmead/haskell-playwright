@@ -11,7 +11,7 @@ import Playwright
   , FulfillBody (FulfillText)
   , FulfillOptions (fulfillBody, fulfillContentType, fulfillStatus)
   , HttpStatus (HttpStatus)
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , acceptDialog
   , armDialog
   , click
@@ -148,7 +148,7 @@ tests =
               clickWith
                 (getByRole page (AriaRole "link") defaultGetByRoleOptions)
                 defaultClickOptions {clickOptionsTimeout = Just timeout}
-          waitForURL page (UrlGlob (prefix <> "/frames/one-frame.html"))
+          waitForURL page (UrlMatchGlob (prefix <> "/frames/one-frame.html"))
     , testCase "should support dismissing the dialog multiple times" $
         withAssetsContextWith defaultNewContextOptions $ \prefix ctx _ -> do
           page <- newPage ctx
@@ -198,7 +198,7 @@ tests =
               page
               "() => { window.addEventListener('beforeunload', event => { event.preventDefault(); }); }"
           click (locate page "body")
-          route page (UrlGlob "**/api") $ \handled ->
+          route page (UrlMatchGlob "**/api") $ \handled ->
             fulfillRoute
               handled
               defaultFulfillOptions

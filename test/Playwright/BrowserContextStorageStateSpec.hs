@@ -21,7 +21,7 @@ import Playwright
   , StorageName (StorageName, storageNameToText)
   , StorageState (storageStateCookies, storageStateOrigins)
   , StorageValue (StorageValue, storageValueToText)
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , addCookies
   , cookieForUrl
   , defaultFulfillOptions
@@ -122,7 +122,7 @@ replaced =
 
 fulfillBlank :: Page -> Playwright ()
 fulfillBlank page =
-  route page (UrlGlob "**/*") $ \handled ->
+  route page (UrlMatchGlob "**/*") $ \handled ->
     fulfillRoute handled defaultFulfillOptions {fulfillBody = Just (FulfillText " ")}
 
 originValue :: StorageState -> Text -> Text -> Maybe Text

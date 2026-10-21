@@ -3,7 +3,7 @@ module Playwright.PageWaitForRequestSpec
   ) where
 
 import Playwright
-  ( UrlGlob (UrlGlob)
+  ( UrlMatch (UrlMatchGlob, UrlMatchRegex)
   , armRequest
   , armRequestWhere
   , armRequestWith
@@ -42,7 +42,7 @@ tests =
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           let wanted = prefix <> "/digits/2.png"
-          takeRequest <- armRequest page (UrlGlob wanted)
+          takeRequest <- armRequest page (UrlMatchGlob wanted)
           _ <-
             evaluate
               page
@@ -70,7 +70,7 @@ tests =
             Nothing ->
               assertFailure "timeout"
             Just timeout -> do
-              takeRequest <- armRequestWith page (UrlGlob wanted) timeout
+              takeRequest <- armRequestWith page (UrlMatchGlob wanted) timeout
               _ <-
                 evaluate
                   page
@@ -85,7 +85,7 @@ tests =
             Nothing ->
               assertFailure "timeout"
             Just timeout ->
-              assertWaitTimeout (waitForRequestWith page (UrlGlob (prefix <> "/does-not-exist.png")) timeout)
+              assertWaitTimeout (waitForRequestWith page (UrlMatchGlob (prefix <> "/does-not-exist.png")) timeout)
     , testCase "should respect default timeout" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
@@ -94,7 +94,7 @@ tests =
               assertFailure "timeout"
             Just timeout -> do
               setDefaultTimeout page timeout
-              assertWaitTimeout (waitForRequest page (UrlGlob (prefix <> "/does-not-exist.png")))
+              assertWaitTimeout (waitForRequest page (UrlMatchGlob (prefix <> "/does-not-exist.png")))
     , testCase "armRequest ignores a request made before it was armed" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
@@ -104,6 +104,22 @@ tests =
             Nothing ->
               assertFailure "timeout"
             Just timeout -> do
-              takeRequest <- armRequestWith page (UrlGlob (prefix <> "/digits/1.png")) timeout
+              takeRequest <- armRequestWith page (UrlMatchGlob (prefix <> "/digits/1.png")) timeout
               assertWaitTimeout takeRequest
+    , testCase "should work with url match" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          takeRequest <- armRequest page (UrlMatchRegex "digits\\/\\d\\.png" "")
+          _ <- evaluate page "() => fetch('/digits/1.png')"
+          request <- takeRequest
+          url <- requestUrl request
+          assertEqual "url" (prefix <> "/digits/1.png") (urlToText url)
+    , testCase "should work with url match regular expression with flags" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          takeRequest <- armRequest page (UrlMatchRegex "DIGITS/2\\.PNG" "i")
+          _ <- evaluate page "() => fetch('/digits/2.png')"
+          request <- takeRequest
+          url <- requestUrl request
+          assertEqual "url" (prefix <> "/digits/2.png") (urlToText url)
     ]

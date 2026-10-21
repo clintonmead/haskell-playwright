@@ -50,7 +50,7 @@ import Playwright
   , HttpStatus (HttpStatus)
   , Page
   , Request
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , WaitForState (WaitForVisible)
   , continueRoute
   , defaultFulfillOptions
@@ -104,7 +104,7 @@ tests =
       [ testCase "should work with navigation" $
         withRedirectAssets $ \prefix page -> do
           captured <- newIORef []
-          route page (UrlGlob "**/*") $ \handled -> do
+          route page (UrlMatchGlob "**/*") $ \handled -> do
             request <- routeRequest handled
             url <- requestUrl request
             let
@@ -128,7 +128,7 @@ tests =
           swResponse <-
             evaluateText page "() => window['fetchDummy']('foo')"
           assertEqual "sw" "responseFromServiceWorker:foo" swResponse
-          route page (UrlGlob "**/foo") $ \handled -> do
+          route page (UrlMatchGlob "**/foo") $ \handled -> do
             request <- routeRequest handled
             url <- requestUrl request
             let
@@ -152,7 +152,7 @@ tests =
             let
               hostPrefix = replace "127.0.0.1" "localhost" prefix
             _ <- goto page (urlFromText (hostPrefix <> "/empty.html")) defaultGotoOptions
-            route page (UrlGlob "http://localhos**?*oo") $ \handled ->
+            route page (UrlMatchGlob "http://localhos**?*oo") $ \handled ->
               fulfillRoute
                 handled
                 defaultFulfillOptions
@@ -170,7 +170,7 @@ tests =
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           let
             url = prefix <> "/data_for_worker"
-          route page (UrlGlob url) $ \handled ->
+          route page (UrlMatchGlob url) $ \handled ->
             ignoreFulfill $
               fulfillRoute
                 handled
@@ -206,7 +206,7 @@ tests =
                 \}"
                 (textArgument url)
             _ <- wait workerPending
-            route page (UrlGlob url) $ \handled ->
+            route page (UrlMatchGlob url) $ \handled ->
               ignoreFulfill $
                 fulfillRoute
                   handled
@@ -222,7 +222,7 @@ tests =
         withAssets $ \prefix page -> do
           let
             url = prefix <> "/worker/worker.js"
-          route page (UrlGlob url) $ \handled ->
+          route page (UrlMatchGlob url) $ \handled ->
             ignoreFulfill $
               fulfillRoute
                 handled
@@ -241,7 +241,7 @@ tests =
             assertEqual "worker.js" "intercepted" (consoleMessageText msg)
     , testCase "should not break remote worker importScripts" $
         withAssets $ \prefix page -> do
-          route page (UrlGlob "**") continueRoute
+          route page (UrlMatchGlob "**") continueRoute
           _ <-
             goto
               page
@@ -251,7 +251,7 @@ tests =
     , testCase "should disable memory cache when intercepting" $
         withAssets $ \prefix page -> do
           intercepted <- newIORef (0 :: Int)
-          route page (UrlGlob "**/page.html") $ \handled -> do
+          route page (UrlMatchGlob "**/page.html") $ \handled -> do
             modifyIORef' intercepted (+ 1)
             fulfillRoute
               handled

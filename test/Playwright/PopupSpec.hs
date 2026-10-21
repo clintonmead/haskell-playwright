@@ -57,7 +57,7 @@ import Playwright
   , NewContextOptions (newContextExtraHTTPHeaders, newContextHasTouch, newContextHttpCredentials, newContextUserAgent, newContextViewport)
   , Page
   , Playwright
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , UserAgent (UserAgent)
   , ViewportHeight (ViewportHeight)
   , ViewportSize (ViewportSize)
@@ -185,7 +185,7 @@ contextRoutesOnClick =
     _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
     setContent page "<a target=_blank rel=noopener href=\"empty.html\">link</a>"
     intercepted <- newIORef False
-    contextRoute ctx (UrlGlob "**/empty.html") $ \handled -> do
+    contextRoute ctx (UrlMatchGlob "**/empty.html") $ \handled -> do
       continueRoute handled
       writeIORef intercepted True
     withAsync (waitForContextPage ctx) $ \pending -> do
@@ -317,7 +317,7 @@ contextRoutesOnWindowOpen =
   withAssetsContextWith defaultNewContextOptions $ \prefix ctx page -> do
     _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
     intercepted <- newIORef False
-    contextRoute ctx (UrlGlob "**/empty.html") $ \handled -> do
+    contextRoute ctx (UrlMatchGlob "**/empty.html") $ \handled -> do
       continueRoute handled
       writeIORef intercepted True
     withAsync (waitForPopup page) $ \pending -> do

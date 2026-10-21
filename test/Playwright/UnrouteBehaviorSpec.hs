@@ -17,7 +17,7 @@ import Playwright
   , Playwright
   , Response
   , Route
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , abortRoute
   , closeContext
   , closePage
@@ -77,8 +77,8 @@ tests =
     "unroute-behavior"
     [ testCase "context.unrouteAll removes all handlers" $
         withAssetsContextWith defaultNewContextOptions $ \prefix ctx page -> do
-          contextRoute ctx (UrlGlob "**/*") abortRoute
-          contextRoute ctx (UrlGlob "**/empty.html") abortRoute
+          contextRoute ctx (UrlMatchGlob "**/*") abortRoute
+          contextRoute ctx (UrlMatchGlob "**/empty.html") abortRoute
           unrouteContextAll ctx
           response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           case response of
@@ -88,8 +88,8 @@ tests =
               assertEqual "ok" True =<< responseOk value
     , testCase "page.unrouteAll removes all routes" $
         withAssets $ \prefix page -> do
-          route page (UrlGlob "**/*") abortRoute
-          route page (UrlGlob "**/empty.html") abortRoute
+          route page (UrlMatchGlob "**/*") abortRoute
+          route page (UrlMatchGlob "**/empty.html") abortRoute
           unrouteAll page
           response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           case response of
@@ -100,30 +100,30 @@ tests =
     , testCase "page.close should not wait for active route handlers on the owning context" $
         withAssetsContextWith defaultNewContextOptions $ \prefix ctx page -> do
           arrived <- newEmptyMVar
-          contextRoute ctx (UrlGlob "**/*") $ \_handled -> do
+          contextRoute ctx (UrlMatchGlob "**/*") $ \_handled -> do
             putMVar arrived ()
             hangForever
-          route page (UrlGlob "**/*") fallbackRoute
+          route page (UrlMatchGlob "**/*") fallbackRoute
           ignoreGoto page (prefix <> "/empty.html")
           takeMVar arrived
           closePage page
     , testCase "context.close should not wait for active route handlers on the owned pages" $
         withAssetsContextWith defaultNewContextOptions $ \prefix ctx page -> do
           arrived <- newEmptyMVar
-          route page (UrlGlob "**/*") $ \_handled -> do
+          route page (UrlMatchGlob "**/*") $ \_handled -> do
             putMVar arrived ()
             hangForever
-          route page (UrlGlob "**/*") fallbackRoute
+          route page (UrlMatchGlob "**/*") fallbackRoute
           ignoreGoto page (prefix <> "/empty.html")
           takeMVar arrived
           closeContext ctx
     , testCase "page.close does not wait for active route handlers" $
         withAssets $ \prefix page -> do
           secondCalled <- newIORef False
-          route page (UrlGlob "**/*") $ \_handled ->
+          route page (UrlMatchGlob "**/*") $ \_handled ->
             writeIORef secondCalled True
           arrived <- newEmptyMVar
-          route page (UrlGlob "**/*") $ \_handled -> do
+          route page (UrlMatchGlob "**/*") $ \_handled -> do
             putMVar arrived ()
             hangForever
           ignoreGoto page (prefix <> "/empty.html")
@@ -149,7 +149,7 @@ withHeldRoute :: (Page -> Route -> Playwright ()) -> IO ()
 withHeldRoute action =
   withAssets $ \prefix page -> do
     arrived <- newEmptyMVar
-    route page (UrlGlob "**/*") $ \handled ->
+    route page (UrlMatchGlob "**/*") $ \handled ->
       putMVar arrived handled
     ignoreGoto page (prefix <> "/empty.html")
     handled <- takeMVar arrived

@@ -29,7 +29,7 @@ import Playwright
   , Request
   , ResourceTiming (resourceTimingConnectEnd, resourceTimingConnectStart, resourceTimingDomainLookupEnd, resourceTimingDomainLookupStart, resourceTimingRequestStart, resourceTimingResponseEnd, resourceTimingResponseStart, resourceTimingSecureConnectionStart)
   , Response
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , defaultGotoOptions
   , goto
   , onRequestFinished
@@ -135,7 +135,7 @@ tests =
           assets <- testAssetsDir
           withLocalApp (cachedCssApp assets) $ \prefix -> do
             _ <- goto page (urlFromText (prefix <> "/one-style.html")) defaultGotoOptions
-            withAsync (waitForResponse page (UrlGlob "**/one-style.css")) $ \pending -> do
+            withAsync (waitForResponse page (UrlMatchGlob "**/one-style.css")) $ \pending -> do
               _ <- reload page
               response <- wait pending
               responseFinished response

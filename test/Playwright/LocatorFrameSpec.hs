@@ -7,7 +7,7 @@ import Playwright
   , FulfillBody (FulfillText)
   , FulfillOptions (fulfillBody, fulfillContentType)
   , Page
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , WaitForState (WaitForVisible)
   , childFrameLocator
   , childLocator
@@ -83,14 +83,14 @@ tests =
 
 routeIframe :: Page -> Playwright ()
 routeIframe page = do
-  route page (UrlGlob "**/empty.html") $ \handled ->
+  route page (UrlMatchGlob "**/empty.html") $ \handled ->
     fulfillRoute
       handled
       defaultFulfillOptions
         { fulfillContentType = Just (ContentType "text/html")
         , fulfillBody = Just (FulfillText "<iframe src=\"iframe.html\" name=\"frame1\"></iframe>")
         }
-  route page (UrlGlob "**/iframe.html") $ \handled ->
+  route page (UrlMatchGlob "**/iframe.html") $ \handled ->
     fulfillRoute
       handled
       defaultFulfillOptions
@@ -101,7 +101,7 @@ routeIframe page = do
                   "<html><div><button data-testid=\"buttonId\">Hello iframe</button><iframe src=\"iframe-2.html\"></iframe></div><span>1</span><span>2</span></html>"
               )
         }
-  route page (UrlGlob "**/iframe-2.html") $ \handled ->
+  route page (UrlMatchGlob "**/iframe-2.html") $ \handled ->
     fulfillRoute
       handled
       defaultFulfillOptions

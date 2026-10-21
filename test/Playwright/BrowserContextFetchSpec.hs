@@ -133,7 +133,7 @@ import Playwright
   , Page
   , StorageState (storageStateCookies)
   , Url
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , addCookies
   , apiRequestStorageState
   , apiResponseBody
@@ -1392,7 +1392,7 @@ overrideRequestParameters = do
   withApplication (pure (postCaptureApp captured)) $ \port ->
     withChromiumContext $ \ctx page -> do
       let prefix = "http://127.0.0.1:" <> pack (show port)
-      withAsync (waitForRequest page (UrlGlob (prefix <> "/empty.html"))) $ \handle -> do
+      withAsync (waitForRequest page (UrlMatchGlob (prefix <> "/empty.html"))) $ \handle -> do
         _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
         pageReq <- wait handle
         request <- contextRequest ctx

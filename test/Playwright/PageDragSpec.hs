@@ -15,7 +15,7 @@ import Playwright
   , Page
   , Point (Point)
   , Playwright
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , abortRoute
   , cssPixelFromInt
   , defaultDragAndDropOptions
@@ -216,7 +216,7 @@ tests =
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/drag-n-drop.html")) defaultGotoOptions
           captured <- newEmptyMVar
-          route page (UrlGlob "**/empty.html") (putMVar captured)
+          route page (UrlMatchGlob "**/empty.html") (putMVar captured)
           withAsync (attachFrame page "frame" (prefix <> "/empty.html")) $ \_ -> do
             pending <- takeMVar captured
             hover (locate page "#source")

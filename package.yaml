@@ -50,6 +50,8 @@ library:
     - exceptions
     - filepath
     - mtl
+    - regex-base
+    - regex-tdfa
     - scientific
     - stm
     - text

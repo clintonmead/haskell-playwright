@@ -9,7 +9,7 @@ import Data.Text
   ( isInfixOf
   )
 import Playwright
-  ( UrlGlob (UrlGlob)
+  ( UrlMatch (UrlMatchGlob)
   , armResponse
   , armResponseWhere
   , armResponseWith
@@ -51,7 +51,7 @@ tests =
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           let wanted = prefix <> "/digits/2.png"
-          takeResponse <- armResponse page (UrlGlob wanted)
+          takeResponse <- armResponse page (UrlMatchGlob wanted)
           _ <-
             evaluate
               page
@@ -66,7 +66,7 @@ tests =
             Nothing ->
               assertFailure "timeout"
             Just timeout ->
-              assertWaitTimeout (waitForResponseWith page (UrlGlob (prefix <> "/does-not-exist.png")) timeout)
+              assertWaitTimeout (waitForResponseWith page (UrlMatchGlob (prefix <> "/does-not-exist.png")) timeout)
     , testCase "should respect default timeout" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
@@ -75,7 +75,7 @@ tests =
               assertFailure "timeout"
             Just timeout -> do
               setDefaultTimeout page timeout
-              assertWaitTimeout (waitForResponse page (UrlGlob (prefix <> "/does-not-exist.png")))
+              assertWaitTimeout (waitForResponse page (UrlMatchGlob (prefix <> "/does-not-exist.png")))
     , testCase "should work with predicate" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
@@ -115,7 +115,7 @@ tests =
             Nothing ->
               assertFailure "timeout"
             Just timeout -> do
-              takeResponse <- armResponseWith page (UrlGlob wanted) timeout
+              takeResponse <- armResponseWith page (UrlMatchGlob wanted) timeout
               _ <-
                 evaluate
                   page

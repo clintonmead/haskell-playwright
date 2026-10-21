@@ -7,7 +7,7 @@ import Data.Text
   )
 import Playwright
   ( NewContextOptions (newContextDeviceScaleFactor)
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , defaultGotoOptions
   , defaultNewContextOptions
   , deviceScaleFactorFromInt
@@ -41,7 +41,7 @@ tests =
         withAssetsWith
           defaultNewContextOptions {newContextDeviceScaleFactor = Just (deviceScaleFactorFromInt 1)}
           $ \prefix page ->
-            withAsync (waitForRequest page (UrlGlob "**/image*")) $ \pending -> do
+            withAsync (waitForRequest page (UrlMatchGlob "**/image*")) $ \pending -> do
               _ <- goto page (urlFromText (prefix <> "/highdpi.html")) defaultGotoOptions
               request <- wait pending
               assertBool "image1x" . ("image1x" `isInfixOf`) . urlToText =<< requestUrl request
@@ -49,7 +49,7 @@ tests =
         withAssetsWith
           defaultNewContextOptions {newContextDeviceScaleFactor = Just (deviceScaleFactorFromInt 2)}
           $ \prefix page ->
-            withAsync (waitForRequest page (UrlGlob "**/image*")) $ \pending -> do
+            withAsync (waitForRequest page (UrlMatchGlob "**/image*")) $ \pending -> do
               _ <- goto page (urlFromText (prefix <> "/highdpi.html")) defaultGotoOptions
               request <- wait pending
               assertBool "image2x" . ("image2x" `isInfixOf`) . urlToText =<< requestUrl request

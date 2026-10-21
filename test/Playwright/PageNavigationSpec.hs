@@ -29,7 +29,7 @@ import Playwright
   , HeaderValue (HeaderValue)
   , HttpHeader (HttpHeader)
   , HttpStatus (HttpStatus)
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , armNavigationOptions
   , click
   , closePage
@@ -89,7 +89,7 @@ tests =
             closePage popup
     , testCase "should work with _blank target in form" $
         withAssets $ \prefix page -> do
-          route page (UrlGlob "**/done.html") $ \handled ->
+          route page (UrlMatchGlob "**/done.html") $ \handled ->
             fulfillRoute
               handled
               defaultFulfillOptions
@@ -116,7 +116,7 @@ tests =
           withLocalApp titleApp $ \prefix -> do
             let
               cross = replace "127.0.0.1" "localhost" prefix
-            route page (UrlGlob "**/redirect") $ \handled ->
+            route page (UrlMatchGlob "**/redirect") $ \handled ->
               fulfillRoute
                 handled
                 defaultFulfillOptions

@@ -75,7 +75,7 @@ import Playwright
   , HttpStatus (HttpStatus, httpStatusToInt)
   , Page
   , APIResponse
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , apiResponseHeaders
   , apiResponseHeadersArray
   , apiResponseOk
@@ -140,7 +140,7 @@ tests =
       [ testCase "should fulfill intercepted response" $
           withAssets $ \prefix page -> do
             ctx <- pageRequest page
-            route page (UrlGlob "**/*") $ \handled -> do
+            route page (UrlMatchGlob "**/*") $ \handled -> do
               response <- fetchRequest ctx =<< routeRequest handled
               fulfillRoute
                 handled
@@ -166,7 +166,7 @@ tests =
       , testCase "should fulfill response with empty body" $
           withAssets $ \prefix page -> do
             ctx <- pageRequest page
-            route page (UrlGlob "**/*") $ \handled -> do
+            route page (UrlMatchGlob "**/*") $ \handled -> do
               response <- fetchRequest ctx =<< routeRequest handled
               fulfillRoute
                 handled
@@ -187,7 +187,7 @@ tests =
       , testCase "should override with defaults when intercepted response not provided" $
           withEmptyFooApp $ \prefix page -> do
             ctx <- pageRequest page
-            route page (UrlGlob "**/*") $ \handled -> do
+            route page (UrlMatchGlob "**/*") $ \handled -> do
               _ <- fetchRequest ctx =<< routeRequest handled
               fulfillRoute
                 handled
@@ -206,7 +206,7 @@ tests =
           withSampleApp $ \prefix page -> do
             ctx <- pageRequest page
             sample <- fetchGet ctx (urlFromText (prefix <> "/sample"))
-            route page (UrlGlob "**/*") $ \handled ->
+            route page (UrlMatchGlob "**/*") $ \handled ->
               fulfillRoute
                 handled
                 defaultFulfillOptions
@@ -228,7 +228,7 @@ tests =
           withAssets $ \prefix page -> do
             ctx <- pageRequest page
             original <- fmap decodeUtf8 (readTestAsset "title.html")
-            route page (UrlGlob "**") $ \handled -> do
+            route page (UrlMatchGlob "**") $ \handled -> do
               response <- fetchRequest ctx =<< routeRequest handled
               fulfillRoute handled defaultFulfillOptions {fulfillResponse = Just response}
             navigated <- goto page (urlFromText (prefix <> "/title.html")) defaultGotoOptions
@@ -242,7 +242,7 @@ tests =
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
             ctx <- pageRequest page
             seen <- newIORef (Nothing :: Maybe APIResponse)
-            route page (UrlGlob "**/title.html") $ \handled -> do
+            route page (UrlMatchGlob "**/title.html") $ \handled -> do
               response <- fetchRequest ctx =<< routeRequest handled
               writeIORef seen (Just response)
               fulfillRoute handled defaultFulfillOptions {fulfillResponse = Just response}
@@ -267,7 +267,7 @@ tests =
           withAssets $ \prefix page -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
             ctx <- pageRequest page
-            route page (UrlGlob "**/simple.json") $ \handled -> do
+            route page (UrlMatchGlob "**/simple.json") $ \handled -> do
               response <- fetchRequest ctx =<< routeRequest handled
               assertEqual "body" "{\"foo\": \"bar\"}\n" =<< apiResponseText response
               fulfillRoute handled defaultFulfillOptions {fulfillResponse = Just response}
@@ -279,7 +279,7 @@ tests =
             pure ()
       , testCase "should fulfill intercepted response using alias" $
           withAssets $ \prefix page -> do
-            route page (UrlGlob "**/*") $ \handled -> do
+            route page (UrlMatchGlob "**/*") $ \handled -> do
               response <- routeFetch handled
               fulfillRoute handled defaultFulfillOptions {fulfillResponse = Just response}
             navigated <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
@@ -299,7 +299,7 @@ tests =
           withSlowApp $ \prefix page -> do
             timeout <- requireTimeout 1000
             navTimeout <- requireTimeout 2000
-            route page (UrlGlob "**/*") $ \handled ->
+            route page (UrlMatchGlob "**/*") $ \handled ->
               assertProtocolContains
                 "Timeout 1000ms exceeded"
                 (routeFetchWith handled defaultFetchOptions {fetchTimeout = Just timeout})
@@ -312,7 +312,7 @@ tests =
               )
       , testCase "should not follow redirects when maxRedirects is set to 0 in route.fetch" $
           withRedirectApp $ \prefix page -> do
-            route page (UrlGlob "**/*") $ \handled -> do
+            route page (UrlMatchGlob "**/*") $ \handled -> do
               response <-
                 routeFetchWith handled defaultFetchOptions {fetchMaxRedirects = Just 0}
               assertEqual "location" (Just "/empty.html") (headerValue "location" (apiResponseHeaders response))
@@ -323,7 +323,7 @@ tests =
             assertBool "hello" ("hello" `isInfixOf` html)
       , testCase "should intercept with url override" $
           withAssets $ \prefix page -> do
-            route page (UrlGlob "**/*.html") $ \handled -> do
+            route page (UrlMatchGlob "**/*.html") $ \handled -> do
               response <-
                 routeFetchWith
                   handled
@@ -340,7 +340,7 @@ tests =
                 assertBool "css" ("one-style.css" `isInfixOf` body)
       , testCase "should intercept with post data override" $
           withCapturedEmpty $ \prefix captured page -> do
-            route page (UrlGlob "**/*.html") $ \handled -> do
+            route page (UrlMatchGlob "**/*.html") $ \handled -> do
               response <-
                 routeFetchWith
                   handled
@@ -353,7 +353,7 @@ tests =
           withAssets $ \prefix page -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
             posted <- newEmptyMVar
-            route page (UrlGlob (prefix <> "/upload")) $ \handled -> do
+            route page (UrlMatchGlob (prefix <> "/upload")) $ \handled -> do
               request <- routeRequest handled
               assertEqual "method" "POST" . httpMethodToText =<< requestMethod request
               payload <- requestPostData request
@@ -373,7 +373,7 @@ tests =
             assertBool "hello" ("\r\nhello\r\n" `isInfixOf` postData)
       , testCase "should abort favicon requests if interception is enabled" $
           withFaviconApp $ \prefix hits page -> do
-            route page (UrlGlob "**/*") $ \handled ->
+            route page (UrlMatchGlob "**/*") $ \handled ->
               fulfillRoute
                 handled
                 defaultFulfillOptions

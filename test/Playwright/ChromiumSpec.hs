@@ -64,7 +64,7 @@ import Playwright
   , Playwright
   , Request
   , Response
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , Worker
   , closeContext
   , closePage
@@ -173,7 +173,7 @@ tests =
         withAssets $ \prefix page -> do
           let
             ctx = pageContext page
-          contextRoute ctx (UrlGlob "**/*") continueRoute
+          contextRoute ctx (UrlMatchGlob "**/*") continueRoute
           withAsync (waitForServiceWorker ctx) $ \pending -> do
             _ <- goto page (urlFromText (prefix <> "/serviceworkers/empty/sw.html")) defaultGotoOptions
             worker <- wait pending
@@ -281,7 +281,7 @@ tests =
         withAssets $ \prefix page -> do
           let
             ctx = pageContext page
-          contextRoute ctx (UrlGlob "**/request-from-within-worker") $ \handled ->
+          contextRoute ctx (UrlMatchGlob "**/request-from-within-worker") $ \handled ->
             fulfillRoute
               handled
               defaultFulfillOptions
@@ -289,7 +289,7 @@ tests =
                 , fulfillStatus = Just (HttpStatus 200)
                 , fulfillBody = Just (FulfillText "\"intercepted!\"")
                 }
-          contextRoute ctx (UrlGlob "**/sw.js") $ \handled ->
+          contextRoute ctx (UrlMatchGlob "**/sw.js") $ \handled ->
             fulfillRoute
               handled
               defaultFulfillOptions
@@ -326,7 +326,7 @@ tests =
         withAssets $ \prefix page -> do
           let
             ctx = pageContext page
-          contextRoute ctx (UrlGlob "**/import.js") $ \handled ->
+          contextRoute ctx (UrlMatchGlob "**/import.js") $ \handled ->
             fulfillRoute
               handled
               defaultFulfillOptions
@@ -334,7 +334,7 @@ tests =
                 , fulfillStatus = Just (HttpStatus 200)
                 , fulfillBody = Just (FulfillText "self.exportedValue = 47;")
                 }
-          contextRoute ctx (UrlGlob "**/sw.js") $ \handled ->
+          contextRoute ctx (UrlMatchGlob "**/sw.js") $ \handled ->
             fulfillRoute
               handled
               defaultFulfillOptions
@@ -358,7 +358,7 @@ tests =
         withAssets $ \prefix page -> do
           let
             ctx = pageContext page
-          contextRoute ctx (UrlGlob "**/data.json") $ \handled -> do
+          contextRoute ctx (UrlMatchGlob "**/data.json") $ \handled -> do
             request <- routeRequest handled
             sw <- requestServiceWorker request
             case sw of
@@ -490,7 +490,7 @@ tests =
         captured <- newEmptyMVar
         withChromiumContext $ \_ctx page ->
           withLocalApp (interventionApp captured) $ \prefix -> do
-            route page (UrlGlob "*") continueRoute
+            route page (UrlMatchGlob "*") continueRoute
             _ <- goto page (urlFromText (prefix <> "/intervention")) defaultGotoOptions
             headers <- takeMVarTimed captured
             let

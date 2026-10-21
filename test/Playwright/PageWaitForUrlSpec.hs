@@ -3,7 +3,7 @@ module Playwright.PageWaitForUrlSpec
   ) where
 
 import Playwright
-  ( UrlGlob (UrlGlob)
+  ( UrlMatch (UrlMatchGlob)
   , click
   , defaultGotoOptions
   , evaluateTextWith
@@ -45,19 +45,19 @@ tests =
               page
               "url => { window.location.href = url; return url; }"
               (textArgument (prefix <> "/grid.html"))
-          waitForURL page (UrlGlob "**/grid.html")
+          waitForURL page (UrlMatchGlob "**/grid.html")
     , testCase "should respect timeout" $
         withAssetPage "empty.html" $ \page ->
           case milliseconds 2500 of
             Nothing ->
               assertFailure "timeout"
             Just timeout ->
-              assertWaitTimeout (waitForURLWith page (UrlGlob "**/frame.html") timeout)
+              assertWaitTimeout (waitForURLWith page (UrlMatchGlob "**/frame.html") timeout)
     , testCase "should work with clicking on anchor links" $
         withAssetPage "empty.html" $ \page -> do
           setContent page "<a href='#foobar'>foobar</a>"
           click (locate page "a")
-          waitForURL page (UrlGlob "**/*#foobar")
+          waitForURL page (UrlMatchGlob "**/*#foobar")
     , testCase "should work with history.pushState()" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
@@ -65,7 +65,7 @@ tests =
             page
             "<a onclick='javascript:pushState()'>SPA</a><script>function pushState() { history.pushState({}, '', 'wow.html') }</script>"
           click (locate page "a")
-          waitForURL page (UrlGlob "**/wow.html")
+          waitForURL page (UrlMatchGlob "**/wow.html")
           assertEqual "url" (prefix <> "/wow.html") . urlToText =<< url page
     , testCase "should work with history.replaceState()" $
         withAssets $ \prefix page -> do
@@ -74,7 +74,7 @@ tests =
             page
             "<a onclick='javascript:replaceState()'>SPA</a><script>function replaceState() { history.replaceState({}, '', '/replaced.html') }</script>"
           click (locate page "a")
-          waitForURL page (UrlGlob "**/replaced.html")
+          waitForURL page (UrlMatchGlob "**/replaced.html")
           assertEqual "url" (prefix <> "/replaced.html") . urlToText =<< url page
     , testCase "should work with DOM history.back()/history.forward()" $
         withAssets $ \prefix page -> do
@@ -84,9 +84,9 @@ tests =
             "<a id=back onclick='javascript:goBack()'>back</a><a id=forward onclick='javascript:goForward()'>forward</a><script>function goBack() { history.back(); } function goForward() { history.forward(); } history.pushState({}, '', '/first.html'); history.pushState({}, '', '/second.html');</script>"
           assertEqual "second" (prefix <> "/second.html") . urlToText =<< url page
           click (locate page "a#back")
-          waitForURL page (UrlGlob "**/first.html")
+          waitForURL page (UrlMatchGlob "**/first.html")
           assertEqual "first" (prefix <> "/first.html") . urlToText =<< url page
           click (locate page "a#forward")
-          waitForURL page (UrlGlob "**/second.html")
+          waitForURL page (UrlMatchGlob "**/second.html")
           assertEqual "second again" (prefix <> "/second.html") . urlToText =<< url page
     ]

@@ -50,7 +50,7 @@ import Playwright
   , NewContextOptions (newContextBypassCSP, newContextDeviceScaleFactor, newContextHttpCredentials, newContextJavaScriptEnabled, newContextOffline, newContextUserAgent, newContextViewport)
   , Playwright
   , ScriptTag (scriptTagContent)
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , UserAgent (UserAgent)
   , ViewportHeight (ViewportHeight)
   , ViewportSize (ViewportSize)
@@ -182,7 +182,7 @@ tests =
             defaultNewContextOptions {newContextUserAgent = Just (UserAgent "foobar")}
             $ \_ page -> do
               assertEqual "ua" "foobar" =<< evaluateText page "() => navigator.userAgent"
-              withAsync (waitForRequest page (UrlGlob "**/empty.html")) $ \pending -> do
+              withAsync (waitForRequest page (UrlMatchGlob "**/empty.html")) $ \pending -> do
                 _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
                 request <- wait pending
                 headers <- requestHeaders request

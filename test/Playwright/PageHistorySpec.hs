@@ -55,7 +55,7 @@ import Playwright
   , Page
   , Playwright
   , SpecialJsValue (SpecialUndefined)
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , WaitForState (WaitForVisible)
   , click
   , content
@@ -342,12 +342,12 @@ ignorePlaywrightError _ =
 
 runRendererNavigation :: Page -> Playwright () -> Playwright ()
 runRendererNavigation page navigate = do
-  route page (UrlGlob "**/post") $ \_ ->
+  route page (UrlMatchGlob "**/post") $ \_ ->
     liftIO (forever (threadDelay 1000000))
   setContent page "<form method='POST' action='/post'>Form is here<input type='submit'></form>"
   withAsync
     ( do
-        _ <- waitForRequest page (UrlGlob "**/post")
+        _ <- waitForRequest page (UrlMatchGlob "**/post")
         swallow navigate
     )
     $ \pending -> do

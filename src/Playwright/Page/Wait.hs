@@ -171,9 +171,9 @@ import Playwright.Timeout
   ( Timeout
   , defaultTimeout
   )
-import Playwright.UrlGlob
-  ( UrlGlob
-  , matchesUrlGlob
+import Playwright.UrlMatch
+  ( UrlMatch
+  , matchesUrlMatch
   )
 import Playwright.WaitForNavigationOptions
   ( WaitForNavigationOptions (waitForNavigationOptionsTimeout, waitForNavigationOptionsUrl, waitForNavigationOptionsWaitUntil)
@@ -329,17 +329,17 @@ waitForFunctionOnFrame :: Frame -> Text -> Playwright JsHandle
 waitForFunctionOnFrame frame expression = do
   waitForFunctionFrame frame expression undefinedArgument defaultTimeout Nothing
 
-waitForURL :: Page -> UrlGlob -> Playwright ()
+waitForURL :: Page -> UrlMatch -> Playwright ()
 waitForURL page glob = do
   timeout <- pageNavigationTimeout page
   waitForURLWith page glob timeout
 
-waitForURLWith :: Page -> UrlGlob -> Timeout -> Playwright ()
+waitForURLWith :: Page -> UrlMatch -> Timeout -> Playwright ()
 waitForURLWith page glob timeout =
   waitWithTimeout timeout $ do
     waitUntilUrl
       (channelGuid (frameChannel (pageMainFrame page)))
-      (matchesUrlGlob glob)
+      (matchesUrlMatch glob)
     waitForLoadState page LoadStateLoad
 
 waitForNavigation :: Page -> Playwright (Maybe Response)
@@ -385,7 +385,7 @@ armFrameDetached page = do
     event <- throwDecode params
     frameFromRef (pageFrameDetachedEventFrame event)
 
-waitForNavigationWith :: Page -> Timeout -> Maybe UrlGlob -> Playwright (Maybe Response)
+waitForNavigationWith :: Page -> Timeout -> Maybe UrlMatch -> Playwright (Maybe Response)
 waitForNavigationWith page timeout glob =
   waitForNavigationOptions
     page
@@ -423,7 +423,7 @@ collectNavigation page opts = do
 finishNavigation :: Page -> WaitForNavigationOptions -> Value -> Playwright (Maybe Response)
 finishNavigation page opts params = do
   event <- throwDecode params
-  let matches = maybe True (`matchesUrlGlob` frameNavigatedEventUrl event) (waitForNavigationOptionsUrl opts)
+  let matches = maybe True (`matchesUrlMatch` frameNavigatedEventUrl event) (waitForNavigationOptionsUrl opts)
   if matches
     then completeNavigation page opts event
     else collectNavigation page opts
@@ -500,26 +500,26 @@ waitForConsoleWhere page predicate = do
         _ ->
           collect
 
-waitForResponse :: Page -> UrlGlob -> Playwright Response
+waitForResponse :: Page -> UrlMatch -> Playwright Response
 waitForResponse page glob = do
   timeout <- pageActionTimeout page
   waitForResponseWith page glob timeout
 
-waitForResponseWith :: Page -> UrlGlob -> Timeout -> Playwright Response
+waitForResponseWith :: Page -> UrlMatch -> Timeout -> Playwright Response
 waitForResponseWith page glob timeout = do
   takeResponse <- armResponseWith page glob timeout
   takeResponse
 
 -- | Registers for the next response whose URL matches the glob, before the
 -- action that makes it runs. See 'armRequest'.
-armResponse :: Page -> UrlGlob -> Playwright (Playwright Response)
+armResponse :: Page -> UrlMatch -> Playwright (Playwright Response)
 armResponse page glob = do
   timeout <- pageActionTimeout page
   armResponseWith page glob timeout
 
-armResponseWith :: Page -> UrlGlob -> Timeout -> Playwright (Playwright Response)
+armResponseWith :: Page -> UrlMatch -> Timeout -> Playwright (Playwright Response)
 armResponseWith page glob timeout =
-  armResponseWhereWith page (\response -> matchesUrlGlob glob <$> responseUrl response) timeout
+  armResponseWhereWith page (\response -> matchesUrlMatch glob <$> responseUrl response) timeout
 
 -- | Waits for the next response that the predicate accepts.
 waitForResponseWhere :: Page -> (Response -> Playwright Bool) -> Playwright Response
@@ -552,12 +552,12 @@ armResponseWhereWith page predicate timeout = do
           nextWaiter <- registerEventWaiter guid (MethodName "response")
           collectResponse nextWaiter
 
-waitForRequest :: Page -> UrlGlob -> Playwright Request
+waitForRequest :: Page -> UrlMatch -> Playwright Request
 waitForRequest page glob = do
   timeout <- pageActionTimeout page
   waitForRequestWith page glob timeout
 
-waitForRequestWith :: Page -> UrlGlob -> Timeout -> Playwright Request
+waitForRequestWith :: Page -> UrlMatch -> Timeout -> Playwright Request
 waitForRequestWith page glob timeout = do
   takeRequest <- armRequestWith page glob timeout
   takeRequest
@@ -565,14 +565,14 @@ waitForRequestWith page glob timeout = do
 -- | Registers for the next request whose URL matches the glob, before the
 -- action that makes it runs. The subscription is made here, not when the
 -- returned action starts, so a request that fires first is not missed.
-armRequest :: Page -> UrlGlob -> Playwright (Playwright Request)
+armRequest :: Page -> UrlMatch -> Playwright (Playwright Request)
 armRequest page glob = do
   timeout <- pageActionTimeout page
   armRequestWith page glob timeout
 
-armRequestWith :: Page -> UrlGlob -> Timeout -> Playwright (Playwright Request)
+armRequestWith :: Page -> UrlMatch -> Timeout -> Playwright (Playwright Request)
 armRequestWith page glob timeout =
-  armRequestWhereWith page (\request -> matchesUrlGlob glob <$> requestUrl request) timeout
+  armRequestWhereWith page (\request -> matchesUrlMatch glob <$> requestUrl request) timeout
 
 -- | Waits for the next request that the predicate accepts.
 waitForRequestWhere :: Page -> (Request -> Playwright Bool) -> Playwright Request

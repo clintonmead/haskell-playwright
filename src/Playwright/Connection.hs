@@ -199,8 +199,8 @@ import Playwright.Transport
 import Playwright.Url
   ( Url
   )
-import Playwright.UrlGlob
-  ( UrlGlob
+import Playwright.UrlMatch
+  ( UrlMatch
   )
 import Playwright.WaitId
   ( WaitId
@@ -249,11 +249,11 @@ closedGuids :: Playwright (Set Guid)
 closedGuids =
   inConnection Store.closedGuids
 
-pushRouteHandler :: Guid -> UrlGlob -> (ChannelRef -> IO Bool) -> Playwright Bool
+pushRouteHandler :: Guid -> UrlMatch -> (ChannelRef -> IO Bool) -> Playwright Bool
 pushRouteHandler guid glob run =
   inConnection $ \conn -> Store.pushRouteHandler conn guid glob run
 
-removeRouteHandlers :: Guid -> UrlGlob -> Playwright ()
+removeRouteHandlers :: Guid -> UrlMatch -> Playwright ()
 removeRouteHandlers guid glob =
   inConnection $ \conn -> Store.removeRouteHandlers conn guid glob
 
@@ -261,7 +261,7 @@ clearRouteHandlers :: Guid -> Playwright ()
 clearRouteHandlers guid =
   inConnection (`Store.clearRouteHandlers` guid)
 
-routeHandlersFor :: Guid -> Playwright [(UrlGlob, ChannelRef -> IO Bool)]
+routeHandlersFor :: Guid -> Playwright [(UrlMatch, ChannelRef -> IO Bool)]
 routeHandlersFor guid =
   inConnection (`Store.routeHandlersFor` guid)
 

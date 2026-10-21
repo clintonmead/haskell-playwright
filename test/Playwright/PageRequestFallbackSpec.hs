@@ -58,7 +58,7 @@ import Playwright
   , Page
   , RouteOptions (routeTimes)
   , RouteTimes (RouteTimes)
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , abortRoute
   , continueRoute
   , defaultContinueOptions
@@ -107,19 +107,19 @@ tests =
     "page-request-fallback"
     [ testCase "should work" $
         withAssets $ \prefix page -> do
-          route page (UrlGlob "**/*") fallbackRoute
+          route page (UrlMatchGlob "**/*") fallbackRoute
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           pure ()
     , testCase "should fall back" $
         withAssets $ \prefix page -> do
           intercepted <- newIORef ([] :: [Int])
-          route page (UrlGlob "**/empty.html") $ \handled -> do
+          route page (UrlMatchGlob "**/empty.html") $ \handled -> do
             modifyIORef' intercepted (1 :)
             fallbackRoute handled
-          route page (UrlGlob "**/empty.html") $ \handled -> do
+          route page (UrlMatchGlob "**/empty.html") $ \handled -> do
             modifyIORef' intercepted (2 :)
             fallbackRoute handled
-          route page (UrlGlob "**/empty.html") $ \handled -> do
+          route page (UrlMatchGlob "**/empty.html") $ \handled -> do
             modifyIORef' intercepted (3 :)
             fallbackRoute handled
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
@@ -127,16 +127,16 @@ tests =
     , testCase "should not chain fulfill" $
         withAssets $ \prefix page -> do
           failed <- newIORef False
-          route page (UrlGlob "**/empty.html") $ \_ ->
+          route page (UrlMatchGlob "**/empty.html") $ \_ ->
             writeTrue failed
-          route page (UrlGlob "**/empty.html") $ \handled ->
+          route page (UrlMatchGlob "**/empty.html") $ \handled ->
             fulfillRoute
               handled
               defaultFulfillOptions
                 { fulfillStatus = Just (HttpStatus 200)
                 , fulfillBody = Just (FulfillText "fulfilled")
                 }
-          route page (UrlGlob "**/empty.html") fallbackRoute
+          route page (UrlMatchGlob "**/empty.html") fallbackRoute
           response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           case response of
             Nothing ->
@@ -147,10 +147,10 @@ tests =
     , testCase "should not chain abort" $
         withAssets $ \prefix page -> do
           failed <- newIORef False
-          route page (UrlGlob "**/empty.html") $ \_ ->
+          route page (UrlMatchGlob "**/empty.html") $ \_ ->
             writeTrue failed
-          route page (UrlGlob "**/empty.html") abortRoute
-          route page (UrlGlob "**/empty.html") fallbackRoute
+          route page (UrlMatchGlob "**/empty.html") abortRoute
+          route page (UrlMatchGlob "**/empty.html") fallbackRoute
           assertProtocolContains
             "net::ERR_FAILED"
             (goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions)
@@ -159,7 +159,7 @@ tests =
         withAssets $ \prefix page -> do
           routeWith
             page
-            (UrlGlob "**/empty.html")
+            (UrlMatchGlob "**/empty.html")
             defaultRouteOptions {routeTimes = Just (RouteTimes 1)}
             $ \handled ->
               fulfillRoute
@@ -170,7 +170,7 @@ tests =
                   }
           routeWith
             page
-            (UrlGlob "**/empty.html")
+            (UrlMatchGlob "**/empty.html")
             defaultRouteOptions {routeTimes = Just (RouteTimes 1)}
             fallbackRoute
           response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
@@ -183,11 +183,11 @@ tests =
         withCaptureServer $ \prefix captured page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           seen <- newIORef (Nothing :: Maybe Text)
-          route page (UrlGlob "**/sleep.zzz") $ \handled -> do
+          route page (UrlMatchGlob "**/sleep.zzz") $ \handled -> do
             headers <- requestHeaders =<< routeRequest handled
             writeIORef seen (headerValue "foo" headers)
             continueRoute handled
-          route page (UrlGlob "**/*") $ \handled -> do
+          route page (UrlMatchGlob "**/*") $ \handled -> do
             headers <- requestHeaders =<< routeRequest handled
             fallbackRouteWith
               handled
@@ -204,10 +204,10 @@ tests =
         withCaptureServer $ \prefix captured page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           seen <- newIORef (HttpMethod "")
-          route page (UrlGlob "**/*") $ \handled -> do
+          route page (UrlMatchGlob "**/*") $ \handled -> do
             writeIORef seen =<< requestMethod =<< routeRequest handled
             continueRoute handled
-          route page (UrlGlob "**/*") $ \handled ->
+          route page (UrlMatchGlob "**/*") $ \handled ->
             fallbackRouteWith
               handled
               defaultContinueOptions {continueMethod = Just (HttpMethod "POST")}
@@ -220,10 +220,10 @@ tests =
         withCaptureServer $ \prefix captured page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           seen <- newIORef (Nothing :: Maybe ByteString)
-          route page (UrlGlob "**/*") $ \handled -> do
+          route page (UrlMatchGlob "**/*") $ \handled -> do
             writeIORef seen =<< requestPostData =<< routeRequest handled
             continueRoute handled
-          route page (UrlGlob "**/*") $ \handled ->
+          route page (UrlMatchGlob "**/*") $ \handled ->
             fallbackRouteWith
               handled
               defaultContinueOptions {continuePostData = Just (Char8.pack "doggo")}
@@ -237,10 +237,10 @@ tests =
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           let bytes = ByteString.pack (map fromIntegral [0 .. 255 :: Int])
           seen <- newIORef (Nothing :: Maybe ByteString)
-          route page (UrlGlob "**/*") $ \handled -> do
+          route page (UrlMatchGlob "**/*") $ \handled -> do
             writeIORef seen =<< requestPostData =<< routeRequest handled
             continueRoute handled
-          route page (UrlGlob "**/*") $ \handled ->
+          route page (UrlMatchGlob "**/*") $ \handled ->
             fallbackRouteWith handled defaultContinueOptions {continuePostData = Just bytes}
           _ <- evaluate page "() => fetch('/sleep.zzz', { method: 'POST', body: 'birdy' })"
           fromRoute <- readIORef seen
@@ -251,10 +251,10 @@ tests =
         withCaptureServer $ \prefix captured page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           seen <- newIORef (Nothing :: Maybe Value)
-          route page (UrlGlob "**/*") $ \handled -> do
+          route page (UrlMatchGlob "**/*") $ \handled -> do
             writeIORef seen =<< requestPostDataJSON =<< routeRequest handled
             continueRoute handled
-          route page (UrlGlob "**/*") $ \handled ->
+          route page (UrlMatchGlob "**/*") $ \handled ->
             fallbackRouteWith
               handled
               defaultContinueOptions {continuePostData = Just (Char8.pack "{\"foo\":\"bar\"}")}
@@ -266,10 +266,10 @@ tests =
     , testCase "should override request url" $
         withAssets $ \prefix page -> do
           seen <- newIORef (Nothing :: Maybe Text)
-          route page (UrlGlob "**/global-var.html") $ \handled -> do
+          route page (UrlMatchGlob "**/global-var.html") $ \handled -> do
             writeIORef seen . Just . urlToText =<< requestUrl =<< routeRequest handled
             continueRoute handled
-          route page (UrlGlob "**/foo") $ \handled ->
+          route page (UrlMatchGlob "**/foo") $ \handled ->
             fallbackRouteWith
               handled
               defaultContinueOptions {continueUrl = Just (urlFromText (prefix <> "/global-var.html"))}

@@ -38,7 +38,7 @@ import Playwright
   , HeaderValue (HeaderValue, headerValueToText)
   , HttpHeader (HttpHeader, httpHeaderName, httpHeaderValue)
   , HttpStatus (HttpStatus, httpStatusToInt)
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , RequestFailure (requestFailureText)
   , armRequestFailed
   , armResponse
@@ -82,7 +82,7 @@ tests =
     "page-request-fulfill"
     [ testCase "should work" $
         withAssets $ \prefix page -> do
-          route page (UrlGlob "**/*") $ \handled ->
+          route page (UrlMatchGlob "**/*") $ \handled ->
             fulfillRoute
               handled
               defaultFulfillOptions
@@ -104,7 +104,7 @@ tests =
           assertEqual "body" "Yo, page!" body
     , testCase "should work with status code 422" $
         withAssets $ \prefix page -> do
-          route page (UrlGlob "**/*") $ \handled ->
+          route page (UrlMatchGlob "**/*") $ \handled ->
             fulfillRoute
               handled
               defaultFulfillOptions
@@ -125,7 +125,7 @@ tests =
     , testCase "should support cors with GET" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-          route page (UrlGlob "**/cars*") $ \handled -> do
+          route page (UrlMatchGlob "**/cars*") $ \handled -> do
             request <- routeRequest handled
             url <- requestUrl request
             let
@@ -153,7 +153,7 @@ tests =
           withLocalApp emptyApp $ \prefix -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
             image <- readTestAsset "pptr.png"
-            route page (UrlGlob "**/*") $ \handled ->
+            route page (UrlMatchGlob "**/*") $ \handled ->
               fulfillRoute
                 handled
                 defaultFulfillOptions
@@ -172,7 +172,7 @@ tests =
         withChromiumPage $ \page ->
           withLocalApp emptyApp $ \prefix -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-            route page (UrlGlob "**/data.json") $ \handled ->
+            route page (UrlMatchGlob "**/data.json") $ \handled ->
               fulfillRoute
                 handled
                 defaultFulfillOptions
@@ -181,7 +181,7 @@ tests =
                   , fulfillHeaders = [HttpHeader (HeaderName "foo") (HeaderValue "bar")]
                   , fulfillBody = Just (FulfillText "{\"bar\":\"baz\"}")
                   }
-            takeResponse <- armResponse page (UrlGlob "**/*")
+            takeResponse <- armResponse page (UrlMatchGlob "**/*")
             body <- evaluateText page "() => fetch('./data.json').then(r => r.text())"
             response <- takeResponse
             assertEqual "status" (HttpStatus 201) =<< responseStatus response
@@ -189,7 +189,7 @@ tests =
     , testCase "should not throw if request was cancelled by the page" $
         withAssets $ \prefix page -> do
           intercepted <- newEmptyMVar
-          route page (UrlGlob "**/data.json") $ \handled -> putMVar intercepted handled
+          route page (UrlMatchGlob "**/data.json") $ \handled -> putMVar intercepted handled
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           _ <-
             evaluate

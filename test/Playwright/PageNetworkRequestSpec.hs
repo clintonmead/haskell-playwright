@@ -33,7 +33,7 @@ import Playwright
   , HeaderValue (headerValueToText)
   , Playwright
   , Request
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , click
   , defaultGotoOptions
   , evaluate
@@ -81,7 +81,7 @@ tests =
     "page-network-request"
     [ testCase "should work for main frame navigation request" $
         withAssets $ \prefix page -> do
-          withAsync (waitForRequest page (UrlGlob (prefix <> "/empty.html"))) $ \handle -> do
+          withAsync (waitForRequest page (UrlMatchGlob (prefix <> "/empty.html"))) $ \handle -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
             request <- wait handle
             frame <- requestFrame request
@@ -93,7 +93,7 @@ tests =
     , testCase "should work for fetch requests" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-          withAsync (waitForRequest page (UrlGlob (prefix <> "/digits/1.png"))) $ \handle -> do
+          withAsync (waitForRequest page (UrlMatchGlob (prefix <> "/digits/1.png"))) $ \handle -> do
             _ <- evaluate page "() => fetch('/digits/1.png')"
             request <- wait handle
             frame <- requestFrame request

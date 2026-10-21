@@ -65,7 +65,7 @@ import Playwright
   , NewContextOptions (newContextAcceptDownloads)
   , Page
   , Playwright
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , click
   , clickWith
   , closeBrowser
@@ -317,7 +317,7 @@ tests =
           assertEqual "no failure" True . isNothing =<< downloadFailure download
     , testCase "should report downloads with interception" $
         withDownloadServer $ \prefix page -> do
-          route page (UrlGlob "**/*") continueRoute
+          route page (UrlMatchGlob "**/*") continueRoute
           download <- clickHref page (prefix <> "/download")
           assertDownloadBody download
     , testCase "should emit download event from nested iframes" $

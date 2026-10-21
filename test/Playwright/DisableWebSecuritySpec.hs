@@ -24,7 +24,7 @@ import Playwright
   , LaunchOptions (launchOptionsArgs)
   , Page
   , Playwright
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , addContextInitScript
   , click
   , defaultGetByRoleOptions
@@ -67,7 +67,7 @@ tests =
                     defaultGetByRoleOptions {getByRoleName = Just "Click me"}
                 )
               popup <- wait pending
-              waitForURL popup (UrlGlob "**/target.html")
+              waitForURL popup (UrlMatchGlob "**/target.html")
     , testCase "test init script w/ --disable-web-security" $
         withDisabledWebSecurity $ \ctx page ->
           withLocalApp popupApp $ \prefix -> do
@@ -81,7 +81,7 @@ tests =
                     defaultGetByRoleOptions {getByRoleName = Just "Click me"}
                 )
               popup <- wait pending
-              waitForURL popup (UrlGlob "**/target.html")
+              waitForURL popup (UrlMatchGlob "**/target.html")
               assertEqual "injected" (123 :: Double) =<< evaluateNumber popup "() => window.injected"
     ]
 

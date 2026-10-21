@@ -51,7 +51,7 @@ import Playwright
   , Page
   , Request
   , ResourceType (resourceTypeToText)
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , asElement
   , contentFrameHandle
   , defaultGotoOptions
@@ -150,7 +150,7 @@ tests =
     , testCase "main resource xhr should have type xhr" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-          withAsync (waitForRequest page (UrlGlob (prefix <> "/title.html"))) $ \pending -> do
+          withAsync (waitForRequest page (UrlMatchGlob (prefix <> "/title.html"))) $ \pending -> do
             _ <-
               evaluate
                 page
@@ -161,7 +161,7 @@ tests =
     , testCase "<picture> resource should have type image" $
         withAssets $ \prefix page -> do
           let image = prefix <> "/digits/1.png"
-          withAsync (waitForRequest page (UrlGlob image)) $ \pending -> do
+          withAsync (waitForRequest page (UrlMatchGlob image)) $ \pending -> do
             setContent
               page
               ("<picture><source><img src=\"" <> image <> "\"></source></picture>")

@@ -177,7 +177,7 @@ library
       Playwright.Transport.Stdio
       Playwright.TypedArrayKind
       Playwright.Url
-      Playwright.UrlGlob
+      Playwright.UrlMatch
       Playwright.UserAgent
       Playwright.ViewportSize
       Playwright.WaitForNavigationOptions
@@ -214,6 +214,8 @@ library
     , exceptions
     , filepath
     , mtl
+    , regex-base
+    , regex-tdfa
     , scientific
     , stm
     , text

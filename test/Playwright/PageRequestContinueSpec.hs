@@ -45,7 +45,7 @@ import Playwright
   , HttpHeader (HttpHeader)
   , HttpMethod (HttpMethod)
   , RequestFailure (requestFailureText)
-  , UrlGlob (UrlGlob)
+  , UrlMatch (UrlMatchGlob)
   , armRequestFailed
   , continueRoute
   , continueRouteWith
@@ -99,7 +99,7 @@ tests =
     "page-request-continue"
     [ testCase "should work" $
         withAssets $ \prefix page -> do
-          route page (UrlGlob "**/*") continueRoute
+          route page (UrlMatchGlob "**/*") continueRoute
           response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           case response of
             Nothing ->
@@ -109,7 +109,7 @@ tests =
     , testCase "should amend HTTP headers" $
         withApplication (pure echoFooHeader) $ \port ->
           withChromiumPage $ \page -> do
-            route page (UrlGlob "**/*") $ \handled -> do
+            route page (UrlMatchGlob "**/*") $ \handled -> do
               headers <- requestHeaders =<< routeRequest handled
               continueRouteWith
                 handled
@@ -127,7 +127,7 @@ tests =
         withChromiumPage $ \page ->
           withLocalApp (recordingApp requests) $ \prefix -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-            route page (UrlGlob "**/*") $ \handled ->
+            route page (UrlMatchGlob "**/*") $ \handled ->
               continueRouteWith handled defaultContinueOptions {continueMethod = Just (HttpMethod "POST")}
             _ <- evaluateText page "() => fetch('/sleep.zzz').then(r => r.text())"
             seen <- readIORef requests
@@ -136,7 +136,7 @@ tests =
         requests <- newIORef []
         withChromiumPage $ \page ->
           withLocalApp (recordingApp requests) $ \prefix -> do
-            route page (UrlGlob "**/*") $ \handled ->
+            route page (UrlMatchGlob "**/*") $ \handled ->
               continueRouteWith handled defaultContinueOptions {continueMethod = Just (HttpMethod "POST")}
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
             seen <- readIORef requests
@@ -145,7 +145,7 @@ tests =
         requests <- newIORef []
         withChromiumPage $ \page ->
           withLocalApp (recordingApp requests) $ \prefix -> do
-            route page (UrlGlob "**/foo") $ \handled ->
+            route page (UrlMatchGlob "**/foo") $ \handled ->
               continueRouteWith handled defaultContinueOptions {continueUrl = Just (urlFromText (prefix <> "/global-var.html"))}
             response <- goto page (urlFromText (prefix <> "/foo")) defaultGotoOptions
             case response of
@@ -160,7 +160,7 @@ tests =
         requests <- newIORef []
         withChromiumPage $ \page ->
           withLocalApp (recordingApp requests) $ \prefix -> do
-            route page (UrlGlob "**/foo") $ \handled ->
+            route page (UrlMatchGlob "**/foo") $ \handled ->
               continueRouteWith
                 handled
                 defaultContinueOptions
@@ -175,7 +175,7 @@ tests =
         withChromiumPage $ \page ->
           withLocalApp (recordingApp requests) $ \prefix -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-            route page (UrlGlob "**/*") $ \handled ->
+            route page (UrlMatchGlob "**/*") $ \handled ->
               continueRouteWith handled defaultContinueOptions {continuePostData = Just "doggo"}
             _ <- evaluateText page "() => fetch('/sleep.zzz', { method: 'POST', body: 'birdy' }).then(r => r.text())"
             seen <- readIORef requests
@@ -185,7 +185,7 @@ tests =
         withChromiumPage $ \page ->
           withLocalApp (recordingApp requests) $ \prefix -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-            route page (UrlGlob "**/*") $ \handled ->
+            route page (UrlMatchGlob "**/*") $ \handled ->
               continueRouteWith handled defaultContinueOptions {continuePostData = Just (encodeUtf8 "你好")}
             _ <- evaluateText page "() => fetch('/sleep.zzz', { method: 'POST', body: 'birdy' }).then(r => r.text())"
             seen <- readIORef requests
@@ -196,7 +196,7 @@ tests =
           withLocalApp (recordingApp requests) $ \prefix -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
             let longBody = BS8.replicate 7500 'a'
-            route page (UrlGlob "**/*") $ \handled ->
+            route page (UrlMatchGlob "**/*") $ \handled ->
               continueRouteWith handled defaultContinueOptions {continuePostData = Just longBody}
             _ <- evaluateText page "() => fetch('/sleep.zzz', { method: 'POST', body: 'birdy' }).then(r => r.text())"
             seen <- readIORef requests
@@ -207,7 +207,7 @@ tests =
           withLocalApp (recordingApp requests) $ \prefix -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
             let binary = BS.pack [0, 1, 2, 127, 128, 255]
-            route page (UrlGlob "**/*") $ \handled ->
+            route page (UrlMatchGlob "**/*") $ \handled ->
               continueRouteWith handled defaultContinueOptions {continuePostData = Just binary}
             _ <- evaluateText page "() => fetch('/sleep.zzz', { method: 'POST', body: 'birdy' }).then(r => r.text())"
             seen <- readIORef requests
@@ -218,7 +218,7 @@ tests =
         withChromiumPage $ \page ->
           withLocalApp (recordingApp requests) $ \prefix -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-            route page (UrlGlob "**/title.html") $ \handled ->
+            route page (UrlMatchGlob "**/title.html") $ \handled ->
               continueRouteWith handled defaultContinueOptions {continuePostData = Just "{\"b\":2}"}
             _ <-
               evaluateText
@@ -233,7 +233,7 @@ tests =
         requests <- newIORef []
         withChromiumPage $ \page ->
           withLocalApp (recordingApp requests) $ \prefix -> do
-            route page (UrlGlob "**/*") $ \handled ->
+            route page (UrlMatchGlob "**/*") $ \handled ->
               continueRouteWith
                 handled
                 defaultContinueOptions
@@ -253,7 +253,7 @@ tests =
           withLocalApp (recordingApp requests) $ \prefix -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
             let longBody = BS8.replicate 7500 'a'
-            route page (UrlGlob "**/*") $ \handled ->
+            route page (UrlMatchGlob "**/*") $ \handled ->
               continueRouteWith handled defaultContinueOptions {continuePostData = Just longBody}
             _ <- evaluateText page "() => fetch('/sleep.zzz', { method: 'PATCH', body: 'birdy' }).then(r => r.text())"
             seen <- readIORef requests
@@ -263,7 +263,7 @@ tests =
         withChromiumPage $ \page ->
           withLocalApp (recordingApp requests) $ \prefix -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-            route page (UrlGlob "**/*") $ \handled ->
+            route page (UrlMatchGlob "**/*") $ \handled ->
               continueRouteWith handled defaultContinueOptions {continuePostData = Just ""}
             _ <- evaluateText page "() => fetch('/sleep.zzz', { method: 'POST', body: 'original' }).then(r => r.text())"
             seen <- readIORef requests
@@ -271,7 +271,7 @@ tests =
     , testCase "should not throw if request was cancelled by the page" $
         withAssets $ \prefix page -> do
           intercepted <- newEmptyMVar
-          route page (UrlGlob "**/data.json") $ \handled -> putMVar intercepted handled
+          route page (UrlMatchGlob "**/data.json") $ \handled -> putMVar intercepted handled
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           _ <-
             evaluate
