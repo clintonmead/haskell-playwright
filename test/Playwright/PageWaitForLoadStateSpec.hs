@@ -203,6 +203,16 @@ tests =
           waitForLoadState page LoadStateDomContentLoaded
           waitForLoadState page LoadStateLoad
           waitForLoadState page LoadStateNetworkIdle
+    , testCase "should work with broken blob-url iframe" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          setContentWith
+            page
+            "<iframe src=\"blob:\"></iframe>"
+            defaultSetContentOptions {setContentOptionsWaitUntil = Just LoadStateCommit}
+          waitForLoadState page LoadStateDomContentLoaded
+          waitForLoadState page LoadStateLoad
+          waitForLoadState page LoadStateNetworkIdle
     , testCase "should wait for load state of newPage" $
         withChromiumPage $ \page -> do
           newPage' <- newPage (pageContext page)
