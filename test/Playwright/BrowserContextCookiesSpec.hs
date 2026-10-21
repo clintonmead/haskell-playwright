@@ -4,6 +4,15 @@ module Playwright.BrowserContextCookiesSpec
 
 import Data.ByteString.Char8 qualified as BS8
 import Data.ByteString.Lazy.Char8 qualified as LBS8
+import Data.List
+  ( sort
+  , sortOn
+  )
+import UnliftIO.IORef
+  ( IORef
+  , newIORef
+
+  )
 import Data.Text
   ( pack
   )
@@ -13,17 +22,28 @@ import Network.HTTP.Types
   )
 import Network.Wai
   ( Application
+  , pathInfo
   , responseLBS
   )
 import Network.Wai.Handler.Warp
   ( withApplication
   )
 import Playwright
-  ( Cookie (cookieHttpOnly, cookieName, cookieSameSite, cookieValue)
+  ( Cookie (cookieDomain, cookieExpires, cookieHttpOnly, cookieName, cookieSameSite, cookieValue)
+  , CookieDomain (CookieDomain, cookieDomainToText)
+  , CookieSecure (CookieSecure)
+  , CookieToSet (cookieToSetSameSite, cookieToSetSecure)
+  , CookiePath (CookiePath)
+  , cookieForHost
+  , cookieForUrl
+  , addCookies
+  , pageContext
   , CookieHttpOnly (cookieHttpOnlyToBool)
-  , CookieName (cookieNameToText)
-  , CookieSameSite (CookieSameSiteLax, CookieSameSiteStrict)
-  , CookieValue (cookieValueToText)
+  , CookieName (CookieName, cookieNameToText)
+  , CookieSameSite (CookieSameSiteLax, CookieSameSiteNone, CookieSameSiteStrict)
+  , CookieValue (CookieValue, cookieValueToText)
+  , CookieExpires (cookieExpiresToScientific)
+  , cookiesFor
   , cookies
   , defaultGotoOptions
   , evaluateText
@@ -31,7 +51,12 @@ import Playwright
   , urlFromText
   )
 import Playwright.Harness
-  ( withChromiumContext
+  ( Recorded
+  , recordRequest
+  , assertBool
+  , withLocalApp
+  , withAssets
+  , withChromiumContext
   , assertEqual
   )
 import Test.Tasty
@@ -96,6 +121,67 @@ tests =
                 assertEqual "sameSite" CookieSameSiteStrict (cookieSameSite cookie)
               _ ->
                 assertEqual "one cookie" 1 (length jar)
+    , testCase "should get multiple cookies" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "document" "password=1234; username=John Doe"
+            =<< evaluateText
+              page
+              "() => { document.cookie = 'username=John Doe'; document.cookie = 'password=1234'; return document.cookie.split('; ').sort().join('; '); }"
+          jar <- cookies (pageContext page)
+          assertEqual "names" ["password", "username"] (sort (fmap (cookieNameToText . cookieName) jar))
+          assertEqual "values" ["1234", "John Doe"] (fmap (cookieValueToText . cookieValue) (sortOn (cookieNameToText . cookieName) jar))
+    , testCase "should get cookies from multiple urls" $
+        withAssets $ \_ page -> do
+          addCookies
+            (pageContext page)
+            [ (cookieForUrl (urlFromText "https://foo.com") (CookieName "doggo") (CookieValue "woofs")) {cookieToSetSameSite = Just CookieSameSiteNone}
+            , (cookieForUrl (urlFromText "https://bar.com") (CookieName "catto") (CookieValue "purrs")) {cookieToSetSameSite = Just CookieSameSiteLax}
+            , (cookieForUrl (urlFromText "https://baz.com") (CookieName "birdo") (CookieValue "tweets")) {cookieToSetSameSite = Just CookieSameSiteLax}
+            ]
+          jar <- cookiesFor (pageContext page) [urlFromText "https://foo.com", urlFromText "https://baz.com"]
+          assertEqual "names" ["birdo", "doggo"] (sort (fmap (cookieNameToText . cookieName) jar))
+    , testCase "should return secure cookies based on HTTP(S) protocol" $
+        withAssets $ \_ page -> do
+          addCookies
+            (pageContext page)
+            [ (cookieForUrl (urlFromText "https://foo.com") (CookieName "doggo") (CookieValue "woofs")) {cookieToSetSecure = Just (CookieSecure True)}
+            , (cookieForUrl (urlFromText "http://foo.com") (CookieName "catto") (CookieValue "purrs")) {cookieToSetSecure = Just (CookieSecure False)}
+            ]
+          jar <- cookiesFor (pageContext page) [urlFromText "https://foo.com"]
+          assertEqual "names" ["catto", "doggo"] (sort (fmap (cookieNameToText . cookieName) jar))
+    , testCase "should work with subdomain cookie" $
+        withAssets $ \_ page -> do
+          addCookies
+            (pageContext page)
+            [ (cookieForHost (CookieDomain ".foo.com") (CookiePath "/") (CookieName "doggo") (CookieValue "woofs"))
+                { cookieToSetSecure = Just (CookieSecure True)
+                , cookieToSetSameSite = Just CookieSameSiteLax
+                }
+            ]
+          onFoo <- cookiesFor (pageContext page) [urlFromText "https://foo.com"]
+          assertEqual "foo.com domain" [".foo.com"] (fmap (cookieDomainToText . cookieDomain) onFoo)
+          onSub <- cookiesFor (pageContext page) [urlFromText "https://sub.foo.com"]
+          assertEqual "sub.foo.com names" ["doggo"] (fmap (cookieNameToText . cookieName) onSub)
+    , testCase "should get a non-session cookie" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "document" "username=John Doe"
+            =<< evaluateText
+              page
+              "() => { const date = new Date('1/1/2038'); document.cookie = `username=John Doe;expires=${date.toUTCString()}`; return document.cookie; }"
+          jar <- cookies (pageContext page)
+          assertEqual "names" ["username"] (fmap (cookieNameToText . cookieName) jar)
+          assertEqual "values" ["John Doe"] (fmap (cookieValueToText . cookieValue) jar)
+          assertBool "expires is set" (fmap ((/= -1) . cookieExpiresToScientific . cookieExpires) jar == [True])
+    , testCase "should return cookies with empty value" $ do
+        requests <- newIORef []
+        withChromiumContext $ \ctx page ->
+          withLocalApp (emptyCookieApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            jar <- cookies ctx
+            assertEqual "names" ["name"] (fmap (cookieNameToText . cookieName) jar)
+            assertEqual "values" [""] (fmap (cookieValueToText . cookieValue) jar)
     ]
 
 emptyHtml :: Application
@@ -128,3 +214,14 @@ strictCookie _req respond =
         ]
         (LBS8.pack "<html></html>")
     )
+
+-- | Records every request. Sets an empty-valued cookie on /empty.html and
+-- answers every path with an empty page.
+emptyCookieApp :: IORef [Recorded] -> Application
+emptyCookieApp requests request respond = do
+  recordRequest requests request
+  case pathInfo request of
+    ["empty.html"] ->
+      respond (responseLBS status200 [(hContentType, "text/html"), ("Set-Cookie", "name=;Path=/")] "")
+    _ ->
+      respond (responseLBS status200 [(hContentType, "text/html")] "")
