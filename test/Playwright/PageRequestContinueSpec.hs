@@ -75,6 +75,7 @@ import Playwright
   , requestFailure
   , requestHeaders
   , requestUrl
+  , setContent
   , requestAllHeaders
   , fallbackRouteWith
   , url
@@ -528,6 +529,54 @@ tests =
             assertEqual "text" "done" text
             assertEqual "authorization" (Just "credentials") . headerOf "/something" "authorization" =<< readIORef requests
             assertEqual "custom" (Just "foo") . headerOf "/something" "custom" =<< readIORef requests
+    , testCase "should respect set-cookie in redirect response" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (cookieApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            setContent page "<a href=\"/set-cookie-redirect\">Set cookie</a>"
+            route page (UrlMatchGlob "**/set-cookie-redirect") $ \handled -> do
+              headers <- requestHeaders =<< routeRequest handled
+              continueRouteWith handled defaultContinueOptions {continueHeaders = Just headers}
+            _ <- goto page (urlFromText (prefix <> "/set-cookie-redirect")) defaultGotoOptions
+            assertEqual "server cookie" (Just "foo=bar") . headerOf "/empty.html" "cookie" =<< readIORef requests
+            assertEqual "document cookie" "foo=bar" =<< evaluateText page "() => document.cookie"
+    , testCase "continue should not propagate cookie override to redirects" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (cookieApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/set-cookie")) defaultGotoOptions
+            assertEqual "document cookie" "foo=bar" =<< evaluateText page "() => document.cookie"
+            route page (UrlMatchGlob "**/redirect") $ \handled -> do
+              headers <- requestHeaders =<< routeRequest handled
+              continueRouteWith
+                handled
+                defaultContinueOptions
+                  {continueHeaders = Just (filter (not . hasName "cookie") headers <> [HttpHeader (HeaderName "cookie") (HeaderValue "override")])}
+            _ <- goto page (urlFromText (prefix <> "/redirect")) defaultGotoOptions
+            assertEqual "server cookie" (Just "foo=bar") . headerOf "/empty.html" "cookie" =<< readIORef requests
+    , testCase "continue should not override cookie" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (cookieApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/set-cookie")) defaultGotoOptions
+            assertEqual "document cookie" "foo=bar" =<< evaluateText page "() => document.cookie"
+            route page (UrlMatchGlob "**") $ \handled -> do
+              headers <- requestHeaders =<< routeRequest handled
+              continueRouteWith
+                handled
+                defaultContinueOptions
+                  { continueHeaders =
+                      Just
+                        ( filter (not . hasName "cookie") headers
+                            <> [ HttpHeader (HeaderName "cookie") (HeaderValue "override")
+                               , HttpHeader (HeaderName "custom") (HeaderValue "value")
+                               ]
+                        )
+                  }
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            assertEqual "server cookie" (Just "foo=bar") . headerOf "/empty.html" "cookie" =<< readIORef requests
+            assertEqual "server custom" (Just "value") . headerOf "/empty.html" "custom" =<< readIORef requests
     , testCase "propagate headers cross origin redirect" $ do
         requests <- newIORef []
         withChromiumPage $ \page ->
@@ -788,3 +837,18 @@ redirectingCorsCredentialsApp requests request respond =
       corsCredentialsApp requests request respond
   where
     host = fromMaybe BS8.empty (lookup "host" (Wai.requestHeaders request))
+
+-- | Serves the cookie cases: /set-cookie sets a cookie, and the redirects go to
+-- /empty.html. Every request is recorded.
+cookieApp :: IORef [Recorded] -> Application
+cookieApp requests request respond = do
+  recordRequest requests request
+  case pathInfo request of
+    ["set-cookie"] ->
+      respond (responseLBS status200 [(hContentType, "text/html"), ("Set-Cookie", "foo=bar;")] LBS8.empty)
+    ["set-cookie-redirect"] ->
+      respond (responseLBS status302 [("Set-Cookie", "foo=bar;  max-age=36000"), (hLocation, "/empty.html")] LBS8.empty)
+    ["redirect"] ->
+      respond (responseLBS status302 [(hLocation, "/empty.html")] LBS8.empty)
+    _ ->
+      respond (responseLBS status200 [(hContentType, "text/html")] LBS8.empty)
