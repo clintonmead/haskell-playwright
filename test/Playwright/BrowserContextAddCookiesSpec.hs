@@ -2,6 +2,9 @@ module Playwright.BrowserContextAddCookiesSpec
   ( tests
   ) where
 
+import Data.List
+  ( sort
+  )
 import Data.Text
   ( isInfixOf
   )
@@ -26,6 +29,7 @@ import Playwright
   , CookieSecure (cookieSecureToBool)
   , CookieToSet (CookieToSet, cookieToSetDomain, cookieToSetExpires, cookieToSetHttpOnly, cookieToSetName, cookieToSetPath, cookieToSetSameSite, cookieToSetSecure, cookieToSetUrl, cookieToSetValue)
   , CookieValue (CookieValue, cookieValueToText)
+  , CookieSameSite (CookieSameSiteLax, CookieSameSiteNone, CookieSameSiteStrict)
   , Playwright
   , addCookies
   , clearCookies
@@ -283,6 +287,19 @@ tests =
           jar2 <- cookies (pageContext page)
           assertEqual "names" (fmap (cookieNameToText . cookieName) jar) (fmap (cookieNameToText . cookieName) jar2)
           assertEqual "values" (fmap (cookieValueToText . cookieValue) jar) (fmap (cookieValueToText . cookieValue) jar2)
+    , testCase "should set cookies with SameSite attribute and no secure attribute" $
+        withAssets $ \_ page -> do
+          let
+            domainCookie name = cookieForHost (CookieDomain "foo.com") (CookiePath "/") (CookieName name) (CookieValue "1")
+          addCookies
+            (pageContext page)
+            [ domainCookie "same-site-unset"
+            , (domainCookie "same-site-none") {cookieToSetSameSite = Just CookieSameSiteNone}
+            , (domainCookie "same-site-lax") {cookieToSetSameSite = Just CookieSameSiteLax}
+            , (domainCookie "same-site-strict") {cookieToSetSameSite = Just CookieSameSiteStrict}
+            ]
+          jar <- cookiesFor (pageContext page) [urlFromText "https://foo.com"]
+          assertEqual "names" ["same-site-lax", "same-site-strict", "same-site-unset"] (sort (fmap (cookieNameToText . cookieName) jar))
     ]
 
 -- | Records every request. Sets a session cookie on /setsession.html and a
