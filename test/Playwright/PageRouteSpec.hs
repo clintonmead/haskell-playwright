@@ -516,6 +516,25 @@ tests =
           response <- takeResponse
           headers <- responseHeaders response
           assertEqual "allow origin" (Just prefix) (headerValue "access-control-allow-origin" headers)
+    , testCase "should allow null origin for about:blank" $
+        withChromiumPage $ \page -> do
+          route page (UrlMatchGlob "**/something") $ \handled ->
+            fulfillRoute
+              handled
+              defaultFulfillOptions
+                { fulfillStatus = Just (HttpStatus 200)
+                , fulfillContentType = Just (ContentType "text/plain")
+                , fulfillBody = Just (FulfillText "done")
+                }
+          takeResponse <- armResponse page (UrlMatchGlob "https://example.com/something")
+          text <-
+            evaluateText
+              page
+              "async () => (await fetch('https://example.com/something', {method: 'GET', headers: {'X-PINGOTHER': 'pingpong'}})).text()"
+          assertEqual "text" "done" text
+          response <- takeResponse
+          headers <- responseHeaders response
+          assertEqual "allow origin" (Just "null") (headerValue "access-control-allow-origin" headers)
     , testCase "should pause intercepted XHR until continue" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
