@@ -44,7 +44,7 @@ import Playwright
   ( BrowserContext
   , FulfillBody (FulfillText)
   , ContentType (ContentType)
-  , FulfillOptions (fulfillBody, fulfillContentType, fulfillHeaders)
+  , FulfillOptions (fulfillBody, fulfillContentType, fulfillHeaders, fulfillResponse)
   , HeaderName (headerNameToText)
   , HeaderValue (headerValueToText)
   , HttpHeader (httpHeaderName, httpHeaderValue)
@@ -57,6 +57,11 @@ import Playwright
   , abortRoute
   , contextRoute
   , contextRouteWith
+  , armPopup
+  , click
+  , routeFetch
+  , waitForLoadState
+  , LoadState (LoadStateLoad)
   , armResponse
   , responseOk
   , Cookie (cookieName, cookieValue)
@@ -108,6 +113,7 @@ import Playwright.Error
   )
 import Playwright.Harness
   ( Recorded (recordedBody, recordedHeaders, recordedMethod, recordedPath)
+  , locate
   , testAssetsDir
   , recordRequest
   , withChromiumContext
@@ -440,6 +446,22 @@ tests =
                   assertEqual "api requests" (count :: Int) (length (filter ((== "/api") . recordedPath) seen))
               )
               [1, 2, 3]
+    , testCase "should fulfill popup main request using alias" $
+        withAssetsContextWithDefault $ \prefix ctx page -> do
+          contextRoute ctx (UrlMatchGlob "**/*") $ \handled -> do
+            response <- routeFetch handled
+            fulfillRoute
+              handled
+              defaultFulfillOptions
+                { fulfillResponse = Just response
+                , fulfillBody = Just (FulfillText "hello")
+                }
+          setContent page ("<a target=_blank href=\"" <> prefix <> "/empty.html\">click me</a>")
+          takePopup <- armPopup page
+          click (locate page "a")
+          popup <- takePopup
+          waitForLoadState popup LoadStateLoad
+          assertEqual "popup body" "hello" =<< evaluateText popup "() => document.body.innerText"
     ]
 
 withAssetsContextWithDefault :: (Text -> BrowserContext -> Page -> Playwright a) -> IO a
