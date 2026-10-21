@@ -11,6 +11,8 @@ import Playwright
   , KeyboardModifier (KeyboardModifierControlOrMeta, KeyboardModifierShift)
   , LoadState (LoadStateDomContentLoaded)
   , armContextPage
+  , onContextPage
+  , onPageClose
   , clickWith
   , defaultClickOptions
   , closePage
@@ -36,11 +38,18 @@ import Playwright
   )
 import Playwright.Harness
   ( assertBool
+  , recordingPageApp
+  , withLocalApp
   , locate
   , withAssetsContextWith
   , withChromiumContext
   , assertEqual
   , assertFailure
+  )
+import UnliftIO.IORef
+  ( modifyIORef'
+  , newIORef
+  , readIORef
   )
 import Data.Maybe
   ( isNothing
@@ -161,4 +170,20 @@ tests =
           clickWith (locate page "a") defaultClickOptions {clickOptionsModifiers = Just [KeyboardModifierControlOrMeta]}
           popup <- takePopup
           assertBool "no opener" . isNothing =<< opener popup
+    , testCase "should fire page lifecycle events" $ do
+        requests <- newIORef []
+        withChromiumContext $ \ctx _ ->
+          withLocalApp (recordingPageApp requests) $ \prefix -> do
+            events <- newIORef []
+            onContextPage ctx $ \created -> do
+              createdUrl <- urlToText <$> url created
+              modifyIORef' events (<> ["CREATED: " <> createdUrl])
+              onPageClose created $ do
+                closedUrl <- urlToText <$> url created
+                modifyIORef' events (<> ["DESTROYED: " <> closedUrl])
+            page <- newPage ctx
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            closePage page
+            assertEqual "events" ["CREATED: about:blank", "DESTROYED: " <> prefix <> "/empty.html"]
+              =<< readIORef events
     ]
