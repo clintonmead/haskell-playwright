@@ -8,8 +8,27 @@ import Data.Maybe
 import Data.Text
   ( Text
   )
+import Data.Text
+  ( isInfixOf
+  )
+import UnliftIO.Exception
+  ( try
+  )
+import Playwright.Error
+  ( PlaywrightError (ProtocolRpc)
+  , ProtocolFailure (protocolFailureMessage)
+  )
 import Playwright
-  ( Cookie (cookieName)
+  ( BrowserContext
+  , NewContextOptions (newContextStorageState)
+  , OriginStorageState (OriginStorageState)
+  , StorageItem (StorageItem)
+  , StorageName (StorageName)
+  , StorageValue (StorageValue)
+  , StorageState (StorageState)
+  , defaultNewContextOptions
+  , newContextWith
+  , Cookie (cookieName)
   , CookieName (CookieName, cookieNameToText)
   , CookieValue (CookieValue)
   , FulfillBody (FulfillText)
@@ -40,7 +59,10 @@ import Playwright
   , Playwright
   )
 import Playwright.Harness
-  ( withAssetsContextWith
+  ( assertBool
+  , assertFailure
+  , withChromiumBrowser
+  , withAssetsContextWith
   , withChromiumContext
   , withChromiumContextWith
   , assertEqual
@@ -94,6 +116,30 @@ tests =
             setStorageState ctx replaced
             _ <- goto page (urlFromText "https://www.example.com") defaultGotoOptions
             assertEqual "after" "value2" =<< evaluateText page "() => window.localStorage['name1']"
+    , testCase "should report good error if the url is not valid" $
+        withChromiumBrowser $ \browser -> do
+          result <-
+            try
+              ( newContextWith
+                  browser
+                  defaultNewContextOptions
+                    { newContextStorageState =
+                        Just
+                          ( StorageState
+                              []
+                              [OriginStorageState (urlFromText "foo") [StorageItem (StorageName "name1") (StorageValue "value1")]]
+                          )
+                    }
+              )
+              :: Playwright (Either PlaywrightError BrowserContext)
+          case result of
+            Left (ProtocolRpc failure) -> do
+              assertBool "setting" ("Error setting storage state:" `isInfixOf` protocolFailureMessage failure)
+              assertBool "origin" ("foo" `isInfixOf` protocolFailureMessage failure)
+            Left err ->
+              assertFailure ("expected ProtocolRpc, got: " <> show err)
+            Right _ ->
+              assertFailure "expected the storage state to be refused"
     ]
 
 seeded :: StorageState
