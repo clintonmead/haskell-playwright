@@ -41,6 +41,10 @@ import Network.Wai
   , responseLBS
   )
 import Network.Wai qualified as Wai
+import Network.Wai.Application.Static
+  ( defaultFileServerSettings
+  , staticApp
+  )
 import Playwright
   ( ContentType (ContentType)
   , FulfillBody (FulfillText)
@@ -104,6 +108,7 @@ import Playwright.Harness
   , assertProtocolContains
   , withAssets
   , withChromiumPage
+  , testAssetsDir
   , withLocalApp
   )
 import Test.Tasty
@@ -114,7 +119,8 @@ import Test.Tasty.HUnit
   ( testCase
   )
 import UnliftIO.Async
-  ( wait
+  ( poll
+  , wait
   , withAsync
   )
 import UnliftIO.Exception
@@ -414,6 +420,48 @@ tests =
           _ <- goto page (urlFromText (prefix <> "/index1hello")) defaultGotoOptions
           body <- evaluateText page "() => document.body.textContent"
           assertBool "index1hello is not intercepted" (body `notElem` ["any character", "question mark"])
+    , testCase "should work with redirect inside sync XHR" $ do
+        assets <- testAssetsDir
+        withChromiumPage $ \page ->
+          withLocalApp (redirectingAssetsApp assets) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            route page (UrlMatchGlob "**/*") continueRoute
+            status <-
+              evaluateText
+                page
+                "() => { const request = new XMLHttpRequest(); request.open('GET', '/logo.png', false); request.send(null); return String(request.status); }"
+            assertEqual "status" "200" status
+    , testCase "should pause intercepted XHR until continue" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          routes <- newEmptyMVar
+          route page (UrlMatchGlob "**/global-var.html") $ \handled -> putMVar routes handled
+          withAsync
+            ( evaluateText
+                page
+                "() => { const request = new XMLHttpRequest(); request.open('GET', '/global-var.html', false); request.send(null); return String(request.status); }"
+            )
+            $ \pending -> do
+              handled <- takeMVar routes
+              liftIO (threadDelay 500000)
+              finished <- poll pending
+              assertBool "paused" (isNothing finished)
+              continueRoute handled
+              assertEqual "status" "200" =<< wait pending
+    , testCase "should pause intercepted fetch request until continue" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          routes <- newEmptyMVar
+          route page (UrlMatchGlob "**/global-var.html") $ \handled -> putMVar routes handled
+          withAsync
+            (evaluateText page "async () => String((await fetch('/global-var.html')).status)")
+            $ \pending -> do
+              handled <- takeMVar routes
+              liftIO (threadDelay 500000)
+              finished <- poll pending
+              assertBool "paused" (isNothing finished)
+              continueRoute handled
+              assertEqual "status" "200" =<< wait pending
     ]
 
 -- | A Playwright error from an action that is expected to fail, ignored here.
@@ -496,3 +544,13 @@ refererRecordingApp captured request respond =
       respond (responseLBS status200 [(hContentType, "text/html")] "")
     _ ->
       respond (responseLBS status404 [] "")
+
+-- | Redirects /logo.png to /pptr.png, and serves every other path from the assets
+-- directory.
+redirectingAssetsApp :: FilePath -> Application
+redirectingAssetsApp assets request respond =
+  case pathInfo request of
+    ["logo.png"] ->
+      respond (responseLBS status302 [(hLocation, "/pptr.png")] "")
+    _ ->
+      staticApp (defaultFileServerSettings assets) request respond
