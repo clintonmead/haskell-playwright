@@ -47,9 +47,9 @@ import Network.Wai.Handler.Warp
   )
 import Playwright
   ( ContinueOptions (continueHeaders, continueMethod, continuePostData, continueUrl)
-  , HeaderName (HeaderName)
+  , HeaderName (HeaderName, headerNameToText)
   , HeaderValue (HeaderValue)
-  , HttpHeader (HttpHeader)
+  , HttpHeader (HttpHeader, httpHeaderName)
   , HttpMethod (HttpMethod)
   , RequestFailure (requestFailureText)
   , UrlMatch (UrlMatchGlob)
@@ -364,6 +364,18 @@ tests =
             assertEqual "content-length" Nothing (headerOf "/empty.html" "content-length" seen)
             assertEqual "content-type" Nothing (headerOf "/empty.html" "content-type" seen)
             assertEqual "custom header" (Just "value") (headerOf "/empty.html" "custom" seen)
+    , testCase "should not forward Host header on cross-origin redirect" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (crossOriginRedirectApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            route page (UrlMatchGlob "**/*") $ \handled -> do
+              headers <- requestHeaders =<< routeRequest handled
+              assertBool "route sees no host header" (all ((/= "host") . toLower . headerNameToText . httpHeaderName) headers)
+              continueRouteWith handled defaultContinueOptions {continueHeaders = Just headers}
+            _ <- goto page (urlFromText (prefix <> "/redirect")) defaultGotoOptions
+            seen <- readIORef requests
+            assertBool "redirected to the localhost origin" (maybe False ("localhost" `BS8.isPrefixOf`) (headerOf "/final" "host" seen))
     ]
 
 -- | Serves a page whose div takes its background from a CSS variable and an
@@ -462,3 +474,19 @@ redirectingApp requests request respond =
       respond (responseLBS status302 [(hLocation, "/empty.html")] LBS8.empty)
     _ ->
       recordingApp requests request respond
+
+-- | Redirects /redirect to the same server under localhost, which is another
+-- origin. Every other request is recorded.
+crossOriginRedirectApp :: IORef [Recorded] -> Application
+crossOriginRedirectApp requests request respond =
+  case pathInfo request of
+    ["redirect"] ->
+      respond (responseLBS status302 [(hLocation, "http://" <> crossHost <> "/final")] LBS8.empty)
+    _ ->
+      recordingApp requests request respond
+  where
+    host = fromMaybe BS8.empty (lookup "host" (Wai.requestHeaders request))
+    crossHost =
+      if BS8.isPrefixOf "127.0.0.1" host
+        then "localhost" <> BS8.drop 9 host
+        else host
