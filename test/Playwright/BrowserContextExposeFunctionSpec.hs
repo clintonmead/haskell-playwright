@@ -5,12 +5,28 @@ module Playwright.BrowserContextExposeFunctionSpec
 import Data.Text
   ( isInfixOf
   )
+import Network.HTTP.Types
+  ( hContentType
+  , status200
+  )
+import Network.Wai
+  ( Application
+  , responseLBS
+  )
+import UnliftIO.IORef
+  ( modifyIORef'
+  , newIORef
+  , readIORef
+  )
 import UnliftIO.Exception
   ( throwIO
   , try
   )
 import Playwright
   ( BindingName (BindingName)
+  , newPage
+  , undefinedArgument
+  , evaluateText
   , dispose
   , contextExposeFunction
   , defaultGotoOptions
@@ -28,6 +44,7 @@ import Playwright.Error
   )
 import Playwright.Harness
   ( assertBool
+  , withLocalApp
   , assertFailure
   , assertProtocolContains
   , withAssetsContextWith
@@ -91,6 +108,17 @@ tests =
               assertFailure ("expected ProtocolRpc, got: " <> show err)
             Right _ ->
               assertFailure "expected the disposed function to be gone"
+    , testCase "should work with CSP" $
+        withChromiumContext $ \ctx _ ->
+          withLocalApp cspEmptyApp $ \base -> do
+            page <- newPage ctx
+            _ <- goto page (urlFromText (base <> "/empty.html")) defaultGotoOptions
+            called <- newIORef False
+            _ <- contextExposeFunction ctx (BindingName "hi") $ \_ -> do
+              modifyIORef' called (const True)
+              pure undefinedArgument
+            assertEqual "returned" "done" =<< evaluateText page "async () => { await window.hi(); return 'done'; }"
+            assertEqual "called" True =<< readIORef called
     ]
 
 add :: [SerializedValue] -> Playwright SerializedArgument
@@ -108,3 +136,15 @@ multiply args =
       pure (numberArgument (left * right))
     _ ->
       throwIO (EvaluateUnexpected (SerializedNode (PayloadNumber 0) Nothing))
+
+-- | Serves an empty page with a Content-Security-Policy header.
+cspEmptyApp :: Application
+cspEmptyApp _ respond =
+  respond
+    ( responseLBS
+        status200
+        [ ("Content-Security-Policy", "default-src \"self\"")
+        , (hContentType, "text/html")
+        ]
+        ""
+    )
