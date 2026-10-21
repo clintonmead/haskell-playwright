@@ -31,6 +31,7 @@ import Data.Text.Encoding
   )
 import Network.HTTP.Types
   ( hContentType
+  , status204
   , hLocation
   , status302
   , status200
@@ -511,6 +512,21 @@ tests =
             text <- evaluateText page ("async () => (await fetch('" <> prefix <> "/redirect', {headers: {foo: 'a'}})).text()")
             assertEqual "text" "done" text
             assertEqual "server foo" Nothing . headerOf "/something" "foo" =<< readIORef requests
+    , testCase "propagate headers cross origin" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (corsCredentialsApp requests) $ \prefix -> do
+            let
+              cross = replace "127.0.0.1" "localhost" prefix
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            text <-
+              evaluateText
+                page
+                ( "async () => (await fetch('" <> cross <> "/something', {headers: {authorization: 'credentials', custom: 'foo'}, credentials: 'include'})).text()"
+                )
+            assertEqual "text" "done" text
+            assertEqual "authorization" (Just "credentials") . headerOf "/something" "authorization" =<< readIORef requests
+            assertEqual "custom" (Just "foo") . headerOf "/something" "custom" =<< readIORef requests
     ]
 
 -- | Redirects /redirect to /something, which answers with a body another origin
@@ -676,3 +692,42 @@ crossOriginRedirectApp requests request respond =
       if BS8.isPrefixOf "127.0.0.1" host
         then "localhost" <> BS8.drop 9 host
         else host
+
+-- | Answers the preflight of a cross-origin request, then the request itself, for
+-- the page's origin with credentials allowed. Every request is recorded.
+corsCredentialsApp :: IORef [Recorded] -> Application
+corsCredentialsApp requests request respond = do
+  recordRequest requests request
+  if Wai.requestMethod request == "OPTIONS"
+    then
+      respond
+        ( responseLBS
+            status204
+            [ ("Access-Control-Allow-Origin", origin)
+            , ("Access-Control-Allow-Credentials", "true")
+            , ("Access-Control-Allow-Methods", "POST, GET, OPTIONS, DELETE")
+            , ("Access-Control-Allow-Headers", "authorization,custom")
+            ]
+            LBS8.empty
+        )
+    else
+      respond
+        ( responseLBS
+            status200
+            [ (hContentType, "text/plain")
+            , ("Access-Control-Allow-Origin", origin)
+            , ("Access-Control-Allow-Credentials", "true")
+            ]
+            "done"
+        )
+  where
+    host = fromMaybe BS8.empty (lookup "host" (Wai.requestHeaders request))
+    origin = "http://" <> otherOrigin host
+
+-- | The same host and port under the other name, since 127.0.0.1 and localhost
+-- are different origins.
+otherOrigin :: BS8.ByteString -> BS8.ByteString
+otherOrigin host
+  | "127.0.0.1" `BS8.isPrefixOf` host = "localhost" <> BS8.drop 9 host
+  | "localhost" `BS8.isPrefixOf` host = "127.0.0.1" <> BS8.drop 9 host
+  | otherwise = host
