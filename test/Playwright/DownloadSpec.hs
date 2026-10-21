@@ -29,7 +29,10 @@ import UnliftIO.Temporary
 import Data.ByteString.Builder
   ( byteString
   )
+import Data.ByteString qualified as BS
+import Data.ByteString (ByteString)
 import Data.ByteString.Char8 qualified as BS8
+import Data.ByteString.Lazy qualified as LBS
 import Data.ByteString.Lazy.Char8 qualified as LBS8
 import Data.Maybe
   ( isNothing
@@ -101,6 +104,7 @@ import Playwright
   )
 import Playwright.Harness
   ( assertProtocolContains
+  , readTestAsset
   , locate
   , withAssetPage
   , withChromiumBrowser
@@ -166,6 +170,20 @@ tests =
               page
               ("<a href=\"" <> prefix <> "/download\" download=\"foo.zip\">download</a>")
           assertEqual "url" (prefix <> "/download") (urlToText (downloadUrl download))
+    , testCase "should be able to download a PDF file" $ do
+        pdf <- readTestAsset "empty.pdf"
+        withApplication (pure (pdfApp pdf)) $ \port ->
+          withAcceptedPage $ \page -> do
+            let
+              base = "http://127.0.0.1:" <> pack (show port)
+            _ <- goto page (urlFromText (base <> "/empty")) defaultGotoOptions
+            download <-
+              clickHrefWith
+                page
+                ("<a href=\"" <> base <> "/empty.pdf\" download>download</a>")
+            path <- downloadPath download
+            saved <- liftIO (BS.readFile path)
+            assertEqual "pdf bytes" pdf saved
     , testCase "should report downloads for download attribute" $
         withDownloadServer $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty")) defaultGotoOptions
@@ -483,3 +501,12 @@ attachment respond disposition =
 html :: (Response -> IO ResponseReceived) -> LBS8.ByteString -> IO ResponseReceived
 html respond body =
   respond (responseLBS status200 [(hContentType, "text/html")] body)
+
+-- | Serves the PDF bytes at /empty.pdf, and an empty page for every other path.
+pdfApp :: ByteString -> Application
+pdfApp pdf request respond =
+  case pathInfo request of
+    ["empty.pdf"] ->
+      respond (responseLBS status200 [(hContentType, "application/pdf")] (LBS.fromStrict pdf))
+    _ ->
+      respond (responseLBS status200 [(hContentType, "text/html")] LBS8.empty)
