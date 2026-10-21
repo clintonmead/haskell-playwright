@@ -7,7 +7,12 @@ import UnliftIO.Async
   , withAsync
   )
 import Playwright
-  ( LoadState (LoadStateDomContentLoaded)
+  ( ClickOptions (clickOptionsModifiers)
+  , KeyboardModifier (KeyboardModifierControlOrMeta, KeyboardModifierShift)
+  , LoadState (LoadStateDomContentLoaded)
+  , armContextPage
+  , clickWith
+  , defaultClickOptions
   , closePage
   , contextPages
   , defaultGotoOptions
@@ -21,6 +26,7 @@ import Playwright
   , pagesEqual
   , querySelector
   , selectorFromText
+  , setContent
   , textArgument
   , url
   , urlFromText
@@ -29,10 +35,15 @@ import Playwright
   , waitForLoadState
   )
 import Playwright.Harness
-  ( withAssetsContextWith
+  ( assertBool
+  , locate
+  , withAssetsContextWith
   , withChromiumContext
   , assertEqual
   , assertFailure
+  )
+import Data.Maybe
+  ( isNothing
   )
 import Test.Tasty
   ( TestTree
@@ -134,4 +145,20 @@ tests =
                 pure ()
               Just _ ->
                 assertFailure "expected no opener on original page"
+    , testCase "should work with Shift-clicking" $
+        withAssetsContextWith defaultNewContextOptions $ \prefix ctx page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          setContent page "<a href=\"/one-style.html\">yo</a>"
+          takePopup <- armContextPage ctx
+          clickWith (locate page "a") defaultClickOptions {clickOptionsModifiers = Just [KeyboardModifierShift]}
+          popup <- takePopup
+          assertBool "no opener" . isNothing =<< opener popup
+    , testCase "should work with Ctrl-clicking" $
+        withAssetsContextWith defaultNewContextOptions $ \prefix ctx page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          setContent page "<a href=\"/one-style.html\">yo</a>"
+          takePopup <- armContextPage ctx
+          clickWith (locate page "a") defaultClickOptions {clickOptionsModifiers = Just [KeyboardModifierControlOrMeta]}
+          popup <- takePopup
+          assertBool "no opener" . isNothing =<< opener popup
     ]
