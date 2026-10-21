@@ -74,6 +74,9 @@ import Playwright
   , fallbackRoute
   , framesEqual
   , fulfillRoute
+  , requestAllHeaders
+  , requestResponse
+  , responseHeaders
   , goto
   , mainFrame
   , requestFailure
@@ -431,6 +434,38 @@ tests =
                 page
                 "() => { const request = new XMLHttpRequest(); request.open('GET', '/logo.png', false); request.send(null); return String(request.status); }"
             assertEqual "status" "200" status
+    , testCase "should contain raw request header" $
+        withAssets $ \prefix page -> do
+          headers <- newIORef []
+          route page (UrlMatchGlob "**/*") $ \handled -> do
+            request <- routeRequest handled
+            writeIORef headers =<< requestAllHeaders request
+            continueRoute handled
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertBool "accept" . isJust . headerValue "accept" =<< readIORef headers
+    , testCase "should contain raw response header" $
+        withAssets $ \prefix page -> do
+          requests <- newIORef Nothing
+          route page (UrlMatchGlob "**/*") $ \handled -> do
+            request <- routeRequest handled
+            writeIORef requests (Just request)
+            continueRoute handled
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertContentTypeOfResponse =<< readIORef requests
+    , testCase "should contain raw response header after fulfill" $
+        withAssets $ \prefix page -> do
+          requests <- newIORef Nothing
+          route page (UrlMatchGlob "**/*") $ \handled -> do
+            request <- routeRequest handled
+            writeIORef requests (Just request)
+            fulfillRoute
+              handled
+              defaultFulfillOptions
+                { fulfillBody = Just (FulfillText "Hello")
+                , fulfillContentType = Just (ContentType "text/html")
+                }
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertContentTypeOfResponse =<< readIORef requests
     , testCase "should pause intercepted XHR until continue" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
@@ -554,3 +589,17 @@ redirectingAssetsApp assets request respond =
       respond (responseLBS status302 [(hLocation, "/pptr.png")] "")
     _ ->
       staticApp (defaultFileServerSettings assets) request respond
+
+-- | Checks that the response of the recorded request has a content type header.
+assertContentTypeOfResponse :: Maybe Request -> Playwright ()
+assertContentTypeOfResponse recorded =
+  case recorded of
+    Nothing ->
+      assertFailure "no request was routed"
+    Just request -> do
+      response <- requestResponse request
+      case response of
+        Nothing ->
+          assertFailure "no response"
+        Just value ->
+          assertBool "content-type" . isJust . headerValue "content-type" =<< responseHeaders value
