@@ -8,6 +8,7 @@ import UnliftIO.Async
   )
 import Playwright
   ( ClickOptions (clickOptionsModifiers)
+  , Playwright
   , KeyboardModifier (KeyboardModifierControlOrMeta, KeyboardModifierShift)
   , LoadState (LoadStateDomContentLoaded)
   , armContextPage
@@ -47,9 +48,19 @@ import Playwright.Harness
   , assertFailure
   )
 import UnliftIO.IORef
-  ( modifyIORef'
+  ( IORef
+  , modifyIORef'
   , newIORef
   , readIORef
+  )
+import Data.Text
+  ( Text
+  )
+import Control.Concurrent
+  ( threadDelay
+  )
+import Control.Monad.IO.Class
+  ( liftIO
   )
 import Data.Maybe
   ( isNothing
@@ -185,5 +196,17 @@ tests =
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
             closePage page
             assertEqual "events" ["CREATED: about:blank", "DESTROYED: " <> prefix <> "/empty.html"]
-              =<< readIORef events
+              =<< awaitEvents events ["CREATED: about:blank", "DESTROYED: " <> prefix <> "/empty.html"] 100
     ]
+
+-- | Polls the recorded events until they match the expected list, or the
+-- attempts run out. A close listener runs after closePage returns, so the
+-- events are read after a short wait.
+awaitEvents :: IORef [Text] -> [Text] -> Int -> Playwright [Text]
+awaitEvents events expected attempts = do
+  current <- readIORef events
+  if current == expected || attempts <= 0
+    then pure current
+    else do
+      liftIO (threadDelay 50000)
+      awaitEvents events expected (attempts - 1)
