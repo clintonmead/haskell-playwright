@@ -5,21 +5,26 @@ module Playwright.BrowserContextAddCookiesSpec
 import Data.Text
   ( isInfixOf
   )
+import Data.Text qualified as Text
 import Playwright
   ( Cookie (cookieExpires, cookieHttpOnly, cookieName, cookiePath, cookieSecure, cookieValue)
   , CookieExpires (cookieExpiresToScientific)
   , CookieHttpOnly (cookieHttpOnlyToBool)
+  , CookieDomain (CookieDomain)
   , CookieName (CookieName, cookieNameToText)
-  , CookiePath (cookiePathToText)
+  , CookiePath (CookiePath, cookiePathToText)
   , CookieSecure (cookieSecureToBool)
   , CookieValue (CookieValue, cookieValueToText)
   , Playwright
   , addCookies
   , clearCookies
+  , cookieForHost
   , cookieForUrl
   , cookies
   , defaultGotoOptions
+  , evaluateOnFrameText
   , evaluateText
+  , frames
   , goto
   , pageContext
   , urlFromText
@@ -149,4 +154,34 @@ tests =
               assertFailure ("expected ProtocolRpc, got: " <> show err)
             Right _ ->
               assertFailure "expected the cookie to be refused"
+    , testCase "should set cookies for a frame" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          addCookies (pageContext page) [cookieForUrl (urlFromText prefix) (CookieName "frame-cookie") (CookieValue "value")]
+          _ <-
+            evaluateText
+              page
+              ( "async () => { const iframe = document.createElement('iframe'); document.body.appendChild(iframe); await new Promise(resolve => { iframe.onload = resolve; iframe.src = '"
+                  <> prefix
+                  <> "/grid.html'; }); return 'loaded'; }"
+              )
+          allFrames <- frames page
+          case drop 1 allFrames of
+            frame : _ ->
+              assertEqual "frame cookie" "frame-cookie=value" =<< evaluateOnFrameText frame "() => document.cookie"
+            [] ->
+              assertFailure "expected a child frame"
+    , testCase "should set a cookie with a path" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          addCookies
+            (pageContext page)
+            [cookieForHost (CookieDomain (Text.drop 7 prefix)) (CookiePath "/grid.html") (CookieName "gridcookie") (CookieValue "GRID")]
+          jar <- cookies (pageContext page)
+          assertEqual "path" ["/grid.html"] (fmap (cookiePathToText . cookiePath) jar)
+          assertEqual "on grid" "gridcookie=GRID" =<< evaluateText page "() => document.cookie"
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "off grid" "" =<< evaluateText page "() => document.cookie"
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          assertEqual "back on grid" "gridcookie=GRID" =<< evaluateText page "() => document.cookie"
     ]
