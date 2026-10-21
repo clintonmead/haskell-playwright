@@ -2,6 +2,9 @@ module Playwright.BrowserContextRouteSpec
   ( tests
   ) where
 
+import UnliftIO.Exception
+  ( try
+  )
 import UnliftIO.IORef
   ( modifyIORef'
   , newIORef
@@ -40,6 +43,12 @@ import Playwright
   , defaultNewContextOptions
   , defaultRouteOptions
   , fallbackRoute
+  , fallbackRouteWith
+  , evaluateText
+  , Response
+  , ContinueOptions (continueUrl)
+  , defaultContinueOptions
+  , defaultFulfillOptions
   , framesEqual
   , fulfillRoute
   , goto
@@ -60,6 +69,9 @@ import Playwright
   , urlFromText
   , urlToText
   , Playwright
+  )
+import Playwright.Error
+  ( PlaywrightError
   )
 import Playwright.Harness
   ( withAssetsContextWith
@@ -191,6 +203,65 @@ tests =
               assertFailure "missing response"
             Just value ->
               assertEqual "ok" True =<< responseOk value
+    , testCase "should chain fallback" $
+        withAssetsContextWithDefault $ \prefix ctx page -> do
+          intercepted <- newIORef []
+          contextRoute ctx (UrlMatchGlob "**/empty.html") $ \handled -> do
+            modifyIORef' intercepted (<> [1 :: Int])
+            fallbackRoute handled
+          contextRoute ctx (UrlMatchGlob "**/empty.html") $ \handled -> do
+            modifyIORef' intercepted (<> [2])
+            fallbackRoute handled
+          contextRoute ctx (UrlMatchGlob "**/empty.html") $ \handled -> do
+            modifyIORef' intercepted (<> [3])
+            fallbackRoute handled
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "order" [3, 2, 1] =<< readIORef intercepted
+    , testCase "should chain fallback w/ dynamic URL" $
+        withAssetsContextWithDefault $ \prefix ctx page -> do
+          intercepted <- newIORef []
+          contextRoute ctx (UrlMatchGlob "**/bar") $ \handled -> do
+            modifyIORef' intercepted (<> [1 :: Int])
+            fallbackRouteWith handled defaultContinueOptions {continueUrl = Just (urlFromText (prefix <> "/empty.html"))}
+          contextRoute ctx (UrlMatchGlob "**/foo") $ \handled -> do
+            modifyIORef' intercepted (<> [2])
+            fallbackRouteWith handled defaultContinueOptions {continueUrl = Just (urlFromText "http://localhost/bar")}
+          contextRoute ctx (UrlMatchGlob "**/empty.html") $ \handled -> do
+            modifyIORef' intercepted (<> [3])
+            fallbackRouteWith handled defaultContinueOptions {continueUrl = Just (urlFromText "http://localhost/foo")}
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "order" [3, 2, 1] =<< readIORef intercepted
+    , testCase "should not chain fulfill" $
+        withAssetsContextWithDefault $ \prefix ctx page -> do
+          failed <- newIORef False
+          contextRoute ctx (UrlMatchGlob "**/empty.html") $ \_ ->
+            writeIORef failed True
+          contextRoute ctx (UrlMatchGlob "**/empty.html") $ \handled ->
+            fulfillRoute handled defaultFulfillOptions {fulfillBody = Just (FulfillText "fulfilled")}
+          contextRoute ctx (UrlMatchGlob "**/empty.html") $ \handled ->
+            fallbackRoute handled
+          response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          case response of
+            Nothing ->
+              assertFailure "missing response"
+            Just _ ->
+              assertEqual "body" "fulfilled" =<< evaluateText page "() => document.body.innerText"
+          assertEqual "failed" False =<< readIORef failed
+    , testCase "should not chain abort" $
+        withAssetsContextWithDefault $ \prefix ctx page -> do
+          failed <- newIORef False
+          contextRoute ctx (UrlMatchGlob "**/empty.html") $ \_ ->
+            writeIORef failed True
+          contextRoute ctx (UrlMatchGlob "**/empty.html") abortRoute
+          contextRoute ctx (UrlMatchGlob "**/empty.html") $ \handled ->
+            fallbackRoute handled
+          result <- try (goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions) :: Playwright (Either PlaywrightError (Maybe Response))
+          case result of
+            Left _ ->
+              pure ()
+            Right _ ->
+              assertFailure "expected the navigation to be aborted"
+          assertEqual "failed" False =<< readIORef failed
     ]
 
 withAssetsContextWithDefault :: (Text -> BrowserContext -> Page -> Playwright a) -> IO a
