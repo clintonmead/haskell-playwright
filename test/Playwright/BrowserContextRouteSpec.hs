@@ -6,7 +6,8 @@ import UnliftIO.Exception
   ( try
   )
 import UnliftIO.IORef
-  ( modifyIORef'
+  ( IORef
+  , modifyIORef'
   , newIORef
   , readIORef
   , writeIORef
@@ -19,6 +20,14 @@ import Data.Text
   ( Text
   , isInfixOf
   , toLower
+  )
+import Network.HTTP.Types
+  ( hContentType
+  , status200
+  )
+import Network.Wai
+  ( Application
+  , responseLBS
   )
 import Playwright
   ( BrowserContext
@@ -45,8 +54,11 @@ import Playwright
   , fallbackRoute
   , fallbackRouteWith
   , evaluateText
+  , setContent
+  , waitForFunction
+  , continueRouteWith
   , Response
-  , ContinueOptions (continueUrl)
+  , ContinueOptions (continuePostData, continueUrl)
   , defaultContinueOptions
   , defaultFulfillOptions
   , framesEqual
@@ -74,7 +86,11 @@ import Playwright.Error
   ( PlaywrightError
   )
 import Playwright.Harness
-  ( withAssetsContextWith
+  ( Recorded (recordedBody, recordedMethod)
+  , recordRequest
+  , withChromiumContext
+  , withLocalApp
+  , withAssetsContextWith
   , assertBool
   , assertEqual
   , assertFailure
@@ -262,6 +278,25 @@ tests =
             Right _ ->
               assertFailure "expected the navigation to be aborted"
           assertEqual "failed" False =<< readIORef failed
+    , testCase "should overwrite post body with empty string" $ do
+        requests <- newIORef []
+        withChromiumContext $ \ctx page ->
+          withLocalApp (recordingPageApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            contextRoute ctx (UrlMatchGlob "**/empty.html") $ \handled ->
+              continueRouteWith handled defaultContinueOptions {continuePostData = Just ""}
+            setContent
+              page
+              ( "<script>(async () => { await fetch('" <> prefix <> "/empty.html', {method: 'POST', body: 'original'}); window.done = true; })()</script>"
+              )
+            _ <- waitForFunction page "() => window.done === true"
+            seen <- readIORef requests
+            case seen of
+              latest : _ -> do
+                assertEqual "method" "POST" (recordedMethod latest)
+                assertEqual "body" "" (recordedBody latest)
+              [] ->
+                assertFailure "the server saw no request"
     ]
 
 withAssetsContextWithDefault :: (Text -> BrowserContext -> Page -> Playwright a) -> IO a
@@ -281,3 +316,9 @@ headerValue name headers =
       Just value
     _ ->
       Nothing
+
+-- | Records every request, and answers with an empty page.
+recordingPageApp :: IORef [Recorded] -> Application
+recordingPageApp requests request respond = do
+  recordRequest requests request
+  respond (responseLBS status200 [(hContentType, "text/html")] "")
