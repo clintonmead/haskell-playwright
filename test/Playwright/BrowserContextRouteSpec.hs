@@ -318,6 +318,46 @@ tests =
           assertEqual "first" "intercepted" =<< evaluateText page "() => document.body.innerText"
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           assertBool "second" . (/= "intercepted") =<< evaluateText page "() => document.body.innerText"
+    , testCase "should chain fallback into page" $
+        withAssetsContextWithDefault $ \prefix ctx page -> do
+          intercepted <- newIORef []
+          contextRoute ctx (UrlMatchGlob "**/empty.html") $ \handled -> do
+            modifyIORef' intercepted (<> [1 :: Int])
+            fallbackRoute handled
+          contextRoute ctx (UrlMatchGlob "**/empty.html") $ \handled -> do
+            modifyIORef' intercepted (<> [2])
+            fallbackRoute handled
+          contextRoute ctx (UrlMatchGlob "**/empty.html") $ \handled -> do
+            modifyIORef' intercepted (<> [3])
+            fallbackRoute handled
+          route page (UrlMatchGlob "**/empty.html") $ \handled -> do
+            modifyIORef' intercepted (<> [4])
+            fallbackRoute handled
+          route page (UrlMatchGlob "**/empty.html") $ \handled -> do
+            modifyIORef' intercepted (<> [5])
+            fallbackRoute handled
+          route page (UrlMatchGlob "**/empty.html") $ \handled -> do
+            modifyIORef' intercepted (<> [6])
+            fallbackRoute handled
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "order" [6, 5, 4, 3, 2, 1] =<< readIORef intercepted
+    , testCase "should fall back async" $
+        withAssetsContextWithDefault $ \prefix ctx page -> do
+          intercepted <- newIORef []
+          contextRoute ctx (UrlMatchGlob "**/empty.html") $ \handled -> do
+            modifyIORef' intercepted (<> [1 :: Int])
+            liftIO (threadDelay 100000)
+            fallbackRoute handled
+          contextRoute ctx (UrlMatchGlob "**/empty.html") $ \handled -> do
+            modifyIORef' intercepted (<> [2])
+            liftIO (threadDelay 100000)
+            fallbackRoute handled
+          contextRoute ctx (UrlMatchGlob "**/empty.html") $ \handled -> do
+            modifyIORef' intercepted (<> [3])
+            liftIO (threadDelay 100000)
+            fallbackRoute handled
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "order" [3, 2, 1] =<< readIORef intercepted
     ]
 
 withAssetsContextWithDefault :: (Text -> BrowserContext -> Page -> Playwright a) -> IO a
