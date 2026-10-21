@@ -28,6 +28,8 @@ import Data.Text.Encoding
   )
 import Network.HTTP.Types
   ( hContentType
+  , hLocation
+  , status302
   , status200
   )
 import Network.Wai
@@ -333,6 +335,19 @@ tests =
             assertEqual "status after" 200 after
             seenAfter <- bodyOf "/upload" <$> readIORef requests
             assertBool "body after continue" (maybe False (uploadPart `BS8.isInfixOf`) seenAfter)
+    , testCase "continue should propagate headers to redirects" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (redirectingApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            route page (UrlMatchGlob "**/redirect") $ \handled ->
+              continueRouteWith
+                handled
+                defaultContinueOptions
+                  {continueHeaders = Just [HttpHeader (HeaderName "custom") (HeaderValue "value")]}
+            _ <- goto page (urlFromText (prefix <> "/redirect")) defaultGotoOptions
+            seen <- readIORef requests
+            assertEqual "custom header" (Just "value") (headerOf "/empty.html" "custom" seen)
     ]
 
 -- | Serves a page whose div takes its background from a CSS variable and an
@@ -422,3 +437,12 @@ uploadPart =
     , "file content"
     , "------"
     ]
+
+-- | Redirects /redirect to /empty.html. Every other request is recorded.
+redirectingApp :: IORef [Recorded] -> Application
+redirectingApp requests request respond =
+  case pathInfo request of
+    ["redirect"] ->
+      respond (responseLBS status302 [(hLocation, "/empty.html")] LBS8.empty)
+    _ ->
+      recordingApp requests request respond
