@@ -24,6 +24,7 @@ import Data.Maybe
 import Data.Text
   ( Text
   , isInfixOf
+  , isSuffixOf
   , takeWhileEnd
   , toLower
   )
@@ -48,10 +49,11 @@ import Network.Wai.Application.Static
 import Playwright
   ( ContentType (ContentType)
   , FulfillBody (FulfillText)
-  , FulfillOptions (fulfillBody, fulfillContentType)
+  , FulfillOptions (fulfillBody, fulfillContentType, fulfillHeaders, fulfillStatus)
   , HeaderName (HeaderName, headerNameToText)
   , HeaderValue (HeaderValue, headerValueToText)
   , HttpHeader (HttpHeader, httpHeaderName, httpHeaderValue)
+  , HttpStatus (HttpStatus)
   , HttpMethod (httpMethodToText)
   , Playwright
   , Request
@@ -102,7 +104,8 @@ import Playwright
   , urlToText
   )
 import Playwright.Error
-  ( PlaywrightError
+  ( PlaywrightError (ProtocolRpc)
+  , ProtocolFailure (protocolFailureMessage)
   )
 import Playwright.Harness
   ( assertBool
@@ -466,6 +469,32 @@ tests =
                 }
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           assertContentTypeOfResponse =<< readIORef requests
+    , testCase "should support cors with GET" $
+        withAssets $ \prefix page -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            route page (UrlMatchGlob "**/cars*") $ \handled -> do
+              request <- routeRequest handled
+              allowed <- isSuffixOf "allow" . urlToText <$> requestUrl request
+              fulfillRoute
+                handled
+                defaultFulfillOptions
+                  { fulfillStatus = Just (HttpStatus 200)
+                  , fulfillHeaders =
+                      [HttpHeader (HeaderName "access-control-allow-origin") (HeaderValue (if allowed then "*" else "none"))]
+                  , fulfillContentType = Just (ContentType "application/json")
+                  , fulfillBody = Just (FulfillText "[\"electric\", \"gas\"]")
+                  }
+            allowed <-
+              evaluateText page "async () => JSON.stringify(await (await fetch('https://example.com/cars?allow', {mode: 'cors'})).json())"
+            assertEqual "allowed" "[\"electric\",\"gas\"]" allowed
+            rejected <- try (evaluateText page "async () => (await fetch('https://example.com/cars?reject', {mode: 'cors'})).json()")
+            case rejected of
+              Left (ProtocolRpc failure) ->
+                assertBool "rejected" ("Failed" `isInfixOf` protocolFailureMessage failure)
+              Left err ->
+                assertFailure ("expected ProtocolRpc, got: " <> show err)
+              Right _ ->
+                assertFailure "expected the rejected fetch to fail"
     , testCase "should pause intercepted XHR until continue" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
