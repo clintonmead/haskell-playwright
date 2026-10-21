@@ -3,7 +3,8 @@ module Playwright.BrowserContextExposeFunctionSpec
   ) where
 
 import Data.Text
-  ( isInfixOf
+  ( Text
+  , isInfixOf
   )
 import Network.HTTP.Types
   ( hContentType
@@ -14,9 +15,17 @@ import Network.Wai
   , responseLBS
   )
 import UnliftIO.IORef
-  ( modifyIORef'
+  ( IORef
+  , modifyIORef'
+  , writeIORef
   , newIORef
   , readIORef
+  )
+import Control.Concurrent
+  ( threadDelay
+  )
+import Control.Monad.IO.Class
+  ( liftIO
   )
 import UnliftIO.Exception
   ( throwIO
@@ -24,6 +33,9 @@ import UnliftIO.Exception
   )
 import Playwright
   ( BindingName (BindingName)
+  , addContextInitScript
+  , addInitScript
+  , reload
   , newPage
   , undefinedArgument
   , evaluateText
@@ -55,7 +67,8 @@ import Playwright.SerializedArgument
   ( SerializedArgument
   )
 import Playwright.SerializedValue
-  ( SerializedPayload (PayloadNumber)
+  ( SerializedPayload (PayloadString)
+  , SerializedPayload (PayloadNumber)
   , SerializedValue (SerializedNode)
   )
 import Test.Tasty
@@ -119,6 +132,20 @@ tests =
               pure undefinedArgument
             assertEqual "returned" "done" =<< evaluateText page "async () => { await window.hi(); return 'done'; }"
             assertEqual "called" True =<< readIORef called
+    , testCase "should be callable from-inside addInitScript" $
+        withAssetsContextWith defaultNewContextOptions $ \prefix ctx page -> do
+          calls <- newIORef []
+          _ <-
+            contextExposeFunction ctx (BindingName "woof") $ \values -> do
+              modifyIORef' calls (<> [firstText values])
+              pure undefinedArgument
+          _ <- addContextInitScript ctx "window['woof']('context')"
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "context" ["context"] =<< awaitTexts calls ["context"] 100
+          writeIORef calls []
+          addInitScript page "window['woof']('page')"
+          _ <- reload page
+          assertEqual "page" ["context", "page"] =<< awaitTexts calls ["context", "page"] 100
     ]
 
 add :: [SerializedValue] -> Playwright SerializedArgument
@@ -148,3 +175,21 @@ cspEmptyApp _ respond =
         ]
         ""
     )
+
+-- | The text of the first argument, or empty when there is none.
+firstText :: [SerializedValue] -> Text
+firstText values =
+  case values of
+    SerializedNode (PayloadString text) _ : _ -> text
+    _ -> ""
+
+-- | Polls the recorded values until they match the expected list, or the
+-- attempts run out.
+awaitTexts :: IORef [Text] -> [Text] -> Int -> Playwright [Text]
+awaitTexts calls expected attempts = do
+  current <- readIORef calls
+  if current == expected || attempts <= 0
+    then pure current
+    else do
+      liftIO (threadDelay 50000)
+      awaitTexts calls expected (attempts - 1)
