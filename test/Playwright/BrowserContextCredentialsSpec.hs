@@ -5,7 +5,8 @@ module Playwright.BrowserContextCredentialsSpec
 import Data.ByteString.Char8 qualified as BS8
 import Data.ByteString.Lazy.Char8 qualified as LBS8
 import Data.Text
-  ( pack
+  ( Text
+  , pack
   )
 import Network.HTTP.Types
   ( hAuthorization
@@ -130,6 +131,33 @@ tests =
                   defaultGotoOptions
               assertEqual "status" 200 =<< statusCode response
               assertEqual "title" "Playground" =<< evaluateText page "() => document.title"
+    , testCase "should fail with correct credentials and mismatching scheme" $
+        withAuthServer $ \port ->
+          withChromiumContextWith
+            defaultNewContextOptions
+              {newContextHttpCredentials = Just (credentialsWithOrigin ("https://127.0.0.1:" <> pack (show port)))}
+            $ \_ page -> do
+              response <-
+                goto page (urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/empty.html")) defaultGotoOptions
+              assertEqual "status" 401 =<< statusCode response
+    , testCase "should fail with correct credentials and mismatching hostname" $
+        withAuthServer $ \port ->
+          withChromiumContextWith
+            defaultNewContextOptions
+              {newContextHttpCredentials = Just (credentialsWithOrigin ("http://mismatching-hostname:" <> pack (show port)))}
+            $ \_ page -> do
+              response <-
+                goto page (urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/empty.html")) defaultGotoOptions
+              assertEqual "status" 401 =<< statusCode response
+    , testCase "should fail with correct credentials and mismatching port" $
+        withAuthServer $ \port ->
+          withChromiumContextWith
+            defaultNewContextOptions
+              {newContextHttpCredentials = Just (credentialsWithOrigin ("http://127.0.0.1:" <> pack (show (port + 1))))}
+            $ \_ page -> do
+              response <-
+                goto page (urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/empty.html")) defaultGotoOptions
+              assertEqual "status" 401 =<< statusCode response
     ]
 
 validCredentials :: HttpCredentials
@@ -187,3 +215,8 @@ authAssetsApp assets expected req respond =
             [("WWW-Authenticate", BS8.pack "Basic realm=\"test\"")]
             LBS8.empty
         )
+
+-- | The valid credentials, limited to the origin given.
+credentialsWithOrigin :: Text -> HttpCredentials
+credentialsWithOrigin origin =
+  validCredentials {httpCredentialsOrigin = Just (urlFromText origin)}
