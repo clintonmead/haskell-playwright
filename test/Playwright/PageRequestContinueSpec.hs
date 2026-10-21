@@ -348,6 +348,22 @@ tests =
             _ <- goto page (urlFromText (prefix <> "/redirect")) defaultGotoOptions
             seen <- readIORef requests
             assertEqual "custom header" (Just "value") (headerOf "/empty.html" "custom" seen)
+    , testCase "continue should drop content-length on redirects" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (redirectingApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            route page (UrlMatchGlob "**/redirect") $ \handled ->
+              continueRouteWith
+                handled
+                defaultContinueOptions
+                  {continueHeaders = Just [HttpHeader (HeaderName "custom") (HeaderValue "value")]}
+            _ <- evaluateNumber page "() => fetch('/redirect', { method: 'POST', body: 'foo' }).then(r => r.status)"
+            seen <- readIORef requests
+            assertEqual "method" (Just "GET") (recordedMethod <$> lastFor "/empty.html" seen)
+            assertEqual "content-length" Nothing (headerOf "/empty.html" "content-length" seen)
+            assertEqual "content-type" Nothing (headerOf "/empty.html" "content-type" seen)
+            assertEqual "custom header" (Just "value") (headerOf "/empty.html" "custom" seen)
     ]
 
 -- | Serves a page whose div takes its background from a CSS variable and an
