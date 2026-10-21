@@ -5,6 +5,14 @@ module Playwright.PageCloseSpec
 import Control.Concurrent
   ( threadDelay
   )
+import Control.Monad.IO.Class
+  ( liftIO
+  )
+import UnliftIO.IORef
+  ( IORef
+  , modifyIORef'
+  , readIORef
+  )
 import Control.Monad
   ( forever
   , void
@@ -32,6 +40,8 @@ import Network.Wai
   )
 import Playwright
   ( BindingName (BindingName)
+  , closePage
+  , onPageClose
   , GotoOptions (gotoOptionsWaitUntil)
   , LoadState (LoadStateDomContentLoaded)
   , Page
@@ -104,7 +114,6 @@ import UnliftIO.Exception
   )
 import UnliftIO.IORef
   ( newIORef
-  , readIORef
   , writeIORef
   )
 import UnliftIO.MVar
@@ -274,6 +283,12 @@ tests =
               pure ()
             Right _ ->
               assertFailure "expected goto to fail"
+    , testCase "page.close should work with window.close" $
+        withChromiumPage $ \page -> do
+          closed <- newIORef False
+          onPageClose page (modifyIORef' closed (const True))
+          closePage page
+          assertEqual "closed" True =<< awaitFlag closed 100
     ]
 
 clickButton :: Page -> Playwright ()
@@ -333,3 +348,13 @@ hangingGetApp request respond =
     _ ->
       respond $
         responseLBS status200 [(hContentType, "text/html")] (LBS8.pack "")
+
+-- | Polls a flag until it is set, or the attempts run out.
+awaitFlag :: IORef Bool -> Int -> Playwright Bool
+awaitFlag flag attempts = do
+  current <- readIORef flag
+  if current || attempts <= 0
+    then pure current
+    else do
+      liftIO (threadDelay 50000)
+      awaitFlag flag (attempts - 1)
