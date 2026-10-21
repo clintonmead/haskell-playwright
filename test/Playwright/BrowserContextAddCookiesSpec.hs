@@ -22,6 +22,7 @@ import Playwright
   , cookieForUrl
   , cookies
   , defaultGotoOptions
+  , newContext
   , evaluateOnFrameText
   , evaluateText
   , frames
@@ -40,6 +41,7 @@ import Playwright.Harness
   , assertFailure
   , recordingPageApp
   , withAssets
+  , withChromiumBrowser
   , withChromiumContext
   , withLocalApp
   )
@@ -184,4 +186,16 @@ tests =
           assertEqual "off grid" "" =<< evaluateText page "() => document.cookie"
           _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
           assertEqual "back on grid" "gridcookie=GRID" =<< evaluateText page "() => document.cookie"
+    , testCase "should isolate cookies in browser contexts" $ do
+        requests <- newIORef []
+        withChromiumBrowser $ \browser ->
+          withLocalApp (recordingPageApp requests) $ \prefix -> do
+            ctx <- newContext browser
+            other <- newContext browser
+            addCookies ctx [cookieForUrl (urlFromText (prefix <> "/empty.html")) (CookieName "isolatecookie") (CookieValue "page1value")]
+            addCookies other [cookieForUrl (urlFromText (prefix <> "/empty.html")) (CookieName "isolatecookie") (CookieValue "page2value")]
+            jar1 <- cookies ctx
+            jar2 <- cookies other
+            assertEqual "lengths" [1, 1] [length jar1, length jar2]
+            assertEqual "values" ["page1value", "page2value"] (fmap (cookieValueToText . cookieValue) jar1 <> fmap (cookieValueToText . cookieValue) jar2)
     ]
