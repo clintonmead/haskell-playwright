@@ -55,9 +55,12 @@ import Playwright
   , continueRoute
   , continueRouteWith
   , defaultContinueOptions
+  , Page
+  , Playwright
   , defaultGotoOptions
   , waitForTimeout
   , evaluate
+  , evaluateNumber
   , evaluateText
   , goto
   , requestFailure
@@ -316,6 +319,20 @@ tests =
             assertEqual "text" "Yo!" =<< evaluateText page "() => document.querySelector('div').textContent"
             waitForTimeout page =<< requireTimeout 1000
             assertEqual "intercepted once" 1 =<< readIORef counter
+    , testCase "continue should not change multipart/form-data body" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (recordingApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            before <- sendUpload page
+            assertEqual "status before" 200 before
+            seenBefore <- bodyOf "/upload" <$> readIORef requests
+            assertBool "body before continue" (maybe False (uploadPart `BS8.isInfixOf`) seenBefore)
+            route page (UrlMatchGlob "**/*") $ \handled -> continueRoute handled
+            after <- sendUpload page
+            assertEqual "status after" 200 after
+            seenAfter <- bodyOf "/upload" <$> readIORef requests
+            assertBool "body after continue" (maybe False (uploadPart `BS8.isInfixOf`) seenAfter)
     ]
 
 -- | Serves a page whose div takes its background from a CSS variable and an
@@ -386,3 +403,22 @@ lastFor path requests =
       Just latest
     [] ->
       Nothing
+
+-- | Posts a one-file multipart form from the page and returns the status.
+sendUpload :: Page -> Playwright Double
+sendUpload page =
+  evaluateNumber
+    page
+    "() => { const newFile = new File(['file content'], 'file.txt'); const formData = new FormData(); formData.append('file', newFile); return fetch('/upload', { method: 'POST', credentials: 'include', body: formData }).then(r => r.status); }"
+
+-- | The file part of the upload, as the server receives it.
+uploadPart :: BS8.ByteString
+uploadPart =
+  BS8.intercalate
+    "\r\n"
+    [ "Content-Disposition: form-data; name=\"file\"; filename=\"file.txt\""
+    , "Content-Type: application/octet-stream"
+    , ""
+    , "file content"
+    , "------"
+    ]
