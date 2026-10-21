@@ -402,6 +402,18 @@ tests =
             =<< evaluateText page "() => fetch('/digits/2.png').then(r => r.text())"
           other <- evaluateText page "() => fetch('/digits/1.png').then(r => r.text())"
           assertBool "other request not intercepted" (other /= "intercepted")
+    , testCase "should not support ? in glob pattern" $
+        withAssets $ \prefix page -> do
+          -- In a glob, ? is a literal question mark, so ?hello matches only index?hello.
+          route page (UrlMatchGlob "**/index?hello") $ \handled ->
+            fulfillRoute handled defaultFulfillOptions {fulfillBody = Just (FulfillText "any character")}
+          route page (UrlMatchGlob "**/index\\?hello") $ \handled ->
+            fulfillRoute handled defaultFulfillOptions {fulfillBody = Just (FulfillText "question mark")}
+          _ <- goto page (urlFromText (prefix <> "/index?hello")) defaultGotoOptions
+          assertEqual "question mark" "question mark" =<< evaluateText page "() => document.body.textContent"
+          _ <- goto page (urlFromText (prefix <> "/index1hello")) defaultGotoOptions
+          body <- evaluateText page "() => document.body.textContent"
+          assertBool "index1hello is not intercepted" (body `notElem` ["any character", "question mark"])
     ]
 
 -- | A Playwright error from an action that is expected to fail, ignored here.

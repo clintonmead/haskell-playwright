@@ -158,6 +158,7 @@ import Playwright.PageWaitForSelector1Spec qualified as PageWaitForSelector1Spec
 import Playwright.PageWaitForSelector2Spec qualified as PageWaitForSelector2Spec
 import Playwright.PageWaitForSelectorSpec qualified as PageWaitForSelectorSpec
 import Playwright.PageWaitForUrlSpec qualified as PageWaitForUrlSpec
+import Playwright.UrlMatchSpec qualified as UrlMatchSpec
 import Playwright.PermissionsSpec qualified as PermissionsSpec
 import Playwright.PopupSpec qualified as PopupSpec
 import Playwright.ProxySpec qualified as ProxySpec
@@ -348,6 +349,7 @@ main =
         , PageWaitForSelector2Spec.tests
         , PageWaitForSelectorSpec.tests
         , PageWaitForUrlSpec.tests
+        , UrlMatchSpec.tests
         , PermissionsSpec.tests
         , PopupSpec.tests
         , ProxySpec.tests

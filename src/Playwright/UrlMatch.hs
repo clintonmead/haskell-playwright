@@ -65,7 +65,7 @@ matchesUrlMatch :: UrlMatch -> Url -> Bool
 matchesUrlMatch match url =
   case match of
     UrlMatchGlob glob ->
-      globMatch (unpack glob) (unpack (urlToText url))
+      globMatches (unpack glob) (unpack (urlToText url))
     UrlMatchRegex source flags ->
       regexMatches source flags (unpack (urlToText url))
     UrlMatchPredicate predicate ->
@@ -136,30 +136,51 @@ wordChars = "a-zA-Z0-9_"
 spaces :: String
 spaces = " \t\n\r\f\v"
 
-globMatch :: String -> String -> Bool
-globMatch pattern text =
-  case (pattern, text) of
-    ([], []) ->
-      True
-    ('*' : '*' : rest, remaining) ->
-      globMatch rest remaining
-        || case remaining of
-          [] ->
-            False
-          (_ : more) ->
-            globMatch ('*' : '*' : rest) more
-    ('*' : rest, remaining) ->
-      globMatch rest remaining
-        || case remaining of
-          [] ->
-            False
-          ('/' : _) ->
-            False
-          (_ : more) ->
-            globMatch ('*' : rest) more
-    ('?' : rest, _ : more) ->
-      globMatch rest more
-    (p : ps, c : cs) ->
-      p == c && globMatch ps cs
+-- | A glob as an anchored regex source, translated as the TypeScript client
+-- does. @*@ stays within one path segment, @**\/@ crosses segments, @{a,b}@
+-- is alternation, @?@ is a literal, and a backslash escapes the next character.
+-- Returns Nothing for an unbalanced brace.
+globSource :: String -> Maybe String
+globSource glob = do
+  tokens <- translateGlob Nothing False glob
+  pure ("^" <> concat tokens <> "$")
+
+translateGlob :: Maybe Char -> Bool -> String -> Maybe [String]
+translateGlob _ inGroup [] =
+  if inGroup then Nothing else Just []
+translateGlob _ inGroup ('\\' : c : rest) =
+  (escapeGlobChar c :) <$> translateGlob (Just c) inGroup rest
+translateGlob previous inGroup ('*' : rest) =
+  case span (== '*') rest of
+    (more, '/' : after) | not (null more) ->
+      ((if previous == Just '/' then "(.+/)?" else "(.*/)") :)
+        <$> translateGlob (Just '/') inGroup after
+    (more, after) | not (null more) ->
+      ("(.*)" :) <$> translateGlob (Just '*') inGroup after
     _ ->
+      ("([^/]*)" :) <$> translateGlob (Just '*') inGroup rest
+translateGlob _ False ('{' : rest) =
+  ("(" :) <$> translateGlob (Just '{') True rest
+translateGlob _ True ('{' : _) =
+  Nothing
+translateGlob _ False ('}' : _) =
+  Nothing
+translateGlob _ True ('}' : rest) =
+  (")" :) <$> translateGlob (Just '}') False rest
+translateGlob _ True (',' : rest) =
+  ("|" :) <$> translateGlob (Just ',') True rest
+translateGlob _ inGroup (c : rest) =
+  (escapeGlobChar c :) <$> translateGlob (Just c) inGroup rest
+
+escapeGlobChar :: Char -> String
+escapeGlobChar c
+  | c `elem` ("$^+.*()|\\?{}[]" :: String) = ['\\', c]
+  | otherwise = [c]
+
+globMatches :: String -> String -> Bool
+globMatches glob text =
+  case globSource glob of
+    Just source ->
+      regexMatches (pack source) (pack "") text
+    Nothing ->
       False

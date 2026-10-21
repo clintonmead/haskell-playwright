@@ -401,6 +401,7 @@ test-suite playwright-test
       Playwright.TapSpec
       Playwright.TransportSpec
       Playwright.UnrouteBehaviorSpec
+      Playwright.UrlMatchSpec
       Playwright.WebSocketSpec
       Playwright.WheelSpec
       Playwright.WorkersSpec

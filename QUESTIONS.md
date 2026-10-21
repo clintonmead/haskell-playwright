@@ -34,3 +34,11 @@ Decisions made without waiting for an answer. Each entry gives the question, the
 **Guess taken:** No. With `g`, the driver's stateful `test` misses the URL it checks second, so the route is skipped. Those two flags only affect stateful matching, and this library always wants a fresh test. `src/Playwright/Route/Intercept.hs` drops them before sending. Other flags are sent unchanged.
 
 **To change:** If the driver is later fixed to reset `lastIndex`, the filter can go.
+
+## Glob matching follows the upstream translation
+
+**Question:** Should client-side glob matching keep its own matcher, where `?` is a wildcard and `{a,b}` is not supported?
+
+**Guess taken:** No. Globs now turn into an anchored regex the way `packages/isomorphic/urlMatch.ts` does. `?` is a literal, `*` stays within a segment, `**/` crosses segments, and `{a,b}` is alternation. The regex is matched by `regex-tdfa`. An empty alternative is written as `(.+/)?`, because `regex-tdfa` rejects `((.+/)|)`.
+
+**To change:** The old matcher is in git history (`src/Playwright/UrlGlob.hs` before the UrlMatch rename).
