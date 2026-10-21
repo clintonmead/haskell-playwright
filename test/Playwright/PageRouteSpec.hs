@@ -583,6 +583,27 @@ tests =
               pure ()
             Right _ ->
               assertFailure "expected the credentialed fetch to be rejected"
+    , testCase "should support cors for different methods" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          route page (UrlMatchGlob "**/cars") $ \handled -> do
+            request <- routeRequest handled
+            method <- httpMethodToText <$> requestMethod request
+            fulfillRoute
+              handled
+              defaultFulfillOptions
+                { fulfillStatus = Just (HttpStatus 200)
+                , fulfillContentType = Just (ContentType "application/json")
+                , fulfillHeaders = [HttpHeader (HeaderName "Access-Control-Allow-Origin") (HeaderValue "*")]
+                , fulfillBody = Just (FulfillText ("[\"" <> method <> "\", \"electric\", \"gas\"]"))
+                }
+          posted <- evaluateText page (postCarsScript "")
+          assertEqual "post" "[\"POST\",\"electric\",\"gas\"]" posted
+          deleted <-
+            evaluateText
+              page
+              "async () => JSON.stringify(await (await fetch('https://example.com/cars', {method: 'DELETE', headers: {}, mode: 'cors', body: ''})).json())"
+          assertEqual "delete" "[\"DELETE\",\"electric\",\"gas\"]" deleted
     , testCase "should pause intercepted XHR until continue" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
