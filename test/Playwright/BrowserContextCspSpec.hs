@@ -8,6 +8,9 @@ import UnliftIO.Exception
 import Control.Monad
   ( void
   )
+import Data.Text
+  ( replace
+  )
 import Network.HTTP.Types
   ( hContentType
   , status200
@@ -39,6 +42,7 @@ import Playwright.Error
   )
 import Playwright.Harness
   ( withAssetsWith
+  , withLocalApp
   , withLocalApp
   , withChromiumBrowser
   , assertEqual
@@ -95,6 +99,21 @@ tests =
             assertEqual "bypass inline" "42" =<< evaluateText bypassingPage "() => String(window['__inlineScriptValue'])"
             _ <- addScriptTag bypassingPage emptyScriptTag {scriptTagContent = Just "window['__injected'] = 42;"}
             assertEqual "bypass injected" "42" =<< evaluateText bypassingPage "() => String(window['__injected'])"
+    , testCase "should bypass after cross-process navigation" $
+        withChromiumBrowser $ \browser ->
+          withLocalApp cspInlineApp $ \base -> do
+            context <- newContextWith browser defaultNewContextOptions {newContextBypassCSP = Just True}
+            page <- newPage context
+            let
+              cross = replace "127.0.0.1" "localhost" base
+            mapM_
+              ( \origin -> do
+                  _ <- goto page (urlFromText (origin <> "/csp.html")) defaultGotoOptions
+                  assertEqual "inline" "42" =<< evaluateText page "() => String(window['__inlineScriptValue'])"
+                  _ <- addScriptTag page emptyScriptTag {scriptTagContent = Just "window['__injected'] = 42;"}
+                  assertEqual "injected" "42" =<< evaluateText page "() => String(window['__injected'])"
+              )
+              [base, cross]
     ]
 
 -- | Serves a page whose Content-Security-Policy forbids inline scripts, with an
