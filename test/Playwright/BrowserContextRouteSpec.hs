@@ -113,6 +113,7 @@ import Playwright.Error
   )
 import Playwright.Harness
   ( Recorded (recordedBody, recordedHeaders, recordedMethod, recordedPath)
+  , recordingPageApp
   , locate
   , testAssetsDir
   , recordRequest
@@ -481,12 +482,6 @@ headerValue name headers =
       Just value
     _ ->
       Nothing
-
--- | Records every request, and answers with an empty page.
-recordingPageApp :: IORef [Recorded] -> Application
-recordingPageApp requests request respond = do
-  recordRequest requests request
-  respond (responseLBS status200 [(hContentType, "text/html")] "")
 
 -- | Answers /api with a cacheable body, recording each call, and serves every
 -- other path from the assets directory.

@@ -11,6 +11,7 @@ module Playwright.Harness
   , rafraf
   , readTestAsset
   , recordRequest
+  , recordingPageApp
   , requireHandle
   , requireTimeout
   , withAssetPage
@@ -420,3 +421,9 @@ recordRequest requests request = do
         (map (\(name, value) -> (CI.foldedCase name, value)) (Wai.requestHeaders request))
         :
     )
+
+-- | Records every request, and answers with an empty page.
+recordingPageApp :: IORef [Recorded] -> Application
+recordingPageApp requests request respond = do
+  recordRequest requests request
+  respond (responseLBS status200 [(hContentType, "text/html")] "")
