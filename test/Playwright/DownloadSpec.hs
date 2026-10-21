@@ -158,6 +158,14 @@ tests =
         withDownloadServer $ \prefix page -> do
           download <- clickHref page (prefix <> "/download")
           assertDownloadBody download
+    , testCase "should report proper download url when download is from download attribute" $
+        withDownloadServer $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty")) defaultGotoOptions
+          download <-
+            clickHrefWith
+              page
+              ("<a href=\"" <> prefix <> "/download\" download=\"foo.zip\">download</a>")
+          assertEqual "url" (prefix <> "/download") (urlToText (downloadUrl download))
     , testCase "should report downloads for download attribute" $
         withDownloadServer $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty")) defaultGotoOptions
