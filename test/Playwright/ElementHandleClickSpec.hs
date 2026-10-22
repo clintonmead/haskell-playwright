@@ -11,6 +11,7 @@ import Playwright
   , defaultClickOptions
   , defaultGotoOptions
   , dblclick
+  , dblclickHandle
   , elementArgument
   , evaluate
   , evaluateBool
@@ -81,6 +82,17 @@ tests =
             "Element is outside of the viewport"
             (clickHandleWith br defaultClickOptions {clickOptionsForce = Just True})
     , testCase "should double click the button" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/input/button.html")) defaultGotoOptions
+          _ <-
+            evaluate
+              page
+              "() => { window['double'] = false; document.querySelector('button').addEventListener('dblclick', () => { window['double'] = true; }); }"
+          handle <- requireHandle =<< querySelector page (selectorFromText "button")
+          dblclickHandle handle
+          assertEqual "double" True =<< evaluateBool page "() => window['double']"
+          assertEqual "clicked" "Clicked" =<< evaluateText page "() => window.result"
+    , testCase "should double click the button through a locator" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/input/button.html")) defaultGotoOptions
           _ <-

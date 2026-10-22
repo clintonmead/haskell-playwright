@@ -228,6 +228,8 @@ module Playwright
   , click
   , clickHandle
   , clickHandleWith
+  , dblclickHandle
+  , dblclickHandleWith
   , clickWith
   , clockFastForward
   , clockInstall
@@ -1034,6 +1036,8 @@ import Playwright.ElementHandle
   , boundingBox
   , clickHandle
   , clickHandleWith
+  , dblclickHandle
+  , dblclickHandleWith
   , contentFrameHandle
   , dispatchEventHandle
   , dispatchEventHandleWith

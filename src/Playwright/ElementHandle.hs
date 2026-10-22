@@ -3,6 +3,8 @@ module Playwright.ElementHandle
   , boundingBox
   , clickHandle
   , clickHandleWith
+  , dblclickHandle
+  , dblclickHandleWith
   , dispatchEventHandle
   , dispatchEventHandleWith
   , tapHandle
@@ -58,6 +60,10 @@ import Playwright.ClickOptions
   ( ClickOptions (clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsSteps, clickOptionsTimeout, clickOptionsTrial)
   , defaultClickOptions
   )
+import Playwright.DblclickOptions
+  ( DblclickOptions (dblclickOptionsForce, dblclickOptionsModifiers, dblclickOptionsPosition, dblclickOptionsTimeout, dblclickOptionsTrial)
+  , defaultDblclickOptions
+  )
 import Playwright.CssPixel
   ( CssPixel (CssPixel)
   , cssPixelToScientific
@@ -105,6 +111,9 @@ import Playwright.Protocol
   , ElementHandleClickParamsButton (ElementHandleClickParamsButtonLeft, ElementHandleClickParamsButtonMiddle, ElementHandleClickParamsButtonRight)
   , ElementHandleClickParamsModifiers (ElementHandleClickParamsModifiersAlt, ElementHandleClickParamsModifiersControl, ElementHandleClickParamsModifiersControlOrMeta, ElementHandleClickParamsModifiersMeta, ElementHandleClickParamsModifiersShift)
   , ElementHandleClickResult
+  , ElementHandleDblclickParams (elementHandleDblclickParamsForce, elementHandleDblclickParamsModifiers, elementHandleDblclickParamsPosition, elementHandleDblclickParamsTrial)
+  , ElementHandleDblclickParamsModifiers (ElementHandleDblclickParamsModifiersAlt, ElementHandleDblclickParamsModifiersControl, ElementHandleDblclickParamsModifiersControlOrMeta, ElementHandleDblclickParamsModifiersMeta, ElementHandleDblclickParamsModifiersShift)
+  , ElementHandleDblclickResult
   , ElementHandleDispatchEventResult
   , ElementHandleContentFrameResult (elementHandleContentFrameResultFrame)
   , ElementHandleGetAttributeResult (elementHandleGetAttributeResultValue)
@@ -132,6 +141,7 @@ import Playwright.Protocol
   , Rect (rectHeight, rectWidth, rectX, rectY)
   , mkElementHandleBoundingBoxParams
   , mkElementHandleClickParams
+  , mkElementHandleDblclickParams
   , mkElementHandleDispatchEventParams
   , mkElementHandleContentFrameParams
   , mkElementHandleGetAttributeParams
@@ -244,6 +254,47 @@ toHandleClickModifier modifier =
       ElementHandleClickParamsModifiersMeta
     KeyboardModifierShift ->
       ElementHandleClickParamsModifiersShift
+
+dblclickHandle :: ElementHandle -> Playwright ()
+dblclickHandle handle =
+  dblclickHandleWith handle defaultDblclickOptions
+
+-- | Double-clicks through the handle. The protocol's handle dblclick takes no
+-- button, steps or delay, so those fields of 'DblclickOptions' do not exist here.
+dblclickHandleWith :: ElementHandle -> DblclickOptions -> Playwright ()
+dblclickHandleWith handle opts = do
+  timeout <-
+    case dblclickOptionsTimeout opts of
+      Just value ->
+        pure value
+      Nothing ->
+        pure defaultTimeout
+  _ :: ElementHandleDblclickResult <-
+    handleSendWithTimeout
+      handle
+      "dblclick"
+      timeout
+      (mkElementHandleDblclickParams)
+        { elementHandleDblclickParamsForce = dblclickOptionsForce opts
+        , elementHandleDblclickParamsModifiers = fmap (fmap toHandleDblclickModifier) (dblclickOptionsModifiers opts)
+        , elementHandleDblclickParamsPosition = fmap toProtocolPoint (dblclickOptionsPosition opts)
+        , elementHandleDblclickParamsTrial = dblclickOptionsTrial opts
+        }
+  pure ()
+
+toHandleDblclickModifier :: KeyboardModifier -> ElementHandleDblclickParamsModifiers
+toHandleDblclickModifier modifier =
+  case modifier of
+    KeyboardModifierAlt ->
+      ElementHandleDblclickParamsModifiersAlt
+    KeyboardModifierControl ->
+      ElementHandleDblclickParamsModifiersControl
+    KeyboardModifierControlOrMeta ->
+      ElementHandleDblclickParamsModifiersControlOrMeta
+    KeyboardModifierMeta ->
+      ElementHandleDblclickParamsModifiersMeta
+    KeyboardModifierShift ->
+      ElementHandleDblclickParamsModifiersShift
 
 dispatchEventHandle :: ElementHandle -> DomEventType -> Playwright ()
 dispatchEventHandle handle eventType =
