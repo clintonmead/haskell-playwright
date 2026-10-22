@@ -510,3 +510,13 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 **Guess taken:** Add `touchscreenTap :: Page -> Point -> Playwright ()` in `src/Playwright/Touchscreen.hs` and export it from `Playwright`. It follows the `Mouse.hs` pattern, and the touch-point case uses it.
 
 **To change:** Drop the export and skip the case if the public surface should stay as it is.
+
+## browsercontext-csp: plain frame under CSP accepts addScriptTagOnFrame
+
+**Question:** In `should bypass CSP in iframes as well`, the plain context's frame blocks inline scripts (`window.__inlineScriptValue` is `undefined`). But `addScriptTagOnFrame` on that same frame still sets `window['__injected'] = 42`. The upstream test expects `undefined` there, and `addScriptTag` on a page under the same CSP is blocked (`should honor CSP meta tag`). Why does the frame path inject?
+
+**Evidence:** Background run, `cabal build playwright-test` then the binary with `-p "/browsercontext-csp/"`. Four cases pass. The iframe case fails at `plain injected`, expected `"undefined"`, got `"42"`. The check is in the patch saved at `scratchpad/csp-plain-frame.patch`. It was reverted from the committed tree so the suite stays green.
+
+**Guess taken:** The driver's frame `addScriptTag` takes a different path from the page one. The likely cause is that it evaluates the script in the frame's utility world or via `frame.evaluate`, not through an inline `<script>` element. That would bypass the CSP. This is a guess; I did not read the driver source.
+
+**To change:** Read the driver's `addScriptTag` for frames (`playwright-driver` in the nix store) and check whether it goes through an inline element. If the driver really injects into a CSP-blocked frame, skip the plain-frame half and record it as a driver difference.
