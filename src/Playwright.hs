@@ -1685,7 +1685,7 @@ import Playwright.StorageState
   , emptyStorageState
   )
 import Playwright.StyleTag
-  ( StyleTag (StyleTag, styleTagContent, styleTagUrl)
+  ( StyleTag (StyleTag, styleTagContent, styleTagPath, styleTagUrl)
   , emptyStyleTag
   )
 import Playwright.Timeout

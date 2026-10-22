@@ -252,7 +252,7 @@ import Playwright.ScriptTag
   ( ScriptTag (scriptTagContent, scriptTagPath, scriptTagType, scriptTagUrl)
   )
 import Playwright.StyleTag
-  ( StyleTag (styleTagContent, styleTagUrl)
+  ( StyleTag (styleTagContent, styleTagPath, styleTagUrl)
   )
 import Playwright.PdfOptions
   ( PdfOptions (pdfOptionsOutline, pdfOptionsTagged)
@@ -666,18 +666,30 @@ scriptTagSource tag =
 
 addStyleTag :: Page -> StyleTag -> Playwright ElementHandle
 addStyleTag page tag = do
+  styleText <- styleTagSource tag
   result <-
     frameSend
       (pageMainFrame page)
       "addStyleTag"
       mkFrameAddStyleTagParams
-        { frameAddStyleTagParamsContent = styleTagContent tag
+        { frameAddStyleTagParamsContent = styleText
         , frameAddStyleTagParamsUrl = styleTagUrl tag
         }
   pure
     ( elementHandleFromRef
         (frameAddStyleTagResultElement result)
     )
+
+-- | The style text to send. A path is read from disk and marked with a
+-- sourceURL, as the script tag path is.
+styleTagSource :: StyleTag -> Playwright (Maybe Text)
+styleTagSource tag =
+  case styleTagPath tag of
+    Nothing ->
+      pure (styleTagContent tag)
+    Just path -> do
+      bytes <- liftIO (ByteString.readFile path)
+      pure (Just (decodeUtf8 bytes <> "\n/*# sourceURL=" <> Text.pack path <> " */"))
 
 setExtraHTTPHeaders :: Page -> [HttpHeader] -> Playwright ()
 setExtraHTTPHeaders page headers = do

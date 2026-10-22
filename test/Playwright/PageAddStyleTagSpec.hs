@@ -14,7 +14,7 @@ import Playwright.Error
 import Playwright
   ( ElementHandle
   , Playwright
-  , StyleTag (styleTagContent, styleTagUrl)
+  , StyleTag (styleTagContent, styleTagPath, styleTagUrl)
   , emptyStyleTag
   , url
   , urlFromText
@@ -29,6 +29,7 @@ import Playwright
 import Playwright.Harness
   ( assertProtocolContains
   , withAssetPage
+  , testAssetsDir
   , assertFailure
   , withAssets
   , assertEqual
@@ -111,4 +112,10 @@ tests =
               pure ()
             Right _ ->
               assertFailure "expected an error without options"
+    , testCase "should work with a path" $ do
+        assets <- testAssetsDir
+        withAssetPage "empty.html" $ \page -> do
+          _ <- addStyleTag page emptyStyleTag {styleTagPath = Just (assets <> "/injectedstyle.css")}
+          assertEqual "background" "rgb(255, 0, 0)"
+            =<< evaluateText page "() => window.getComputedStyle(document.querySelector('body')).getPropertyValue('background-color')"
     ]

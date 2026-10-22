@@ -13,6 +13,7 @@ import Playwright.Url
 data StyleTag = StyleTag
   { styleTagContent :: Maybe Text
   , styleTagUrl :: Maybe Url
+  , styleTagPath :: Maybe FilePath
   }
   deriving stock (Eq, Show)
 
@@ -21,4 +22,5 @@ emptyStyleTag =
   StyleTag
     { styleTagContent = Nothing
     , styleTagUrl = Nothing
+    , styleTagPath = Nothing
     }
