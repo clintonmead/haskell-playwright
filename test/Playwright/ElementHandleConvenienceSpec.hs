@@ -134,6 +134,12 @@ tests =
           button2 <- requireHandle =<< querySelector page (selectorFromText ":text(\"button2\")")
           assertEqual "button2 enabled" True =<< isEnabledHandle button2
           assertEqual "button2 disabled" False =<< isDisabledHandle button2
+    , testCase "innerText should throw" $
+        withChromiumPage $ \page -> do
+          setContent page "<svg>text</svg>"
+          assertProtocolContains "Node is not an HTMLElement" (innerText (locate page "svg"))
+          svgHandle <- requireHandle =<< querySelector page (selectorFromText "svg")
+          assertProtocolContains "Node is not an HTMLElement" (innerTextHandle svgHandle)
     , testCase "textContent should work" $
         withAssetPage "dom.html" $ \page -> do
           handle <- requireHandle =<< querySelector page (selectorFromText "#inner")
