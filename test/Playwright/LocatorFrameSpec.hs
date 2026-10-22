@@ -20,6 +20,7 @@ import Playwright
   , isHidden
   , isVisible
   , innerText
+  , locatorCount
   , route
   , selectorFromText
   , urlFromText
@@ -79,6 +80,17 @@ tests =
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           let spanLocator = childLocator (frameLocator page (selectorFromText "iframe")) (selectorFromText "span")
           assertEqual "not visible" False =<< isVisible spanLocator
+    , testCase "should work for $ and $$" $
+        withAssets $ \prefix page -> do
+          routeIframe page
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let
+            frame = frameLocator page (selectorFromText "iframe")
+            button = childLocator frame (selectorFromText "button")
+            spans = childLocator frame (selectorFromText "span")
+          waitFor button WaitForVisible
+          assertEqual "button" "Hello iframe" =<< innerText button
+          assertEqual "spans" 2 =<< locatorCount spans
     ]
 
 routeIframe :: Page -> Playwright ()
