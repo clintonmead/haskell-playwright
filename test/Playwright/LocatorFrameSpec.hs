@@ -167,6 +167,13 @@ tests =
           waitFor button WaitForDetached
           timeout <- requireTimeout 1000
           assertProtocolContains "Timeout 1000ms exceeded" (waitForWith button timeout WaitForAttached)
+    , testCase "locator.frameLocator should throw on ambiguity" $
+        withAssets $ \prefix page -> do
+          routeAmbiguous page
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let
+            button = childLocator (frameLocator page (selectorFromText "iframe")) (selectorFromText "button")
+          assertProtocolContains "strict mode violation" (waitFor button WaitForVisible)
     ]
 
 routeIframe :: Page -> Playwright ()
@@ -195,4 +202,26 @@ routeIframe page = do
       defaultFulfillOptions
         { fulfillContentType = Just (ContentType "text/html")
         , fulfillBody = Just (FulfillText "<html><button>Hello nested iframe</button></html>")
+        }
+
+-- | Serves three iframes on the page, each with its own button.
+routeAmbiguous :: Page -> Playwright ()
+routeAmbiguous page = do
+  route page (UrlMatchGlob "**/empty.html") $ \handled ->
+    fulfillRoute
+      handled
+      defaultFulfillOptions
+        { fulfillContentType = Just (ContentType "text/html")
+        , fulfillBody =
+            Just
+              ( FulfillText
+                  "<iframe src=\"iframe-1.html\"></iframe><iframe src=\"iframe-2.html\"></iframe><iframe src=\"iframe-3.html\"></iframe>"
+              )
+        }
+  route page (UrlMatchGlob "**/iframe-*") $ \handled ->
+    fulfillRoute
+      handled
+      defaultFulfillOptions
+        { fulfillContentType = Just (ContentType "text/html")
+        , fulfillBody = Just (FulfillText "<html><button>Hello from iframe</button></html>")
         }
