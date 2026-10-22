@@ -15,9 +15,12 @@ import Playwright
   , ViewportSize (ViewportSize)
   , ViewportWidth (ViewportWidth)
   , cssPixelFromInt
+  , defaultGotoOptions
   , defaultNewContextOptions
   , deviceScaleFactorFromInt
   , evaluateBool
+  , goto
+  , urlFromText
   , evaluateNumber
   , evaluateText
   , mouseDown
@@ -27,6 +30,7 @@ import Playwright
   )
 import Playwright.Harness
   ( assertBool
+  , withAssets
   , withChromiumContext
   , withChromiumContextWith
   , assertEqual
@@ -118,6 +122,22 @@ tests =
           mediaMatches page "(min-device-width: 600px)" >>= assertEqual "min 600 after" False
           mediaMatches page "(device-width: 200px)" >>= assertEqual "device 200 after" False
           mediaMatches page "(device-width: 500px)" >>= assertEqual "device 500 after" True
+    , testCase "should emulate device height" $
+        withChromiumContext $ \_ page -> do
+          setViewportSize page (ViewportSize (ViewportWidth 300) (ViewportHeight 300))
+          assertEqual "screen" (300 :: Double) =<< evaluateNumber page "() => window.screen.height"
+          mediaMatches page "(min-device-height: 200px)" >>= assertEqual "min 200" True
+          mediaMatches page "(min-device-height: 400px)" >>= assertEqual "min 400" False
+          mediaMatches page "(max-device-height: 200px)" >>= assertEqual "max 200" False
+          mediaMatches page "(max-device-height: 400px)" >>= assertEqual "max 400" True
+          mediaMatches page "(device-height: 600px)" >>= assertEqual "device 600" False
+          mediaMatches page "(device-height: 300px)" >>= assertEqual "device 300" True
+          setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 500))
+          assertEqual "screen after" (500 :: Double) =<< evaluateNumber page "() => window.screen.height"
+    , testCase "should not have touch by default" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/mobile.html")) defaultGotoOptions
+          assertEqual "touch" False =<< evaluateBool page "() => 'ontouchstart' in window"
     ]
 
 -- | Whether a media query matches the page.
