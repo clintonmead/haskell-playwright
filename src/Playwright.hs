@@ -15,6 +15,7 @@ module Playwright
   , CheckOptions (..)
   , ClearCookiesOptions (..)
   , ClickOptions (..)
+  , TapOptions (..)
   , ClockMillis (..)
   , ClockTicks (..)
   , ClockTime (..)
@@ -262,6 +263,7 @@ module Playwright
   , defaultCheckOptions
   , defaultClearCookiesOptions
   , defaultClickOptions
+  , defaultTapOptions
   , defaultContinueOptions
   , defaultDragAndDropOptions
   , defaultSelectOptionOptions
@@ -651,6 +653,8 @@ module Playwright
   , storageState
   , tap
   , tapHandle
+  , tapWith
+  , tapHandleWith
   , textArgument
   , textContent
   , textContentHandle
@@ -882,6 +886,10 @@ import Playwright.ClearCookiesOptions
   ( ClearCookiesOptions (ClearCookiesOptions, clearCookiesDomain, clearCookiesName, clearCookiesNameRegex, clearCookiesPath)
   , defaultClearCookiesOptions
   )
+import Playwright.TapOptions
+  ( TapOptions (TapOptions, tapOptionsForce, tapOptionsModifiers, tapOptionsPosition, tapOptionsTimeout, tapOptionsTrial)
+  , defaultTapOptions
+  )
 import Playwright.ClickOptions
   ( ClickOptions (ClickOptions, clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsSteps, clickOptionsTimeout, clickOptionsTrial)
   , defaultClickOptions
@@ -1010,6 +1018,7 @@ import Playwright.ElementHandle
   , selectTextWith
   , setInputFilesHandle
   , tapHandle
+  , tapHandleWith
   , textContentHandle
   , typeHandle
   , waitForElementState
@@ -1316,6 +1325,7 @@ import Playwright.Locator
   , setChecked
   , setInputFiles
   , tap
+  , tapWith
   , textContent
   , typeText
   , uncheck

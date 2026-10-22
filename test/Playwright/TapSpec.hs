@@ -17,6 +17,12 @@ import Playwright
   , asElement
   , defaultNewContextOptions
   , evaluate
+  , evaluateBool
+  , evaluateText
+  , defaultTapOptions
+  , KeyboardModifier (KeyboardModifierAlt)
+  , TapOptions (tapOptionsModifiers, tapOptionsTrial)
+  , tapWith
   , evaluateHandle
   , evaluateHandleOnElement
   , evaluateOnElement
@@ -99,6 +105,28 @@ tests =
             "<div id=\"a\" style=\"background: lightblue; width: 50px; height: 50px\">a</div><div id=\"b\" style=\"background: pink; width: 50px; height: 50px\">b</div>"
           tap (locator page (selectorFromText "#a"))
           tap (locator page (selectorFromText "#b"))
+    , testCase "should work with modifiers" $
+        withChromiumContextWith defaultNewContextOptions {newContextHasTouch = Just True} $ \_ page -> do
+          setContent page "hello world"
+          _ <-
+            evaluate
+              page
+              "() => { window.altKey = null; document.addEventListener('touchstart', event => { window.altKey = event.altKey; }, { passive: false }); }"
+          tapWith (locate page "body") defaultTapOptions {tapOptionsModifiers = Just [KeyboardModifierAlt]}
+          assertEqual "alt key" True =<< evaluateBool page "() => window.altKey === true"
+    , testCase "trial run should not tap" $
+        withChromiumContextWith defaultNewContextOptions {newContextHasTouch = Just True} $ \_ page -> do
+          setContent
+            page
+            "<div id=\"a\" style=\"background: lightblue; width: 50px; height: 50px\">a</div><div id=\"b\" style=\"background: pink; width: 50px; height: 50px\">b</div>"
+          tapHandle =<< requireHandle =<< querySelector page (selectorFromText "#a")
+          _ <-
+            evaluate
+              page
+              "() => { window.events = []; const b = document.querySelector('#b'); for (const t of ['pointerover', 'pointerenter', 'pointerout', 'pointerleave']) b.addEventListener(t, () => window.events.push(t)); }"
+          tapWith (locate page "#b") defaultTapOptions {tapOptionsTrial = Just True}
+          assertEqual "events" "[\"pointerover\",\"pointerenter\",\"pointerout\",\"pointerleave\"]"
+            =<< evaluateText page "() => JSON.stringify(window.events)"
     ]
 
 withTouchPage :: (Page -> Playwright a) -> IO a

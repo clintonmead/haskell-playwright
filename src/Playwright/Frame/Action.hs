@@ -16,6 +16,7 @@ module Playwright.Frame.Action
   , selectOptionFrame
   , selectOptionFrameWith
   , tapFrame
+  , tapFrameWith
   , typeTextFrame
   , uncheckFrame
   , dragAndDropFrame
@@ -125,7 +126,8 @@ import Playwright.Protocol
   , FrameSetInputFilesParams (frameSetInputFilesParamsPayloads, frameSetInputFilesParamsStrict)
   , FrameSetInputFilesParamsPayloads
   , FrameSetInputFilesResult
-  , FrameTapParams (frameTapParamsStrict)
+  , FrameTapParams (frameTapParamsForce, frameTapParamsModifiers, frameTapParamsPosition, frameTapParamsStrict, frameTapParamsTrial)
+  , FrameTapParamsModifiers (FrameTapParamsModifiersAlt, FrameTapParamsModifiersControl, FrameTapParamsModifiersControlOrMeta, FrameTapParamsModifiersMeta, FrameTapParamsModifiersShift)
   , FrameTapResult
   , FrameTypeParams (frameTypeParamsStrict)
   , FrameTypeResult
@@ -172,6 +174,10 @@ import Playwright.SelectOptionOptions
   )
 import Playwright.Selector
   ( Selector
+  )
+import Playwright.TapOptions
+  ( TapOptions (tapOptionsForce, tapOptionsModifiers, tapOptionsPosition, tapOptionsTrial)
+  , defaultTapOptions
   )
 import Playwright.Timeout
   ( Timeout
@@ -341,13 +347,35 @@ hideHighlightFrame frame selector =
 
 tapFrame :: Frame -> Selector -> Timeout -> Playwright ()
 tapFrame frame selector timeout =
+  tapFrameWith frame selector timeout defaultTapOptions
+
+tapFrameWith :: Frame -> Selector -> Timeout -> TapOptions -> Playwright ()
+tapFrameWith frame selector timeout opts =
   frameSendTimed_ @FrameTapResult
     frame
     "tap"
     timeout
     (mkFrameTapParams selector)
       { frameTapParamsStrict = Just True
+      , frameTapParamsForce = tapOptionsForce opts
+      , frameTapParamsModifiers = fmap (fmap toFrameTapModifier) (tapOptionsModifiers opts)
+      , frameTapParamsPosition = fmap toProtocolPoint (tapOptionsPosition opts)
+      , frameTapParamsTrial = tapOptionsTrial opts
       }
+
+toFrameTapModifier :: KeyboardModifier -> FrameTapParamsModifiers
+toFrameTapModifier modifier =
+  case modifier of
+    KeyboardModifierAlt ->
+      FrameTapParamsModifiersAlt
+    KeyboardModifierControl ->
+      FrameTapParamsModifiersControl
+    KeyboardModifierControlOrMeta ->
+      FrameTapParamsModifiersControlOrMeta
+    KeyboardModifierMeta ->
+      FrameTapParamsModifiersMeta
+    KeyboardModifierShift ->
+      FrameTapParamsModifiersShift
 
 pressFrame :: Frame -> Selector -> Key -> Timeout -> Playwright ()
 pressFrame frame selector key timeout =

@@ -72,6 +72,7 @@ module Playwright.Locator
   , setChecked
   , setInputFiles
   , tap
+  , tapWith
   , textContent
   , typeText
   , uncheck
@@ -172,6 +173,7 @@ import Playwright.Frame.Action
   , selectOptionFrame
   , selectOptionFrameWith
   , tapFrame
+  , tapFrameWith
   , typeTextFrame
   , uncheckFrame
   )
@@ -234,6 +236,9 @@ import Playwright.Selector
   )
 import Playwright.Connection
   ( lookupTimeoutDefaults
+  )
+import Playwright.TapOptions
+  ( TapOptions (tapOptionsTimeout)
   )
 import Playwright.Timeout
   ( Timeout
@@ -517,6 +522,16 @@ hideHighlight loc =
 tap :: Locator -> Playwright ()
 tap loc =
   withActionTimeout loc (tapFrame (locatorFrame loc) (locatorSelector loc))
+
+tapWith :: Locator -> TapOptions -> Playwright ()
+tapWith loc opts = do
+  timeout <-
+    case tapOptionsTimeout opts of
+      Just value ->
+        pure value
+      Nothing ->
+        locatorActionTimeout loc
+  tapFrameWith (locatorFrame loc) (locatorSelector loc) timeout opts
 
 press :: Locator -> Key -> Playwright ()
 press loc key =

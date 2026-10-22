@@ -114,7 +114,7 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 
 - **capabilities (environment):** "should support webgl" and "should support webgl 2" fail with the driver 1.64.1 Chromium in this sandbox (`getContext('webgl')` returns null). They passed on driver 1.61.1. The cause is the browser build or GPU setup, not the binding. Left failing until the browser setup is checked.
 - **browsercontext-network-event:** "should not fire events for favicon or favicon redirects" is skipped upstream for headless Chromium (`headless && browserName !== 'firefox'`), so it does not apply to this suite.
-- **tap:** the driver pin is now 1.64.1, and its tap params take `modifiers`, `force`, `position` and `trial`. The binding still has only `tap` and `tapHandle` with no options. A `tapWith` with `TapOptions` is the next step, which unblocks the modifiers and trial cases.
+- **tap:** `tapWith` (Locator) and `tapHandleWith` take `TapOptions` (force, modifiers, position, timeout, trial). The modifiers and trial cases are ported and pass. Still open: the touch-point and touchend-canceled cases, which are not examined yet.
 - **browsercontext-basic:** skip "default user agent". It calls `browser._channel.defaultUserAgentForTest()`, a test-only channel method, not public API.
 - **popup:** skip "should not dispatch binding on a closed page". It reads `source.page.isClosed()` inside an exposed binding callback, and the Haskell binding callback has no source page.
 - **browsercontext-set-extra-http-headers:** "should throw for non-string header values" does not apply. Header values are typed as `Text`, so a non-string cannot be passed.

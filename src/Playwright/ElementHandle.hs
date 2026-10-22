@@ -6,6 +6,7 @@ module Playwright.ElementHandle
   , dispatchEventHandle
   , dispatchEventHandleWith
   , tapHandle
+  , tapHandleWith
   , elementArgument
   , contentFrameHandle
   , ownerFrameHandle
@@ -121,6 +122,8 @@ import Playwright.Protocol
   , ElementHandleSetInputFilesParams (elementHandleSetInputFilesParamsPayloads)
   , ElementHandleSetInputFilesParamsPayloads
   , ElementHandleSetInputFilesResult
+  , ElementHandleTapParams (elementHandleTapParamsForce, elementHandleTapParamsModifiers, elementHandleTapParamsPosition, elementHandleTapParamsTrial)
+  , ElementHandleTapParamsModifiers (ElementHandleTapParamsModifiersAlt, ElementHandleTapParamsModifiersControl, ElementHandleTapParamsModifiersControlOrMeta, ElementHandleTapParamsModifiersMeta, ElementHandleTapParamsModifiersShift)
   , ElementHandleTapResult
   , ElementHandleTextContentResult (elementHandleTextContentResultValue)
   , ElementHandleTypeResult
@@ -158,6 +161,10 @@ import Playwright.SerializedArgument
   ( SerializedArgument
   , channelArgument
   , undefinedArgument
+  )
+import Playwright.TapOptions
+  ( TapOptions (tapOptionsForce, tapOptionsModifiers, tapOptionsPosition, tapOptionsTimeout, tapOptionsTrial)
+  , defaultTapOptions
   )
 import Playwright.Timeout
   ( Timeout
@@ -256,10 +263,40 @@ toProtocolPoint point =
   Protocol.mkPoint (cssPixelToScientific (pointX point)) (cssPixelToScientific (pointY point))
 
 tapHandle :: ElementHandle -> Playwright ()
-tapHandle handle = do
+tapHandle handle =
+  tapHandleWith handle defaultTapOptions
+
+tapHandleWith :: ElementHandle -> TapOptions -> Playwright ()
+tapHandleWith handle opts = do
+  timeout <-
+    case tapOptionsTimeout opts of
+      Just value ->
+        pure value
+      Nothing ->
+        pure defaultTimeout
   _ :: ElementHandleTapResult <-
-    handleSendWithTimeout handle "tap" defaultTimeout mkElementHandleTapParams
+    handleSendWithTimeout handle "tap" timeout
+      (mkElementHandleTapParams)
+        { elementHandleTapParamsForce = tapOptionsForce opts
+        , elementHandleTapParamsModifiers = fmap (fmap toHandleTapModifier) (tapOptionsModifiers opts)
+        , elementHandleTapParamsPosition = fmap toProtocolPoint (tapOptionsPosition opts)
+        , elementHandleTapParamsTrial = tapOptionsTrial opts
+        }
   pure ()
+
+toHandleTapModifier :: KeyboardModifier -> ElementHandleTapParamsModifiers
+toHandleTapModifier modifier =
+  case modifier of
+    KeyboardModifierAlt ->
+      ElementHandleTapParamsModifiersAlt
+    KeyboardModifierControl ->
+      ElementHandleTapParamsModifiersControl
+    KeyboardModifierControlOrMeta ->
+      ElementHandleTapParamsModifiersControlOrMeta
+    KeyboardModifierMeta ->
+      ElementHandleTapParamsModifiersMeta
+    KeyboardModifierShift ->
+      ElementHandleTapParamsModifiersShift
 
 screenshotHandle :: ElementHandle -> Playwright ByteString
 screenshotHandle handle = do

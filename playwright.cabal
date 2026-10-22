@@ -168,6 +168,7 @@ library
       Playwright.StorageState
       Playwright.StoredLocatorHandler
       Playwright.StyleTag
+      Playwright.TapOptions
       Playwright.Timeout
       Playwright.TimeoutDefaults
       Playwright.TimezoneId
