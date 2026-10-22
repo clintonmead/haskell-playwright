@@ -32,8 +32,11 @@ import Playwright
   , evaluateText
   , evaluateTexts
   , goto
+  , querySelector
   , selectOption
+  , selectOptionElements
   , selectOptionWith
+  , selectorFromText
   , setContent
   , url
   , urlFromText
@@ -45,6 +48,7 @@ import Playwright.Harness
   , assertStillPending
   , locate
   , rafraf
+  , requireHandle
   , requireTimeout
   , withAssetPage
   , withAssets
@@ -71,6 +75,13 @@ tests =
           _ <- selectOption (locate page "select") [SelectValueOrLabel "blue"]
           assertEqual "input" ["blue"] =<< evaluateTexts page "() => window.result.onInput"
           assertEqual "change" ["blue"] =<< evaluateTexts page "() => window.result.onChange"
+    , testCase "should select single option by handle" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/input/select.html")) defaultGotoOptions
+          handle <- requireHandle =<< querySelector page (selectorFromText "[id=whiteOption]")
+          _ <- selectOptionElements (locate page "select") [handle]
+          assertEqual "input" ["white"] =<< evaluateTexts page "() => window.result.onInput"
+          assertEqual "change" ["white"] =<< evaluateTexts page "() => window.result.onChange"
     , testCase "should select single option by value" $
         withAssetPage "input/select.html" $ \page -> do
           _ <- selectOption (locate page "select") [SelectValue "blue"]

@@ -17,6 +17,7 @@ module Playwright.Frame.Action
   , pressFrame
   , selectOptionFrame
   , selectOptionFrameWith
+  , selectOptionElementsFrameWith
   , tapFrame
   , tapFrameWith
   , typeTextFrame
@@ -73,6 +74,9 @@ import Playwright.InputFile
 import Playwright.InputFileName
   ( inputFileNameToText
   )
+import Playwright.Json.ChannelRef
+  ( ChannelRef
+  )
 import Playwright.Json.ProtocolBinary
   ( protocolBinaryFromByteString
   )
@@ -127,7 +131,7 @@ import Playwright.Protocol
   , FrameHideHighlightResult
   , FramePressParams (framePressParamsStrict)
   , FramePressResult
-  , FrameSelectOptionParams (frameSelectOptionParamsForce, frameSelectOptionParamsOptions, frameSelectOptionParamsStrict)
+  , FrameSelectOptionParams (frameSelectOptionParamsElements, frameSelectOptionParamsForce, frameSelectOptionParamsOptions, frameSelectOptionParamsStrict)
   , FrameSelectOptionParamsOptions (frameSelectOptionParamsOptionsIndex, frameSelectOptionParamsOptionsLabel, frameSelectOptionParamsOptionsValue, frameSelectOptionParamsOptionsValueOrLabel)
   , FrameSelectOptionResult (frameSelectOptionResultValues)
   , FrameSetInputFilesParams (frameSetInputFilesParamsPayloads, frameSetInputFilesParamsStrict)
@@ -573,6 +577,22 @@ selectOptionFrameWith frame selector options timeout opts = do
           { frameSelectOptionParamsStrict = Just True
           , frameSelectOptionParamsForce = selectOptionOptionsForce opts
           , frameSelectOptionParamsOptions = Just (fmap toProtocolOption options)
+          }
+      )
+  pure (frameSelectOptionResultValues result)
+
+-- Element-handle form: the handles travel in the `elements` list, and `options` stays unset.
+selectOptionElementsFrameWith :: Frame -> Selector -> [ChannelRef] -> Timeout -> SelectOptionOptions -> Playwright [Text]
+selectOptionElementsFrameWith frame selector elements timeout opts = do
+  result <-
+    frameSendWithTimeout
+      frame
+      "selectOption"
+      timeout
+      ( (mkFrameSelectOptionParams selector)
+          { frameSelectOptionParamsStrict = Just True
+          , frameSelectOptionParamsForce = selectOptionOptionsForce opts
+          , frameSelectOptionParamsElements = Just elements
           }
       )
   pure (frameSelectOptionResultValues result)

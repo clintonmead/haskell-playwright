@@ -73,6 +73,8 @@ module Playwright.Locator
   , pressSequentially
   , selectOption
   , selectOptionWith
+  , selectOptionElements
+  , selectOptionElementsWith
   , setChecked
   , setInputFiles
   , tap
@@ -139,7 +141,7 @@ import Playwright.DropPayload
   ( DropPayload
   )
 import Playwright.ElementHandle
-  ( ElementHandle
+  ( ElementHandle (elementHandleChannel)
   , boundingBox
   , scrollIntoViewIfNeeded
   , selectText
@@ -178,6 +180,7 @@ import Playwright.Frame.Action
   , pressFrame
   , selectOptionFrame
   , selectOptionFrameWith
+  , selectOptionElementsFrameWith
   , tapFrame
   , tapFrameWith
   , typeTextFrame
@@ -224,6 +227,9 @@ import Playwright.GetByRoleOptions
 import Playwright.InputFile
   ( InputFile
   )
+import Playwright.Json.ChannelRef
+  ( ChannelRef (ChannelRef)
+  )
 import Playwright.Key
   ( Key
   )
@@ -232,6 +238,7 @@ import Playwright.SelectOption
   )
 import Playwright.SelectOptionOptions
   ( SelectOptionOptions (selectOptionOptionsTimeout)
+  , defaultSelectOptionOptions
   )
 import Playwright.Selector
   ( Selector
@@ -650,6 +657,29 @@ selectOptionWith loc options opts = do
     options
     timeout
     opts
+
+selectOptionElements :: Locator -> [ElementHandle] -> Playwright [Text]
+selectOptionElements loc elements =
+  selectOptionElementsWith loc elements defaultSelectOptionOptions
+
+selectOptionElementsWith :: Locator -> [ElementHandle] -> SelectOptionOptions -> Playwright [Text]
+selectOptionElementsWith loc elements opts = do
+  timeout <-
+    case selectOptionOptionsTimeout opts of
+      Just value ->
+        pure value
+      Nothing ->
+        locatorActionTimeout loc
+  selectOptionElementsFrameWith
+    (locatorFrame loc)
+    (locatorSelector loc)
+    (fmap elementHandleRef elements)
+    timeout
+    opts
+
+elementHandleRef :: ElementHandle -> ChannelRef
+elementHandleRef handle =
+  ChannelRef (channelGuid (elementHandleChannel handle))
 
 innerText :: Locator -> Playwright Text
 innerText loc =

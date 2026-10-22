@@ -633,6 +633,8 @@ module Playwright
   , scrollIntoViewIfNeeded
   , scrollIntoViewIfNeededWith
   , selectOption
+  , selectOptionElements
+  , selectOptionElementsWith
   , selectOptionHandle
   , selectOptionWith
   , selectText
@@ -1365,6 +1367,8 @@ import Playwright.Locator
   , press
   , pressSequentially
   , selectOption
+  , selectOptionElements
+  , selectOptionElementsWith
   , selectOptionWith
   , setChecked
   , setInputFiles

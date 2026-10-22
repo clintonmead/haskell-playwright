@@ -532,3 +532,13 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 **Guess taken:** Run the test binary only under `nix develop --command bash -c '...'`. The earlier tap timeout was carried forward as unresolved. It is probably the same stale-driver cause, but it has not been reproduced under `nix develop`, so that remains unconfirmed.
 
 **To change:** If the inherited env is moved to 1.64.1, the wrapper is no longer needed.
+
+## Element-handle form of selectOption: the public shape
+
+**Guess taken:** `selectOptionElements :: Locator -> [ElementHandle] -> Playwright [Text]` and `selectOptionElementsWith` (which takes `SelectOptionOptions`) are the Locator-level port. They send the protocol `elements` list with `options` unset, using `strict: true`, and they take the timeout from the options or from the locator action timeout.
+
+**Why not a `SelectOption` constructor:** `SelectOption` is a plain value list. A handle inside it would make the list mix values with live handles, and the handle form has to carry the handle channel, not a string. A separate function keeps the two forms apart.
+
+**Not representable:** the upstream `null` and wrong-type cases for the element form. `[ElementHandle]` cannot hold `null`, and the type checker rejects a non-handle. Those stay skipped in `progress/FUNCTIONALITY_TODO.md`.
+
+**To change:** If a combined `SelectOption` type is wanted later, `selectOptionElements` can be kept as a thin wrapper over it.
