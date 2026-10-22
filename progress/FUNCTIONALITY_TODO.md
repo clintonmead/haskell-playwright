@@ -113,6 +113,7 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 - **page-event-request:** service worker / intercept-race / Chromium 204 fixme leftovers.
 - **page-event-crash:** `chrome://crash` `goto` is fired in the background; awaiting it can hang the driver.
 - **downloads:** createReadStream / PDF / `artifactsDir`.
+- **download (partial):** "should download successfully when routing" is ported. "should expose stream" needs a Node stream from `download.createReadStream()`, which has no Haskell equivalent, so it is not applicable.
 - **page-pdf:** remaining `PdfOptions` (format, margin, …).
 
 ## `tests/library` with no or thin coverage

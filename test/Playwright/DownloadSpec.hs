@@ -74,6 +74,7 @@ import Playwright
   , closeBrowser
   , closeContext
   , continueRoute
+  , contextRoute
   , currentUrl
   , defaultClickOptions
   , defaultGotoOptions
@@ -373,6 +374,16 @@ tests =
             click (getByText page "Download" Inexact)
             download <- wait handle
             assertEqual "name" "SomeFile.txt" (suggestedFilenameToText (downloadSuggestedFilename download))
+    , testCase "should download successfully when routing" $
+        withDownloadServer $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          contextRoute (pageContext page) (UrlMatchGlob "**/*") $ \handled -> continueRoute handled
+          download <-
+            clickHrefWith
+              page
+              ("<a href=\"" <> prefix <> "/chromium-linux.zip\" download=\"foo.zip\">download</a>")
+          assertEqual "name" "foo.zip" (suggestedFilenameToText (downloadSuggestedFilename download))
+          assertEqual "url" (prefix <> "/chromium-linux.zip") (urlToText (downloadUrl download))
     ]
 
 withAcceptedPage :: (Page -> Playwright a) -> IO a
@@ -440,6 +451,8 @@ matchesSuffix suffix frame = do
 downloadSuiteApp :: Application
 downloadSuiteApp request respond =
   case pathInfo request of
+    ["chromium-linux.zip"] ->
+      attachment respond Nothing
     ["download"] ->
       attachment respond Nothing
     ["downloadWithFilename"] ->
