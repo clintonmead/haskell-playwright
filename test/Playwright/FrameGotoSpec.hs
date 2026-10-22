@@ -6,6 +6,15 @@ import Control.Concurrent
   ( threadDelay
   )
 import Data.ByteString.Lazy.Char8 qualified as LBS8
+import UnliftIO.MVar
+  ( newEmptyMVar
+  , putMVar
+  , takeMVar
+  )
+import UnliftIO.Async
+  ( wait
+  , withAsync
+  )
 import Network.HTTP.Types
   ( status200
   )
@@ -25,11 +34,17 @@ import Playwright.Error
 import UnliftIO.Exception
   ( try
   )
+import Data.Text qualified as Text
 import Data.Text
   ( isInfixOf
   )
 import Playwright
   ( GotoOptions (gotoOptionsTimeout, gotoOptionsWaitUntil)
+  , frames
+  , gotoFrame
+  , route
+  , evaluateText
+  , UrlMatch (UrlMatchGlob)
   , LoadState (LoadStateNetworkIdle)
   , Playwright
   , Response
@@ -108,6 +123,33 @@ tests =
                     assertFailure ("expected ProtocolRpc, got: " <> show err)
                   Right _ ->
                     assertFailure "expected the navigation to time out"
+    , testCase "should reject when frame detaches" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/frames/one-frame.html")) defaultGotoOptions
+          held <- newEmptyMVar
+          route page (UrlMatchGlob (prefix <> "/one-style.css")) $ \handled -> putMVar held handled
+          allFrames <- frames page
+          case drop 1 allFrames of
+            [] ->
+              assertFailure "expected a child frame"
+            child : _ ->
+              withAsync
+                (try (gotoFrame child (urlFromText (prefix <> "/one-style.html")) defaultGotoOptions) :: Playwright (Either PlaywrightError (Maybe Response)))
+                $ \navigation -> do
+                  _ <- takeMVar held
+                  _ <- evaluateText page "() => { document.querySelector('iframe').remove(); return 'removed'; }"
+                  result <- wait navigation
+                  case result of
+                    Left (ProtocolRpc failure) ->
+                      assertBool
+                        "detached"
+                        ( "net::ERR_ABORTED" `isInfixOf` protocolFailureMessage failure
+                            || "frame was detached" `isInfixOf` Text.toLower (protocolFailureMessage failure)
+                        )
+                    Left err ->
+                      assertFailure ("expected ProtocolRpc, got: " <> show err)
+                    Right _ ->
+                      assertFailure "expected the navigation to fail"
     ]
 
 -- | Serves the assets, except that frames/script.js answers only after a long
