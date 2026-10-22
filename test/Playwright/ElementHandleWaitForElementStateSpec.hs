@@ -6,7 +6,7 @@ import UnliftIO.Async
   ( concurrently_
   )
 import Playwright
-  ( ElementState (ElementHidden, ElementVisible)
+  ( ElementState (ElementEditable, ElementEnabled, ElementHidden, ElementVisible)
   , evaluateOnElement
   , milliseconds
   , querySelector
@@ -78,4 +78,21 @@ tests =
           concurrently_
             (waitForElementState handle ElementHidden)
             (evaluateOnElement handle "div => { div.remove(); return true; }")
+    , testCase "should wait for editable input" $
+        withChromiumPage $ \page -> do
+          setContent page "<input readonly>"
+          handle <- requireHandle =<< querySelector page (selectorFromText "input")
+          concurrently_
+            (waitForElementState handle ElementEditable)
+            (evaluateOnElement handle "input => { input.readOnly = false; return true; }")
+    , testCase "should throw waiting for enabled when detached" $
+        withChromiumPage $ \page -> do
+          setContent page "<button disabled>Target</button>"
+          handle <- requireHandle =<< querySelector page (selectorFromText "button")
+          concurrently_
+            ( assertProtocolContains
+                "Element is not attached to the DOM"
+                (waitForElementState handle ElementEnabled)
+            )
+            (evaluateOnElement handle "button => { button.remove(); return true; }")
     ]
