@@ -35,25 +35,33 @@ import Playwright
   , waitForFunction
   , waitForPopup
   , dialogsEqual
+  , Page
+  , closePage
+  , newPage
+  , pageContext
+  , onContextPageClose
+  , onContextPageLoad
+  , Playwright
   )
 import Playwright.Harness
   ( locate
   , requireHandle
   , withChromiumContext
+  , withAssets
   , withLocalApp
   , assertEqual
   , assertFailure
   )
+import Control.Concurrent (threadDelay)
+import UnliftIO.IORef (IORef, modifyIORef', newIORef, readIORef)
+import UnliftIO.Async ( wait , withAsync )
+import Control.Monad.IO.Class (liftIO)
 import Test.Tasty
   ( TestTree
   , testGroup
   )
 import Test.Tasty.HUnit
   ( testCase
-  )
-import UnliftIO.Async
-  ( wait
-  , withAsync
   )
 
 tests :: TestTree
@@ -152,6 +160,19 @@ tests =
                 acceptDialogWith dialog (Just "hello")
                 _ <- waitForFunction popup "() => window.result === 'hello'"
                 pure ()
+    , testCase "pageload event should work" $
+        withAssets $ \prefix page -> do
+          loaded <- newIORef []
+          onContextPageLoad (pageContext page) (\p -> modifyIORef' loaded (<> [p]))
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "page loaded" True =<< pageSeen loaded page 100
+    , testCase "pageclose event should work" $
+        withAssets $ \_ page -> do
+          closed <- newIORef []
+          onContextPageClose (pageContext page) (\p -> modifyIORef' closed (<> [p]))
+          other <- newPage (pageContext page)
+          closePage other
+          assertEqual "page closed" True =<< pageSeen closed other 100
     ]
 
 popupPromptApp :: Application
@@ -168,3 +189,17 @@ popupPromptApp request respond =
         )
     _ ->
       respond (responseLBS status404 [] "")
+
+-- | Polls the pages seen so far until the target is among them, or the
+-- attempts run out.
+pageSeen :: IORef [Page] -> Page -> Int -> Playwright Bool
+pageSeen seen target attempts = do
+  current <- readIORef seen
+  if any (pagesEqual target) current
+    then pure True
+    else
+      if attempts <= 0
+        then pure False
+        else do
+          liftIO (threadDelay 50000)
+          pageSeen seen target (attempts - 1)

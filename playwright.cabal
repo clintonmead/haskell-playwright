@@ -48,6 +48,7 @@ library
       Playwright.Connection.Wait
       Playwright.ConsoleMessage
       Playwright.ConsoleType
+      Playwright.ContextEvents
       Playwright.ContinueOptions
       Playwright.Contrast
       Playwright.Cookie

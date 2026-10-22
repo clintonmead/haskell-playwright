@@ -532,6 +532,8 @@ module Playwright
   , onConsole
   , onContextClose
   , onContextPage
+  , onContextPageClose
+  , onContextPageLoad
   , onContextRequest
   , onContextRequestFailed
   , onContextRequestFinished
@@ -836,6 +838,10 @@ import Playwright.Browser
   , onBrowserContext
   , withPage
   , withPageWith
+  )
+import Playwright.ContextEvents
+  ( onContextPageClose
+  , onContextPageLoad
   )
 import Playwright.BrowserContext
   ( BrowserContext (BrowserContext, browserContextChannel)

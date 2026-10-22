@@ -384,6 +384,20 @@ tests =
               ("<a href=\"" <> prefix <> "/chromium-linux.zip\" download=\"foo.zip\">download</a>")
           assertEqual "name" "foo.zip" (suggestedFilenameToText (downloadSuggestedFilename download))
           assertEqual "url" (prefix <> "/chromium-linux.zip") (urlToText (downloadUrl download))
+    , testCase "should be able to download a inline PDF file via navigation" $ do
+        pdf <- readTestAsset "empty.pdf"
+        withApplication (pure (pdfApp pdf)) $ \port ->
+          withAcceptedPage $ \page -> do
+            let
+              base = "http://127.0.0.1:" <> pack (show port)
+            _ <- goto page (urlFromText (base <> "/empty")) defaultGotoOptions
+            download <-
+              clickHrefWith
+                page
+                ("<a href=\"" <> base <> "/empty.pdf\">open</a>")
+            path <- downloadPath download
+            saved <- liftIO (BS.readFile path)
+            assertEqual "pdf bytes" pdf saved
     ]
 
 withAcceptedPage :: (Page -> Playwright a) -> IO a
