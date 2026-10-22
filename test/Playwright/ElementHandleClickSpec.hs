@@ -4,7 +4,9 @@ module Playwright.ElementHandleClickSpec
 
 import Playwright
   ( ClickOptions (clickOptionsForce)
+  , asElement
   , clickHandle
+  , evaluateHandle
   , clickHandleWith
   , defaultClickOptions
   , defaultGotoOptions
@@ -88,4 +90,9 @@ tests =
           dblclick (locate page "button")
           assertEqual "double" True =<< evaluateBool page "() => window['double']"
           assertEqual "clicked" "Clicked" =<< evaluateText page "() => window.result"
+    , testCase "should work for Shadow DOM v1" $
+        withAssetPage "shadow.html" $ \page -> do
+          handle <- requireHandle =<< asElement =<< evaluateHandle page "() => window['button']"
+          clickHandle handle
+          assertEqual "clicked" True =<< evaluateBool page "() => clicked"
     ]
