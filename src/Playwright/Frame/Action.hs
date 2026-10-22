@@ -10,6 +10,7 @@ module Playwright.Frame.Action
   , fillFrame
   , focusFrame
   , hoverFrame
+  , hoverFrameWith
   , highlightFrame
   , hideHighlightFrame
   , pressFrame
@@ -115,7 +116,9 @@ import Playwright.Protocol
   , FrameFillResult
   , FrameFocusParams (frameFocusParamsStrict)
   , FrameFocusResult
-  , FrameHoverParams (frameHoverParamsStrict)
+  , FrameHoverParams (frameHoverParamsForce, frameHoverParamsModifiers, frameHoverParamsPosition, frameHoverParamsScroll, frameHoverParamsStrict, frameHoverParamsTrial)
+  , FrameHoverParamsModifiers (FrameHoverParamsModifiersAlt, FrameHoverParamsModifiersControl, FrameHoverParamsModifiersControlOrMeta, FrameHoverParamsModifiersMeta, FrameHoverParamsModifiersShift)
+  , FrameHoverParamsScroll (FrameHoverParamsScrollAuto, FrameHoverParamsScrollNone)
   , FrameHoverResult
   , FrameHighlightResult
   , FrameHideHighlightResult
@@ -175,6 +178,10 @@ import Playwright.SelectOptionOptions
   )
 import Playwright.Selector
   ( Selector
+  )
+import Playwright.HoverOptions
+  ( HoverOptions (hoverOptionsForce, hoverOptionsModifiers, hoverOptionsPosition, hoverOptionsScroll, hoverOptionsTrial)
+  , defaultHoverOptions
   )
 import Playwright.ScrollOption
   ( ScrollOption (ScrollAuto, ScrollNone)
@@ -337,13 +344,44 @@ blurFrame frame selector timeout =
 
 hoverFrame :: Frame -> Selector -> Timeout -> Playwright ()
 hoverFrame frame selector timeout =
+  hoverFrameWith frame selector timeout defaultHoverOptions
+
+hoverFrameWith :: Frame -> Selector -> Timeout -> HoverOptions -> Playwright ()
+hoverFrameWith frame selector timeout opts =
   frameSendTimed_ @FrameHoverResult
     frame
     "hover"
     timeout
     (mkFrameHoverParams selector)
       { frameHoverParamsStrict = Just True
+      , frameHoverParamsForce = hoverOptionsForce opts
+      , frameHoverParamsModifiers = fmap (fmap toFrameHoverModifier) (hoverOptionsModifiers opts)
+      , frameHoverParamsPosition = fmap toProtocolPoint (hoverOptionsPosition opts)
+      , frameHoverParamsScroll = fmap toFrameHoverScroll (hoverOptionsScroll opts)
+      , frameHoverParamsTrial = hoverOptionsTrial opts
       }
+
+toFrameHoverScroll :: ScrollOption -> FrameHoverParamsScroll
+toFrameHoverScroll scroll =
+  case scroll of
+    ScrollAuto ->
+      FrameHoverParamsScrollAuto
+    ScrollNone ->
+      FrameHoverParamsScrollNone
+
+toFrameHoverModifier :: KeyboardModifier -> FrameHoverParamsModifiers
+toFrameHoverModifier modifier =
+  case modifier of
+    KeyboardModifierAlt ->
+      FrameHoverParamsModifiersAlt
+    KeyboardModifierControl ->
+      FrameHoverParamsModifiersControl
+    KeyboardModifierControlOrMeta ->
+      FrameHoverParamsModifiersControlOrMeta
+    KeyboardModifierMeta ->
+      FrameHoverParamsModifiersMeta
+    KeyboardModifierShift ->
+      FrameHoverParamsModifiersShift
 
 highlightFrame :: Frame -> Selector -> Playwright ()
 highlightFrame frame selector =

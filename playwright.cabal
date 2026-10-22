@@ -86,6 +86,7 @@ library
       Playwright.GetByRoleOptions
       Playwright.GotoOptions
       Playwright.Guid
+      Playwright.HoverOptions
       Playwright.HttpCredentials
       Playwright.HttpCredentialsSend
       Playwright.HttpHeader

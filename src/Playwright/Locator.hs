@@ -45,6 +45,7 @@ module Playwright.Locator
   , getByTitle
   , getByTitleRegex
   , hover
+  , hoverWith
   , highlight
   , hideHighlight
   , innerHtml
@@ -167,6 +168,7 @@ import Playwright.Frame.Action
   , setInputFilesFrame
   , focusFrame
   , hoverFrame
+  , hoverFrameWith
   , highlightFrame
   , hideHighlightFrame
   , pressFrame
@@ -236,6 +238,9 @@ import Playwright.Selector
   )
 import Playwright.Connection
   ( lookupTimeoutDefaults
+  )
+import Playwright.HoverOptions
+  ( HoverOptions (hoverOptionsTimeout)
   )
 import Playwright.TapOptions
   ( TapOptions (tapOptionsTimeout)
@@ -510,6 +515,16 @@ blur loc =
 hover :: Locator -> Playwright ()
 hover loc =
   withActionTimeout loc (hoverFrame (locatorFrame loc) (locatorSelector loc))
+
+hoverWith :: Locator -> HoverOptions -> Playwright ()
+hoverWith loc opts = do
+  timeout <-
+    case hoverOptionsTimeout opts of
+      Just value ->
+        pure value
+      Nothing ->
+        locatorActionTimeout loc
+  hoverFrameWith (locatorFrame loc) (locatorSelector loc) timeout opts
 
 highlight :: Locator -> Playwright ()
 highlight loc =

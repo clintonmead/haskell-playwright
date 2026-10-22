@@ -46,6 +46,7 @@ import Playwright
   , click
   , clickHandleWith
   , clickWith
+  , hoverWith
   , contentFrameHandle
   , cssPixelFromInt
   , dblclick
@@ -84,6 +85,10 @@ import Playwright
   , waitForConsoleWhere
   , waitForLoadState
   , waitForPopup
+  )
+import Playwright.HoverOptions
+  ( HoverOptions (hoverOptionsScroll, hoverOptionsTimeout)
+  , defaultHoverOptions
   )
 import Playwright.Error
   ( PlaywrightError
@@ -752,6 +757,16 @@ tests =
           assertEqual "not clicked" False =<< evaluateBool page "() => !!window._clicked"
           clickWith (locate page "button") defaultClickOptions {clickOptionsTimeout = milliseconds 2000}
           assertEqual "clicked with default scroll" True =<< evaluateBool page "() => !!window._clicked"
+    , testCase "should not scroll on hover when scroll is none" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<div style=\"height: 2000px;\"></div><div onmouseover=\"window._hovered=true\" style=\"width: 50px; height: 50px;\">hover me</div>"
+          assertProtocolContains
+            "element is outside of the viewport"
+            (hoverWith (locate page "div >> text=hover me") defaultHoverOptions {hoverOptionsScroll = Just ScrollNone, hoverOptionsTimeout = milliseconds 2000})
+          assertEqual "not hovered" False =<< evaluateBool page "() => !!window._hovered"
+          assertEqual "not scrolled" (0 :: Double) =<< evaluateNumber page "() => window.scrollY"
     ]
 
 waitUntilEnabled :: Text -> Text -> Text -> IO ()
