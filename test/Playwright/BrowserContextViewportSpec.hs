@@ -134,6 +134,11 @@ tests =
           mediaMatches page "(device-height: 300px)" >>= assertEqual "device 300" True
           setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 500))
           assertEqual "screen after" (500 :: Double) =<< evaluateNumber page "() => window.screen.height"
+    , testCase "should emulate availWidth and availHeight" $
+        withChromiumContext $ \_ page -> do
+          setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 600))
+          assertEqual "availWidth" (500 :: Double) =<< evaluateNumber page "() => window.screen.availWidth"
+          assertEqual "availHeight" (600 :: Double) =<< evaluateNumber page "() => window.screen.availHeight"
     , testCase "should not have touch by default" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/mobile.html")) defaultGotoOptions
