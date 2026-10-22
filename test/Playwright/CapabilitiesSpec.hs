@@ -17,6 +17,7 @@ import Data.ByteString
 import Data.ByteString.Lazy.Char8 qualified as LBS8
 import Data.Text
   ( Text
+  , pack
   )
 import Network.HTTP.Types
   ( HeaderName
@@ -74,6 +75,7 @@ import Playwright.Harness
   , withAssets
   , withChromiumPage
   , withLocalApp
+  , testAssetsDir
   , assertEqual
   , assertFailure
   )
@@ -240,6 +242,20 @@ tests =
               \  await PublicKeyCredential.isConditionalMediationAvailable();\
               \  await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();\
               \}"
+          pure ()
+    , testCase "should play video" $ do
+        assets <- testAssetsDir
+        withChromiumPage $ \page -> do
+          _ <- goto page (urlFromText ("file://" <> pack (assets <> "/video.html"))) defaultGotoOptions
+          _ <- evaluate page "() => document.querySelector('video').play()"
+          _ <- evaluate page "() => document.querySelector('video').pause()"
+          pure ()
+    , testCase "should play webm video" $ do
+        assets <- testAssetsDir
+        withChromiumPage $ \page -> do
+          _ <- goto page (urlFromText ("file://" <> pack (assets <> "/video_webm.html"))) defaultGotoOptions
+          _ <- evaluate page "() => document.querySelector('video').play()"
+          _ <- evaluate page "() => document.querySelector('video').pause()"
           pure ()
     ]
 
