@@ -612,7 +612,9 @@ module Playwright
   , responseFinished
   , responseFromServiceWorker
   , responseAllHeaders
+  , responseBody
   , responseHeaders
+  , responseJSON
   , responseOk
   , responseRequest
   , responseStatus
@@ -1624,7 +1626,9 @@ import Playwright.ResourceType
 import Playwright.Response
   ( Response (Response, responseChannel)
   , responseAllHeaders
+  , responseBody
   , responseHeaders
+  , responseJSON
   , responseOk
   , requestResponse
   , responseRequest

@@ -2,7 +2,9 @@ module Playwright.Response
   ( Response (..)
   , responseFromRef
   , responseAllHeaders
+  , responseBody
   , responseHeaders
+  , responseJSON
   , responseOk
   , responseRequest
   , responseStatus
@@ -15,6 +17,13 @@ module Playwright.Response
 
 import Playwright.Monad
   ( Playwright
+  )
+import Data.Aeson
+  ( Value
+  , eitherDecodeStrict
+  )
+import Data.ByteString
+  ( ByteString
   )
 import Data.List
   ( partition
@@ -34,6 +43,9 @@ import Playwright.Channel
   )
 import Playwright.Connection
   ( lookupObject
+  )
+import Playwright.Error
+  ( PlaywrightError (DecodeFailure)
   )
 import Playwright.HttpHeader
   ( HeaderName (HeaderName, headerNameToText)
@@ -74,6 +86,9 @@ import Playwright.Request
   )
 import Playwright.Url
   ( Url
+  )
+import UnliftIO.Exception
+  ( throwIO
   )
 
 newtype Response = Response
@@ -138,14 +153,27 @@ responseFromServiceWorker :: Response -> Playwright Bool
 responseFromServiceWorker response =
   responseInitializerFromServiceWorker <$> responseInitializer response
 
-responseText :: Response -> Playwright Text
-responseText response = do
+responseBody :: Response -> Playwright ByteString
+responseBody response = do
   result <-
     send
       (responseChannel response)
       (MethodName "body")
       mkResponseBodyParams
-  pure (decodeUtf8 (protocolBinaryToByteString (responseBodyResultBinary result)))
+  pure (protocolBinaryToByteString (responseBodyResultBinary result))
+
+responseText :: Response -> Playwright Text
+responseText response =
+  decodeUtf8 <$> responseBody response
+
+responseJSON :: Response -> Playwright Value
+responseJSON response = do
+  bytes <- responseBody response
+  case eitherDecodeStrict bytes of
+    Right value ->
+      pure value
+    Left _ ->
+      throwIO (DecodeFailure ("response body is not valid JSON: " <> decodeUtf8 bytes))
 
 fromNameValue :: NameValue -> HttpHeader
 fromNameValue header =
