@@ -11,6 +11,7 @@ import Data.Ord
 import Data.Text
   ( Text
   , isInfixOf
+  , replace
   )
 import Playwright
   ( Frame
@@ -103,6 +104,14 @@ tests =
               assertEqual "frame2 parent" True (framesEqual second (mainFrame page))
             _ ->
               assertFailure ("unexpected parents: " <> show (length parents))
+    , testCase "should persist mainFrame on cross-process navigation" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let
+            before = mainFrame page
+            cross = replace "127.0.0.1" "localhost" prefix
+          _ <- goto page (urlFromText (cross <> "/empty.html")) defaultGotoOptions
+          assertEqual "same main frame" True (framesEqual (mainFrame page) before)
     ]
 
 dumpFrames :: Frame -> Text -> Playwright [Text]

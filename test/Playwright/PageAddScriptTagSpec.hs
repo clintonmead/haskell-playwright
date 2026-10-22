@@ -7,6 +7,7 @@ import Control.Monad
   )
 import Data.Text
   ( isInfixOf
+  , replace
   )
 import Playwright
   ( Playwright
@@ -127,6 +128,11 @@ tests =
           _ <- goto page (urlFromText (prefix <> "/csp.html")) defaultGotoOptions
           assertFails
             (addScriptTag page emptyScriptTag {scriptTagContent = Just "window[\"__injected\"] = 35;"})
+    , testCase "should throw when added with URL to the CSP page" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/csp.html")) defaultGotoOptions
+          let cross = replace "127.0.0.1" "localhost" prefix
+          assertFails (addScriptTag page emptyScriptTag {scriptTagUrl = Just (urlFromText (cross <> "/injectedfile.js"))})
     , testCase "should throw a nice error when the request fails" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
