@@ -9,6 +9,7 @@ import Playwright
   , evaluateHandleOnFrame
   , frames
   , framesEqual
+  , evaluateHandleOnFrame
   , goto
   , mainFrame
   , ownerFrameHandle
@@ -17,7 +18,8 @@ import Playwright
   , waitForFunction
   )
 import Playwright.Harness
-  ( requireHandle
+  ( attachFrame
+  , requireHandle
   , withAssets
   , assertEqual
   , assertFailure
@@ -77,4 +79,17 @@ tests =
               assertFailure "expected owner"
             Just frame ->
               assertEqual "main" True (framesEqual frame (mainFrame page))
+    , testCase "should work for iframe elements" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          _ <- attachFrame page "frame1" (prefix <> "/empty.html")
+          let mainHandle = mainFrame page
+          jsHandle <- evaluateHandleOnFrame mainHandle "() => document.querySelector('#frame1')"
+          element <- requireHandle =<< asElement jsHandle
+          owner <- ownerFrameHandle element
+          case owner of
+            Nothing ->
+              assertFailure "expected owner"
+            Just frame ->
+              assertEqual "main" True (framesEqual frame mainHandle)
     ]
