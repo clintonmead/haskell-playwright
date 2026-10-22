@@ -520,3 +520,9 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 **Guess taken:** The driver's frame `addScriptTag` takes a different path from the page one. The likely cause is that it evaluates the script in the frame's utility world or via `frame.evaluate`, not through an inline `<script>` element. That would bypass the CSP. This is a guess; I did not read the driver source.
 
 **To change:** Read the driver's `addScriptTag` for frames (`playwright-driver` in the nix store) and check whether it goes through an inline element. If the driver really injects into a CSP-blocked frame, skip the plain-frame half and record it as a driver difference.
+
+### Follow-up: the driver does not branch on frames
+
+The first guess, that the driver takes a different path for frames, is ruled out. In the driver bundle (`$PLAYWRIGHT_CORE_DIR/lib/coreBundle.js`), `Frame.addScriptTag` (around line 22971) is the one implementation for both the page and a child frame. The frame dispatcher (around line 53449) calls it directly. The Haskell side is also clean: `addScriptTagOnFrame` (`src/Playwright/Page.hs:648`) sends `addScriptTag` to the frame it is given.
+
+So the difference is downstream, in the frame's main-world context or in Chromium's CSP check for an injected inline `<script>` in an iframe. This is not settled. Next step: a probe that logs `document.currentScript`, `window.__injected`, and the console CSP error for the iframe, to see whether the element is inserted and executed or never runs. The item stays open until that is known.
