@@ -2,9 +2,20 @@ module Playwright.TapSpec
   ( tests
   ) where
 
+import Control.Monad
+  ( void
+  )
 import UnliftIO.Async
   ( wait
   , withAsync
+  )
+import UnliftIO.MVar
+  ( newEmptyMVar
+  , takeMVar
+  , tryPutMVar
+  )
+import UnliftIO.Timeout
+  ( timeout
   )
 import Data.Text
   ( Text
@@ -14,15 +25,23 @@ import Playwright
   , JsHandle
   , NewContextOptions (newContextHasTouch)
   , Page
+  , Point (Point)
+  , UrlMatch (UrlMatchGlob)
   , asElement
+  , cssPixelFromInt
+  , defaultGotoOptions
   , defaultNewContextOptions
   , evaluate
   , evaluateBool
   , evaluateText
   , defaultTapOptions
+  , goto
   , KeyboardModifier (KeyboardModifierAlt)
+  , route
   , TapOptions (tapOptionsModifiers, tapOptionsTrial)
   , tapWith
+  , touchscreenTap
+  , urlFromText
   , evaluateHandle
   , evaluateHandleOnElement
   , evaluateOnElement
@@ -39,6 +58,7 @@ import Playwright
 import Playwright.Harness
   ( locate
   , requireHandle
+  , withAssetsWith
   , withChromiumContextWith
   , assertEqual
   )
@@ -74,18 +94,38 @@ tests =
           target <- requireHandle =<< querySelector page (selectorFromText "div")
           eventsHandle <- trackEvents target
           tap (locate page "div")
+          assertEqual "canceled touchstart" canceledTapEvents =<< jsonValueTexts eventsHandle
+    , testCase "should not send mouse events when touchend is canceled" $
+        withTouchPage $ \page -> do
+          setContent page "<div style=\"width: 50px; height: 50px; background: red\">"
+          _ <-
+            evaluate
+              page
+              "() => { document.addEventListener('touchend', t => t.preventDefault(), { passive: false }); }"
+          target <- requireHandle =<< querySelector page (selectorFromText "div")
+          eventsHandle <- trackEvents target
+          tap (locate page "div")
+          assertEqual "canceled touchend" canceledTapEvents =<< jsonValueTexts eventsHandle
+    , testCase "should not wait for a navigation caused by a tap" $
+        withAssetsWith defaultNewContextOptions {newContextHasTouch = Just True} $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          setContent page "<a href=\"/intercept-this.html\">link</a>;"
+          routed <- newEmptyMVar
+          route page (UrlMatchGlob "**/intercept-this.html") (\_ -> void (tryPutMVar routed ()))
+          tap (locate page "a")
+          hit <- timeout 10000000 (takeMVar routed)
+          assertEqual "navigation request reached the route" (Just ()) hit
+    , testCase "should send well formed touch points" $
+        withTouchPage $ \page -> do
+          _ <-
+            evaluate
+              page
+              "() => { window.events = {}; for (const type of ['touchstart', 'touchend']) document.addEventListener(type, event => { window.events[type] = [...event.touches].map(t => ({ identifier: t.identifier, clientX: t.clientX, clientY: t.clientY, pageX: t.pageX, pageY: t.pageY, radiusX: t.radiusX, radiusY: t.radiusY, rotationAngle: t.rotationAngle, force: t.force })); }, false); }"
+          touchscreenTap page (Point (cssPixelFromInt 40) (cssPixelFromInt 60))
           assertEqual
-            "canceled touchstart"
-            [ "pointerover"
-            , "pointerenter"
-            , "pointerdown"
-            , "touchstart"
-            , "pointerup"
-            , "pointerout"
-            , "pointerleave"
-            , "touchend"
-            ]
-            =<< jsonValueTexts eventsHandle
+            "touch points"
+            "{\"touchstart\":[{\"identifier\":0,\"clientX\":40,\"clientY\":60,\"pageX\":40,\"pageY\":60,\"radiusX\":1,\"radiusY\":1,\"rotationAngle\":0,\"force\":1}],\"touchend\":[]}"
+            =<< evaluateText page "() => JSON.stringify(window.events)"
     , testCase "should wait until an element is visible to tap it" $
         withTouchPage $ \page -> do
           jsHandle <-
@@ -140,6 +180,20 @@ trackEvents target =
   evaluateHandleOnElement
     target
     "target => { const events = []; for (const event of ['mousedown', 'mouseenter', 'mouseleave', 'mousemove', 'mouseout', 'mouseover', 'mouseup', 'click', 'pointercancel', 'pointerdown', 'pointerenter', 'pointerleave', 'pointermove', 'pointerout', 'pointerover', 'pointerup', 'touchstart', 'touchend', 'touchmove', 'touchcancel']) target.addEventListener(event, () => events.push(event), false); return events; }"
+
+-- | Events a tap delivers to its target when the touch sequence is cancelled,
+-- so no mouse events follow.
+canceledTapEvents :: [Text]
+canceledTapEvents =
+  [ "pointerover"
+  , "pointerenter"
+  , "pointerdown"
+  , "touchstart"
+  , "pointerup"
+  , "pointerout"
+  , "pointerleave"
+  , "touchend"
+  ]
 
 chromiumTapEvents :: [Text]
 chromiumTapEvents =

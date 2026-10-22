@@ -676,6 +676,7 @@ module Playwright
   , textContentHandle
   , timeoutToDouble
   , title
+  , touchscreenTap
   , typeHandle
   , typeText
   , uncheck
@@ -922,6 +923,9 @@ import Playwright.TapOptions
   )
 import Playwright.ScrollOption
   ( ScrollOption (ScrollAuto, ScrollNone)
+  )
+import Playwright.Touchscreen
+  ( touchscreenTap
   )
 import Playwright.ClickOptions
   ( ClickOptions (ClickOptions, clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsScroll, clickOptionsSteps, clickOptionsTimeout, clickOptionsTrial)

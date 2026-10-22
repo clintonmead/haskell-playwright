@@ -502,3 +502,11 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 **Guess taken:** No. The name is an implementation detail of upstream's `exposeFunctions` mechanism, which Haskell does not have. It is recorded as a skip in `progress/FUNCTIONALITY_TODO.md`.
 
 **To change:** Port it if the harness ever needs to observe the binding name.
+
+## tap: touchscreen tap added as a public API
+
+**Question:** Upstream's touch-point case calls `page.touchscreen.tap(40, 60)`. The Haskell library had no touchscreen wrapper, though the protocol method `touchscreenTap` exists. Should a public `touchscreenTap` be added, or should the case be skipped?
+
+**Guess taken:** Add `touchscreenTap :: Page -> Point -> Playwright ()` in `src/Playwright/Touchscreen.hs` and export it from `Playwright`. It follows the `Mouse.hs` pattern, and the touch-point case uses it.
+
+**To change:** Drop the export and skip the case if the public surface should stay as it is.
