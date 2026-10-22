@@ -12,6 +12,10 @@ import Playwright
   , childFrameLocator
   , childLocator
   , click
+  , ClickOptions (clickOptionsTimeout)
+  , clickWith
+  , defaultClickOptions
+  , milliseconds
   , defaultFulfillOptions
   , defaultGotoOptions
   , frameLocator
@@ -27,9 +31,19 @@ import Playwright
   , waitFor
   , Playwright
   )
+import Control.Concurrent
+  ( threadDelay
+  )
+import Control.Monad.IO.Class
+  ( liftIO
+  )
+import UnliftIO.Async
+  ( withAsync
+  )
 import Playwright.Harness
   ( withAssets
   , assertEqual
+  , assertProtocolContains
   )
 import Test.Tasty
   ( TestTree
@@ -91,6 +105,23 @@ tests =
           waitFor button WaitForVisible
           assertEqual "button" "Hello iframe" =<< innerText button
           assertEqual "spans" 2 =<< locatorCount spans
+    , testCase "should wait for frame" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let
+            spanLocator = childLocator (frameLocator page (selectorFromText "iframe")) (selectorFromText "span")
+          assertProtocolContains
+            "Timeout 1000ms exceeded"
+            (clickWith spanLocator defaultClickOptions {clickOptionsTimeout = milliseconds 1000})
+    , testCase "should wait for frame 2" $
+        withAssets $ \prefix page -> do
+          routeIframe page
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let
+            button = childLocator (frameLocator page (selectorFromText "iframe")) (selectorFromText "button")
+          withAsync
+            (liftIO (threadDelay 300000) >> goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions)
+            $ \_ -> click button
     ]
 
 routeIframe :: Page -> Playwright ()
