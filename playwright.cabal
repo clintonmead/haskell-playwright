@@ -150,6 +150,7 @@ library
       Playwright.RouteOptions
       Playwright.ScreenshotOptions
       Playwright.ScriptTag
+      Playwright.ScrollOption
       Playwright.SecurityDetails
       Playwright.SelectOption
       Playwright.SelectOptionOptions

@@ -38,7 +38,7 @@ import Playwright.CheckOptions
   ( CheckOptions (checkOptionsForce, checkOptionsPosition, checkOptionsTimeout, checkOptionsTrial)
   )
 import Playwright.ClickOptions
-  ( ClickOptions (clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsSteps, clickOptionsTrial)
+  ( ClickOptions (clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsScroll, clickOptionsSteps, clickOptionsTrial)
   , defaultClickOptions
   )
 import Playwright.CssPixel
@@ -96,9 +96,10 @@ import Playwright.Protocol
   , FrameBlurResult
   , FrameCheckParams (frameCheckParamsForce, frameCheckParamsPosition, frameCheckParamsStrict, frameCheckParamsTrial)
   , FrameCheckResult
-  , FrameClickParams (frameClickParamsButton, frameClickParamsClickCount, frameClickParamsForce, frameClickParamsModifiers, frameClickParamsNoWaitAfter, frameClickParamsPosition, frameClickParamsSteps, frameClickParamsStrict, frameClickParamsTrial)
+  , FrameClickParams (frameClickParamsButton, frameClickParamsClickCount, frameClickParamsForce, frameClickParamsModifiers, frameClickParamsNoWaitAfter, frameClickParamsPosition, frameClickParamsScroll, frameClickParamsSteps, frameClickParamsStrict, frameClickParamsTrial)
   , FrameClickParamsButton (FrameClickParamsButtonLeft, FrameClickParamsButtonMiddle, FrameClickParamsButtonRight)
   , FrameClickParamsModifiers (FrameClickParamsModifiersAlt, FrameClickParamsModifiersControl, FrameClickParamsModifiersControlOrMeta, FrameClickParamsModifiersMeta, FrameClickParamsModifiersShift)
+  , FrameClickParamsScroll (FrameClickParamsScrollAuto, FrameClickParamsScrollNone)
   , FrameClickResult
   , FrameDblclickParams (frameDblclickParamsStrict)
   , FrameDblclickResult
@@ -175,6 +176,9 @@ import Playwright.SelectOptionOptions
 import Playwright.Selector
   ( Selector
   )
+import Playwright.ScrollOption
+  ( ScrollOption (ScrollAuto, ScrollNone)
+  )
 import Playwright.TapOptions
   ( TapOptions (tapOptionsForce, tapOptionsModifiers, tapOptionsPosition, tapOptionsTrial)
   , defaultTapOptions
@@ -211,6 +215,7 @@ clickFrameWith frame selector timeout opts =
       , frameClickParamsModifiers = fmap (fmap toFrameClickModifier) (clickOptionsModifiers opts)
       , frameClickParamsNoWaitAfter = clickOptionsNoWaitAfter opts
       , frameClickParamsPosition = fmap toProtocolPoint (clickOptionsPosition opts)
+      , frameClickParamsScroll = fmap toFrameClickScroll (clickOptionsScroll opts)
       , frameClickParamsSteps = clickOptionsSteps opts
       , frameClickParamsTrial = clickOptionsTrial opts
       }
@@ -224,6 +229,14 @@ toFrameClickButton button =
       FrameClickParamsButtonRight
     MouseButtonMiddle ->
       FrameClickParamsButtonMiddle
+
+toFrameClickScroll :: ScrollOption -> FrameClickParamsScroll
+toFrameClickScroll scroll =
+  case scroll of
+    ScrollAuto ->
+      FrameClickParamsScrollAuto
+    ScrollNone ->
+      FrameClickParamsScrollNone
 
 toFrameClickModifier :: KeyboardModifier -> FrameClickParamsModifiers
 toFrameClickModifier modifier =

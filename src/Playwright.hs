@@ -15,6 +15,7 @@ module Playwright
   , CheckOptions (..)
   , ClearCookiesOptions (..)
   , ClickOptions (..)
+  , ScrollOption (..)
   , TapOptions (..)
   , ClockMillis (..)
   , ClockTicks (..)
@@ -890,8 +891,11 @@ import Playwright.TapOptions
   ( TapOptions (TapOptions, tapOptionsForce, tapOptionsModifiers, tapOptionsPosition, tapOptionsTimeout, tapOptionsTrial)
   , defaultTapOptions
   )
+import Playwright.ScrollOption
+  ( ScrollOption (ScrollAuto, ScrollNone)
+  )
 import Playwright.ClickOptions
-  ( ClickOptions (ClickOptions, clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsSteps, clickOptionsTimeout, clickOptionsTrial)
+  ( ClickOptions (ClickOptions, clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsScroll, clickOptionsSteps, clickOptionsTimeout, clickOptionsTrial)
   , defaultClickOptions
   )
 import Playwright.Clock
