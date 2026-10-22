@@ -4,7 +4,9 @@ module Playwright.ElementHandlePressSpec
 
 import Playwright
   ( Key (Key)
+  , evaluateText
   , evaluateOnLocatorText
+  , evaluateText
   , press
   , setContent
   )
@@ -35,4 +37,18 @@ tests =
           setContent page "<input type='text' value='hello' />"
           press (locate page "input") (Key "w")
           assertEqual "value" "whello" =<< evaluateOnLocatorText (locate page "input") "input => input.value"
+    , testCase "should reset selection when not focused" $
+        withChromiumPage $ \page -> do
+          setContent page "<input type='text' value='hello' /><div tabIndex=2>text</div>"
+          _ <-
+            evaluateText
+              page
+              "() => { const input = document.querySelector('input'); input.selectionStart = 2; input.selectionEnd = 4; document.querySelector('div').focus(); return 'set'; }"
+          press (locate page "input") (Key "w")
+          assertEqual "value" "whello" =<< evaluateOnLocatorText (locate page "input") "input => input.value"
+    , testCase "should work with number input" $
+        withChromiumPage $ \page -> do
+          setContent page "<input type='number' value=2 />"
+          press (locate page "input") (Key "1")
+          assertEqual "value" "12" =<< evaluateOnLocatorText (locate page "input") "input => input.value"
     ]
