@@ -4,6 +4,14 @@ module Playwright.LocatorQuerySpec
 
 import Playwright
   ( AriaRole (AriaRole)
+  , childLocator
+  , frameLocator
+  , defaultGotoOptions
+  , frames
+  , goto
+  , registerSelector
+  , setContentOnFrame
+  , urlFromText
   , allInnerTexts
   , andLocator
   , chainLocator
@@ -34,7 +42,9 @@ import Playwright
   , setContent
   )
 import Playwright.Harness
-  ( assertProtocolContains
+  ( assertFailure
+  , assertProtocolContains
+  , withAssets
   , locate
   , withChromiumPage
   , assertEqual
@@ -227,4 +237,20 @@ tests =
             =<< locatorCount (Locator.getByRole (locate page "div") (AriaRole "button") defaultGetByRoleOptions)
           assertEqual "mainFrame" 1
             =<< locatorCount (locatorOnFrame page (mainFrame page) (selectorFromText "button"))
+    , testCase "count() should not throw during navigation" $
+        withAssets $ \prefix page -> do
+          registerSelector
+            "locatorCountHelper"
+            "(() => ({ query(root, selector) { window.location.href = './frames/one-frame.html'; return document.querySelector(selector); }, queryAll(root, selector) { window.location.href = './frames/one-frame.html'; return Array.from(document.querySelectorAll(selector)); } }))()"
+          _ <- goto page (urlFromText (prefix <> "/frames/one-frame.html")) defaultGotoOptions
+          allFrames <- frames page
+          case drop 1 allFrames of
+            [] ->
+              assertFailure "expected a child frame"
+            child : _ -> do
+              _ <- setContentOnFrame child "<div>A</div>"
+              count <-
+                locatorCount
+                  (childLocator (frameLocator page (selectorFromText "locatorCountHelper=iframe")) (selectorFromText "locatorCountHelper=div"))
+              assertEqual "count" (0 :: Int) count
     ]
