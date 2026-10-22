@@ -122,3 +122,11 @@ Decisions made without waiting for an answer. Each entry gives the question, the
 **Guess taken:** Yes. The test now expects an empty list from both the page and the element handle.
 
 **To change:** None needed unless the upstream expectation changes back.
+
+## The 307 cross-origin navigation now runs
+
+**Question:** The 307 cross-origin case was left out until the driver moved. Should it be ported now that the pin is 1.64.1?
+
+**Guess taken:** Yes. It is ported with two servers, one on localhost for the redirect and one on 127.0.0.1 for the final page, and it passes on the new driver.
+
+**To change:** Delete the test "continue should pass on 307 cross-origin redirect" if the driver regresses.

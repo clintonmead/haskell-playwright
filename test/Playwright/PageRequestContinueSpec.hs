@@ -32,6 +32,7 @@ import Network.HTTP.Types
   ( hContentType
   , status204
   , status301
+  , status307
   , hLocation
   , status302
   , status200
@@ -63,6 +64,8 @@ import Playwright
   , defaultContinueOptions
   , Page
   , Playwright
+  , click
+  , waitForURL
   , defaultGotoOptions
   , waitForFunction
   , waitForTimeout
@@ -103,6 +106,7 @@ import Playwright.Harness
   , withLocalApp
   , withAssets
   , withChromiumPage
+  , locate
   , assertEqual
   , assertFailure
   )
@@ -111,6 +115,7 @@ import UnliftIO.Exception
   )
 import UnliftIO.Async
   ( race
+  , wait
   , withAsync
   )
 import UnliftIO.IORef
@@ -658,6 +663,24 @@ tests =
             assertEqual "authorization" (Just "credentials") . headerOf "/something" "authorization" =<< readIORef requests
             assertEqual "cookie" Nothing . headerOf "/something" "cookie" =<< readIORef requests
             assertEqual "custom" (Just "foo") . headerOf "/something" "custom" =<< readIORef requests
+    , testCase "continue should pass on 307 cross-origin redirect" $
+        withApplication (pure finalPageApp) $ \finalPort ->
+          withApplication (pure (redirect307App finalPort)) $ \redirectPort ->
+            withChromiumPage $ \page -> do
+              _ <- goto page (urlFromText ("http://127.0.0.1:" <> pack (show finalPort) <> "/empty.html")) defaultGotoOptions
+              setContent
+                page
+                ( "<form id=\"f\" method=\"POST\" action=\"http://localhost:"
+                    <> pack (show redirectPort)
+                    <> "/redirect307\"><input type=\"submit\"></form>"
+                )
+              route page (UrlMatchGlob "**/*") $ \handled -> continueRoute handled
+              withAsync
+                (waitForURL page (UrlMatchGlob ("http://127.0.0.1:" <> pack (show finalPort) <> "/final")))
+                $ \navigated -> do
+                  click (locate page "input")
+                  wait navigated
+              assertEqual "text" "ok" =<< evaluateText page "() => document.querySelector('p').textContent"
     ]
 
 -- | Redirects /redirect to /something, which answers with a body another origin
@@ -888,3 +911,21 @@ sameOriginRedirectCredentialsApp requests request respond =
       respond (responseLBS status302 [(hLocation, "/something")] LBS8.empty)
     _ ->
       corsCredentialsApp requests request respond
+
+-- | Serves /final, the target of the redirect, on its own origin.
+finalPageApp :: Application
+finalPageApp request respond =
+  case pathInfo request of
+    ["final"] ->
+      respond (responseLBS status200 [(hContentType, BS8.pack "text/html")] (LBS8.pack "<!doctype html><title>final</title><p>ok</p>"))
+    _ ->
+      respond (responseLBS status200 [(hContentType, BS8.pack "text/html")] (LBS8.pack "<html></html>"))
+
+-- | Answers /redirect307 with a 307 to the final origin, which keeps the POST method.
+redirect307App :: Int -> Application
+redirect307App finalPort request respond =
+  case pathInfo request of
+    ["redirect307"] ->
+      respond (responseLBS status307 [(hLocation, BS8.pack ("http://127.0.0.1:" <> show finalPort <> "/final"))] LBS8.empty)
+    _ ->
+      respond (responseLBS status200 [] LBS8.empty)
