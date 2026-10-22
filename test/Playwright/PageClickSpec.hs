@@ -116,6 +116,7 @@ import Playwright.Harness
   , withAssets
   , withChromiumPage
   , assertEqual
+  , assertBool
   , assertFailure
   )
 import Test.Tasty
@@ -782,6 +783,14 @@ tests =
           dblclickWith (locate page "button") defaultDblclickOptions {dblclickOptionsTrial = Just True}
           assertEqual "double" False =<< evaluateBool page "() => window['double']"
           assertEqual "result" "Was not clicked" =<< evaluateText page "() => window.result"
+    , testCase "should scroll instantly on retry when scroll-behavior is smooth" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<style>html { scroll-behavior: smooth; } body { margin: 0; } .spacer { height: 2000px; } #header { position: fixed; top: 0; left: 0; right: 0; height: calc(100vh - 50px); background: rgba(0, 0, 0, 0.1); } button { height: 30px; }</style><div id=\"header\"></div><div class=\"spacer\"></div><button onclick=\"window.clicked = true\">Target</button><div class=\"spacer\"></div><script>window.scrolls = []; addEventListener('scroll', () => window.scrolls.push(window.scrollY));</script>"
+          click (locate page "button")
+          assertEqual "clicked" True =<< evaluateBool page "() => !!window.clicked"
+          assertBool "at most two scrolls" . (<= (2 :: Double)) =<< evaluateNumber page "() => window.scrolls.length"
     ]
 
 waitUntilEnabled :: Text -> Text -> Text -> IO ()
