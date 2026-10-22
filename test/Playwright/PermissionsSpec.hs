@@ -107,6 +107,18 @@ tests =
           $ \prefix page -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
             assertEqual "geolocation" "granted" =<< permissionState page "geolocation"
+    , testCase "should grant notifications permission when listed" $
+        withAssets $ \prefix page -> do
+          let
+            empty = urlFromText (prefix <> "/empty.html")
+          _ <- goto page empty defaultGotoOptions
+          grantPermissionsFor (pageContext page) [PermissionName "notifications"] empty
+          assertEqual "state" "granted" =<< permissionState page "notifications"
+    , testCase "should grant permission when listed for all domains" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          grantPermissions (pageContext page) [PermissionName "geolocation"]
+          assertEqual "state" "granted" =<< permissionState page "geolocation"
     ]
 
 permissionState :: Page -> Text -> Playwright Text
