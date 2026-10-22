@@ -26,6 +26,7 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 - page-listeners (JS `removeAllListeners` wait/ignoreErrors)
 
 ## Ported `tests/page` with remaining cases
+- **page-network-post-data (not ported):** "should get post data for file/blob" and "should get post data for navigator.sendBeacon api calls" are `it.fail` on Chromium upstream (the known-broken postData path). They are left out, like the sec-fetch `it.fail` case. The other four cases are in `PageNetworkPostDataSpec`.
 
 - **page-goto:** bad SSL (and after redirects / cross-origin); `networkidle2` invalid option (typed `LoadState` has no such constructor); Node `process` leak-listener tests; raw main-resource buffer (official Chromium fail); error message that includes HTTPS URL. Already ported under a different name: "should fail when exceeding browser context navigation timeout" is "should fail when exceeding default maximum navigation timeout".
 - **page-autowaiting-no-hang:** first official case needs `httpsServer`. In-flight abort uses Warp throwing `ResourceVanished` (Node `socket.destroy()`).
