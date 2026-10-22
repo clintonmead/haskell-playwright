@@ -9,6 +9,9 @@ import Data.Aeson
   ( object
   , (.=)
   )
+import Data.ByteString.Builder
+  ( lazyByteString
+  )
 import Data.ByteString.Lazy qualified as LBS
 import Data.ByteString.Lazy.Char8 qualified as LBS8
 import Data.Maybe
@@ -32,6 +35,7 @@ import Network.Wai
   ( Application
   , pathInfo
   , responseLBS
+  , responseStream
   )
 import Playwright
   ( HeaderName (headerNameToText)
@@ -39,10 +43,15 @@ import Playwright
   , HttpHeader (httpHeaderName, httpHeaderValue)
   , HttpStatus (HttpStatus)
   , Playwright
+  , UrlMatch (UrlMatchGlob)
+  , armResponse
   , defaultGotoOptions
+  , evaluate
   , goto
+  , onRequestFinished
   , requestRedirectedFrom
   , requestResponse
+  , requestUrl
   , responseAllHeaders
   , responseBody
   , responseHeaders
@@ -52,6 +61,7 @@ import Playwright
   , responseStatusText
   , responseText
   , urlFromText
+  , urlToText
   )
 import Playwright.Error
   ( PlaywrightError (ProtocolRpc)
@@ -73,8 +83,23 @@ import Test.Tasty
 import Test.Tasty.HUnit
   ( testCase
   )
+import UnliftIO.Async
+  ( wait
+  , withAsync
+  )
 import UnliftIO.Exception
   ( try
+  )
+import UnliftIO.IORef
+  ( newIORef
+  , readIORef
+  , writeIORef
+  )
+import UnliftIO.MVar
+  ( MVar
+  , newEmptyMVar
+  , putMVar
+  , takeMVar
   )
 
 tests :: TestTree
@@ -205,6 +230,29 @@ tests =
                         assertFailure ("expected ProtocolRpc, got: " <> show err)
                       Right _ ->
                         assertFailure "expected the redirect body request to fail"
+    , testCase "should wait until response completes" $
+        withChromiumPage $ \page -> do
+          hit <- newEmptyMVar
+          release <- newEmptyMVar
+          requestFinished <- newIORef False
+          withLocalApp (streamApp hit release) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            onRequestFinished page $ \request -> do
+              url <- requestUrl request
+              if "/get" `isInfixOf` urlToText url
+                then writeIORef requestFinished True
+                else pure ()
+            takeResponse <- armResponse page (UrlMatchGlob (prefix <> "/get"))
+            withAsync (evaluate page "() => fetch('./get', { method: 'GET' })") $ \fetching -> do
+              takeMVar hit
+              response <- takeResponse
+              assertEqual "status" (HttpStatus 200) =<< responseStatus response
+              assertEqual "requestfinished before the body completes" False =<< readIORef requestFinished
+              withAsync (responseText response) $ \text -> do
+                putMVar release ()
+                assertEqual "body" "hello world!" =<< wait text
+              _ <- wait fetching
+              pure ()
     , testCase "should return text for identity encoding" $
         withChromiumPage $ \page ->
           withLocalApp identityApp $ \prefix -> do
@@ -246,6 +294,31 @@ redirectApp request respond =
   case pathInfo request of
     ["foo.html"] ->
       respond (responseLBS status302 [(hLocation, "/empty.html")] LBS8.empty)
+    ["empty.html"] ->
+      respond (responseLBS status200 [(hContentType, "text/html")] LBS8.empty)
+    _ ->
+      respond (responseLBS status404 [] LBS8.empty)
+
+-- | Streams "hello ", then waits for the test before sending the rest.
+streamApp :: MVar () -> MVar () -> Application
+streamApp hit release request respond =
+  case pathInfo request of
+    ["get"] ->
+      respond
+        ( responseStream
+            status200
+            [(hContentType, "text/plain; charset=utf-8")]
+            ( \write flush -> do
+                write (lazyByteString (LBS8.pack "hello "))
+                flush
+                putMVar hit ()
+                takeMVar release
+                write (lazyByteString (LBS8.pack "wor"))
+                flush
+                write (lazyByteString (LBS8.pack "ld!"))
+                flush
+            )
+        )
     ["empty.html"] ->
       respond (responseLBS status200 [(hContentType, "text/html")] LBS8.empty)
     _ ->
