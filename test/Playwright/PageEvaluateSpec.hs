@@ -12,6 +12,8 @@ import Playwright
   , evaluate
   , evaluateBoolWith
   , evaluateHandleExpression
+  , elementArgument
+  , jsonValue
   , jsonValueNumber
   , urlToText
   , evaluateNumber
@@ -24,20 +26,30 @@ import Playwright
   , numberArgument
   , numbersArgument
   , objectNumberArgument
+  , objectSpecialArgument
   , objectTextArgument
+  , querySelector
+  , selectorFromText
+  , setContent
   , specialArgument
   , textArgument
+  , Playwright
   )
 import Playwright.Harness
   ( assertProtocolContains
+  , requireHandle
   , withAssetPage
   , withChromiumPage
+  , assertBool
   , assertEqual
   , assertFailure
   )
+import Playwright.SerializedArgument
+  ( SerializedArgument
+  )
 import Playwright.SerializedValue
-  ( SerializedPayload (PayloadBigInt, PayloadDate, PayloadObject, PayloadString, PayloadUrl)
-  , SerializedValue (SerializedNode)
+  ( SerializedPayload (PayloadBigInt, PayloadDate, PayloadObject, PayloadSpecial, PayloadString, PayloadUrl)
+  , SerializedValue (SerializedNode, SerializedRef)
   )
 import Test.Tasty
   ( TestTree
@@ -236,5 +248,115 @@ tests =
     , testCase "should evaluate exception" $
         withChromiumPage $ \page ->
           assertProtocolContains "Bar" (evaluate page "() => { throw new Error('Bar'); }")
-
+    , testCase "should roundtrip unserializable values" $
+        withChromiumPage $ \page -> do
+          result <- evaluateWith page "value => value" unserializableFields
+          assertUnserializableFields result
+    , testCase "should roundtrip promise to unserializable values" $
+        withChromiumPage $ \page -> do
+          result <- evaluateWith page "value => Promise.resolve(value)" unserializableFields
+          assertUnserializableFields result
+    , testCase "should accept element handle as an argument" $
+        withChromiumPage $ \page -> do
+          setContent page "<section>42</section>"
+          handle <- requireHandle =<< querySelector page (selectorFromText "section")
+          result <- evaluateTextWith page "e => e.textContent" (elementArgument handle)
+          assertEqual "text" ("42" :: Text) result
+    , testCase "should jsonValue() date" $
+        withChromiumPage $ \page -> do
+          handle <- evaluateHandleExpression page "new Date('2020-02-05T00:00:00.000Z')"
+          result <- jsonValue handle
+          case result of
+            SerializedNode (PayloadDate iso) _ ->
+              assertEqual "date" "2020-02-05T00:00:00.000Z" iso
+            _ ->
+              assertFailure ("expected a date, got " <> show result)
+    , testCase "should jsonValue() url" $
+        withChromiumPage $ \page -> do
+          handle <- evaluateHandleExpression page "new URL('https://example.com/')"
+          result <- jsonValue handle
+          case result of
+            SerializedNode (PayloadUrl url) _ ->
+              assertEqual "url" "https://example.com/" (urlToText url)
+            _ ->
+              assertFailure ("expected a url, got " <> show result)
+    , testCase "should evaluate date nested in an object" $
+        withChromiumPage $ \page -> do
+          result <- evaluate page "() => ({ d: new Date('2020-02-05T00:00:00.000Z') })"
+          case result of
+            SerializedNode (PayloadObject fields) _ ->
+              case lookup ("d" :: Text) fields of
+                Just (SerializedNode (PayloadDate iso) _) ->
+                  assertEqual "date" "2020-02-05T00:00:00.000Z" iso
+                _ ->
+                  assertFailure "missing date"
+            _ ->
+              assertFailure "expected object"
+    , testCase "should evaluate url nested in an object" $
+        withChromiumPage $ \page -> do
+          result <- evaluate page "() => ({ u: new URL('https://example.com/') })"
+          case result of
+            SerializedNode (PayloadObject fields) _ ->
+              case lookup ("u" :: Text) fields of
+                Just (SerializedNode (PayloadUrl url) _) ->
+                  assertEqual "url" "https://example.com/" (urlToText url)
+                _ ->
+                  assertFailure "missing url"
+            _ ->
+              assertFailure "expected object"
+    , testCase "should not use toJSON when evaluating" $
+        withChromiumPage $ \page -> do
+          result <- evaluate page "() => ({ toJSON: () => 'string', data: 'data' })"
+          case result of
+            SerializedNode (PayloadObject fields) _ -> do
+              assertEqual "data" (Just ("data" :: Text)) (textFieldOf "data" fields)
+              assertEqual "toJSON" Nothing (textFieldOf "toJSON" fields)
+            _ ->
+              assertFailure "expected object"
+    , testCase "should work for circular object" $
+        withChromiumPage $ \page -> do
+          result <- evaluate page "() => { const a = {}; a.b = a; return a; }"
+          assertBool "circular" (isSelfCycle result)
     ]
+
+-- | True when the value is an object whose @b@ field refers back to the object
+-- itself, which is how the driver encodes @const a = {}; a.b = a@.
+isSelfCycle :: SerializedValue -> Bool
+isSelfCycle value =
+  case value of
+    SerializedNode (PayloadObject [("b", SerializedRef target)]) (Just self) ->
+      target == self
+    _ ->
+      False
+
+unserializableFields :: SerializedArgument
+unserializableFields =
+  objectSpecialArgument
+    [ ("infinity", SpecialInfinity)
+    , ("nInfinity", SpecialNegInfinity)
+    , ("nZero", SpecialNegZero)
+    , ("nan", SpecialNaN)
+    ]
+
+assertUnserializableFields :: SerializedValue -> Playwright ()
+assertUnserializableFields result =
+  case result of
+    SerializedNode (PayloadObject fields) _ -> do
+      assertEqual "infinity" (Just SpecialInfinity) (specialFieldOf "infinity" fields)
+      assertEqual "nInfinity" (Just SpecialNegInfinity) (specialFieldOf "nInfinity" fields)
+      assertEqual "nZero" (Just SpecialNegZero) (specialFieldOf "nZero" fields)
+      assertEqual "nan" (Just SpecialNaN) (specialFieldOf "nan" fields)
+    _ ->
+      assertFailure "expected object"
+
+specialFieldOf :: Text -> [(Text, SerializedValue)] -> Maybe SpecialJsValue
+specialFieldOf name fields =
+  case lookup name fields of
+    Just (SerializedNode (PayloadSpecial special) _) -> Just special
+    _ -> Nothing
+
+textFieldOf :: Text -> [(Text, SerializedValue)] -> Maybe Text
+textFieldOf name fields =
+  case lookup name fields of
+    Just (SerializedNode (PayloadString text) _) -> Just text
+    _ -> Nothing
