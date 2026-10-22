@@ -120,7 +120,7 @@ Skipped `tests/page` specs that depend on `expect` (no Haskell spec, not started
 - **page-event-crash:** `chrome://crash` `goto` is fired in the background; awaiting it can hang the driver.
 - **downloads:** createReadStream / PDF / `artifactsDir`. "should be able to download a inline PDF file via navigation" is ported.
 - **download (partial):** "should download successfully when routing" is ported. "should expose stream" needs a Node stream from `download.createReadStream()`, which has no Haskell equivalent, so it is not applicable.
-- **page-pdf:** remaining `PdfOptions` (format, margin, …).
+- **page-pdf:** done for tests. Upstream `tests/library/pdf.spec.ts` has two cases, both ported in `PagePdfSpec.hs`. No upstream test passes `format`, `margin` or other options, so the Haskell `PdfOptions` (outline and tagged only) is a missing API surface, not a missing test.
 - **page-event-network:** skip "should resolve responses after a navigation". Upstream marks it `it.fixme(browserName === 'chromium')`.
 - **page-emulate-media:** skip "should throw in case of bad media argument" and "should throw in case of bad colorScheme argument". `emulateMedia` takes the `MediaType` and `ColorScheme` sum types, so an unknown value cannot be built. Upstream asserts on the server's `expected one of` text.
 - **page-drop:** the library has no path form for files. "should drop a file by local path" is ported by reading the file in the test and dropping its bytes under the same name. A `dropOnto` path variant would match upstream.

@@ -522,5 +522,5 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 
 **Correction:** the earlier follow-up below, "the driver does not branch on frames", checked the driver for a problem the page did not have. The driver is not implicated and the Haskell `frameSend` path is fine.
 
-**Follow-up, not changed in this commit:** `test/Playwright/BrowserContextExposeFunctionSpec.hs:173` (`cspEmptyApp`) has the same malformed header, `default-src \"self\"`. Its `should work with CSP` case does not check inline blocking, so it still passes, but the header does not match what the name says. Fix it by switching to `'self'` and rerunning the `browsercontext-expose-function` group.
+**Follow-up, done:** `test/Playwright/BrowserContextExposeFunctionSpec.hs:173` (`cspEmptyApp`) had the same malformed header, `default-src \"self\"`. It now sends `default-src 'self'`. The `browsercontext-expose-function` group passes 7 of 7 with the fix. Its `should work with CSP` case still does not check inline blocking, which is unchanged.
 

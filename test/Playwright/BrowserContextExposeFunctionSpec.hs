@@ -170,7 +170,7 @@ cspEmptyApp _ respond =
   respond
     ( responseLBS
         status200
-        [ ("Content-Security-Policy", "default-src \"self\"")
+        [ ("Content-Security-Policy", "default-src 'self'")
         , (hContentType, "text/html")
         ]
         ""
