@@ -130,3 +130,11 @@ Decisions made without waiting for an answer. Each entry gives the question, the
 **Guess taken:** Yes. It is ported with two servers, one on localhost for the redirect and one on 127.0.0.1 for the final page, and it passes on the new driver.
 
 **To change:** Delete the test "continue should pass on 307 cross-origin redirect" if the driver regresses.
+
+## Context pageload and pageclose attach to existing pages
+
+**Question:** Upstream's context `pageload` and `pageclose` events fire for pages that already exist when the listener is added. The binding's `onContextPage` only reports pages created later. Should the new listeners cover existing pages too?
+
+**Guess taken:** Yes. `onContextPageLoad` and `onContextPageClose` in `Playwright.ContextEvents` first attach to `contextPages`, then to new pages.
+
+**To change:** Drop the existing-pages loop in `Playwright/ContextEvents.hs` if a caller needs only pages created after the listener.
