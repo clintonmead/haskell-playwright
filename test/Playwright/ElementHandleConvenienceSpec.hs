@@ -29,6 +29,8 @@ import Playwright
   , selectOption
   , selectorFromText
   , setContent
+  , textContent
+  , textContentHandle
   )
 import Playwright.Harness
   ( assertProtocolContains
@@ -132,4 +134,9 @@ tests =
           button2 <- requireHandle =<< querySelector page (selectorFromText ":text(\"button2\")")
           assertEqual "button2 enabled" True =<< isEnabledHandle button2
           assertEqual "button2 disabled" False =<< isDisabledHandle button2
+    , testCase "textContent should work" $
+        withAssetPage "dom.html" $ \page -> do
+          handle <- requireHandle =<< querySelector page (selectorFromText "#inner")
+          assertEqual "handle" (Just "Text,\nmore text") =<< textContentHandle handle
+          assertEqual "locator" (Just "Text,\nmore text") =<< textContent (locate page "#inner")
     ]
