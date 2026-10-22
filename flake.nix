@@ -50,6 +50,12 @@
         in
         {
           default = pkgs.mkShell {
+            # With WAYLAND_DISPLAY set, the browser's ANGLE asks for a Wayland
+            # surface that SwiftShader does not provide, so WebGL is disabled.
+            # The tests run headless and do not need Wayland.
+            shellHook = ''
+              unset WAYLAND_DISPLAY
+            '';
             packages = [
               hpkgs.ghc
               cabalWrapped
