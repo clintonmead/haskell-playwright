@@ -16,6 +16,7 @@ import Playwright
   , clickWith
   , defaultClickOptions
   , milliseconds
+  , setContent
   , defaultFulfillOptions
   , defaultGotoOptions
   , frameLocator
@@ -122,6 +123,14 @@ tests =
           withAsync
             (liftIO (threadDelay 300000) >> goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions)
             $ \_ -> click button
+    , testCase "should non work for non-frame" $
+        withAssets $ \prefix page -> do
+          routeIframe page
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          _ <- setContent page "<div></div>"
+          let
+            button = childLocator (frameLocator page (selectorFromText "div")) (selectorFromText "button")
+          assertProtocolContains "<iframe> was expected" (waitFor button WaitForVisible)
     ]
 
 routeIframe :: Page -> Playwright ()
