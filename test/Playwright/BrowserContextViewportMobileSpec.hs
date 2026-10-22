@@ -110,6 +110,19 @@ tests =
             assertEqual "same origin" (90 :: Double) =<< evaluateNumber page "() => window.orientation"
             _ <- goto page (urlFromText (replace "127.0.0.1" "localhost" prefix <> "/mobile.html")) defaultGotoOptions
             assertEqual "cross origin" (90 :: Double) =<< evaluateNumber page "() => window.orientation"
+    , testCase "should preserve screen.orientation.type override after navigation" $
+        withAssetsWith
+          defaultNewContextOptions
+            { newContextViewport = Just (ViewportSize (ViewportWidth 300) (ViewportHeight 400))
+            , newContextIsMobile = Just True
+            }
+          $ \prefix page -> do
+            _ <- goto page (urlFromText (prefix <> "/mobile.html")) defaultGotoOptions
+            assertEqual "same origin" "portrait-primary"
+              =<< evaluateText page "() => window.screen.orientation.type"
+            _ <- goto page (urlFromText (replace "127.0.0.1" "localhost" prefix <> "/mobile.html")) defaultGotoOptions
+            assertEqual "cross origin" "portrait-primary"
+              =<< evaluateText page "() => window.screen.orientation.type"
     , testCase "should fire orientationchange event" $
         withAssetsWith
           defaultNewContextOptions
