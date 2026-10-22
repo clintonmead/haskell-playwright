@@ -5,6 +5,7 @@ module Playwright.FrameEvaluateSpec
 import Data.Text qualified as Text
 import Data.Text
   ( isInfixOf
+  , replace
   )
 import UnliftIO.Exception
   ( try
@@ -121,6 +122,16 @@ tests =
               assertFailure ("expected ProtocolRpc, got: " <> show err)
             Right _ ->
               assertFailure "expected the cross-frame handle to be rejected"
+    , testCase "should execute after cross-site navigation" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          first <- evaluateOnFrameText (mainFrame page) "() => window.location.href"
+          assertBool "first page" (prefix `isInfixOf` first)
+          let
+            cross = replace "127.0.0.1" "localhost" prefix
+          _ <- goto page (urlFromText (cross <> "/empty.html")) defaultGotoOptions
+          second <- evaluateOnFrameText (mainFrame page) "() => window.location.href"
+          assertBool "cross-site page" (cross `isInfixOf` second)
     , testCase "should allow cross-frame element handles" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/frames/one-frame.html")) defaultGotoOptions
