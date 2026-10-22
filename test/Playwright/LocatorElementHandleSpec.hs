@@ -51,4 +51,20 @@ tests =
           setContent page "<html><body><span>A</span><br/><span>B</span></body></html>"
           handles <- elementHandles (childLocator (locate page "html") (selectorFromText "div"))
           assertEqual "empty" 0 (length handles)
+    , testCase "xpath should query existing element" $
+        withChromiumPage $ \page -> do
+          setContent page "<html><body><div class=\"second\"><div class=\"inner\">A</div></div></body></html>"
+          let
+            html = locate page "html"
+            second = childLocator html (selectorFromText "xpath=./body/div[contains(@class, 'second')]")
+            inner = childLocator second (selectorFromText "xpath=./div[contains(@class, 'inner')]")
+          handle <- requireHandle =<< elementHandle inner
+          assertEqual "text" "A" =<< evaluateTextWith page "e => e.textContent" (elementArgument handle)
+    , testCase "xpath should return null for non-existing element" $
+        withChromiumPage $ \page -> do
+          setContent page "<html><body><div class=\"second\"><div class=\"inner\">B</div></div></body></html>"
+          let
+            html = locate page "html"
+          handles <- elementHandles (childLocator html (selectorFromText "xpath=/div[contains(@class, 'third')]"))
+          assertEqual "none" (0 :: Int) (length handles)
     ]
