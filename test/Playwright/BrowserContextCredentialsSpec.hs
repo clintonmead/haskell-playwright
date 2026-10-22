@@ -4,6 +4,9 @@ module Playwright.BrowserContextCredentialsSpec
 
 import Data.ByteString.Char8 qualified as BS8
 import Data.ByteString.Lazy.Char8 qualified as LBS8
+import Data.Maybe
+  ( fromMaybe
+  )
 import Data.Text
   ( Text
   , pack
@@ -158,7 +161,37 @@ tests =
               response <-
                 goto page (urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/empty.html")) defaultGotoOptions
               assertEqual "status" 401 =<< statusCode response
+    , testCase "should not override Authorization header set by the page" $
+        withApplication (pure (echoAuthApp "Basic dXNlcjpwYXNz")) $ \port ->
+          withChromiumContextWith
+            defaultNewContextOptions {newContextHttpCredentials = Just validCredentials}
+            $ \_ page -> do
+              response <-
+                goto
+                  page
+                  (urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/empty.html"))
+                  defaultGotoOptions
+              assertEqual "status" 200 =<< statusCode response
+              assertEqual "page header" "Bearer my-own-app-token"
+                =<< evaluateText
+                  page
+                  "async () => { const response = await fetch('/echo-auth', { headers: { 'Authorization': 'Bearer my-own-app-token' } }); return await response.text(); }"
     ]
+
+-- | Answers /echo-auth with the Authorization header the request sent, and
+-- applies the basic check everywhere else.
+echoAuthApp :: BS8.ByteString -> Application
+echoAuthApp expected req respond =
+  case Wai.pathInfo req of
+    ["echo-auth"] ->
+      respond
+        ( responseLBS
+            status200
+            [(hContentType, BS8.pack "text/plain")]
+            (LBS8.fromStrict (fromMaybe (BS8.pack "<none>") (lookup hAuthorization (Wai.requestHeaders req))))
+        )
+    _ ->
+      basicAuthApp expected req respond
 
 validCredentials :: HttpCredentials
 validCredentials =
