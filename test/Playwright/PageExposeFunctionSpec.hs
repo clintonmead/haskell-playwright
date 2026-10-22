@@ -59,6 +59,7 @@ import Playwright.Harness
   )
 import Playwright.SerializedArgument
   ( SerializedArgument
+  , objectNumberArgument
   )
 import Playwright.SerializedValue
   ( SerializedPayload (PayloadArray, PayloadNumber, PayloadObject, PayloadString)
@@ -186,6 +187,19 @@ tests =
           _ <- evaluate page "() => { const a = {}; a.b = a; window.log(a); }"
           args <- liftIO (timeout 10000000 (takeMVar captured))
           assertBool "cycle" (maybe False isCycle args)
+    , testCase "should work with complex objects" $
+        withChromiumPage $ \page -> do
+          _ <- exposeFunction page (BindingName "complexObject") sumX
+          assertEqual "x" (7 :: Double)
+            =<< evaluateNumber page "async () => (await window.complexObject({ x: 5 }, { x: 2 })).x"
+    , testCase "should fail with busted Array.prototype.toJSON" $
+        withChromiumPage $ \page -> do
+          _ <- evaluate page "() => { Array.prototype.toJSON = () => '\"[]\"'; }"
+          _ <- exposeFunction page (BindingName "add") multiply
+          assertProtocolContains
+            "serializedArgs is not an array"
+            (evaluateNumber page "async () => window.add(5, 6)")
+          assertEqual "toJSON" "\"[]\"" =<< evaluateText page "() => [].toJSON()"
     ]
 
 -- | The names of the three aliased objects, from the one array argument that
@@ -207,6 +221,15 @@ isCycle args =
       target == self
     _ ->
       False
+
+-- | Adds the @x@ fields of two object arguments and returns an object with the sum.
+sumX :: [SerializedValue] -> Playwright SerializedArgument
+sumX args =
+  case args of
+    [SerializedNode (PayloadObject [("x", SerializedNode (PayloadNumber left) _)]) _, SerializedNode (PayloadObject [("x", SerializedNode (PayloadNumber right) _)]) _] ->
+      pure (objectNumberArgument [("x", left + right)])
+    _ ->
+      throwIO (EvaluateUnexpected (SerializedNode (PayloadNumber 0) Nothing))
 
 constant42 :: [SerializedValue] -> Playwright SerializedArgument
 constant42 _ = pure (numberArgument 42)
