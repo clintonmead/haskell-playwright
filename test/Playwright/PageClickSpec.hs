@@ -791,6 +791,27 @@ tests =
           click (locate page "button")
           assertEqual "clicked" True =<< evaluateBool page "() => !!window.clicked"
           assertBool "at most two scrolls" . (<= (2 :: Double)) =<< evaluateNumber page "() => window.scrolls.length"
+    , testCase "should timeout waiting for button to be enabled" $
+        withChromiumPage $ \page -> do
+          setContent page "<button onclick=\"javascript:window.__CLICKED=true;\" disabled><span>Click target</span></button>"
+          assertProtocolContains
+            "element is not enabled"
+            (clickWith (locate page "text=Click target") defaultClickOptions {clickOptionsTimeout = milliseconds 3000})
+          assertEqual "not clicked" "undefined" =<< evaluateText page "() => String(window.__CLICKED)"
+    , testCase "should timeout waiting for display:none to be gone" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/input/button.html")) defaultGotoOptions
+          _ <- evaluate page "() => { document.querySelector('button').style.display = 'none'; }"
+          assertProtocolContains
+            "element is not visible"
+            (clickWith (locate page "button") defaultClickOptions {clickOptionsTimeout = milliseconds 5000})
+    , testCase "should timeout waiting for visibility:hidden to be gone" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/input/button.html")) defaultGotoOptions
+          _ <- evaluate page "() => { document.querySelector('button').style.visibility = 'hidden'; }"
+          assertProtocolContains
+            "element is not visible"
+            (clickWith (locate page "button") defaultClickOptions {clickOptionsTimeout = milliseconds 5000})
     ]
 
 waitUntilEnabled :: Text -> Text -> Text -> IO ()
