@@ -10,11 +10,14 @@ import Playwright
   , evaluateOnLocatorNumber
   , evaluateOnLocatorText
   , evaluateTexts
+  , defaultGotoOptions
+  , goto
   , setContent
   , setInputFiles
   , querySelector
   , selectorFromText
   , setInputFilesHandle
+  , urlFromText
   )
 import Playwright.Harness
   ( locate
@@ -22,8 +25,17 @@ import Playwright.Harness
   , requireHandle
   , withAssetPage
   , withChromiumPage
+  , withLocalApp
   , assertEqual
   , locate
+  )
+import Network.HTTP.Types
+  ( hContentType
+  , status200
+  )
+import Network.Wai
+  ( Application
+  , responseLBS
   )
 import Test.Tasty
   ( TestTree
@@ -83,5 +95,26 @@ tests =
             [InputFile (InputFileName "test.txt") "this is a test"]
           assertEqual "count" (1 :: Double) =<< evaluateOnLocatorNumber (locate page "input") "input => input.files.length"
           assertEqual "name" "test.txt" =<< evaluateOnLocatorText (locate page "input") "input => input.files[0].name"
-
+    , testCase "should work with CSP" $
+        withChromiumPage $ \page ->
+          withLocalApp cspEmptyApp $ \base -> do
+            _ <- goto page (urlFromText (base <> "/empty.html")) defaultGotoOptions
+            setContent page "<input type=file>"
+            bytes <- readTestAsset "file-to-upload.txt"
+            setInputFiles (locate page "input") [InputFile (InputFileName "file-to-upload.txt") bytes]
+            assertEqual "count" (1 :: Double) =<< evaluateOnLocatorNumber (locate page "input") "input => input.files.length"
+            assertEqual "name" "file-to-upload.txt" =<< evaluateOnLocatorText (locate page "input") "input => input.files[0].name"
     ]
+
+-- | Serves an empty page whose Content-Security-Policy forbids every resource
+-- type, the same header the upstream "should work with CSP" case sets.
+cspEmptyApp :: Application
+cspEmptyApp _ respond =
+  respond
+    ( responseLBS
+        status200
+        [ ("Content-Security-Policy", "default-src 'none'")
+        , (hContentType, "text/html")
+        ]
+        ""
+    )
