@@ -50,6 +50,7 @@ import Playwright
   , contentFrameHandle
   , cssPixelFromInt
   , dblclick
+  , dblclickWith
   , defaultClickOptions
   , defaultGetByRoleOptions
   , defaultGotoOptions
@@ -85,6 +86,10 @@ import Playwright
   , waitForConsoleWhere
   , waitForLoadState
   , waitForPopup
+  )
+import Playwright.DblclickOptions
+  ( DblclickOptions (dblclickOptionsTrial)
+  , defaultDblclickOptions
   )
 import Playwright.HoverOptions
   ( HoverOptions (hoverOptionsScroll, hoverOptionsTimeout)
@@ -767,6 +772,16 @@ tests =
             (hoverWith (locate page "div >> text=hover me") defaultHoverOptions {hoverOptionsScroll = Just ScrollNone, hoverOptionsTimeout = milliseconds 2000})
           assertEqual "not hovered" False =<< evaluateBool page "() => !!window._hovered"
           assertEqual "not scrolled" (0 :: Double) =<< evaluateNumber page "() => window.scrollY"
+    , testCase "trial run should not double click" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/input/button.html")) defaultGotoOptions
+          _ <-
+            evaluate
+              page
+              "() => { window['double'] = false; document.querySelector('button').addEventListener('dblclick', () => { window['double'] = true; }); }"
+          dblclickWith (locate page "button") defaultDblclickOptions {dblclickOptionsTrial = Just True}
+          assertEqual "double" False =<< evaluateBool page "() => window['double']"
+          assertEqual "result" "Was not clicked" =<< evaluateText page "() => window.result"
     ]
 
 waitUntilEnabled :: Text -> Text -> Text -> IO ()

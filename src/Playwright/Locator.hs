@@ -13,6 +13,7 @@ module Playwright.Locator
   , clickWith
   , describeLocator
   , dblclick
+  , dblclickWith
   , dispatchEvent
   , dispatchEventWith
   , dragAndDrop
@@ -159,6 +160,7 @@ import Playwright.Frame.Action
   , clickFrame
   , clickFrameWith
   , dblclickFrame
+  , dblclickFrameWith
   , dispatchEventFrame
   , dispatchEventFrameWith
   , dragAndDropFrame
@@ -238,6 +240,9 @@ import Playwright.Selector
   )
 import Playwright.Connection
   ( lookupTimeoutDefaults
+  )
+import Playwright.DblclickOptions
+  ( DblclickOptions (dblclickOptionsTimeout)
   )
 import Playwright.HoverOptions
   ( HoverOptions (hoverOptionsTimeout)
@@ -443,6 +448,16 @@ clickWith loc opts = do
 dblclick :: Locator -> Playwright ()
 dblclick loc =
   withActionTimeout loc (dblclickFrame (locatorFrame loc) (locatorSelector loc))
+
+dblclickWith :: Locator -> DblclickOptions -> Playwright ()
+dblclickWith loc opts = do
+  timeout <-
+    case dblclickOptionsTimeout opts of
+      Just value ->
+        pure value
+      Nothing ->
+        locatorActionTimeout loc
+  dblclickFrameWith (locatorFrame loc) (locatorSelector loc) timeout opts
 
 dispatchEvent :: Locator -> DomEventType -> Playwright ()
 dispatchEvent loc eventType =

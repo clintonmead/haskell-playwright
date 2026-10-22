@@ -5,6 +5,7 @@ module Playwright.Frame.Action
   , clickFrameStrict
   , clickFrameWith
   , dblclickFrame
+  , dblclickFrameWith
   , dispatchEventFrame
   , dispatchEventFrameWith
   , fillFrame
@@ -102,7 +103,9 @@ import Playwright.Protocol
   , FrameClickParamsModifiers (FrameClickParamsModifiersAlt, FrameClickParamsModifiersControl, FrameClickParamsModifiersControlOrMeta, FrameClickParamsModifiersMeta, FrameClickParamsModifiersShift)
   , FrameClickParamsScroll (FrameClickParamsScrollAuto, FrameClickParamsScrollNone)
   , FrameClickResult
-  , FrameDblclickParams (frameDblclickParamsStrict)
+  , FrameDblclickParams (frameDblclickParamsForce, frameDblclickParamsModifiers, frameDblclickParamsPosition, frameDblclickParamsScroll, frameDblclickParamsStrict, frameDblclickParamsTrial)
+  , FrameDblclickParamsModifiers (FrameDblclickParamsModifiersAlt, FrameDblclickParamsModifiersControl, FrameDblclickParamsModifiersControlOrMeta, FrameDblclickParamsModifiersMeta, FrameDblclickParamsModifiersShift)
+  , FrameDblclickParamsScroll (FrameDblclickParamsScrollAuto, FrameDblclickParamsScrollNone)
   , FrameDblclickResult
   , FrameDispatchEventParams (frameDispatchEventParamsStrict)
   , FrameDispatchEventResult
@@ -178,6 +181,10 @@ import Playwright.SelectOptionOptions
   )
 import Playwright.Selector
   ( Selector
+  )
+import Playwright.DblclickOptions
+  ( DblclickOptions (dblclickOptionsForce, dblclickOptionsModifiers, dblclickOptionsPosition, dblclickOptionsScroll, dblclickOptionsTrial)
+  , defaultDblclickOptions
   )
 import Playwright.HoverOptions
   ( HoverOptions (hoverOptionsForce, hoverOptionsModifiers, hoverOptionsPosition, hoverOptionsScroll, hoverOptionsTrial)
@@ -265,13 +272,44 @@ toProtocolPoint point =
 
 dblclickFrame :: Frame -> Selector -> Timeout -> Playwright ()
 dblclickFrame frame selector timeout =
+  dblclickFrameWith frame selector timeout defaultDblclickOptions
+
+dblclickFrameWith :: Frame -> Selector -> Timeout -> DblclickOptions -> Playwright ()
+dblclickFrameWith frame selector timeout opts =
   frameSendTimed_ @FrameDblclickResult
     frame
     "dblclick"
     timeout
     (mkFrameDblclickParams selector)
       { frameDblclickParamsStrict = Just True
+      , frameDblclickParamsForce = dblclickOptionsForce opts
+      , frameDblclickParamsModifiers = fmap (fmap toFrameDblclickModifier) (dblclickOptionsModifiers opts)
+      , frameDblclickParamsPosition = fmap toProtocolPoint (dblclickOptionsPosition opts)
+      , frameDblclickParamsScroll = fmap toFrameDblclickScroll (dblclickOptionsScroll opts)
+      , frameDblclickParamsTrial = dblclickOptionsTrial opts
       }
+
+toFrameDblclickScroll :: ScrollOption -> FrameDblclickParamsScroll
+toFrameDblclickScroll scroll =
+  case scroll of
+    ScrollAuto ->
+      FrameDblclickParamsScrollAuto
+    ScrollNone ->
+      FrameDblclickParamsScrollNone
+
+toFrameDblclickModifier :: KeyboardModifier -> FrameDblclickParamsModifiers
+toFrameDblclickModifier modifier =
+  case modifier of
+    KeyboardModifierAlt ->
+      FrameDblclickParamsModifiersAlt
+    KeyboardModifierControl ->
+      FrameDblclickParamsModifiersControl
+    KeyboardModifierControlOrMeta ->
+      FrameDblclickParamsModifiersControlOrMeta
+    KeyboardModifierMeta ->
+      FrameDblclickParamsModifiersMeta
+    KeyboardModifierShift ->
+      FrameDblclickParamsModifiersShift
 
 dispatchEventFrame :: Frame -> Selector -> DomEventType -> Timeout -> Playwright ()
 dispatchEventFrame frame selector eventType timeout =
