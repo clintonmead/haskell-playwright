@@ -17,6 +17,7 @@ import Playwright
   , defaultClickOptions
   , milliseconds
   , setContent
+  , evaluate
   , defaultFulfillOptions
   , defaultGotoOptions
   , frameLocator
@@ -131,6 +132,29 @@ tests =
           let
             button = childLocator (frameLocator page (selectorFromText "div")) (selectorFromText "button")
           assertProtocolContains "<iframe> was expected" (waitFor button WaitForVisible)
+    , testCase "should click in lazy iframe" $
+        withAssets $ \prefix page -> do
+          route page (UrlMatchGlob "**/iframe.html") $ \handled ->
+            fulfillRoute
+              handled
+              defaultFulfillOptions
+                { fulfillContentType = Just (ContentType "text/html")
+                , fulfillBody = Just (FulfillText "<html><button>Hello iframe</button></html>")
+                }
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let
+            button = childLocator (frameLocator page (selectorFromText "iframe")) (selectorFromText "button")
+          withAsync
+            ( do
+                liftIO (threadDelay 500000)
+                _ <- evaluate page "() => { const iframe = document.createElement('iframe'); document.body.appendChild(iframe); }"
+                liftIO (threadDelay 500000)
+                _ <- evaluate page "() => { document.querySelector('iframe').src = 'iframe.html'; }"
+                pure ()
+            )
+            $ \_ -> do
+              click button
+              assertEqual "text" "Hello iframe" =<< innerText button
     ]
 
 routeIframe :: Page -> Playwright ()
