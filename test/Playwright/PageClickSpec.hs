@@ -812,6 +812,37 @@ tests =
           assertProtocolContains
             "element is not visible"
             (clickWith (locate page "button") defaultClickOptions {clickOptionsTimeout = milliseconds 5000})
+    , testCase "should timeout waiting for hit target" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/input/button.html")) defaultGotoOptions
+          button <- requireHandle =<< querySelector page (selectorFromText "button")
+          _ <-
+            evaluate
+              page
+              "() => { document.body.style.position = 'relative'; const blocker = document.createElement('div'); blocker.id = 'blocker'; blocker.style.position = 'absolute'; blocker.style.width = '400px'; blocker.style.height = '20px'; blocker.style.left = '0'; blocker.style.top = '0'; document.body.appendChild(blocker); }"
+          assertProtocolContains
+            "<div id=\"blocker\"></div> intercepts pointer events"
+            (clickHandleWith button defaultClickOptions {clickOptionsTimeout = milliseconds 5000})
+    , testCase "should still click when force but hit target is obscured" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/input/button.html")) defaultGotoOptions
+          button <- requireHandle =<< querySelector page (selectorFromText "button")
+          _ <-
+            evaluate
+              page
+              "() => { document.body.style.position = 'relative'; const blocker = document.createElement('div'); blocker.id = 'blocker'; blocker.style.position = 'absolute'; blocker.style.width = '400px'; blocker.style.height = '200px'; blocker.style.left = '0'; blocker.style.top = '0'; document.body.appendChild(blocker); }"
+          clickHandleWith button defaultClickOptions {clickOptionsForce = Just True}
+    , testCase "should report wrong hit target subtree" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/input/button.html")) defaultGotoOptions
+          button <- requireHandle =<< querySelector page (selectorFromText "button")
+          _ <-
+            evaluate
+              page
+              "() => { document.body.style.position = 'relative'; const blocker = document.createElement('div'); blocker.id = 'blocker'; blocker.style.position = 'absolute'; blocker.style.width = '400px'; blocker.style.height = '20px'; blocker.style.left = '0'; blocker.style.top = '0'; document.body.appendChild(blocker); const inner = document.createElement('div'); inner.id = 'inner'; inner.style.position = 'absolute'; inner.style.left = '0'; inner.style.top = '0'; inner.style.right = '0'; inner.style.bottom = '0'; blocker.appendChild(inner); }"
+          assertProtocolContains
+            "<div id=\"inner\"></div> from <div id=\"blocker\">…</div> subtree intercepts pointer events"
+            (clickHandleWith button defaultClickOptions {clickOptionsTimeout = milliseconds 5000})
     ]
 
 waitUntilEnabled :: Text -> Text -> Text -> IO ()
