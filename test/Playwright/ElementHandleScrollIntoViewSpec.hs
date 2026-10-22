@@ -8,8 +8,27 @@ import Control.Monad
 import Data.Text
   ( pack
   )
+import Control.Concurrent
+  ( threadDelay
+  )
+import Control.Monad.IO.Class
+  ( liftIO
+  )
+import Data.Maybe
+  ( isNothing
+  )
+import Data.Text
+  ( Text
+  )
+import UnliftIO.Async
+  ( poll
+  , wait
+  , withAsync
+  )
 import Playwright
-  ( evaluate
+  ( ElementHandle
+  , Playwright
+  , evaluate
   , evaluateOnElement
   , evaluateOnElementNumber
   , milliseconds
@@ -82,4 +101,20 @@ tests =
               assertFailure "milliseconds 3000"
             Just timeout ->
               assertProtocolContains "Timeout 3000ms exceeded" (scrollIntoViewIfNeededWith handle timeout)
+    , testCase "should wait for display:none to become visible" $
+        withChromiumPage $ \page -> do
+          setContent page "<div style=\"display:none\">Hello</div>"
+          handle <- requireHandle =<< querySelector page (selectorFromText "div")
+          waitWhileHidden handle "div => { div.style.display = 'block'; return true; }"
     ]
+
+-- | Scrolls the element into view, checks that the scroll is still pending
+-- after a second, then runs the unblocking script and waits for the scroll.
+waitWhileHidden :: ElementHandle -> Text -> Playwright ()
+waitWhileHidden handle unblock =
+  withAsync (scrollIntoViewIfNeeded handle) $ \pending -> do
+    liftIO (threadDelay 1000000)
+    finished <- poll pending
+    assertBool "still waiting" (isNothing finished)
+    _ <- evaluateOnElement handle unblock
+    wait pending
