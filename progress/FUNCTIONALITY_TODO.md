@@ -113,7 +113,7 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 ## `tests/library` with no or thin coverage
 
 - **browsercontext-network-event:** "should not fire events for favicon or favicon redirects" is skipped upstream for headless Chromium (`headless && browserName !== 'firefox'`), so it does not apply to this suite.
-- **tap:** the binding has `tap` and `tapHandle` with no options, so the `modifiers` and `trial` cases are open (`tapWith` with `TapOptions` is needed). The touch-point and touchend-canceled cases are not examined yet.
+- **tap:** blocked on the driver pin. The pinned driver's tap params take only a timeout (`mkElementHandleTapParams`), so `modifiers`, `force` and `trial` cannot be sent until the pin moves to a driver with those params. The modifiers and trial cases stay open. The touch-point and touchend-canceled cases are not examined yet.
 - **browsercontext-basic:** skip "default user agent". It calls `browser._channel.defaultUserAgentForTest()`, a test-only channel method, not public API.
 - **popup:** skip "should not dispatch binding on a closed page". It reads `source.page.isClosed()` inside an exposed binding callback, and the Haskell binding callback has no source page.
 - **browsercontext-set-extra-http-headers:** "should throw for non-string header values" does not apply. Header values are typed as `Text`, so a non-string cannot be passed.
