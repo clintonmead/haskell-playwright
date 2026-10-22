@@ -101,6 +101,12 @@ tests =
           $ \prefix page -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
             assertEqual "state" "granted" =<< permissionState page "geolocation"
+    , testCase "should grant permission when creating context" $
+        withAssetsWith
+          defaultNewContextOptions {newContextPermissions = Just [PermissionName "geolocation"]}
+          $ \prefix page -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            assertEqual "geolocation" "granted" =<< permissionState page "geolocation"
     ]
 
 permissionState :: Page -> Text -> Playwright Text
