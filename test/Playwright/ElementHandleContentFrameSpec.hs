@@ -7,6 +7,7 @@ import Playwright
   , contentFrameHandle
   , defaultGotoOptions
   , evaluateHandle
+  , evaluateHandleOnFrame
   , frames
   , framesEqual
   , goto
@@ -17,7 +18,8 @@ import Playwright
   , waitForFunction
   )
 import Playwright.Harness
-  ( requireHandle
+  ( attachFrame
+  , requireHandle
   , withAssets
   , assertEqual
   , assertFailure
@@ -52,6 +54,14 @@ tests =
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           setContent page ("<iframe id=frame1 src=\"" <> prefix <> "/empty.html\"></iframe>")
           jsHandle <- evaluateHandle page "() => document.body"
+          element <- requireHandle =<< asElement jsHandle
+          frame <- contentFrameHandle element
+          assertEqual "null" True (maybe True (const False) frame)
+    , testCase "should return null for document.documentElement" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          child <- attachFrame page "frame1" (prefix <> "/empty.html")
+          jsHandle <- evaluateHandleOnFrame child "() => document.documentElement"
           element <- requireHandle =<< asElement jsHandle
           frame <- contentFrameHandle element
           assertEqual "null" True (maybe True (const False) frame)
