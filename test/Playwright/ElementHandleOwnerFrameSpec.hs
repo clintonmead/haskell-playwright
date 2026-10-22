@@ -9,6 +9,7 @@ import Playwright
   , evaluateHandleOnFrame
   , frames
   , framesEqual
+  , childFrames
   , evaluateHandleOnFrame
   , goto
   , mainFrame
@@ -92,4 +93,16 @@ tests =
               assertFailure "expected owner"
             Just frame ->
               assertEqual "main" True (framesEqual frame mainHandle)
+    , testCase "should work for cross-frame evaluations" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          _ <- attachFrame page "frame1" (prefix <> "/empty.html")
+          let mainHandle = mainFrame page
+          jsHandle <- evaluateHandleOnFrame mainHandle "() => document.querySelector('iframe').contentWindow.document.body"
+          element <- requireHandle =<< asElement jsHandle
+          owner <- ownerFrameHandle element
+          children <- childFrames mainHandle
+          case (owner, children) of
+            (Just frame, [child]) -> assertEqual "child" True (framesEqual frame child)
+            _ -> assertFailure "expected the owner to be the one child frame"
     ]
