@@ -7,6 +7,7 @@ import Playwright
   , evaluate
   , fill
   , isChecked
+  , isCheckedHandle
   , isEditable
   , isEditableHandle
   , isDisabled
@@ -108,6 +109,13 @@ tests =
           _ <- evaluate page "() => { document.querySelector('input').checked = false; }"
           assertEqual "unchecked" False =<< isChecked (locate page "input")
           assertProtocolContains "Not a checkbox or radio button" (isChecked (locate page "div"))
+          input <- requireHandle =<< querySelector page (selectorFromText "input")
+          _ <- evaluate page "() => { document.querySelector('input').checked = true; }"
+          assertEqual "handle checked" True =<< isCheckedHandle input
+          _ <- evaluate page "() => { document.querySelector('input').checked = false; }"
+          assertEqual "handle unchecked" False =<< isCheckedHandle input
+          divHandle <- requireHandle =<< querySelector page (selectorFromText "div")
+          assertProtocolContains "Not a checkbox or radio button" (isCheckedHandle divHandle)
     , testCase "isVisible and isHidden should work" $
         withChromiumPage $ \page -> do
           setContent page "<div>Hi</div><span></span>"
@@ -134,6 +142,31 @@ tests =
           button2 <- requireHandle =<< querySelector page (selectorFromText ":text(\"button2\")")
           assertEqual "button2 enabled" True =<< isEnabledHandle button2
           assertEqual "button2 disabled" False =<< isDisabledHandle button2
+    , testCase "isVisible should not throw when the DOM element is not connected" $
+        withChromiumPage $ \page -> do
+          setContent page "<div id=\"root\"></div>"
+          _ <-
+            evaluate
+              page
+              "() => { function insert() { document.getElementById('root').innerHTML = '<div id=problem>Problem</div>'; window.requestAnimationFrame(remove); } function remove() { const node = document.getElementById('problem'); node?.parentNode?.removeChild(node); window.requestAnimationFrame(insert); } window.requestAnimationFrame(insert); }"
+          mapM_ (const (isVisible (locate page "#problem"))) [1 .. 10 :: Int]
+    , testCase "isEnabled and isDisabled should work with <select/> option/optgroup correctly" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<select name=\"select\"><option id=\"enabled1\" value=\"1\">Enabled</option><option id=\"disabled1\" value=\"2\" disabled>Disabled</option><optgroup label=\"Foo1\"><option value=\"mercedes\">Mercedes</option></optgroup><optgroup label=\"Foo2\" disabled><option value=\"mercedes\">Mercedes</option></optgroup></select>"
+          enabled1 <- requireHandle =<< querySelector page (selectorFromText "#enabled1")
+          assertEqual "enabled1 enabled" True =<< isEnabledHandle enabled1
+          assertEqual "enabled1 disabled" False =<< isDisabledHandle enabled1
+          disabled1 <- requireHandle =<< querySelector page (selectorFromText "#disabled1")
+          assertEqual "disabled1 enabled" False =<< isEnabledHandle disabled1
+          assertEqual "disabled1 disabled" True =<< isDisabledHandle disabled1
+          group1 <- requireHandle =<< querySelector page (selectorFromText "optgroup >> nth=0")
+          assertEqual "group1 enabled" True =<< isEnabledHandle group1
+          assertEqual "group1 disabled" False =<< isDisabledHandle group1
+          group2 <- requireHandle =<< querySelector page (selectorFromText "optgroup >> nth=1")
+          assertEqual "group2 enabled" False =<< isEnabledHandle group2
+          assertEqual "group2 disabled" True =<< isDisabledHandle group2
     , testCase "innerText should throw" $
         withChromiumPage $ \page -> do
           setContent page "<svg>text</svg>"
