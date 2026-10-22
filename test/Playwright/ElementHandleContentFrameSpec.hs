@@ -2,8 +2,16 @@ module Playwright.ElementHandleContentFrameSpec
   ( tests
   ) where
 
+import Data.Text
+  ( replace
+  )
 import Playwright
   ( asElement
+  , evaluateHandleOnFrame
+  , framesEqual
+  , frames
+  , querySelector
+  , selectorFromText
   , contentFrameHandle
   , defaultGotoOptions
   , evaluateHandle
@@ -65,4 +73,30 @@ tests =
           element <- requireHandle =<< asElement jsHandle
           frame <- contentFrameHandle element
           assertEqual "null" True (maybe True (const False) frame)
+    , testCase "should work for cross-frame evaluations" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          _ <- attachFrame page "frame1" (prefix <> "/empty.html")
+          allFrames <- frames page
+          case drop 1 allFrames of
+            [] ->
+              assertFailure "expected a child frame"
+            child : _ -> do
+              jsHandle <- evaluateHandleOnFrame child "() => window.top.document.querySelector('#frame1')"
+              element <- requireHandle =<< asElement jsHandle
+              owner <- contentFrameHandle element
+              assertEqual "same frame" True (maybe False (`framesEqual` child) owner)
+    , testCase "should work for cross-process iframes" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let cross = replace "127.0.0.1" "localhost" prefix
+          _ <- attachFrame page "frame1" (cross <> "/empty.html")
+          element <- requireHandle =<< querySelector page (selectorFromText "#frame1")
+          content <- contentFrameHandle element
+          allFrames <- frames page
+          case drop 1 allFrames of
+            [] ->
+              assertFailure "expected a child frame"
+            child : _ ->
+              assertEqual "same frame" True (maybe False (`framesEqual` child) content)
     ]
