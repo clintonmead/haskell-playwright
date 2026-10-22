@@ -524,3 +524,11 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 
 **Follow-up, done:** `test/Playwright/BrowserContextExposeFunctionSpec.hs:173` (`cspEmptyApp`) had the same malformed header, `default-src \"self\"`. It now sends `default-src 'self'`. The `browsercontext-expose-function` group passes 7 of 7 with the fix. Its `should work with CSP` case still does not check inline blocking, which is unchanged.
 
+
+## Test runs must use the nix driver, not the inherited one
+
+**Finding:** The shell env inherited into the session pins playwright-core 1.61.1. `nix develop` provides 1.64.1. Under the inherited env, the `elementhandle-click` group failed 9 of 9 with `ProtocolRpc ... "timeout: expected float, got undefined"`, from `playwright-core-1.61.1/lib/coreBundle.js`. The 1.61.1 driver rejects the metadata-timeout path that `sendWithTimeout` uses. Under `nix develop --command`, the same group passes 9 of 9.
+
+**Guess taken:** Run the test binary only under `nix develop --command bash -c '...'`. The earlier tap timeout was carried forward as unresolved. It is probably the same stale-driver cause, but it has not been reproduced under `nix develop`, so that remains unconfirmed.
+
+**To change:** If the inherited env is moved to 1.64.1, the wrapper is no longer needed.
