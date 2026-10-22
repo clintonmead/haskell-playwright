@@ -106,6 +106,18 @@ tests =
           setContent page "<div style=\"display:none\">Hello</div>"
           handle <- requireHandle =<< querySelector page (selectorFromText "div")
           waitWhileHidden handle "div => { div.style.display = 'block'; return true; }"
+    , testCase "should wait for nested display:none to become visible" $
+        withChromiumPage $ \page -> do
+          setContent page "<span style=\"display:none\"><div>Hello</div></span>"
+          handle <- requireHandle =<< querySelector page (selectorFromText "div")
+          waitWhileHidden handle "div => { div.parentElement.style.display = 'block'; return true; }"
+    , testCase "should wait for element to stop moving" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<style>@keyframes move { from { margin-left: 0; } to { margin-left: 200px; } } div.animated { animation: 2s linear 0s infinite alternate move; }</style><div class=animated>moving</div>"
+          handle <- requireHandle =<< querySelector page (selectorFromText "div")
+          waitWhileHidden handle "div => { div.classList.remove('animated'); return true; }"
     ]
 
 -- | Scrolls the element into view, checks that the scroll is still pending
