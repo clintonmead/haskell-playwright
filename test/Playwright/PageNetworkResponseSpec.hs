@@ -16,6 +16,7 @@ import Data.Text
 import Network.HTTP.Types
   ( hContentEncoding
   , hContentType
+  , mkStatus
   , status200
   , status404
   )
@@ -30,7 +31,9 @@ import Playwright
   , HttpHeader (httpHeaderName, httpHeaderValue)
   , defaultGotoOptions
   , goto
+  , responseAllHeaders
   , responseHeaders
+  , responseStatusText
   , responseText
   , urlFromText
   )
@@ -82,6 +85,43 @@ tests =
               Just value ->
                 -- responseHeaders does not list content-encoding (see TODO), so check the decoded body.
                 assertEqual "body" "{\"foo\": \"bar\"}\n" =<< responseText value
+    , testCase "allHeaders should include content-encoding" $
+        withChromiumPage $ \page ->
+          withLocalApp gzipApp $ \prefix -> do
+            response <- goto page (urlFromText (prefix <> "/simple.json")) defaultGotoOptions
+            case response of
+              Nothing ->
+                assertFailure "missing response"
+              Just value -> do
+                headers <- responseAllHeaders value
+                assertEqual "content-encoding" (Just "gzip") (headerValue "content-encoding" headers)
+    , testCase "allHeaders should lowercase header names" $
+        withChromiumPage $ \page ->
+          withLocalApp headerApp $ \prefix -> do
+            response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            case response of
+              Nothing ->
+                assertFailure "missing response"
+              Just value -> do
+                headers <- responseAllHeaders value
+                assertEqual "baz" (Just "bAz") (headerValue "baz" headers)
+                assertEqual
+                  "uppercase names"
+                  []
+                  [ name
+                  | header <- headers
+                  , let name = headerNameToText (httpHeaderName header)
+                  , name /= toLower name
+                  ]
+    , testCase "should return status text" $
+        withChromiumPage $ \page ->
+          withLocalApp coolApp $ \prefix -> do
+            response <- goto page (urlFromText (prefix <> "/cool")) defaultGotoOptions
+            case response of
+              Nothing ->
+                assertFailure "missing response"
+              Just value ->
+                assertEqual "status text" "cool!" =<< responseStatusText value
     , testCase "should return text for identity encoding" $
         withChromiumPage $ \page ->
           withLocalApp identityApp $ \prefix -> do
@@ -117,6 +157,10 @@ gzipApp request respond =
         )
     _ ->
       respond (responseLBS status404 [] LBS8.empty)
+
+coolApp :: Application
+coolApp _ respond =
+  respond (responseLBS (mkStatus 200 "cool!") [] LBS8.empty)
 
 identityApp :: Application
 identityApp request respond =

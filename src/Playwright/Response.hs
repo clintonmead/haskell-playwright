@@ -1,6 +1,7 @@
 module Playwright.Response
   ( Response (..)
   , responseFromRef
+  , responseAllHeaders
   , responseHeaders
   , responseOk
   , responseRequest
@@ -15,8 +16,13 @@ module Playwright.Response
 import Playwright.Monad
   ( Playwright
   )
+import Data.List
+  ( partition
+  )
 import Data.Text
   ( Text
+  , intercalate
+  , toLower
   )
 import Data.Text.Encoding
   ( decodeUtf8
@@ -30,9 +36,9 @@ import Playwright.Connection
   ( lookupObject
   )
 import Playwright.HttpHeader
-  ( HeaderName (HeaderName)
-  , HeaderValue (HeaderValue)
-  , HttpHeader (HttpHeader)
+  ( HeaderName (HeaderName, headerNameToText)
+  , HeaderValue (HeaderValue, headerValueToText)
+  , HttpHeader (HttpHeader, httpHeaderName, httpHeaderValue)
   )
 import Playwright.HttpStatus
   ( HttpStatus (HttpStatus)
@@ -54,7 +60,9 @@ import Playwright.Protocol
   ( NameValue (nameValueName, nameValueValue)
   , ResponseBodyResult (responseBodyResultBinary)
   , ResponseInitializer (responseInitializerFromServiceWorker, responseInitializerHeaders, responseInitializerRequest, responseInitializerStatus, responseInitializerStatusText, responseInitializerUrl)
+  , ResponseRawResponseHeadersResult (responseRawResponseHeadersResultHeaders)
   , mkResponseBodyParams
+  , mkResponseRawResponseHeadersParams
   )
 import Playwright.RemoteObject
   ( RemoteObject (remoteInitializer)
@@ -107,6 +115,21 @@ responseHeaders :: Response -> Playwright [HttpHeader]
 responseHeaders response =
   fmap (fmap fromNameValue . responseInitializerHeaders) (responseInitializer response)
 
+-- | The headers the browser received, including ones the initializer leaves out
+-- (such as content-encoding). Names are lowercased, and repeated values are
+-- joined as upstream allHeaders() does.
+responseAllHeaders :: Response -> Playwright [HttpHeader]
+responseAllHeaders response = do
+  result :: ResponseRawResponseHeadersResult <-
+    send
+      (responseChannel response)
+      (MethodName "rawResponseHeaders")
+      mkResponseRawResponseHeadersParams
+  pure
+    ( collapseHeaders
+        (fmap (lowercaseHeader . fromNameValue) (responseRawResponseHeadersResultHeaders result))
+    )
+
 responseOk :: Response -> Playwright Bool
 responseOk response =
   httpStatusOk <$> responseStatus response
@@ -127,3 +150,30 @@ responseText response = do
 fromNameValue :: NameValue -> HttpHeader
 fromNameValue header =
   HttpHeader (HeaderName (nameValueName header)) (HeaderValue (nameValueValue header))
+
+lowercaseHeader :: HttpHeader -> HttpHeader
+lowercaseHeader header =
+  HttpHeader
+    (HeaderName (toLower (headerNameToText (httpHeaderName header))))
+    (httpHeaderValue header)
+
+-- | Joins the values of each name in first-seen order. Set-Cookie values are
+-- joined by newlines, since they may contain commas.
+collapseHeaders :: [HttpHeader] -> [HttpHeader]
+collapseHeaders [] =
+  []
+collapseHeaders (header : rest) =
+  let
+    name = headerNameToText (httpHeaderName header)
+    (same, others) = partition (\other -> headerNameToText (httpHeaderName other) == name) rest
+    separator :: Text
+    separator =
+      if name == "set-cookie"
+        then "\n"
+        else ", "
+    mergedValue =
+      intercalate
+        separator
+        (fmap (headerValueToText . httpHeaderValue) (header : same))
+  in
+    HttpHeader (httpHeaderName header) (HeaderValue mergedValue) : collapseHeaders others

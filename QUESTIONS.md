@@ -162,3 +162,11 @@ Decisions made without waiting for an answer. Each entry gives the question, the
 **Guess taken:** A `WaitForURLOptions` record (timeout and `waitUntil`) with `waitForURLOptions`, matching `WaitForNavigationOptions`. `waitForURLWith` still takes a plain timeout and waits for `load`.
 
 **To change:** Fold `waitForURLOptions` into `waitForURLWith` if callers would rather have one function.
+
+## allHeaders returns a list, not a Map
+
+**Question:** Upstream `response.allHeaders()` returns a name-to-value object. The binding's header functions return `[HttpHeader]`. Should `responseAllHeaders` return a `Map`?
+
+**Guess taken:** A list of `HttpHeader`, the same type `responseHeaders` returns, so callers use one lookup for both. Names are lowercased and repeated values are merged, with `, ` for most headers and a newline for `set-cookie`, as upstream `RawHeaders` does.
+
+**To change:** Return a `Map HeaderName HttpHeader` or a `Map Text Text` if callers need keyed lookup. The merge rule stays the same.

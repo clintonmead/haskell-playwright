@@ -611,6 +611,7 @@ module Playwright
   , responseFrame
   , responseFinished
   , responseFromServiceWorker
+  , responseAllHeaders
   , responseHeaders
   , responseOk
   , responseRequest
@@ -1622,6 +1623,7 @@ import Playwright.ResourceType
   )
 import Playwright.Response
   ( Response (Response, responseChannel)
+  , responseAllHeaders
   , responseHeaders
   , responseOk
   , requestResponse
