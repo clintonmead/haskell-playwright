@@ -7,16 +7,25 @@ import Control.Concurrent
   )
 import Data.ByteString.Lazy.Char8 qualified as LBS8
 import UnliftIO.MVar
-  ( newEmptyMVar
+  ( MVar
+  , newEmptyMVar
   , putMVar
   , takeMVar
   )
 import UnliftIO.Async
-  ( wait
+  ( async
+  , wait
   , withAsync
   )
+import Control.Monad
+  ( forM_
+  )
 import Network.HTTP.Types
-  ( status200
+  ( hContentType
+  , status200
+  )
+import Network.Wai.Handler.Warp
+  ( withApplication
   )
 import Network.Wai
   ( Application
@@ -36,38 +45,40 @@ import UnliftIO.Exception
   )
 import Data.Text qualified as Text
 import Data.Text
-  ( isInfixOf
+  ( Text
+  , isInfixOf
+  , pack
   )
 import Playwright
   ( GotoOptions (gotoOptionsTimeout, gotoOptionsWaitUntil)
-  , frames
-  , gotoFrame
-  , route
-  , evaluateText
-  , UrlMatch (UrlMatchGlob)
   , LoadState (LoadStateNetworkIdle)
   , Playwright
   , Response
+  , UrlMatch (UrlMatchGlob)
   , currentUrl
-  , milliseconds
   , defaultGotoOptions
+  , evaluateText
   , frames
   , framesEqual
   , goto
   , gotoFrame
+  , milliseconds
   , responseFrame
   , responseOk
+  , responseText
+  , route
   , urlFromText
   , urlToText
   )
 import Playwright.Harness
-  ( testAssetsDir
-  , withChromiumPage
-  , withLocalApp
-  , withAssets
-  , assertBool
+  ( assertBool
   , assertEqual
   , assertFailure
+  , attachFrame
+  , testAssetsDir
+  , withAssets
+  , withChromiumPage
+  , withLocalApp
   )
 import Test.Tasty
   ( TestTree
@@ -150,6 +161,37 @@ tests =
                       assertFailure ("expected ProtocolRpc, got: " <> show err)
                     Right _ ->
                       assertFailure "expected the navigation to fail"
+    , testCase "should return matching responses" $ do
+        arrivals <- newEmptyMVar
+        releases <- mapM (const newEmptyMVar) [0 :: Int, 1, 2]
+        withApplication (pure (heldPagesApp arrivals releases)) $ \port ->
+          withChromiumPage $ \page -> do
+            let
+              base = "http://127.0.0.1:" <> pack (show port)
+            _ <- goto page (urlFromText (base <> "/empty.html")) defaultGotoOptions
+            children <- mapM (\i -> attachFrame page ("frame" <> pack (show i)) (base <> "/empty.html")) [0 :: Int, 1, 2]
+            navigations <-
+              mapM
+                ( \(i, child) -> do
+                    pending <-
+                      async (gotoFrame child (urlFromText (base <> "/" <> pack (show i) <> ".html")) defaultGotoOptions)
+                    arrived <- takeMVar arrivals
+                    assertEqual "arrival" i arrived
+                    pure (i, child, pending)
+                )
+                (zip [0 :: Int, 1, 2] children)
+            forM_ [1, 2, 0] $ \i ->
+              case [(child, pending) | (j, child, pending) <- navigations, j == i] of
+                [(child, pending)] -> do
+                  putMVar (releases !! i) ()
+                  response <- wait pending
+                  case response of
+                    Nothing -> assertFailure "missing response"
+                    Just value -> do
+                      frame <- responseFrame value
+                      assertEqual "frame" True (maybe False (`framesEqual` child) frame)
+                      assertEqual "text" (["AAA", "BBB", "CCC"] !! i) =<< responseText value
+                _ -> assertFailure "missing navigation"
     ]
 
 -- | Serves the assets, except that frames/script.js answers only after a long
@@ -162,3 +204,18 @@ stallingScriptApp assets request respond =
       respond (responseLBS status200 [] LBS8.empty)
     _ ->
       staticApp (defaultFileServerSettings assets) request respond
+
+-- | Records each request to /0.html, /1.html and /2.html as it arrives, then
+-- holds the response until the test releases it with the matching MVar.
+heldPagesApp :: MVar Int -> [MVar ()] -> Application
+heldPagesApp arrivals releases request respond =
+  case pathInfo request of
+    [name] | Just index <- heldIndex name -> do
+      putMVar arrivals index
+      takeMVar (releases !! index)
+      respond (responseLBS status200 [(hContentType, "text/plain")] (LBS8.pack (["AAA", "BBB", "CCC"] !! index)))
+    _ ->
+      respond (responseLBS status200 [(hContentType, "text/html")] LBS8.empty)
+  where
+    heldIndex :: Text -> Maybe Int
+    heldIndex name = lookup name [("0.html", 0), ("1.html", 1), ("2.html", 2)]

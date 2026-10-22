@@ -6,25 +6,46 @@ import UnliftIO.Async
   ( wait
   , withAsync
   )
+import Data.ByteString.Lazy.Char8 qualified as LBS8
+import Network.HTTP.Types
+  ( hLocation
+  , status302
+  )
+import Network.Wai
+  ( Application
+  , pathInfo
+  , responseLBS
+  )
+import Network.Wai.Application.Static
+  ( defaultFileServerSettings
+  , staticApp
+  )
+import UnliftIO.MVar
+  ( MVar
+  , newEmptyMVar
+  , putMVar
+  , takeMVar
+  )
 import Playwright
   ( ClickOptions (clickOptionsModifiers)
-  , Playwright
   , KeyboardModifier (KeyboardModifierControlOrMeta, KeyboardModifierShift)
   , LoadState (LoadStateDomContentLoaded)
+  , Playwright
   , armContextPage
-  , onContextPage
-  , onPageClose
   , clickWith
-  , defaultClickOptions
   , closePage
   , contextPages
+  , defaultClickOptions
   , defaultGotoOptions
   , defaultNewContextOptions
   , evaluate
   , evaluateText
   , evaluateWith
   , goto
+  , newContext
   , newPage
+  , onContextPage
+  , onPageClose
   , opener
   , pagesEqual
   , querySelector
@@ -39,13 +60,15 @@ import Playwright
   )
 import Playwright.Harness
   ( assertBool
-  , recordingPageApp
-  , withLocalApp
-  , locate
-  , withAssetsContextWith
-  , withChromiumContext
   , assertEqual
   , assertFailure
+  , locate
+  , recordingPageApp
+  , testAssetsDir
+  , withAssetsContextWith
+  , withChromiumBrowser
+  , withChromiumContext
+  , withLocalApp
   )
 import UnliftIO.IORef
   ( IORef
@@ -202,6 +225,22 @@ tests =
             closePage page
             assertEqual "events" ["CREATED: about:blank", "DESTROYED: " <> prefix <> "/empty.html"]
               =<< awaitEvents events ["CREATED: about:blank", "DESTROYED: " <> prefix <> "/empty.html"] 200
+    , testCase "should not crash while redirecting of original request was missed" $ do
+        assets <- testAssetsDir
+        arrival <- newEmptyMVar
+        release <- newEmptyMVar
+        withChromiumBrowser $ \browser ->
+          withLocalApp (holdStylesheetApp assets arrival release) $ \prefix -> do
+            ctx <- newContext browser
+            page <- newPage ctx
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            takeNewPage <- armContextPage ctx
+            _ <- evaluateText page ("() => { window.open('" <> prefix <> "/one-style.html'); return 'opened'; }")
+            takeMVar arrival
+            newPage' <- takeNewPage
+            putMVar release ()
+            _ <- waitForLoadState newPage' LoadStateDomContentLoaded
+            assertEqual "url" (prefix <> "/one-style.html") . urlToText =<< url newPage'
     ]
 
 -- | Polls the recorded events until they match the expected list, or the
@@ -215,3 +254,15 @@ awaitEvents events expected attempts = do
     else do
       liftIO (threadDelay 50000)
       awaitEvents events expected (attempts - 1)
+
+-- | Serves the assets, except that /one-style.css reports its arrival and then
+-- answers with a redirect once released.
+holdStylesheetApp :: FilePath -> MVar () -> MVar () -> Application
+holdStylesheetApp assets arrival release request respond =
+  case pathInfo request of
+    ["one-style.css"] -> do
+      putMVar arrival ()
+      takeMVar release
+      respond (responseLBS status302 [(hLocation, "/injectedstyle.css")] LBS8.empty)
+    _ ->
+      staticApp (defaultFileServerSettings assets) request respond
