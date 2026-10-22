@@ -2,11 +2,26 @@ module Playwright.PageAddInitScriptSpec
   ( tests
   ) where
 
+import Control.Concurrent
+  ( threadDelay
+  )
 import Control.Monad
   ( void
+  , when
+  )
+import Control.Monad.IO.Class
+  ( liftIO
   )
 import Data.Text
-  ( replace
+  ( Text
+  , isPrefixOf
+  , replace
+  )
+import UnliftIO.IORef
+  ( IORef
+  , modifyIORef'
+  , newIORef
+  , readIORef
   )
 import Network.HTTP.Types
   ( hContentType
@@ -17,8 +32,10 @@ import Network.Wai
   , responseLBS
   )
 import Playwright
-  ( addInitScript
+  ( ConsoleMessage (consoleMessageText)
+  , addInitScript
   , addScriptTag
+  , onConsole
   , defaultGotoOptions
   , emptyScriptTag
   , evaluateNumber
@@ -88,6 +105,17 @@ tests =
                   (addScriptTag page emptyScriptTag {scriptTagContent = Just "window.e = 10;"})
               )
             assertEqual "blocked" (0 :: Double) =<< evaluateNumber page "() => window.e === undefined ? 0 : 1"
+    , testCase "init script should run only once in iframe" $
+        withAssets $ \prefix page -> do
+          messages <- newIORef []
+          onConsole page $ \message ->
+            when ("init script:" `isPrefixOf` consoleMessageText message) $
+              modifyIORef' messages (<> [consoleMessageText message])
+          addInitScript page "console.log('init script:', location.pathname || 'no url yet')"
+          _ <- goto page (urlFromText (prefix <> "/frames/one-frame.html")) defaultGotoOptions
+          assertEqual "messages"
+            ["init script: /frames/one-frame.html", "init script: /frames/frame.html"]
+            =<< awaitMessages messages 2 100
     , testCase "should work after a cross origin navigation" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (replace "127.0.0.1" "localhost" prefix <> "/empty.html")) defaultGotoOptions
@@ -108,3 +136,14 @@ cspScriptApp _ respond =
         ]
         "<html></html>"
     )
+
+-- | Polls the console messages until the expected count arrives, or the
+-- attempts run out.
+awaitMessages :: IORef [Text] -> Int -> Int -> Playwright [Text]
+awaitMessages messages count attempts = do
+  current <- readIORef messages
+  if length current >= count || attempts <= 0
+    then pure current
+    else do
+      liftIO (threadDelay 50000)
+      awaitMessages messages count (attempts - 1)
