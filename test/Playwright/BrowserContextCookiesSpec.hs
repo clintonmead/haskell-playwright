@@ -32,7 +32,18 @@ import Playwright
   ( Cookie (cookieDomain, cookieExpires, cookieHttpOnly, cookieName, cookieSameSite, cookieValue)
   , CookieDomain (CookieDomain, cookieDomainToText)
   , CookieSecure (CookieSecure)
-  , CookieToSet (cookieToSetSameSite, cookieToSetSecure)
+  , CookieToSet
+      ( CookieToSet
+      , cookieToSetDomain
+      , cookieToSetExpires
+      , cookieToSetHttpOnly
+      , cookieToSetName
+      , cookieToSetPath
+      , cookieToSetSameSite
+      , cookieToSetSecure
+      , cookieToSetUrl
+      , cookieToSetValue
+      )
   , CookiePath (CookiePath)
   , cookieForHost
   , cookieForUrl
@@ -42,7 +53,7 @@ import Playwright
   , CookieName (CookieName, cookieNameToText)
   , CookieSameSite (CookieSameSiteLax, CookieSameSiteNone, CookieSameSiteStrict)
   , CookieValue (CookieValue, cookieValueToText)
-  , CookieExpires (cookieExpiresToScientific)
+  , CookieExpires (CookieExpires, cookieExpiresToScientific)
   , cookiesFor
   , cookies
   , defaultGotoOptions
@@ -182,6 +193,24 @@ tests =
             jar <- cookies ctx
             assertEqual "names" ["name"] (fmap (cookieNameToText . cookieName) jar)
             assertEqual "values" [""] (fmap (cookieValueToText . cookieValue) jar)
+    , testCase "should allow adding cookies with >400 days expiration" $
+        withAssets $ \_ page -> do
+          addCookies
+            (pageContext page)
+            [ CookieToSet
+                { cookieToSetName = CookieName "username"
+                , cookieToSetValue = CookieValue "John Doe"
+                , cookieToSetUrl = Nothing
+                , cookieToSetDomain = Just (CookieDomain "127.0.0.1")
+                , cookieToSetPath = Just (CookiePath "/")
+                , cookieToSetExpires = Just (CookieExpires 2000000000)
+                , cookieToSetHttpOnly = Nothing
+                , cookieToSetSecure = Nothing
+                , cookieToSetSameSite = Just CookieSameSiteLax
+                }
+            ]
+          jar <- cookies (pageContext page)
+          assertEqual "names" ["username"] (fmap (cookieNameToText . cookieName) jar)
     ]
 
 emptyHtml :: Application
