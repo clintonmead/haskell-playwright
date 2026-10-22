@@ -317,6 +317,16 @@ tests =
         withChromiumPage $ \page -> do
           result <- evaluate page "() => { const a = {}; a.b = a; return a; }"
           assertBool "circular" (isSelfCycle result)
+    , testCase "should throw for too deep reference chain" $
+        withChromiumPage $ \page ->
+          assertProtocolContains
+            "object reference chain is too long"
+            (evaluate page "() => { const obj = {}; let temp = obj; for (let i = 0; i < 1000; i++) { temp[i] = {}; temp = temp[i]; } return obj; }")
+    , testCase "should throw for too deep reference chain 2" $
+        withChromiumPage $ \page ->
+          assertProtocolContains
+            "object reference chain is too long"
+            (evaluate page "() => { let node = {}; for (let i = 0; i < 200; i++) node = { child: node }; return node; }")
     ]
 
 -- | True when the value is an object whose @b@ field refers back to the object
