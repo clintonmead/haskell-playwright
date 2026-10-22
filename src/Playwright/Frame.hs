@@ -14,6 +14,8 @@ module Playwright.Frame
   , framesEqual
   , frameSend
   , frameSend_
+  , frameSendTimed_
+  , frameSendWithTimeout
   , gotoFrame
   , setContentFrame
   , setContentFrameWith
@@ -38,6 +40,7 @@ import Playwright.Channel
   ( Channel (Channel, channelGuid)
   , FrameTag
   , send
+  , sendWithTimeout
   )
 import Playwright.Guid
   ( Guid
@@ -185,18 +188,30 @@ frameSend_ frame methodName params = do
   _ <- frameSend @result frame methodName params
   pure ()
 
+-- | Sends a frame call whose timeout travels in the message metadata.
+frameSendWithTimeout :: forall result params. (ToJSON params, FromJSON result) => Frame -> Text -> Timeout -> params -> Playwright result
+frameSendWithTimeout frame methodName timeout params =
+  sendWithTimeout (frameChannel frame) (MethodName methodName) timeout params
+
+frameSendTimed_ :: forall result params. (ToJSON params, FromJSON result) => Frame -> Text -> Timeout -> params -> Playwright ()
+frameSendTimed_ frame methodName timeout params = do
+  _ <- frameSendWithTimeout @result frame methodName timeout params
+  pure ()
+
 gotoFrame :: Frame -> Url -> GotoOptions -> Playwright (Maybe Response)
 gotoFrame frame url opts = do
   resolved <- resolveFrameUrl frame url
   timeout <- resolveFrameNavigationTimeout frame (gotoOptionsTimeout opts)
   result <-
-    frameSend
+    frameSendWithTimeout
       frame
       "goto"
-      (mkFrameGotoParams timeout resolved)
-        { frameGotoParamsWaitUntil = Just (toLifecycle (fromMaybe defaultNavigationLoadState (gotoOptionsWaitUntil opts)))
-        , frameGotoParamsReferer = gotoOptionsReferer opts
-        }
+      timeout
+      ( (mkFrameGotoParams resolved)
+          { frameGotoParamsWaitUntil = Just (toLifecycle (fromMaybe defaultNavigationLoadState (gotoOptionsWaitUntil opts)))
+          , frameGotoParamsReferer = gotoOptionsReferer opts
+          }
+      )
   case frameGotoResultResponse result of
     Nothing ->
       pure Nothing
@@ -250,13 +265,17 @@ setContentFrame frame html timeout =
   setContentFrameWith frame html timeout Nothing
 
 setContentFrameWith :: Frame -> Text -> Timeout -> Maybe LoadState -> Playwright ()
-setContentFrameWith frame html timeout waitUntil =
-  frameSend_ @FrameSetContentResult
-    frame
-    "setContent"
-    (mkFrameSetContentParams html timeout)
-      { frameSetContentParamsWaitUntil = fmap toLifecycle waitUntil
-      }
+setContentFrameWith frame html timeout waitUntil = do
+  _ <-
+    frameSendWithTimeout @FrameSetContentResult
+      frame
+      "setContent"
+      timeout
+      ( (mkFrameSetContentParams html)
+          { frameSetContentParamsWaitUntil = fmap toLifecycle waitUntil
+          }
+      )
+  pure ()
 
 setContentOnFrame :: Frame -> Text -> Playwright ()
 setContentOnFrame frame html =

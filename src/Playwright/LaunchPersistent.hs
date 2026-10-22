@@ -41,7 +41,7 @@ import Playwright.HttpHeader
   ( toNameValue
   )
 import Playwright.LaunchOptions
-  ( LaunchOptions (launchOptionsArgs, launchOptionsChromiumSandbox, launchOptionsDownloadsPath, launchOptionsExecutablePath, launchOptionsHeadless, launchOptionsIgnoreDefaultArgs, launchOptionsProxy, launchOptionsSlowMo, launchOptionsTimeout)
+  ( LaunchOptions (launchOptionsArgs, launchOptionsChromiumSandbox, launchOptionsDownloadsPath, launchOptionsExecutablePath, launchOptionsHeadless, launchOptionsIgnoreDefaultArgs, launchOptionsProxy, launchOptionsSlowMo)
   )
 import Playwright.Locale
   ( Locale (localeToText)
@@ -56,6 +56,7 @@ import Playwright.ProxySettings
   ( ProxyHost (proxyHostToText)
   , ProxySettings (proxySettingsBypass, proxySettingsPassword, proxySettingsServer, proxySettingsUsername)
   )
+import Playwright.Protocol qualified as Protocol
 import Playwright.Protocol
   ( BrowserTypeLaunchPersistentContextParams (browserTypeLaunchPersistentContextParamsAcceptDownloads, browserTypeLaunchPersistentContextParamsArgs, browserTypeLaunchPersistentContextParamsBaseURL, browserTypeLaunchPersistentContextParamsBypassCSP, browserTypeLaunchPersistentContextParamsChromiumSandbox, browserTypeLaunchPersistentContextParamsColorScheme, browserTypeLaunchPersistentContextParamsContrast, browserTypeLaunchPersistentContextParamsDeviceScaleFactor, browserTypeLaunchPersistentContextParamsDownloadsPath, browserTypeLaunchPersistentContextParamsExecutablePath, browserTypeLaunchPersistentContextParamsExtraHTTPHeaders, browserTypeLaunchPersistentContextParamsForcedColors, browserTypeLaunchPersistentContextParamsGeolocation, browserTypeLaunchPersistentContextParamsHasTouch, browserTypeLaunchPersistentContextParamsHeadless, browserTypeLaunchPersistentContextParamsHttpCredentials, browserTypeLaunchPersistentContextParamsIgnoreDefaultArgs, browserTypeLaunchPersistentContextParamsIgnoreHTTPSErrors, browserTypeLaunchPersistentContextParamsIsMobile, browserTypeLaunchPersistentContextParamsJavaScriptEnabled, browserTypeLaunchPersistentContextParamsLocale, browserTypeLaunchPersistentContextParamsNoDefaultViewport, browserTypeLaunchPersistentContextParamsOffline, browserTypeLaunchPersistentContextParamsPermissions, browserTypeLaunchPersistentContextParamsProxy, browserTypeLaunchPersistentContextParamsReducedMotion, browserTypeLaunchPersistentContextParamsScreen, browserTypeLaunchPersistentContextParamsSelectorEngines, browserTypeLaunchPersistentContextParamsServiceWorkers, browserTypeLaunchPersistentContextParamsSlowMo, browserTypeLaunchPersistentContextParamsStrictSelectors, browserTypeLaunchPersistentContextParamsTimezoneId, browserTypeLaunchPersistentContextParamsUserAgent, browserTypeLaunchPersistentContextParamsViewport)
   , BrowserTypeLaunchPersistentContextParamsAcceptDownloads (BrowserTypeLaunchPersistentContextParamsAcceptDownloadsAccept, BrowserTypeLaunchPersistentContextParamsAcceptDownloadsDeny)
@@ -63,15 +64,12 @@ import Playwright.Protocol
   , BrowserTypeLaunchPersistentContextParamsContrast (BrowserTypeLaunchPersistentContextParamsContrastMore, BrowserTypeLaunchPersistentContextParamsContrastNoOverride, BrowserTypeLaunchPersistentContextParamsContrastNoPreference)
   , BrowserTypeLaunchPersistentContextParamsForcedColors (BrowserTypeLaunchPersistentContextParamsForcedColorsActive, BrowserTypeLaunchPersistentContextParamsForcedColorsNoOverride, BrowserTypeLaunchPersistentContextParamsForcedColorsNone)
   , BrowserTypeLaunchPersistentContextParamsGeolocation (browserTypeLaunchPersistentContextParamsGeolocationAccuracy)
-  , BrowserTypeLaunchPersistentContextParamsHttpCredentials (browserTypeLaunchPersistentContextParamsHttpCredentialsOrigin, browserTypeLaunchPersistentContextParamsHttpCredentialsSend)
-  , BrowserTypeLaunchPersistentContextParamsHttpCredentialsSend (BrowserTypeLaunchPersistentContextParamsHttpCredentialsSendAlways, BrowserTypeLaunchPersistentContextParamsHttpCredentialsSendUnauthorized)
   , BrowserTypeLaunchPersistentContextParamsProxy (browserTypeLaunchPersistentContextParamsProxyBypass, browserTypeLaunchPersistentContextParamsProxyPassword, browserTypeLaunchPersistentContextParamsProxyUsername)
   , BrowserTypeLaunchPersistentContextParamsReducedMotion (BrowserTypeLaunchPersistentContextParamsReducedMotionNoOverride, BrowserTypeLaunchPersistentContextParamsReducedMotionNoPreference, BrowserTypeLaunchPersistentContextParamsReducedMotionReduce)
   , BrowserTypeLaunchPersistentContextParamsServiceWorkers (BrowserTypeLaunchPersistentContextParamsServiceWorkersAllow, BrowserTypeLaunchPersistentContextParamsServiceWorkersBlock)
   , SelectorEngine
   , mkBrowserTypeLaunchPersistentContextParams
   , mkBrowserTypeLaunchPersistentContextParamsGeolocation
-  , mkBrowserTypeLaunchPersistentContextParamsHttpCredentials
   , mkBrowserTypeLaunchPersistentContextParamsProxy
   , mkBrowserTypeLaunchPersistentContextParamsScreen
   , mkBrowserTypeLaunchPersistentContextParamsViewport
@@ -104,9 +102,7 @@ import Playwright.ViewportSize
 
 toLaunchPersistentParams :: FilePath -> LaunchOptions -> NewContextOptions -> [SelectorEngine] -> BrowserTypeLaunchPersistentContextParams
 toLaunchPersistentParams userDataDir launch opts engines =
-  ( mkBrowserTypeLaunchPersistentContextParams
-      (launchOptionsTimeout launch)
-      (pack userDataDir)
+  ( mkBrowserTypeLaunchPersistentContextParams (pack userDataDir)
   )
     { browserTypeLaunchPersistentContextParamsAcceptDownloads = fmap toAccept (newContextAcceptDownloads opts)
     , browserTypeLaunchPersistentContextParamsArgs = launchOptionsArgs launch
@@ -214,25 +210,24 @@ toGeo location =
         fmap accuracyToScientific (geolocationAccuracy location)
     }
 
-toCreds :: HttpCredentials -> BrowserTypeLaunchPersistentContextParamsHttpCredentials
+-- | The protocol takes a list of credentials; a launch has at most one.
+toCreds :: HttpCredentials -> [Protocol.HttpCredentials]
 toCreds creds =
-  ( mkBrowserTypeLaunchPersistentContextParamsHttpCredentials
-      (httpPasswordToText (httpCredentialsPassword creds))
-      (httpUsernameToText (httpCredentialsUsername creds))
-  )
-    { browserTypeLaunchPersistentContextParamsHttpCredentialsOrigin =
-        fmap urlToText (httpCredentialsOrigin creds)
-    , browserTypeLaunchPersistentContextParamsHttpCredentialsSend =
-        fmap toSend (httpCredentialsSend creds)
-    }
+  [ Protocol.HttpCredentials
+      { Protocol.httpCredentialsOrigin = fmap urlToText (httpCredentialsOrigin creds)
+      , Protocol.httpCredentialsPassword = httpPasswordToText (httpCredentialsPassword creds)
+      , Protocol.httpCredentialsSend = fmap toSend (httpCredentialsSend creds)
+      , Protocol.httpCredentialsUsername = httpUsernameToText (httpCredentialsUsername creds)
+      }
+  ]
 
-toSend :: HttpCredentialsSend -> BrowserTypeLaunchPersistentContextParamsHttpCredentialsSend
+toSend :: HttpCredentialsSend -> Protocol.HttpCredentialsSend
 toSend send =
   case send of
     HttpCredentialsSendAlways ->
-      BrowserTypeLaunchPersistentContextParamsHttpCredentialsSendAlways
+      Protocol.HttpCredentialsSendAlways
     HttpCredentialsSendUnauthorized ->
-      BrowserTypeLaunchPersistentContextParamsHttpCredentialsSendUnauthorized
+      Protocol.HttpCredentialsSendUnauthorized
 
 toViewport :: ViewportSize -> BrowserTypeLaunchPersistentContextParamsViewport
 toViewport size =

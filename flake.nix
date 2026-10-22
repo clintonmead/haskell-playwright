@@ -26,7 +26,7 @@
             owner = "microsoft";
             repo = "playwright";
             rev = "v${pkgs.playwright-driver.version}";
-            hash = "sha256-FC3Sjh4LCTqftudcwt7KO3g3c2uyWv7PixhWqSZZR4Y=";
+            hash = "sha256-oWpJTU3Sob674bLfz0gfHK+vqOoYhK1wmYmVKhsPitM=";
           };
           cabalWrapped = pkgs.writeShellScriptBin "cabal" ''
             exec ${pkgs.lib.getExe hpkgs.cabal-install} -v0 "$@"

@@ -10,6 +10,7 @@ import Playwright.Monad
   )
 import Playwright.Channel
   ( send
+  , sendWithTimeout
   )
 import Playwright.ElementHandle
   ( ElementHandle (elementHandleChannel)
@@ -75,10 +76,11 @@ waitForSelectorOnHandle handle selector state =
 waitForSelectorOnHandleWith :: ElementHandle -> Selector -> WaitForState -> Timeout -> Playwright (Maybe ElementHandle)
 waitForSelectorOnHandleWith handle selector state timeout = do
   result <-
-    send
+    sendWithTimeout
       (elementHandleChannel handle)
       (MethodName "waitForSelector")
-      (mkElementHandleWaitForSelectorParams selector timeout)
+      timeout
+      (mkElementHandleWaitForSelectorParams selector)
         { elementHandleWaitForSelectorParamsState = Just (toProtocolState state)
         }
   pure

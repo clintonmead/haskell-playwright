@@ -23,6 +23,7 @@ import Data.Text
   )
 import Playwright.Channel
   ( send
+  , sendWithTimeout
   )
 import Playwright.ElementHandle
   ( ElementHandle (elementHandleChannel)
@@ -70,31 +71,31 @@ import Playwright.Timeout
 hoverHandle :: ElementHandle -> Playwright ()
 hoverHandle handle = do
   _ :: ElementHandleHoverResult <-
-    send (elementHandleChannel handle) (MethodName "hover") (mkElementHandleHoverParams defaultTimeout)
+    sendWithTimeout (elementHandleChannel handle) (MethodName "hover") defaultTimeout (mkElementHandleHoverParams)
   pure ()
 
 pressHandle :: ElementHandle -> Key -> Playwright ()
 pressHandle handle key = do
   _ :: ElementHandlePressResult <-
-    send (elementHandleChannel handle) (MethodName "press") (mkElementHandlePressParams (keyToText key) defaultTimeout)
+    sendWithTimeout (elementHandleChannel handle) (MethodName "press") defaultTimeout (mkElementHandlePressParams (keyToText key))
   pure ()
 
 fillHandle :: ElementHandle -> Text -> Playwright ()
 fillHandle handle value = do
   _ :: ElementHandleFillResult <-
-    send (elementHandleChannel handle) (MethodName "fill") (mkElementHandleFillParams defaultTimeout value)
+    sendWithTimeout (elementHandleChannel handle) (MethodName "fill") defaultTimeout (mkElementHandleFillParams value)
   pure ()
 
 checkHandle :: ElementHandle -> Playwright ()
 checkHandle handle = do
   _ :: ElementHandleCheckResult <-
-    send (elementHandleChannel handle) (MethodName "check") (mkElementHandleCheckParams defaultTimeout)
+    sendWithTimeout (elementHandleChannel handle) (MethodName "check") defaultTimeout (mkElementHandleCheckParams)
   pure ()
 
 uncheckHandle :: ElementHandle -> Playwright ()
 uncheckHandle handle = do
   _ :: ElementHandleUncheckResult <-
-    send (elementHandleChannel handle) (MethodName "uncheck") (mkElementHandleUncheckParams defaultTimeout)
+    sendWithTimeout (elementHandleChannel handle) (MethodName "uncheck") defaultTimeout (mkElementHandleUncheckParams)
   pure ()
 
 setCheckedHandle :: ElementHandle -> Bool -> Playwright ()
@@ -112,10 +113,11 @@ focusHandle handle = do
 selectOptionHandle :: ElementHandle -> [SelectOption] -> Playwright [Text]
 selectOptionHandle handle options = do
   result <-
-    send
+    sendWithTimeout
       (elementHandleChannel handle)
       (MethodName "selectOption")
-      (mkElementHandleSelectOptionParams defaultTimeout)
+      defaultTimeout
+      (mkElementHandleSelectOptionParams)
         { elementHandleSelectOptionParamsOptions = Just (fmap toProtocolOption options)
         }
   pure (elementHandleSelectOptionResultValues result)

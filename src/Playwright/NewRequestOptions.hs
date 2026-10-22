@@ -16,12 +16,10 @@ import Playwright.HttpHeader
   ( HttpHeader
   , toNameValue
   )
+import Playwright.Protocol qualified as Protocol
 import Playwright.Protocol
   ( PlaywrightNewRequestParams (playwrightNewRequestParamsBaseURL, playwrightNewRequestParamsExtraHTTPHeaders, playwrightNewRequestParamsFailOnStatusCode, playwrightNewRequestParamsHttpCredentials, playwrightNewRequestParamsIgnoreHTTPSErrors, playwrightNewRequestParamsMaxRedirects, playwrightNewRequestParamsStorageState, playwrightNewRequestParamsUserAgent)
-  , PlaywrightNewRequestParamsHttpCredentials (playwrightNewRequestParamsHttpCredentialsOrigin, playwrightNewRequestParamsHttpCredentialsSend)
-  , PlaywrightNewRequestParamsHttpCredentialsSend (PlaywrightNewRequestParamsHttpCredentialsSendAlways, PlaywrightNewRequestParamsHttpCredentialsSendUnauthorized)
   , mkPlaywrightNewRequestParams
-  , mkPlaywrightNewRequestParamsHttpCredentials
   )
 import Playwright.StorageState
   ( StorageState
@@ -78,22 +76,21 @@ toPlaywrightNewRequestParams opts =
     , playwrightNewRequestParamsUserAgent = fmap userAgentToText (newRequestUserAgent opts)
     }
 
-toProtocolCredentials :: HttpCredentials -> PlaywrightNewRequestParamsHttpCredentials
+-- | The protocol takes a list of credentials; a request has at most one.
+toProtocolCredentials :: HttpCredentials -> [Protocol.HttpCredentials]
 toProtocolCredentials creds =
-  ( mkPlaywrightNewRequestParamsHttpCredentials
-      (httpPasswordToText (httpCredentialsPassword creds))
-      (httpUsernameToText (httpCredentialsUsername creds))
-  )
-    { playwrightNewRequestParamsHttpCredentialsOrigin =
-        fmap urlToText (httpCredentialsOrigin creds)
-    , playwrightNewRequestParamsHttpCredentialsSend =
-        fmap toProtocolCredentialsSend (httpCredentialsSend creds)
-    }
+  [ Protocol.HttpCredentials
+      { Protocol.httpCredentialsOrigin = fmap urlToText (httpCredentialsOrigin creds)
+      , Protocol.httpCredentialsPassword = httpPasswordToText (httpCredentialsPassword creds)
+      , Protocol.httpCredentialsSend = fmap toProtocolCredentialsSend (httpCredentialsSend creds)
+      , Protocol.httpCredentialsUsername = httpUsernameToText (httpCredentialsUsername creds)
+      }
+  ]
 
-toProtocolCredentialsSend :: HttpCredentialsSend -> PlaywrightNewRequestParamsHttpCredentialsSend
+toProtocolCredentialsSend :: HttpCredentialsSend -> Protocol.HttpCredentialsSend
 toProtocolCredentialsSend send =
   case send of
     HttpCredentialsSendAlways ->
-      PlaywrightNewRequestParamsHttpCredentialsSendAlways
+      Protocol.HttpCredentialsSendAlways
     HttpCredentialsSendUnauthorized ->
-      PlaywrightNewRequestParamsHttpCredentialsSendUnauthorized
+      Protocol.HttpCredentialsSendUnauthorized

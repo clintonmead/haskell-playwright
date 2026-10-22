@@ -108,6 +108,7 @@ import Playwright.Channel
   , Channel (Channel, channelGuid)
   , PageTag
   , send
+  , sendWithTimeout
   )
 import Playwright.Connection
   ( closedGuids
@@ -468,10 +469,11 @@ setViewportSize page size = do
 screenshot :: Page -> ScreenshotOptions -> Playwright ByteString
 screenshot page opts = do
   result <-
-    send
+    sendWithTimeout
       (pageChannel page)
       (MethodName "screenshot")
-      (mkPageScreenshotParams (screenshotOptionsTimeout opts))
+      (screenshotOptionsTimeout opts)
+      (mkPageScreenshotParams)
         { pageScreenshotParamsFullPage = screenshotOptionsFullPage opts
         }
   pure (protocolBinaryToByteString (pageScreenshotResultBinary result))
@@ -584,10 +586,11 @@ goBackWith :: Page -> Maybe LoadState -> Playwright (Maybe Response)
 goBackWith page waitUntil = do
   timeout <- pageNavigationTimeout page
   result <-
-    send
+    sendWithTimeout
       (pageChannel page)
       (MethodName "goBack")
-      (mkPageGoBackParams timeout)
+      timeout
+      (mkPageGoBackParams)
         { pageGoBackParamsWaitUntil = fmap toLifecycle waitUntil
         }
   pure (fmap (responseFromRef) (pageGoBackResultResponse result))
@@ -600,10 +603,11 @@ goForwardWith :: Page -> Maybe LoadState -> Playwright (Maybe Response)
 goForwardWith page waitUntil = do
   timeout <- pageNavigationTimeout page
   result <-
-    send
+    sendWithTimeout
       (pageChannel page)
       (MethodName "goForward")
-      (mkPageGoForwardParams timeout)
+      timeout
+      (mkPageGoForwardParams)
         { pageGoForwardParamsWaitUntil = fmap toLifecycle waitUntil
         }
   pure (fmap (responseFromRef) (pageGoForwardResultResponse result))
@@ -611,7 +615,7 @@ goForwardWith page waitUntil = do
 reload :: Page -> Playwright (Maybe Response)
 reload page = do
   timeout <- pageNavigationTimeout page
-  result <- send (pageChannel page) (MethodName "reload") (mkPageReloadParams timeout)
+  result <- sendWithTimeout (pageChannel page) (MethodName "reload") timeout (mkPageReloadParams)
   pure (fmap (responseFromRef) (pageReloadResultResponse result))
 
 querySelector :: Page -> Selector -> Playwright (Maybe ElementHandle)

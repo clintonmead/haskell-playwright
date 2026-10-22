@@ -51,6 +51,7 @@ import Playwright.Channel
   ( Channel (Channel, channelGuid)
   , ElementHandleTag
   , send
+  , sendWithTimeout
   )
 import Playwright.ClickOptions
   ( ClickOptions (clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsSteps, clickOptionsTimeout, clickOptionsTrial)
@@ -179,6 +180,11 @@ handleSend :: (ToJSON params, FromJSON result) => ElementHandle -> Text -> param
 handleSend handle method =
   send (elementHandleChannel handle) (MethodName method)
 
+-- | Sends a handle call whose timeout travels in the message metadata.
+handleSendWithTimeout :: (ToJSON params, FromJSON result) => ElementHandle -> Text -> Timeout -> params -> Playwright result
+handleSendWithTimeout handle method timeout params =
+  sendWithTimeout (elementHandleChannel handle) (MethodName method) timeout params
+
 clickHandle :: ElementHandle -> Playwright ()
 clickHandle handle =
   clickHandleWith handle defaultClickOptions
@@ -192,10 +198,11 @@ clickHandleWith handle opts = do
       Nothing ->
         pure defaultTimeout
   _ :: ElementHandleClickResult <-
-    handleSend
+    handleSendWithTimeout
       handle
       "click"
-      (mkElementHandleClickParams timeout)
+      timeout
+      (mkElementHandleClickParams)
         { elementHandleClickParamsButton = fmap toHandleClickButton (clickOptionsButton opts)
         , elementHandleClickParamsClickCount = clickOptionsClickCount opts
         , elementHandleClickParamsForce = clickOptionsForce opts
@@ -251,12 +258,12 @@ toProtocolPoint point =
 tapHandle :: ElementHandle -> Playwright ()
 tapHandle handle = do
   _ :: ElementHandleTapResult <-
-    handleSend handle "tap" (mkElementHandleTapParams defaultTimeout)
+    handleSendWithTimeout handle "tap" defaultTimeout mkElementHandleTapParams
   pure ()
 
 screenshotHandle :: ElementHandle -> Playwright ByteString
 screenshotHandle handle = do
-  result <- handleSend handle "screenshot" (mkElementHandleScreenshotParams defaultTimeout)
+  result <- handleSendWithTimeout handle "screenshot" defaultTimeout mkElementHandleScreenshotParams
   pure (protocolBinaryToByteString (elementHandleScreenshotResultBinary result))
 
 boundingBox :: ElementHandle -> Playwright (Maybe BoundingBox)
@@ -344,7 +351,7 @@ ownerFrameHandle handle = do
 typeHandle :: ElementHandle -> Text -> Playwright ()
 typeHandle handle text = do
   _ :: ElementHandleTypeResult <-
-    handleSend handle "type" (mkElementHandleTypeParams text defaultTimeout)
+    handleSendWithTimeout handle "type" defaultTimeout (mkElementHandleTypeParams text)
   pure ()
 
 scrollIntoViewIfNeeded :: ElementHandle -> Playwright ()
@@ -354,7 +361,7 @@ scrollIntoViewIfNeeded handle =
 scrollIntoViewIfNeededWith :: ElementHandle -> Timeout -> Playwright ()
 scrollIntoViewIfNeededWith handle timeout = do
   _ :: ElementHandleScrollIntoViewIfNeededResult <-
-    handleSend handle "scrollIntoViewIfNeeded" (mkElementHandleScrollIntoViewIfNeededParams timeout)
+    handleSendWithTimeout handle "scrollIntoViewIfNeeded" timeout mkElementHandleScrollIntoViewIfNeededParams
   pure ()
 
 selectText :: ElementHandle -> Playwright ()
@@ -364,16 +371,17 @@ selectText handle =
 selectTextWith :: ElementHandle -> Timeout -> Playwright ()
 selectTextWith handle timeout = do
   _ :: ElementHandleSelectTextResult <-
-    handleSend handle "selectText" (mkElementHandleSelectTextParams timeout)
+    handleSendWithTimeout handle "selectText" timeout mkElementHandleSelectTextParams
   pure ()
 
 setInputFilesHandle :: ElementHandle -> [InputFile] -> Playwright ()
 setInputFilesHandle handle files = do
   _ :: ElementHandleSetInputFilesResult <-
-    handleSend
+    handleSendWithTimeout
       handle
       "setInputFiles"
-      (mkElementHandleSetInputFilesParams defaultTimeout)
+      defaultTimeout
+      (mkElementHandleSetInputFilesParams)
         { elementHandleSetInputFilesParamsPayloads = Just (fmap toPayload files)
         }
   pure ()
@@ -391,10 +399,11 @@ waitForElementState handle state =
 waitForElementStateWith :: ElementHandle -> ElementState -> Timeout -> Playwright ()
 waitForElementStateWith handle state timeout = do
   _ :: ElementHandleWaitForElementStateResult <-
-    handleSend
+    handleSendWithTimeout
       handle
       "waitForElementState"
-      (mkElementHandleWaitForElementStateParams (toProtocolElementState state) timeout)
+      timeout
+      (mkElementHandleWaitForElementStateParams (toProtocolElementState state))
   pure ()
 
 toProtocolElementState :: ElementState -> ElementHandleWaitForElementStateParamsState

@@ -34,6 +34,7 @@ import Playwright.ElementHandle
 import Playwright.Frame
   ( Frame
   , frameSend
+  , frameSendWithTimeout
   )
 import Playwright.Protocol
   ( FrameFrameElementResult (frameFrameElementResultElement)
@@ -97,7 +98,7 @@ frameElement frame = do
 queryWithTimeout ::
   (ToJSON params, FromJSON result) =>
   Text ->
-  (Selector -> Timeout -> params) ->
+  (Selector -> params) ->
   (params -> params) ->
   (result -> a) ->
   Frame ->
@@ -105,7 +106,7 @@ queryWithTimeout ::
   Timeout ->
   Playwright a
 queryWithTimeout method mk setStrict project frame selector timeout =
-  project <$> frameSend frame method (setStrict (mk selector timeout))
+  project <$> frameSendWithTimeout frame method timeout (setStrict (mk selector))
 
 innerTextFrame :: Frame -> Selector -> Timeout -> Playwright Text
 innerTextFrame =
@@ -182,7 +183,7 @@ getAttributeFrame :: Frame -> Selector -> Text -> Timeout -> Playwright (Maybe T
 getAttributeFrame frame selector name timeout =
   queryWithTimeout
     "getAttribute"
-    (\sel t -> mkFrameGetAttributeParams name sel t)
+    (\sel -> mkFrameGetAttributeParams name sel)
     (\params -> params {frameGetAttributeParamsStrict = Just True})
     frameGetAttributeResultValue
     frame

@@ -60,8 +60,9 @@ import Playwright.Error
   )
 import Playwright.Frame
   ( Frame
-  , frameSend
   , frameSend_
+  , frameSendTimed_
+  , frameSendWithTimeout
   )
 import Playwright.InputFile
   ( InputFile (inputFileBytes, inputFileName)
@@ -182,19 +183,21 @@ clickFrame frame selector timeout =
 
 clickFrameStrict :: Frame -> Selector -> Timeout -> Maybe Bool -> Playwright ()
 clickFrameStrict frame selector timeout strict =
-  frameSend_ @FrameClickResult
+  frameSendTimed_ @FrameClickResult
     frame
     "click"
-    (mkFrameClickParams selector timeout)
+    timeout
+    (mkFrameClickParams selector)
       { frameClickParamsStrict = strict
       }
 
 clickFrameWith :: Frame -> Selector -> Timeout -> ClickOptions -> Playwright ()
 clickFrameWith frame selector timeout opts =
-  frameSend_ @FrameClickResult
+  frameSendTimed_ @FrameClickResult
     frame
     "click"
-    (mkFrameClickParams selector timeout)
+    timeout
+    (mkFrameClickParams selector)
       { frameClickParamsStrict = Just True
       , frameClickParamsButton = fmap toFrameClickButton (clickOptionsButton opts)
       , frameClickParamsClickCount = clickOptionsClickCount opts
@@ -236,10 +239,11 @@ toProtocolPoint point =
 
 dblclickFrame :: Frame -> Selector -> Timeout -> Playwright ()
 dblclickFrame frame selector timeout =
-  frameSend_ @FrameDblclickResult
+  frameSendTimed_ @FrameDblclickResult
     frame
     "dblclick"
-    (mkFrameDblclickParams selector timeout)
+    timeout
+    (mkFrameDblclickParams selector)
       { frameDblclickParamsStrict = Just True
       }
 
@@ -249,28 +253,31 @@ dispatchEventFrame frame selector eventType timeout =
 
 dispatchEventFrameWith :: Frame -> Selector -> DomEventType -> SerializedArgument -> Timeout -> Playwright ()
 dispatchEventFrameWith frame selector eventType eventInit timeout =
-  frameSend_ @FrameDispatchEventResult
+  frameSendTimed_ @FrameDispatchEventResult
     frame
     "dispatchEvent"
-    (mkFrameDispatchEventParams eventInit selector timeout (domEventTypeToText eventType))
+    timeout
+    (mkFrameDispatchEventParams eventInit selector (domEventTypeToText eventType))
       { frameDispatchEventParamsStrict = Just True
       }
 
 fillFrame :: Frame -> Selector -> Text -> Timeout -> Playwright ()
 fillFrame frame selector value timeout =
-  frameSend_ @FrameFillResult
+  frameSendTimed_ @FrameFillResult
     frame
     "fill"
-    (mkFrameFillParams selector timeout value)
+    timeout
+    (mkFrameFillParams selector value)
       { frameFillParamsStrict = Just True
       }
 
 checkFrame :: Frame -> Selector -> CheckOptions -> Playwright ()
 checkFrame frame selector opts =
-  frameSend_ @FrameCheckResult
+  frameSendTimed_ @FrameCheckResult
     frame
     "check"
-    (mkFrameCheckParams selector (checkOptionsTimeout opts))
+    (checkOptionsTimeout opts)
+    (mkFrameCheckParams selector)
       { frameCheckParamsStrict = Just True
       , frameCheckParamsForce = checkOptionsForce opts
       , frameCheckParamsTrial = checkOptionsTrial opts
@@ -278,10 +285,11 @@ checkFrame frame selector opts =
 
 uncheckFrame :: Frame -> Selector -> CheckOptions -> Playwright ()
 uncheckFrame frame selector opts =
-  frameSend_ @FrameUncheckResult
+  frameSendTimed_ @FrameUncheckResult
     frame
     "uncheck"
-    (mkFrameUncheckParams selector (checkOptionsTimeout opts))
+    (checkOptionsTimeout opts)
+    (mkFrameUncheckParams selector)
       { frameUncheckParamsStrict = Just True
       , frameUncheckParamsForce = checkOptionsForce opts
       , frameUncheckParamsTrial = checkOptionsTrial opts
@@ -289,28 +297,31 @@ uncheckFrame frame selector opts =
 
 focusFrame :: Frame -> Selector -> Timeout -> Playwright ()
 focusFrame frame selector timeout =
-  frameSend_ @FrameFocusResult
+  frameSendTimed_ @FrameFocusResult
     frame
     "focus"
-    (mkFrameFocusParams selector timeout)
+    timeout
+    (mkFrameFocusParams selector)
       { frameFocusParamsStrict = Just True
       }
 
 blurFrame :: Frame -> Selector -> Timeout -> Playwright ()
 blurFrame frame selector timeout =
-  frameSend_ @FrameBlurResult
+  frameSendTimed_ @FrameBlurResult
     frame
     "blur"
-    (mkFrameBlurParams selector timeout)
+    timeout
+    (mkFrameBlurParams selector)
       { frameBlurParamsStrict = Just True
       }
 
 hoverFrame :: Frame -> Selector -> Timeout -> Playwright ()
 hoverFrame frame selector timeout =
-  frameSend_ @FrameHoverResult
+  frameSendTimed_ @FrameHoverResult
     frame
     "hover"
-    (mkFrameHoverParams selector timeout)
+    timeout
+    (mkFrameHoverParams selector)
       { frameHoverParamsStrict = Just True
       }
 
@@ -330,28 +341,31 @@ hideHighlightFrame frame selector =
 
 tapFrame :: Frame -> Selector -> Timeout -> Playwright ()
 tapFrame frame selector timeout =
-  frameSend_ @FrameTapResult
+  frameSendTimed_ @FrameTapResult
     frame
     "tap"
-    (mkFrameTapParams selector timeout)
+    timeout
+    (mkFrameTapParams selector)
       { frameTapParamsStrict = Just True
       }
 
 pressFrame :: Frame -> Selector -> Key -> Timeout -> Playwright ()
 pressFrame frame selector key timeout =
-  frameSend_ @FramePressResult
+  frameSendTimed_ @FramePressResult
     frame
     "press"
-    (mkFramePressParams (keyToText key) selector timeout)
+    timeout
+    (mkFramePressParams (keyToText key) selector)
       { framePressParamsStrict = Just True
       }
 
 typeTextFrame :: Frame -> Selector -> Text -> Timeout -> Playwright ()
 typeTextFrame frame selector text timeout =
-  frameSend_ @FrameTypeResult
+  frameSendTimed_ @FrameTypeResult
     frame
     "type"
-    (mkFrameTypeParams selector text timeout)
+    timeout
+    (mkFrameTypeParams selector text)
       { frameTypeParamsStrict = Just True
       }
 
@@ -361,10 +375,11 @@ dragAndDropFrame frame source target timeout =
 
 dragAndDropFrameWith :: Frame -> Selector -> Selector -> Timeout -> DragAndDropOptions -> Playwright ()
 dragAndDropFrameWith frame source target timeout opts =
-  frameSend_ @FrameDragAndDropResult
+  frameSendTimed_ @FrameDragAndDropResult
     frame
     "dragAndDrop"
-    (mkFrameDragAndDropParams source target timeout)
+    timeout
+    (mkFrameDragAndDropParams source target)
       { frameDragAndDropParamsStrict = Just True
       , frameDragAndDropParamsForce = dragAndDropOptionsForce opts
       , frameDragAndDropParamsSourcePosition = fmap toProtocolPoint (dragAndDropOptionsSourcePosition opts)
@@ -379,10 +394,11 @@ dropFrame frame selector payload timeout =
     then
       throwIO (DecodeFailure "At least one of \"files\" or \"data\" must be provided")
     else
-      frameSend_ @FrameDropResult
+      frameSendTimed_ @FrameDropResult
         frame
         "drop"
-        (mkFrameDropParams selector timeout)
+        timeout
+        (mkFrameDropParams selector)
           { frameDropParamsStrict = Just True
           , frameDropParamsPayloads =
               if null (dropPayloadFiles payload)
@@ -409,10 +425,11 @@ toDropDataPayload item =
 
 setInputFilesFrame :: Frame -> Selector -> [InputFile] -> Timeout -> Playwright ()
 setInputFilesFrame frame selector files timeout =
-  frameSend_ @FrameSetInputFilesResult
+  frameSendTimed_ @FrameSetInputFilesResult
     frame
     "setInputFiles"
-    (mkFrameSetInputFilesParams selector timeout)
+    timeout
+    (mkFrameSetInputFilesParams selector)
       { frameSetInputFilesParamsStrict = Just True
       , frameSetInputFilesParamsPayloads = Just (fmap toPayload files)
       }
@@ -430,14 +447,16 @@ selectOptionFrame frame selector options timeout =
 selectOptionFrameWith :: Frame -> Selector -> [SelectOption] -> Timeout -> SelectOptionOptions -> Playwright [Text]
 selectOptionFrameWith frame selector options timeout opts = do
   result <-
-    frameSend
+    frameSendWithTimeout
       frame
       "selectOption"
-      (mkFrameSelectOptionParams selector timeout)
-        { frameSelectOptionParamsStrict = Just True
-        , frameSelectOptionParamsForce = selectOptionOptionsForce opts
-        , frameSelectOptionParamsOptions = Just (fmap toProtocolOption options)
-        }
+      timeout
+      ( (mkFrameSelectOptionParams selector)
+          { frameSelectOptionParamsStrict = Just True
+          , frameSelectOptionParamsForce = selectOptionOptionsForce opts
+          , frameSelectOptionParamsOptions = Just (fmap toProtocolOption options)
+          }
+      )
   pure (frameSelectOptionResultValues result)
 
 toProtocolOption :: SelectOption -> FrameSelectOptionParamsOptions

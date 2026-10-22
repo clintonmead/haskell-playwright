@@ -47,6 +47,7 @@ import Playwright.ProxySettings
   ( ProxyHost (proxyHostToText)
   , ProxySettings (proxySettingsBypass, proxySettingsPassword, proxySettingsServer, proxySettingsUsername)
   )
+import Playwright.Protocol qualified as Protocol
 import Playwright.Protocol
   ( BrowserNewContextParams (browserNewContextParamsAcceptDownloads, browserNewContextParamsBaseURL, browserNewContextParamsBypassCSP, browserNewContextParamsColorScheme, browserNewContextParamsContrast, browserNewContextParamsDeviceScaleFactor, browserNewContextParamsExtraHTTPHeaders, browserNewContextParamsForcedColors, browserNewContextParamsGeolocation, browserNewContextParamsHasTouch, browserNewContextParamsHttpCredentials, browserNewContextParamsIgnoreHTTPSErrors, browserNewContextParamsIsMobile, browserNewContextParamsJavaScriptEnabled, browserNewContextParamsLocale, browserNewContextParamsNoDefaultViewport, browserNewContextParamsOffline, browserNewContextParamsPermissions, browserNewContextParamsProxy, browserNewContextParamsReducedMotion, browserNewContextParamsScreen, browserNewContextParamsServiceWorkers, browserNewContextParamsStorageState, browserNewContextParamsStrictSelectors, browserNewContextParamsTimezoneId, browserNewContextParamsUserAgent, browserNewContextParamsViewport)
   , BrowserNewContextParamsAcceptDownloads (BrowserNewContextParamsAcceptDownloadsAccept, BrowserNewContextParamsAcceptDownloadsDeny)
@@ -54,8 +55,6 @@ import Playwright.Protocol
   , BrowserNewContextParamsContrast (BrowserNewContextParamsContrastMore, BrowserNewContextParamsContrastNoOverride, BrowserNewContextParamsContrastNoPreference)
   , BrowserNewContextParamsForcedColors (BrowserNewContextParamsForcedColorsActive, BrowserNewContextParamsForcedColorsNoOverride, BrowserNewContextParamsForcedColorsNone)
   , BrowserNewContextParamsGeolocation (browserNewContextParamsGeolocationAccuracy)
-  , BrowserNewContextParamsHttpCredentials (browserNewContextParamsHttpCredentialsOrigin, browserNewContextParamsHttpCredentialsSend)
-  , BrowserNewContextParamsHttpCredentialsSend (BrowserNewContextParamsHttpCredentialsSendAlways, BrowserNewContextParamsHttpCredentialsSendUnauthorized)
   , BrowserNewContextParamsProxy (browserNewContextParamsProxyBypass, browserNewContextParamsProxyPassword, browserNewContextParamsProxyUsername)
   , BrowserNewContextParamsReducedMotion (BrowserNewContextParamsReducedMotionNoOverride, BrowserNewContextParamsReducedMotionNoPreference, BrowserNewContextParamsReducedMotionReduce)
   , BrowserNewContextParamsScreen
@@ -63,7 +62,6 @@ import Playwright.Protocol
   , BrowserNewContextParamsViewport
   , mkBrowserNewContextParams
   , mkBrowserNewContextParamsGeolocation
-  , mkBrowserNewContextParamsHttpCredentials
   , mkBrowserNewContextParamsProxy
   , mkBrowserNewContextParamsScreen
   , mkBrowserNewContextParamsViewport
@@ -250,25 +248,24 @@ toProtocolGeolocation location =
         fmap accuracyToScientific (geolocationAccuracy location)
     }
 
-toProtocolCredentials :: HttpCredentials -> BrowserNewContextParamsHttpCredentials
+-- | The protocol takes a list of credentials; a context has at most one.
+toProtocolCredentials :: HttpCredentials -> [Protocol.HttpCredentials]
 toProtocolCredentials creds =
-  ( mkBrowserNewContextParamsHttpCredentials
-      (httpPasswordToText (httpCredentialsPassword creds))
-      (httpUsernameToText (httpCredentialsUsername creds))
-  )
-    { browserNewContextParamsHttpCredentialsOrigin =
-        fmap urlToText (httpCredentialsOrigin creds)
-    , browserNewContextParamsHttpCredentialsSend =
-        fmap toProtocolCredentialsSend (httpCredentialsSend creds)
-    }
+  [ Protocol.HttpCredentials
+      { Protocol.httpCredentialsOrigin = fmap urlToText (httpCredentialsOrigin creds)
+      , Protocol.httpCredentialsPassword = httpPasswordToText (httpCredentialsPassword creds)
+      , Protocol.httpCredentialsSend = fmap toProtocolCredentialsSend (httpCredentialsSend creds)
+      , Protocol.httpCredentialsUsername = httpUsernameToText (httpCredentialsUsername creds)
+      }
+  ]
 
-toProtocolCredentialsSend :: HttpCredentialsSend -> BrowserNewContextParamsHttpCredentialsSend
+toProtocolCredentialsSend :: HttpCredentialsSend -> Protocol.HttpCredentialsSend
 toProtocolCredentialsSend send =
   case send of
     HttpCredentialsSendAlways ->
-      BrowserNewContextParamsHttpCredentialsSendAlways
+      Protocol.HttpCredentialsSendAlways
     HttpCredentialsSendUnauthorized ->
-      BrowserNewContextParamsHttpCredentialsSendUnauthorized
+      Protocol.HttpCredentialsSendUnauthorized
 
 toProtocolViewport :: ViewportSize -> BrowserNewContextParamsViewport
 toProtocolViewport size =

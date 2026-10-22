@@ -122,6 +122,7 @@ import Playwright.Page
 import Playwright.PermissionName
   ( PermissionName (permissionNameToText)
   )
+import Playwright.Protocol qualified as Protocol
 import Playwright.Protocol
   ( BrowserContextAddCookiesResult
   , BrowserContextAddInitScriptResult (browserContextAddInitScriptResultDisposable)
@@ -141,7 +142,6 @@ import Playwright.Protocol
   , BrowserContextSetGeolocationParamsGeolocation (browserContextSetGeolocationParamsGeolocationAccuracy)
   , BrowserContextSetGeolocationResult
   , BrowserContextSetHTTPCredentialsParams (browserContextSetHTTPCredentialsParamsHttpCredentials)
-  , BrowserContextSetHTTPCredentialsParamsHttpCredentials (browserContextSetHTTPCredentialsParamsHttpCredentialsOrigin)
   , BrowserContextSetHTTPCredentialsResult
   , BrowserContextSetOfflineResult
   , BrowserContextSetStorageStateParams (browserContextSetStorageStateParamsStorageState)
@@ -159,7 +159,6 @@ import Playwright.Protocol
   , mkBrowserContextSetGeolocationParams
   , mkBrowserContextSetGeolocationParamsGeolocation
   , mkBrowserContextSetHTTPCredentialsParams
-  , mkBrowserContextSetHTTPCredentialsParamsHttpCredentials
   , mkBrowserContextSetOfflineParams
   , mkBrowserContextSetStorageStateParams
   , mkBrowserContextStorageStateParams
@@ -461,14 +460,13 @@ setHTTPCredentials ctx creds = do
       mkBrowserContextSetHTTPCredentialsParams
         { browserContextSetHTTPCredentialsParamsHttpCredentials =
             Just
-              ( ( mkBrowserContextSetHTTPCredentialsParamsHttpCredentials
-                    (httpPasswordToText (httpCredentialsPassword creds))
-                    (httpUsernameToText (httpCredentialsUsername creds))
-                )
-                  { browserContextSetHTTPCredentialsParamsHttpCredentialsOrigin =
-                      fmap urlToText (httpCredentialsOrigin creds)
+              [ Protocol.HttpCredentials
+                  { Protocol.httpCredentialsOrigin = fmap urlToText (httpCredentialsOrigin creds)
+                  , Protocol.httpCredentialsPassword = httpPasswordToText (httpCredentialsPassword creds)
+                  , Protocol.httpCredentialsSend = Nothing
+                  , Protocol.httpCredentialsUsername = httpUsernameToText (httpCredentialsUsername creds)
                   }
-              )
+              ]
         }
   pure ()
 

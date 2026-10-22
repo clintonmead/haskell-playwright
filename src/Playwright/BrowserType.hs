@@ -37,6 +37,7 @@ import Playwright.Channel
   ( BrowserTypeTag
   , Channel (Channel, channelGuid)
   , send
+  , sendWithTimeout
   )
 import Playwright.Connection
   ( lookupBrowserTypeGuid
@@ -56,7 +57,7 @@ import Playwright.LaunchEnv
   ( applyEnvLaunchOverrides
   )
 import Playwright.LaunchOptions
-  ( LaunchOptions (launchOptionsDownloadsPath)
+  ( LaunchOptions (launchOptionsDownloadsPath, launchOptionsTimeout)
   )
 import Playwright.LaunchPersistent
   ( toLaunchPersistentParams
@@ -116,9 +117,10 @@ launchPersistentContext browserType userDataDir launchOpts ctxOpts = do
   resolvedLaunch <- liftIO (resolveLaunchDownloads launchOpts >>= applyEnvLaunchOverrides)
   engines <- lookupSelectorEngines
   result <-
-    send
+    sendWithTimeout
       (browserTypeChannel browserType)
       (MethodName "launchPersistentContext")
+      (launchOptionsTimeout resolvedLaunch)
       (toLaunchPersistentParams absUserDataDir resolvedLaunch ctxOpts engines)
   browser <-
     browserFromRef

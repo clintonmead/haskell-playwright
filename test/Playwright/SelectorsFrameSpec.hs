@@ -160,16 +160,14 @@ tests =
           assertProtocolContains
             "Failed to find element matching selector"
             (evalOnSelectorHandleText body (selectorFromText iframeCanvas) "e => 1")
-    , testCase "$$eval should throw for missing frame" $
+    , testCase "$$eval should not throw for missing frame" $
         withAssets $ \prefix page -> do
           _ <- gotoEmpty prefix page
-          assertProtocolContains
-            "Failed to find frame for selector"
-            (evalOnSelectorAllTexts page (selectorFromText iframeCanvas) "els => 1")
+          assertEqual "page" []
+            =<< evalOnSelectorAllTexts page (selectorFromText iframeCanvas) "els => els.map(e => e.textContent)"
           body <- requireHandle =<< querySelector page (selectorFromText "body")
-          assertProtocolContains
-            "Failed to find frame for selector"
-            (evalOnSelectorAllHandleTexts body (selectorFromText iframeCanvas) "els => 1")
+          assertEqual "handle" []
+            =<< evalOnSelectorAllHandleTexts body (selectorFromText iframeCanvas) "els => els.map(e => e.textContent)"
     , testCase "should work for $ and $$ (handle)" $
         withAssets $ \prefix page -> do
           routeIframe page

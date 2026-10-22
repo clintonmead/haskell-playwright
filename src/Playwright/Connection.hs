@@ -3,6 +3,7 @@ module Playwright.Connection
   , EventAbort (EventAbort)
   , withConnection
   , sendCommand
+  , sendCommandWithMetadata
   , guidsOfType
   , lookupObject
   , registerEventHandler
@@ -231,6 +232,17 @@ sendCommand ::
 sendCommand guid method params = do
   conn <- askConnection
   liftIO (sendCommandIO conn guid method params)
+
+sendCommandWithMetadata ::
+  (ToJSON params, FromJSON result) =>
+  Guid ->
+  MethodName ->
+  params ->
+  Value ->
+  Playwright result
+sendCommandWithMetadata guid method params metadata = do
+  conn <- askConnection
+  liftIO (sendCommandMetaIO conn guid method params metadata)
 
 inConnection :: (Connection -> IO a) -> Playwright a
 inConnection action = do
@@ -484,7 +496,20 @@ sendCommandIO ::
   MethodName ->
   params ->
   IO result
-sendCommandIO conn guid method params = do
+sendCommandIO conn guid method params =
+  sendCommandMetaIO conn guid method params (Aeson.object ["internal" Aeson..= False])
+
+-- | Sends a command with message metadata. The protocol takes call timeouts in
+-- the metadata, so calls whose timeout is no longer in their params use this.
+sendCommandMetaIO ::
+  (ToJSON params, FromJSON result) =>
+  Connection ->
+  Guid ->
+  MethodName ->
+  params ->
+  Value ->
+  IO result
+sendCommandMetaIO conn guid method params metadata = do
   closed <- atomically (sessionClosed <$> readSession conn)
   case closed of
     Just err ->
@@ -510,7 +535,7 @@ sendCommandIO conn guid method params = do
             , outgoingCallGuid = guid
             , outgoingCallMethod = method
             , outgoingCallParams = toJSON params
-            , outgoingCallMetadata = Aeson.object ["internal" Aeson..= False]
+            , outgoingCallMetadata = metadata
             }
       sendPayload (connectionTransport conn) (toStrict (encode outgoing))
       result <-

@@ -105,7 +105,7 @@ tests =
             (evaluateBool page "() => { window.__FOO = 1; return true; }")
     , testCase "should work when resolved right before execution context disposal" $
         withChromiumPage $ \page -> do
-          addInitScript page "() => { window.__RELOADED = true; }"
+          addInitScript page "(() => { window.__RELOADED = true; })()"
           _ <- waitForFunction page "() => { if (!window.__RELOADED) window.location.reload(); return true; }"
           pure ()
     , testCase "should poll on interval" $

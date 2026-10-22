@@ -16,6 +16,15 @@ import Data.Scientific
 import Data.Text
   ( Text
   )
+import Control.Monad.IO.Class
+  ( liftIO
+  )
+import Playwright.Error
+  ( PlaywrightError (DecodeFailure)
+  )
+import UnliftIO.Exception
+  ( throwIO
+  )
 import Playwright.Channel
   ( Channel (channelGuid)
   )
@@ -28,8 +37,8 @@ import Playwright.ElementHandle
   )
 import Playwright.Frame
   ( Frame (frameChannel)
-  , frameSend
   , frameSend_
+  , frameSendWithTimeout
   )
 import Playwright.JsHandle
   ( JsHandle
@@ -67,10 +76,11 @@ import Playwright.WaitForState
 waitForSelectorFrame :: Frame -> Selector -> WaitForState -> Timeout -> Maybe Bool -> Playwright ()
 waitForSelectorFrame frame selector state timeout strict = do
   _ :: FrameWaitForSelectorResult <-
-    frameSend
+    frameSendWithTimeout
       frame
       "waitForSelector"
-      (mkFrameWaitForSelectorParams selector timeout)
+      timeout
+      (mkFrameWaitForSelectorParams selector)
         { frameWaitForSelectorParamsStrict = strict
         , frameWaitForSelectorParamsOmitReturnValue = Just True
         , frameWaitForSelectorParamsState = Just (toProtocolState state)
@@ -80,10 +90,11 @@ waitForSelectorFrame frame selector state timeout strict = do
 waitForSelectorHandleFrame :: Frame -> Selector -> WaitForState -> Timeout -> Maybe Bool -> Playwright (Maybe ElementHandle)
 waitForSelectorHandleFrame frame selector state timeout strict = do
   result <-
-    frameSend
+    frameSendWithTimeout
       frame
       "waitForSelector"
-      (mkFrameWaitForSelectorParams selector timeout)
+      timeout
+      (mkFrameWaitForSelectorParams selector)
         { frameWaitForSelectorParamsStrict = strict
         , frameWaitForSelectorParamsOmitReturnValue = Nothing
         , frameWaitForSelectorParamsState = Just (toProtocolState state)
@@ -108,17 +119,19 @@ waitForTimeoutFrame frame timeout =
 waitForFunctionFrame :: Frame -> Text -> SerializedArgument -> Timeout -> Maybe Scientific -> Playwright JsHandle
 waitForFunctionFrame frame expression arg timeout polling = do
   result <-
-    frameSend
+    frameSendWithTimeout
       frame
       "waitForFunction"
-      (mkFrameWaitForFunctionParams arg expression timeout)
+      timeout
+      (mkFrameWaitForFunctionParams arg expression)
         { frameWaitForFunctionParamsIsFunction = Just True
         , frameWaitForFunctionParamsPollingInterval = polling
         }
-  pure
-    ( jsHandleFromRef
-        (frameWaitForFunctionResultHandle result)
-    )
+  case frameWaitForFunctionResultHandle result of
+    Just handleRef ->
+      pure (jsHandleFromRef handleRef)
+    Nothing ->
+      liftIO (throwIO (DecodeFailure "waitForFunction returned no handle"))
 
 waitForLoadStateFrame :: Frame -> LoadState -> Playwright ()
 waitForLoadStateFrame frame state =

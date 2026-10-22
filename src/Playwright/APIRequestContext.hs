@@ -54,6 +54,7 @@ import Playwright.Channel
   ( APIRequestContextTag
   , Channel (Channel)
   , send
+  , sendWithTimeout
   )
 import Playwright.Connection
   ( lookupObject
@@ -248,11 +249,12 @@ sendFetch ctx url method headers post opts = do
   validateFetchBound "maxRetries" (fetchMaxRetries opts)
   timeout <- resolveFetchTimeout ctx (fetchTimeout opts)
   result <-
-    send
+    sendWithTimeout
       (apiRequestContextChannel ctx)
       (MethodName "fetch")
-      (mkAPIRequestContextFetchParams timeout url)
-        { aPIRequestContextFetchParamsEncodedParams = fetchEncodedParams opts
+      timeout
+      ( (mkAPIRequestContextFetchParams url)
+          { aPIRequestContextFetchParamsEncodedParams = fetchEncodedParams opts
         , aPIRequestContextFetchParamsFailOnStatusCode = fetchFailOnStatusCode opts
         , aPIRequestContextFetchParamsFormData = fmap (fmap formNameValue) (fetchFormData opts)
         , aPIRequestContextFetchParamsHeaders = fmap (fmap toNameValue) headers
@@ -265,6 +267,7 @@ sendFetch ctx url method headers post opts = do
         , aPIRequestContextFetchParamsParams = fmap (fmap queryNameValue) (fetchQueryParams opts)
         , aPIRequestContextFetchParamsPostData = fmap protocolBinaryFromByteString (postBodyBytes post)
         }
+      )
   pure
     APIResponse
       { apiResponseChannel = apiRequestContextChannel ctx
