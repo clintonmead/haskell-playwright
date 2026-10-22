@@ -542,3 +542,13 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 **Not representable:** the upstream `null` and wrong-type cases for the element form. `[ElementHandle]` cannot hold `null`, and the type checker rejects a non-handle. Those stay skipped in `progress/FUNCTIONALITY_TODO.md`.
 
 **To change:** If a combined `SelectOption` type is wanted later, `selectOptionElements` can be kept as a thin wrapper over it.
+
+## page-evaluate nice error after navigation
+
+**Question:** Upstream "should throw a nice error after a navigation" (`tests/page/page-evaluate.spec.ts`, around line 542) starts an evaluate, navigates the page, and expects the first evaluate to fail with a nice error. Does the case need the first evaluate to reach the page before the navigation?
+
+**Guess taken:** Yes. The error only shows up when the first evaluate is already running in the page when the reload starts. Haskell has no ordering barrier between an in-flight evaluate and a later `goto` or `reload` on the same page, so the case is left open in `progress/FUNCTIONALITY_TODO.md`.
+
+**Why not ported:** Sending the navigation right after forking the evaluate would race. The case could pass or fail depending on timing, and that would not test the error.
+
+**To change:** Add a page-side barrier, for example a script that sets a flag once the first evaluate has started, then wait on that flag before the navigation. The case can then be ported as written.

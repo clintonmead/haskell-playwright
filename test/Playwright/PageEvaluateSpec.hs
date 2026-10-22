@@ -4,30 +4,58 @@ module Playwright.PageEvaluateSpec
 
 import Data.Text
   ( Text
+  , replace
   )
 import Data.Text qualified as Text
+import Data.Maybe
+  ( fromMaybe
+  )
+import UnliftIO.Async
+  ( async
+  , wait
+  )
+import UnliftIO.MVar
+  ( newEmptyMVar
+  , takeMVar
+  , tryPutMVar
+  )
+import Network.HTTP.Types
+  ( hContentType
+  , status200
+  )
+import Network.Wai
+  ( Application
+  , requestHeaderHost
+  , responseLBS
+  )
 import Playwright
   ( SpecialJsValue (SpecialInfinity, SpecialNaN, SpecialNegInfinity, SpecialNegZero, SpecialNull, SpecialUndefined)
   , boolArgument
   , evaluate
+  , evaluateBool
   , evaluateBoolWith
   , evaluateHandleExpression
   , elementArgument
   , jsonValue
   , jsonValueNumber
+  , urlFromText
   , urlToText
   , evaluateNumber
   , evaluateNumberWith
   , evaluateNumbersWith
+  , evaluateOnFrame
   , evaluateSpecial
   , evaluateSpecialWith
   , evaluateTextWith
   , evaluateWith
+  , defaultGotoOptions
+  , goto
   , numberArgument
   , numbersArgument
   , objectNumberArgument
   , objectSpecialArgument
   , objectTextArgument
+  , onFrameNavigated
   , querySelector
   , selectorFromText
   , setContent
@@ -39,7 +67,9 @@ import Playwright.Harness
   ( assertProtocolContains
   , requireHandle
   , withAssetPage
+  , withAssets
   , withChromiumPage
+  , withLocalApp
   , assertBool
   , assertEqual
   , assertFailure
@@ -48,7 +78,7 @@ import Playwright.SerializedArgument
   ( SerializedArgument
   )
 import Playwright.SerializedValue
-  ( SerializedPayload (PayloadBigInt, PayloadDate, PayloadObject, PayloadSpecial, PayloadString, PayloadUrl)
+  ( SerializedPayload (PayloadBigInt, PayloadDate, PayloadNumber, PayloadObject, PayloadSpecial, PayloadString, PayloadUrl)
   , SerializedValue (SerializedNode, SerializedRef)
   )
 import Test.Tasty
@@ -327,7 +357,109 @@ tests =
           assertProtocolContains
             "object reference chain is too long"
             (evaluate page "() => { let node = {}; for (let i = 0; i < 200; i++) node = { child: node }; return node; }")
+    , testCase "should throw when evaluation triggers reload" $
+        withChromiumPage $ \page ->
+          assertProtocolContains
+            "navigation"
+            (evaluate page "() => { location.reload(); return new Promise(() => {}); }")
+    , testCase "should not throw an error when evaluation does a navigation" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/one-style.html")) defaultGotoOptions
+          result <-
+            evaluateNumbersWith
+              page
+              "() => { window.location.href = '/empty.html'; return [42]; }"
+              (specialArgument SpecialUndefined)
+          assertEqual "result" [42] result
+    , testCase "should not throw an error when evaluation does a synchronous navigation and returns an object" $
+        withChromiumPage $ \page -> do
+          result <- evaluate page "() => { window.location.reload(); return { a: 42 }; }"
+          assertEqual "a" (Just 42) (objectNumberField "a" result)
+    , testCase "should not throw an error when evaluation does a synchronous navigation and returns undefined" $
+        withChromiumPage $ \page -> do
+          special <- evaluateSpecial page "() => { window.location.reload(); return undefined; }"
+          assertEqual "undefined" SpecialUndefined special
+    , testCase "should work with new Function() and CSP" $
+        withChromiumPage $ \page ->
+          withLocalApp scriptHostApp $ \base -> do
+            _ <- goto page (urlFromText (base <> "/empty.html")) defaultGotoOptions
+            assertEqual "result" True =<< evaluateBool page "() => new Function('return true')()"
+    , testCase "should work with CSP" $
+        withChromiumPage $ \page ->
+          withLocalApp scriptSelfApp $ \base -> do
+            _ <- goto page (urlFromText (base <> "/empty.html")) defaultGotoOptions
+            assertEqual "four" (4 :: Double) =<< evaluateNumber page "() => 2 + 2"
+    , testCase "should work right after framenavigated" $
+        withAssets $ \prefix page -> do
+          evaluation <- newEmptyMVar
+          onFrameNavigated page $ \frame -> do
+            pending <- async (evaluateOnFrame frame "() => 6 * 7")
+            _ <- tryPutMVar evaluation pending
+            pure ()
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          pending <- takeMVar evaluation
+          assertEqual "result" (Just 42) . numberOf =<< wait pending
+    , testCase "should work right after a cross-origin navigation" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          evaluation <- newEmptyMVar
+          onFrameNavigated page $ \frame -> do
+            pending <- async (evaluateOnFrame frame "() => 6 * 7")
+            _ <- tryPutMVar evaluation pending
+            pure ()
+          -- localhost is a different origin from 127.0.0.1, and the same server answers both.
+          _ <- goto page (urlFromText (replace "127.0.0.1" "localhost" prefix <> "/empty.html")) defaultGotoOptions
+          pending <- takeMVar evaluation
+          assertEqual "result" (Just 42) . numberOf =<< wait pending
     ]
+
+-- | The number a frame evaluation returned, or 'Nothing' when it is not a number.
+numberOf :: SerializedValue -> Maybe Double
+numberOf value =
+  case value of
+    SerializedNode (PayloadNumber number) _ -> Just number
+    _ -> Nothing
+
+-- | Serves an empty page whose Content-Security-Policy allows scripts from the
+-- page's own origin only, the header the upstream "should work with CSP" case sets.
+scriptSelfApp :: Application
+scriptSelfApp _ respond =
+  respond
+    ( responseLBS
+        status200
+        [ ("Content-Security-Policy", "script-src 'self'")
+        , (hContentType, "text/html")
+        ]
+        ""
+    )
+
+-- | Serves an empty page whose Content-Security-Policy allows scripts from the
+-- host the request was sent to. The app is built before the test knows its base
+-- URL, so it reads the @Host@ header, as the upstream case reads its server prefix.
+scriptHostApp :: Application
+scriptHostApp request respond =
+  respond
+    ( responseLBS
+        status200
+        [ ("Content-Security-Policy", "script-src http://" <> fromMaybe "" (requestHeaderHost request))
+        , (hContentType, "text/html")
+        ]
+        ""
+    )
+
+-- | The number stored under one field of an object result, or 'Nothing' when the
+-- value is not an object or the field is not a number.
+objectNumberField :: Text -> SerializedValue -> Maybe Double
+objectNumberField name value =
+  case value of
+    SerializedNode (PayloadObject fields) _ ->
+      case lookup name fields of
+        Just (SerializedNode (PayloadNumber number) _) ->
+          Just number
+        _ ->
+          Nothing
+    _ ->
+      Nothing
 
 -- | True when the value is an object whose @b@ field refers back to the object
 -- itself, which is how the driver encodes @const a = {}; a.b = a@.
