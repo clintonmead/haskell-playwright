@@ -82,3 +82,43 @@ Decisions made without waiting for an answer. Each entry gives the question, the
 **Guess taken:** No. Globs now turn into an anchored regex the way `packages/isomorphic/urlMatch.ts` does. `?` is a literal, `*` stays within a segment, `**/` crosses segments, and `{a,b}` is alternation. The regex is matched by `regex-tdfa`. An empty alternative is written as `(.+/)?`, because `regex-tdfa` rejects `((.+/)|)`.
 
 **To change:** The old matcher is in git history (`src/Playwright/UrlGlob.hs` before the UrlMatch rename).
+
+## Driver pin moved to 1.64.1
+
+**Question:** Should the pinned driver move from 1.61.1 to 1.64.1, which needs the timeout moved into message metadata and the protocol port that comes with it?
+
+**Guess taken:** Yes. The pin in `flake.nix` now uses nixpkgs with playwright-driver 1.64.1, and the source hash is updated. The protocol port is in commit f82c0e3. Calls that lost their timeout param now send it through `sendWithTimeout`.
+
+**To change:** Revert `flake.nix` and `flake.lock` to 8ce4ef6 and undo the port commit. Tap options and the check-position and click-scroll cases were waiting on this pin.
+
+## WAYLAND_DISPLAY unset in the dev shell
+
+**Question:** Should the dev shell unset `WAYLAND_DISPLAY`, given that the headless WebGL tests fail when it is set?
+
+**Guess taken:** Yes. With it set, the browser's ANGLE asks for a Wayland surface that SwiftShader does not provide, so `getContext('webgl')` returns null. The tests run headless and do not need Wayland. The `shellHook` is in commit 1b09f49, with the reason written in the flake.
+
+**To change:** Remove the `shellHook` from `flake.nix`. The two WebGL tests will fail again on a Wayland session.
+
+## Single credential sent as a list
+
+**Question:** The protocol now takes a list of HTTP credentials. Should the Haskell API keep one credential per context and request?
+
+**Guess taken:** Yes. The binding keeps the single `HttpCredentials` argument and sends a one-element list. Upstream's array form, with several credentials for different origins, is still not ported (the cases listed in QUESTIONS.md under the array form).
+
+**To change:** Change the `NewContextOptions` and `NewRequestOptions` fields to a list, and the converters to map it.
+
+## waitForFunction without a handle
+
+**Question:** The protocol's `waitForFunction` result handle is optional now. What should the binding return when it is missing?
+
+**Guess taken:** A `DecodeFailure` with the message "waitForFunction returned no handle". The upstream client assumes the handle is present (`result.handle!`), so this should not happen in practice.
+
+**To change:** Return a `JsHandle` for `undefined` instead if that case turns out to be legitimate.
+
+## $$eval on a missing frame
+
+**Question:** Upstream 1.64 renamed "$$eval should throw for missing frame" to "$$eval should not throw for missing frame", and expects no error and no matches. Should the Haskell test follow it?
+
+**Guess taken:** Yes. The test now expects an empty list from both the page and the element handle.
+
+**To change:** None needed unless the upstream expectation changes back.
