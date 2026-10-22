@@ -10,7 +10,12 @@ import Playwright
   , ViewportSize (ViewportSize)
   , ViewportWidth (ViewportWidth)
   , boundingBox
+  , boundingBoxHeight
+  , boundingBoxWidth
   , cssPixelFromInt
+  , elementArgument
+  , evaluateNumberWith
+  , evaluateWith
   , defaultGotoOptions
   , evaluateBool
   , goto
@@ -99,7 +104,42 @@ tests =
                     (shiftPixel (boundingBoxY box) 10)
                 )
           assertEqual "clicked" True =<< evaluateBool page "() => window.__clicked"
+    , testCase "should return null for invisible elements" $
+        withChromiumPage $ \page -> do
+          setContent page "<div style=\"display:none\">hi</div>"
+          element <- requireHandle =<< querySelector page (selectorFromText "div")
+          assertEqual "no box" Nothing =<< boundingBox element
+    , testCase "should force a layout" $
+        withChromiumPage $ \page -> do
+          setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 500))
+          setContent page "<div style=\"width: 100px; height: 100px\">hello</div>"
+          element <- requireHandle =<< querySelector page (selectorFromText "div")
+          _ <- evaluateWith page "element => element.style.height = '200px'" (elementArgument element)
+          assertEqual "box"
+            (Just (BoundingBox (cssPixelFromInt 8) (cssPixelFromInt 8) (cssPixelFromInt 100) (cssPixelFromInt 200)))
+            =<< boundingBox element
+    , testCase "should work with SVG nodes" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"500\" height=\"500\"><rect id=\"theRect\" x=\"30\" y=\"50\" width=\"200\" height=\"300\"></rect></svg>"
+          element <- requireHandle =<< querySelector page (selectorFromText "#theRect")
+          box <- boundingBox element
+          case box of
+            Nothing ->
+              assertFailure "expected a bounding box"
+            Just found -> do
+              let
+                web property = evaluateNumberWith page ("e => e.getBoundingClientRect()." <> property) (elementArgument element)
+              assertEqual "x" (pixelValue (boundingBoxX found)) =<< web "x"
+              assertEqual "y" (pixelValue (boundingBoxY found)) =<< web "y"
+              assertEqual "width" (pixelValue (boundingBoxWidth found)) =<< web "width"
+              assertEqual "height" (pixelValue (boundingBoxHeight found)) =<< web "height"
     ]
+
+-- | The pixel value as a Double, for comparing with numbers read from the page.
+pixelValue :: CssPixel -> Double
+pixelValue = realToFrac . cssPixelToScientific
 
 shiftPixel :: CssPixel -> Int -> CssPixel
 shiftPixel pixel delta =
