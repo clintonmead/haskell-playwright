@@ -6,8 +6,12 @@ import UnliftIO.Exception
   ( throwIO
   )
 import Data.Text
-  ( isInfixOf
+  ( Text
+  , isInfixOf
   , replace
+  )
+import UnliftIO.Async
+  ( concurrently_
   )
 import UnliftIO.MVar
   ( newEmptyMVar
@@ -27,6 +31,7 @@ import Playwright
   ( BindingName (BindingName)
   , SpecialJsValue (SpecialUndefined)
   , addInitScript
+  , evaluate
   , evaluateText
   , reload
   , specialArgument
@@ -56,7 +61,7 @@ import Playwright.SerializedArgument
   ( SerializedArgument
   )
 import Playwright.SerializedValue
-  ( SerializedPayload (PayloadNumber)
+  ( SerializedPayload (PayloadArray, PayloadNumber, PayloadString)
   , SerializedValue (SerializedNode)
   )
 import Test.Tasty
@@ -139,7 +144,51 @@ tests =
           _ <- goto page (urlFromText (replace "127.0.0.1" "localhost" prefix <> "/empty.html")) defaultGotoOptions
           assertEqual "product" (36 :: Double)
             =<< evaluateNumber page "async () => window.compute(9, 4)"
+    , testCase "should work with overridden console object" $
+        withChromiumPage $ \page -> do
+          _ <- evaluate page "() => { window.console = null; }"
+          assertEqual "console" "true" =<< evaluateText page "() => String(window.console === null)"
+          _ <- exposeFunction page (BindingName "compute") multiply
+          assertEqual "product" (30 :: Double)
+            =<< evaluateNumber page "async () => window.compute(5, 6)"
+    , testCase "should work with busted Array.prototype.map/push" $
+        withChromiumPage $ \page -> do
+          setContent page "<script>Array.prototype.map = null; Array.prototype.push = null;</script>"
+          _ <- exposeFunction page (BindingName "compute") multiply
+          assertEqual "product" (30 :: Double)
+            =<< evaluateNumber page "async () => window.compute(5, 6)"
+    , testCase "exposeBinding should work in parallel" $
+        withChromiumPage $ \page -> do
+          concurrently_
+            (exposeFunction page (BindingName "foo") constant42)
+            (exposeFunction page (BindingName "bar") constant42)
+          assertEqual "sum" (84 :: Double)
+            =<< evaluateNumber page "async () => (await window.foo()) + (await window.bar())"
+    , testCase "should alias Window, Document and Node" $
+        withChromiumPage $ \page -> do
+          captured <- newEmptyMVar
+          _ <-
+            exposeFunction
+              page
+              (BindingName "log")
+              (\args -> tryPutMVar captured args >> pure (specialArgument SpecialUndefined))
+          _ <- evaluate page "() => window.log([window, document, document.body])"
+          args <- liftIO (timeout 10000000 (takeMVar captured))
+          assertEqual "aliases" (Just ["ref: <Window>", "ref: <Document>", "ref: <Node>"]) (aliasNames <$> args)
     ]
+
+-- | The names of the three aliased objects, from the one array argument that
+-- @window.log([window, document, document.body])@ sends.
+aliasNames :: [SerializedValue] -> [Text]
+aliasNames args =
+  case args of
+    [SerializedNode (PayloadArray items) _] ->
+      [text | SerializedNode (PayloadString text) _ <- items]
+    _ ->
+      []
+
+constant42 :: [SerializedValue] -> Playwright SerializedArgument
+constant42 _ = pure (numberArgument 42)
 
 multiply :: [SerializedValue] -> Playwright SerializedArgument
 multiply args =
