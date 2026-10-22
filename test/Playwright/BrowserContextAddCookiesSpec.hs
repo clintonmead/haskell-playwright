@@ -21,7 +21,13 @@ import Network.Wai
   )
 import Playwright
   ( Cookie (cookieDomain, cookieExpires, cookieHttpOnly, cookieName, cookiePath, cookieSameSite, cookieSecure, cookieValue)
-  , CookieExpires (cookieExpiresToScientific)
+  , CookieExpires (CookieExpires, cookieExpiresToScientific)
+  , FulfillBody (FulfillText)
+  , FulfillOptions (fulfillBody)
+  , UrlMatch (UrlMatchGlob)
+  , defaultFulfillOptions
+  , fulfillRoute
+  , route
   , CookieHttpOnly (cookieHttpOnlyToBool)
   , CookieDomain (CookieDomain, cookieDomainToText)
   , CookieName (CookieName, cookieNameToText)
@@ -309,6 +315,20 @@ tests =
           assertEqual "names" ["example-cookie"] (fmap (cookieNameToText . cookieName) jar)
           assertEqual "domains" ["www.example.com"] (fmap (cookieDomainToText . cookieDomain) jar)
           assertEqual "secure" [True] (fmap (cookieSecureToBool . cookieSecure) jar)
+    , testCase "should work with expires=-1" $
+        withChromiumContext $ \ctx page -> do
+          addCookies ctx [expiredWwwCookie "username" "John Doe"]
+          route page (UrlMatchGlob "**/*") $ \handled ->
+            fulfillRoute handled defaultFulfillOptions {fulfillBody = Just (FulfillText "<html></html>")}
+          _ <- goto page (urlFromText "https://www.example.com") defaultGotoOptions
+          assertEqual "document.cookie" "username=John Doe" =<< evaluateText page "() => document.cookie"
+    , testCase "should add cookies with empty value" $
+        withChromiumContext $ \ctx page -> do
+          addCookies ctx [expiredWwwCookie "marker" ""]
+          route page (UrlMatchGlob "**/*") $ \handled ->
+            fulfillRoute handled defaultFulfillOptions {fulfillBody = Just (FulfillText "<html></html>")}
+          _ <- goto page (urlFromText "https://www.example.com") defaultGotoOptions
+          assertEqual "document.cookie" "marker=" =<< evaluateText page "() => document.cookie"
     ]
 
 -- | Records every request. Sets a session cookie on /setsession.html and a
@@ -344,4 +364,20 @@ cookieToSetFrom cookie =
     , cookieToSetHttpOnly = Just (cookieHttpOnly cookie)
     , cookieToSetSecure = Just (cookieSecure cookie)
     , cookieToSetSameSite = Just (cookieSameSite cookie)
+    }
+
+-- | A cookie for www.example.com whose expiry is -1, which means a session
+-- cookie in the protocol.
+expiredWwwCookie :: Text.Text -> Text.Text -> CookieToSet
+expiredWwwCookie name value =
+  CookieToSet
+    { cookieToSetName = CookieName name
+    , cookieToSetValue = CookieValue value
+    , cookieToSetUrl = Nothing
+    , cookieToSetDomain = Just (CookieDomain "www.example.com")
+    , cookieToSetPath = Just (CookiePath "/")
+    , cookieToSetExpires = Just (CookieExpires (-1))
+    , cookieToSetHttpOnly = Nothing
+    , cookieToSetSecure = Nothing
+    , cookieToSetSameSite = Just CookieSameSiteLax
     }
