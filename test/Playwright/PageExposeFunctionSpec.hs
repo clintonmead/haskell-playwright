@@ -61,8 +61,8 @@ import Playwright.SerializedArgument
   ( SerializedArgument
   )
 import Playwright.SerializedValue
-  ( SerializedPayload (PayloadArray, PayloadNumber, PayloadString)
-  , SerializedValue (SerializedNode)
+  ( SerializedPayload (PayloadArray, PayloadNumber, PayloadObject, PayloadString)
+  , SerializedValue (SerializedNode, SerializedRef)
   )
 import Test.Tasty
   ( TestTree
@@ -175,6 +175,17 @@ tests =
           _ <- evaluate page "() => window.log([window, document, document.body])"
           args <- liftIO (timeout 10000000 (takeMVar captured))
           assertEqual "aliases" (Just ["ref: <Window>", "ref: <Document>", "ref: <Node>"]) (aliasNames <$> args)
+    , testCase "should serialize cycles" $
+        withChromiumPage $ \page -> do
+          captured <- newEmptyMVar
+          _ <-
+            exposeFunction
+              page
+              (BindingName "log")
+              (\args -> tryPutMVar captured args >> pure (specialArgument SpecialUndefined))
+          _ <- evaluate page "() => { const a = {}; a.b = a; window.log(a); }"
+          args <- liftIO (timeout 10000000 (takeMVar captured))
+          assertBool "cycle" (maybe False isCycle args)
     ]
 
 -- | The names of the three aliased objects, from the one array argument that
@@ -186,6 +197,16 @@ aliasNames args =
       [text | SerializedNode (PayloadString text) _ <- items]
     _ ->
       []
+
+-- | True when the one argument is an object whose @b@ field refers back to the
+-- object itself, which is how the driver encodes @const a = {}; a.b = a@.
+isCycle :: [SerializedValue] -> Bool
+isCycle args =
+  case args of
+    [SerializedNode (PayloadObject [("b", SerializedRef target)]) (Just self)] ->
+      target == self
+    _ ->
+      False
 
 constant42 :: [SerializedValue] -> Playwright SerializedArgument
 constant42 _ = pure (numberArgument 42)
