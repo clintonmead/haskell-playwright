@@ -8,7 +8,8 @@ import Playwright
   , FulfillOptions (fulfillBody, fulfillContentType)
   , Page
   , UrlMatch (UrlMatchGlob)
-  , WaitForState (WaitForVisible)
+  , WaitForState (WaitForAttached, WaitForDetached, WaitForHidden, WaitForVisible)
+  , waitForWith
   , childFrameLocator
   , childLocator
   , click
@@ -46,6 +47,7 @@ import Playwright.Harness
   ( withAssets
   , assertEqual
   , assertProtocolContains
+  , requireTimeout
   )
 import Test.Tasty
   ( TestTree
@@ -155,6 +157,16 @@ tests =
             $ \_ -> do
               click button
               assertEqual "text" "Hello iframe" =<< innerText button
+    , testCase "wait for hidden should succeed when frame is not in dom" $
+        withAssets $ \_ page -> do
+          _ <- goto page (urlFromText "about:blank") defaultGotoOptions
+          let
+            button = childLocator (frameLocator page (selectorFromText "iframe1")) (selectorFromText "button")
+          assertEqual "hidden" True =<< isHidden button
+          waitFor button WaitForHidden
+          waitFor button WaitForDetached
+          timeout <- requireTimeout 1000
+          assertProtocolContains "Timeout 1000ms exceeded" (waitForWith button timeout WaitForAttached)
     ]
 
 routeIframe :: Page -> Playwright ()
