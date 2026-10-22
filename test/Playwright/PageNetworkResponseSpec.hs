@@ -21,11 +21,13 @@ import Data.List
   ( sort
   )
 import Data.Maybe
-  ( listToMaybe
+  ( isJust
+  , listToMaybe
   )
 import Data.Text
   ( Text
   , isInfixOf
+  , isSuffixOf
   , toLower
   )
 import Network.HTTP.Types
@@ -58,6 +60,7 @@ import Playwright
   , Playwright
   , UrlMatch (UrlMatchGlob)
   , armResponse
+  , armResponseWhere
   , continueRoute
   , defaultFulfillOptions
   , defaultGotoOptions
@@ -67,17 +70,20 @@ import Playwright
   , fulfillRoute
   , goto
   , onRequestFinished
+  , requestFrame
   , requestRedirectedFrom
   , requestResponse
   , requestUrl
   , responseAllHeaders
   , responseBody
+  , responseFromServiceWorker
   , responseHeaders
   , responseJSON
   , responseRequest
   , responseStatus
   , responseStatusText
   , responseText
+  , responseUrl
   , route
   , urlFromText
   , urlToText
@@ -335,6 +341,25 @@ tests =
                 , ("foo", "bar")
                 ]
                 (sortedHeaders headers)
+    , testCase "should report if request was fromServiceWorker" $
+        withAssets $ \prefix page -> do
+          navigation <- goto page (urlFromText (prefix <> "/serviceworkers/fetch/sw.html")) defaultGotoOptions
+          case navigation of
+            Nothing ->
+              assertFailure "missing navigation response"
+            Just value ->
+              assertEqual "navigation from worker" False =<< responseFromServiceWorker value
+          _ <- evaluate page "async () => { await window.activationPromise; }"
+          -- The worker makes its own fetch of the same URL, and that request has no
+          -- frame. Only the page's request, which the worker answers, has one.
+          takeResponse <- armResponseWhere page $ \response -> do
+            url <- responseUrl response
+            request <- responseRequest response
+            frame <- requestFrame request
+            pure (isSuffixOf "/example.txt" (urlToText url) && isJust frame)
+          _ <- evaluate page "async () => (await fetch('/example.txt')).status"
+          response <- takeResponse
+          assertEqual "fetch from worker" True =<< responseFromServiceWorker response
     , testCase "should return body for prefetch script" $
         withChromiumPage $ \page ->
           withLocalApp prefetchApp $ \prefix -> do
