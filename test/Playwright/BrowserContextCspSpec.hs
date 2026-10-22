@@ -37,7 +37,9 @@ import Playwright
   , evaluateBool
   , evaluateNumber
   , goto
+  , LoadState (LoadStateLoad)
   , urlFromText
+  , waitForLoadStateFrame
   )
 import Playwright.Error
   ( PlaywrightError
@@ -124,7 +126,12 @@ tests =
             plainPage <- newPage plain
             _ <- goto plainPage (urlFromText (base <> "/empty.html")) defaultGotoOptions
             plainFrame <- attachFrame plainPage "frame1" (base <> "/csp.html")
+            waitForLoadStateFrame plainFrame LoadStateLoad
+            assertEqual "plain frame url" (base <> "/csp.html") =<< evaluateOnFrameText plainFrame "() => location.href"
             assertEqual "plain inline" "undefined" =<< evaluateOnFrameText plainFrame "() => String(window['__inlineScriptValue'])"
+            plainAdd <- try (addScriptTagOnFrame plainFrame emptyScriptTag {scriptTagContent = Just "window['__injected'] = 42;"}) :: Playwright (Either PlaywrightError ElementHandle)
+            assertEqual "plain injected blocked" True (either (const True) (const False) plainAdd)
+            assertEqual "plain injected" "undefined" =<< evaluateOnFrameText plainFrame "() => String(window['__injected'])"
             bypassing <- newContextWith browser defaultNewContextOptions {newContextBypassCSP = Just True}
             bypassingPage <- newPage bypassing
             _ <- goto bypassingPage (urlFromText (base <> "/empty.html")) defaultGotoOptions
@@ -141,7 +148,7 @@ cspInlineApp _ respond =
   respond
     ( responseLBS
         status200
-        [ ("Content-Security-Policy", "default-src \"self\"")
+        [ ("Content-Security-Policy", "default-src 'self'")
         , (hContentType, "text/html")
         ]
         "<script type='text/javascript'>window.__inlineScriptValue = 42;</script>"

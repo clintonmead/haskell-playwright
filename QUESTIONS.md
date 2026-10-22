@@ -511,18 +511,16 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 
 **To change:** Drop the export and skip the case if the public surface should stay as it is.
 
-## browsercontext-csp: plain frame under CSP accepts addScriptTagOnFrame
+## browsercontext-csp: plain frame under CSP accepts addScriptTagOnFrame (resolved: the test header was malformed)
 
-**Question:** In `should bypass CSP in iframes as well`, the plain context's frame blocks inline scripts (`window.__inlineScriptValue` is `undefined`). But `addScriptTagOnFrame` on that same frame still sets `window['__injected'] = 42`. The upstream test expects `undefined` there, and `addScriptTag` on a page under the same CSP is blocked (`should honor CSP meta tag`). Why does the frame path inject?
+**Resolved.** The plain-frame failure was a bug in the test, not in the driver. `cspInlineApp` in `test/Playwright/BrowserContextCspSpec.hs` sent `default-src "self"`, with literal double quotes. The quotes make `"self"` an invalid CSP source. Chromium then blocks the iframe load through the `default-src` fallback, and the frame sits at `chrome-error://chromewebdata/`. An error page has no CSP, so `addScriptTagOnFrame` injected into it and `__injected` was `42`. The `plain inline` assertion of `"undefined"` passed on that error page, so it tested nothing.
 
-**Evidence:** Background run, `cabal build playwright-test` then the binary with `-p "/browsercontext-csp/"`. Four cases pass. The iframe case fails at `plain injected`, expected `"undefined"`, got `"42"`. The check is in the patch saved at `scratchpad/csp-plain-frame.patch`. It was reverted from the committed tree so the suite stays green.
+**Evidence:**
+- `scratchpad/probe.log`, `probe2.log`, `probe3.log`: the plain frame stays at `chrome-error://chromewebdata/` with `scripts=0`, while the top-level `csp.html` in the same context loads.
+- `scratchpad/probe4.log`, with the header changed to `default-src 'self'`: the frame loads `…/csp.html` with `scripts=1` and `inline=undefined`. `addScriptTagOnFrame` now fails with Chromium's "Executing inline script violates the following Content Security Policy directive 'default-src 'self''".
+- `scratchpad/csp-final.log`: the committed CSP group passes, 5 of 5. The plain-frame case now asserts the frame URL is `csp.html`, asserts the injection is rejected, and asserts `__injected` is `undefined`.
 
-**Guess taken:** The driver's frame `addScriptTag` takes a different path from the page one. The likely cause is that it evaluates the script in the frame's utility world or via `frame.evaluate`, not through an inline `<script>` element. That would bypass the CSP. This is a guess; I did not read the driver source.
+**Correction:** the earlier follow-up below, "the driver does not branch on frames", checked the driver for a problem the page did not have. The driver is not implicated and the Haskell `frameSend` path is fine.
 
-**To change:** Read the driver's `addScriptTag` for frames (`playwright-driver` in the nix store) and check whether it goes through an inline element. If the driver really injects into a CSP-blocked frame, skip the plain-frame half and record it as a driver difference.
+**Follow-up, not changed in this commit:** `test/Playwright/BrowserContextExposeFunctionSpec.hs:173` (`cspEmptyApp`) has the same malformed header, `default-src \"self\"`. Its `should work with CSP` case does not check inline blocking, so it still passes, but the header does not match what the name says. Fix it by switching to `'self'` and rerunning the `browsercontext-expose-function` group.
 
-### Follow-up: the driver does not branch on frames
-
-The first guess, that the driver takes a different path for frames, is ruled out. In the driver bundle (`$PLAYWRIGHT_CORE_DIR/lib/coreBundle.js`), `Frame.addScriptTag` (around line 22971) is the one implementation for both the page and a child frame. The frame dispatcher (around line 53449) calls it directly. The Haskell side is also clean: `addScriptTagOnFrame` (`src/Playwright/Page.hs:648`) sends `addScriptTag` to the frame it is given.
-
-So the difference is downstream, in the frame's main-world context or in Chromium's CSP check for an injected inline `<script>` in an iframe. This is not settled. Next step: a probe that logs `document.currentScript`, `window.__injected`, and the console CSP error for the iframe, to see whether the element is inserted and executed or never runs. The item stays open until that is known.
