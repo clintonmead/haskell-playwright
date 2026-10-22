@@ -6,9 +6,16 @@ import Data.Text
   ( replace
   )
 import Playwright
-  ( asElement
+  ( LoadState (LoadStateDomContentLoaded)
+  , armContextPage
+  , asElement
   , defaultGotoOptions
+  , defaultNewContextOptions
+  , evaluate
   , evaluateHandle
+  , evaluateWith
+  , textArgument
+  , waitForLoadState
   , evaluateHandleOnFrame
   , frames
   , framesEqual
@@ -26,6 +33,7 @@ import Playwright.Harness
   ( attachFrame
   , requireHandle
   , withAssets
+  , withAssetsContextWith
   , assertEqual
   , assertFailure
   )
@@ -123,4 +131,18 @@ tests =
               element <- requireHandle =<< asElement jsHandle
               owner <- ownerFrameHandle element
               assertEqual "same frame" True (maybe False (`framesEqual` child) owner)
+    , testCase "should work for adopted elements" $
+        withAssetsContextWith defaultNewContextOptions $ \prefix ctx page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          takePopup <- armContextPage ctx
+          _ <- evaluateWith page "url => window['__popup'] = window.open(url)" (textArgument (prefix <> "/empty.html"))
+          popup <- takePopup
+          divHandle <-
+            requireHandle =<< asElement =<< evaluateHandle page "() => { const div = document.createElement('div'); document.body.appendChild(div); return div; }"
+          ownerBefore <- ownerFrameHandle divHandle
+          assertEqual "main frame" True (maybe False (\owner -> framesEqual owner (mainFrame page)) ownerBefore)
+          _ <- waitForLoadState popup LoadStateDomContentLoaded
+          _ <- evaluate page "() => { const div = document.querySelector('div'); window['__popup'].document.body.appendChild(div); }"
+          ownerAfter <- ownerFrameHandle divHandle
+          assertEqual "popup frame" True (maybe False (\owner -> framesEqual owner (mainFrame popup)) ownerAfter)
     ]

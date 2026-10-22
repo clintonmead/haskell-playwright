@@ -28,6 +28,7 @@ import UnliftIO.Async
 import Playwright
   ( ElementHandle
   , Playwright
+  , evaluateNumber
   , evaluate
   , evaluateOnElement
   , evaluateOnElementNumber
@@ -118,6 +119,12 @@ tests =
             "<style>@keyframes move { from { margin-left: 0; } to { margin-left: 200px; } } div.animated { animation: 2s linear 0s infinite alternate move; }</style><div class=animated>moving</div>"
           handle <- requireHandle =<< querySelector page (selectorFromText "div")
           waitWhileHidden handle "div => { div.classList.remove('animated'); return true; }"
+    , testCase "should scroll display:contents into view" $
+        withChromiumPage $ \page -> do
+          setContent page "<style>html, body { margin: 0; padding: 0; width: 100%; height: 100%; } ::-webkit-scrollbar { display: none; } * { scrollbar-width: none; }</style><div id=container style=\"width:200px;height:200px;overflow:scroll;border:1px solid black;\"><div style=\"margin-top:500px;background:red;\"><div style=\"height:50px;width:100px;background:cyan;\"><div id=target style=\"display:contents\">Hello</div></div><div></div></div></div>"
+          target <- requireHandle =<< querySelector page (selectorFromText "#target")
+          scrollIntoViewIfNeeded target
+          assertBool "scrolled to 350" . (\value -> abs (value - 350) < (1 :: Double)) =<< evaluateNumber page "() => document.querySelector('#container').scrollTop"
     ]
 
 -- | Scrolls the element into view, checks that the scroll is still pending

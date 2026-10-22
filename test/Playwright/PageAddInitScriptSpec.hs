@@ -2,16 +2,44 @@ module Playwright.PageAddInitScriptSpec
   ( tests
   ) where
 
+import Control.Monad
+  ( void
+  )
+import Data.Text
+  ( replace
+  )
+import Network.HTTP.Types
+  ( hContentType
+  , status200
+  )
+import Network.Wai
+  ( Application
+  , responseLBS
+  )
 import Playwright
   ( addInitScript
+  , addScriptTag
   , defaultGotoOptions
+  , emptyScriptTag
   , evaluateNumber
   , goto
+  , newContext
+  , newPage
+  , Playwright
+  , ScriptTag (scriptTagContent)
   , urlFromText
   )
+import Playwright.Error
+  ( PlaywrightError
+  )
 import Playwright.Harness
-  ( withAssets
-  , assertEqual
+  ( assertEqual
+  , withAssets
+  , withChromiumBrowser
+  , withLocalApp
+  )
+import UnliftIO.Exception
+  ( try
   )
 import Test.Tasty
   ( TestTree
@@ -48,4 +76,35 @@ tests =
           addInitScript page "window['injected'] = 123;"
           _ <- goto page (urlFromText (prefix <> "/tamperable.html")) defaultGotoOptions
           assertEqual "result" (123 :: Double) =<< evaluateNumber page "() => window.result"
+    , testCase "should work with CSP" $
+        withChromiumBrowser $ \browser ->
+          withLocalApp cspScriptApp $ \base -> do
+            page <- newPage =<< newContext browser
+            addInitScript page "window['injected'] = 123;"
+            _ <- goto page (urlFromText (base <> "/empty.html")) defaultGotoOptions
+            assertEqual "injected" (123 :: Double) =<< evaluateNumber page "() => window.injected"
+            void
+              ( try @Playwright @PlaywrightError
+                  (addScriptTag page emptyScriptTag {scriptTagContent = Just "window.e = 10;"})
+              )
+            assertEqual "blocked" (0 :: Double) =<< evaluateNumber page "() => window.e === undefined ? 0 : 1"
+    , testCase "should work after a cross origin navigation" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (replace "127.0.0.1" "localhost" prefix <> "/empty.html")) defaultGotoOptions
+          addInitScript page "window['injected'] = 123;"
+          _ <- goto page (urlFromText (prefix <> "/tamperable.html")) defaultGotoOptions
+          assertEqual "result" (123 :: Double) =<< evaluateNumber page "() => window.result"
     ]
+
+-- | Serves every page with a Content-Security-Policy that only allows scripts
+-- from the page's own origin, so an inline script is refused.
+cspScriptApp :: Application
+cspScriptApp _ respond =
+  respond
+    ( responseLBS
+        status200
+        [ ("Content-Security-Policy", "script-src 'self'")
+        , (hContentType, "text/html")
+        ]
+        "<html></html>"
+    )

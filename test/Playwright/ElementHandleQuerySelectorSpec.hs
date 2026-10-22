@@ -6,16 +6,32 @@ import Data.Maybe
   ( isNothing
   )
 import Playwright
-  ( elementArgument
+  ( ElementHandle
+  , LoadState (LoadStateDomContentLoaded)
+  , Page
+  , Playwright
+  , armContextPage
+  , asElement
+  , defaultGotoOptions
+  , defaultNewContextOptions
+  , elementArgument
+  , evaluate
+  , evaluateHandle
   , evaluateTextWith
+  , evaluateWith
+  , goto
   , querySelector
   , querySelectorAllHandle
   , querySelectorHandle
   , selectorFromText
   , setContent
+  , textArgument
+  , urlFromText
+  , waitForLoadState
   )
 import Playwright.Harness
   ( requireHandle
+  , withAssetsContextWith
   , withChromiumPage
   , assertEqual
   , assertFailure
@@ -80,4 +96,22 @@ tests =
           html <- requireHandle =<< querySelector page (selectorFromText "html")
           second <- querySelectorAllHandle html (selectorFromText "xpath=/div[contains(@class, 'third')]")
           assertEqual "empty" 0 (length second)
+    , testCase "should work for adopted elements" $
+        withAssetsContextWith defaultNewContextOptions $ \prefix ctx page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          takePopup <- armContextPage ctx
+          _ <- evaluateWith page "url => window['__popup'] = window.open(url)" (textArgument (prefix <> "/empty.html"))
+          popup <- takePopup
+          divHandle <-
+            requireHandle =<< asElement =<< evaluateHandle page "() => { const div = document.createElement('div'); document.body.appendChild(div); const span = document.createElement('span'); span.textContent = 'hello'; div.appendChild(span); return div; }"
+          assertSpanText page divHandle
+          waitForLoadState popup LoadStateDomContentLoaded
+          _ <- evaluate page "() => { const div = document.querySelector('div'); window['__popup'].document.body.appendChild(div); }"
+          assertSpanText page divHandle
     ]
+
+-- | The handle's child span is found and reads "hello".
+assertSpanText :: Page -> ElementHandle -> Playwright ()
+assertSpanText page divHandle = do
+  child <- requireHandle =<< querySelectorHandle divHandle (selectorFromText "span")
+  assertEqual "text" "hello" =<< evaluateTextWith page "e => e.textContent" (elementArgument child)
