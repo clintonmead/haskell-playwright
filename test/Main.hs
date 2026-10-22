@@ -90,7 +90,9 @@ import Playwright.LocatorMiscSpec qualified as LocatorMiscSpec
 import Playwright.LocatorMisc2Spec qualified as LocatorMisc2Spec
 import Playwright.LocatorQuerySpec qualified as LocatorQuerySpec
 import Playwright.LocatorSpec qualified as LocatorSpec
+import Playwright.LocatorWaitForFunctionSpec qualified as LocatorWaitForFunctionSpec
 import Playwright.OopifSpec qualified as OopifSpec
+import Playwright.PageAddInitScriptCallbackSpec qualified as PageAddInitScriptCallbackSpec
 import Playwright.PageAddInitScriptSpec qualified as PageAddInitScriptSpec
 import Playwright.PageAddLocatorHandlerSpec qualified as PageAddLocatorHandlerSpec
 import Playwright.PageAddScriptTagSpec qualified as PageAddScriptTagSpec
@@ -98,12 +100,13 @@ import Playwright.PageAddStyleTagSpec qualified as PageAddStyleTagSpec
 import Playwright.PageAutowaitingBasicSpec qualified as PageAutowaitingBasicSpec
 import Playwright.PageAutowaitingNoHangSpec qualified as PageAutowaitingNoHangSpec
 import Playwright.PageBasicSpec qualified as PageBasicSpec
+import Playwright.PageClickTimeoutSpec qualified as PageClickTimeoutSpec
 import Playwright.PageCheckSpec qualified as PageCheckSpec
 import Playwright.PageClockSpec qualified as PageClockSpec
 import Playwright.PageClickSpec qualified as PageClickSpec
 import Playwright.PageClickReactSpec qualified as PageClickReactSpec
 import Playwright.PageClickScrollSpec qualified as PageClickScrollSpec
-import Playwright.PageClickTimeoutSpec qualified as PageClickTimeoutSpec
+import Playwright.PageCacheStorageSpec qualified as PageCacheStorageSpec
 import Playwright.PageCloseSpec qualified as PageCloseSpec
 import Playwright.PageDispatchEventSpec qualified as PageDispatchEventSpec
 import Playwright.PageDialogSpec qualified as PageDialogSpec
@@ -116,6 +119,7 @@ import Playwright.PageEventNetworkSpec qualified as PageEventNetworkSpec
 import Playwright.PageEventPopupSpec qualified as PageEventPopupSpec
 import Playwright.PageEventRequestSpec qualified as PageEventRequestSpec
 import Playwright.PageEvaluateSpec qualified as PageEvaluateSpec
+import Playwright.PageEvaluateCallbackSpec qualified as PageEvaluateCallbackSpec
 import Playwright.PageEvaluateHandleSpec qualified as PageEvaluateHandleSpec
 import Playwright.PageEmulateMediaSpec qualified as PageEmulateMediaSpec
 import Playwright.PageEventPageErrorSpec qualified as PageEventPageErrorSpec
@@ -278,7 +282,9 @@ main =
         , LocatorMiscSpec.tests
         , LocatorMisc2Spec.tests
         , LocatorQuerySpec.tests
+        , LocatorWaitForFunctionSpec.tests
         , OopifSpec.tests
+        , PageAddInitScriptCallbackSpec.tests
         , PageAddInitScriptSpec.tests
         , PageAddLocatorHandlerSpec.tests
         , PageAddScriptTagSpec.tests
@@ -286,15 +292,13 @@ main =
         , PageAutowaitingBasicSpec.tests
         , PageAutowaitingNoHangSpec.tests
         , PageBasicSpec.tests
+        , PageClickTimeoutSpec.tests
         , PageCheckSpec.tests
         , PageClockSpec.tests
         , PageClickSpec.tests
         , PageClickReactSpec.tests
         , PageClickScrollSpec.tests
-        , PageClickTimeoutSpec.timeout1Tests
-        , PageClickTimeoutSpec.timeout2Tests
-        , PageClickTimeoutSpec.timeout3Tests
-        , PageClickTimeoutSpec.timeout4Tests
+        , PageCacheStorageSpec.tests
         , PageCloseSpec.tests
         , PageDispatchEventSpec.tests
         , PageDialogSpec.tests
@@ -309,6 +313,7 @@ main =
         , PageEventPopupSpec.tests
         , PageEventRequestSpec.tests
         , PageEvaluateSpec.tests
+        , PageEvaluateCallbackSpec.tests
         , PageEvaluateHandleSpec.tests
         , PageExposeFunctionSpec.tests
         , PageFileChooserSpec.tests

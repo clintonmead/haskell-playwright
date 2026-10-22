@@ -95,6 +95,7 @@ library
       Playwright.HttpMethod
       Playwright.HttpStatus
       Playwright.Incoming
+      Playwright.InitScript
       Playwright.InputFile
       Playwright.InputFileName
       Playwright.Instance
@@ -322,7 +323,9 @@ test-suite playwright-test
       Playwright.LocatorMiscSpec
       Playwright.LocatorQuerySpec
       Playwright.LocatorSpec
+      Playwright.LocatorWaitForFunctionSpec
       Playwright.OopifSpec
+      Playwright.PageAddInitScriptCallbackSpec
       Playwright.PageAddInitScriptSpec
       Playwright.PageAddLocatorHandlerSpec
       Playwright.PageAddScriptTagSpec
@@ -330,6 +333,7 @@ test-suite playwright-test
       Playwright.PageAutowaitingBasicSpec
       Playwright.PageAutowaitingNoHangSpec
       Playwright.PageBasicSpec
+      Playwright.PageCacheStorageSpec
       Playwright.PageCheckSpec
       Playwright.PageClickReactSpec
       Playwright.PageClickScrollSpec
@@ -342,6 +346,7 @@ test-suite playwright-test
       Playwright.PageDragSpec
       Playwright.PageDropSpec
       Playwright.PageEmulateMediaSpec
+      Playwright.PageEvaluateCallbackSpec
       Playwright.PageEvaluateHandleSpec
       Playwright.PageEvaluateSpec
       Playwright.PageEventConsoleSpec
