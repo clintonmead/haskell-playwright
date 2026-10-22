@@ -138,3 +138,11 @@ Decisions made without waiting for an answer. Each entry gives the question, the
 **Guess taken:** Yes. `onContextPageLoad` and `onContextPageClose` in `Playwright.ContextEvents` first attach to `contextPages`, then to new pages.
 
 **To change:** Drop the existing-pages loop in `Playwright/ContextEvents.hs` if a caller needs only pages created after the listener.
+
+## FrameLocator is a plain Locator
+
+**Question:** Upstream `locator.contentFrame()` and `frameLocator.owner()` return a `FrameLocator`, which has its own type. The binding has no such type. Should these add one?
+
+**Guess taken:** No. `contentFrame` and `frameLocatorOwner` return a `Locator`, the same type `frameLocator` already returns. `frameLocatorOwner` removes a trailing `enter-frame` step, so a locator that is not a frame locator comes back unchanged.
+
+**To change:** Add a `FrameLocator` newtype if callers need the two types kept apart at compile time.

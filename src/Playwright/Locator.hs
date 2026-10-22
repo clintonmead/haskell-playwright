@@ -8,6 +8,8 @@ module Playwright.Locator
   , checkWith
   , childLocator
   , childFrameLocator
+  , contentFrame
+  , frameLocatorOwner
   , clear
   , click
   , clickWith
@@ -351,6 +353,28 @@ childFrameLocator loc iframeSelector =
           (nestedSelector (locatorSelector loc) iframeSelector)
           enterFrameSelector
     }
+
+-- | The frame an iframe element hosts, as a locator inside that frame. Upstream
+-- returns a FrameLocator, which this binding represents as a plain Locator.
+contentFrame :: Locator -> Locator
+contentFrame loc =
+  loc
+    { locatorSelector = nestedSelector (locatorSelector loc) enterFrameSelector
+    }
+
+-- | The iframe element a frame locator points at, as upstream's
+-- FrameLocator.owner. It drops the trailing enter-frame step, so a locator
+-- that is not a frame locator comes back unchanged.
+frameLocatorOwner :: Locator -> Locator
+frameLocatorOwner loc =
+  case Text.stripSuffix enterFrameSuffix (selectorToText (locatorSelector loc)) of
+    Just owner ->
+      loc {locatorSelector = selectorFromText owner}
+    Nothing ->
+      loc
+  where
+    enterFrameSuffix =
+      " >> " <> selectorToText enterFrameSelector
 
 nth :: Locator -> Int -> Locator
 nth loc index =

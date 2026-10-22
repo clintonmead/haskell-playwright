@@ -13,6 +13,10 @@ import Playwright
   , childFrameLocator
   , childLocator
   , click
+  , contentFrame
+  , frameLocatorOwner
+  , getAttribute
+  , locator
   , ClickOptions (clickOptionsTimeout)
   , clickWith
   , defaultClickOptions
@@ -109,6 +113,21 @@ tests =
           waitFor button WaitForVisible
           assertEqual "button" "Hello iframe" =<< innerText button
           assertEqual "spans" 2 =<< locatorCount spans
+    , testCase "locator.contentFrame should work" $
+        withAssets $ \prefix page -> do
+          routeIframe page
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let
+            button = childLocator (contentFrame (locator page (selectorFromText "iframe"))) (selectorFromText "button")
+          assertEqual "text" "Hello iframe" =<< innerText button
+          click button
+    , testCase "frameLocator.owner should work" $
+        withAssets $ \prefix page -> do
+          routeIframe page
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let owner = frameLocatorOwner (frameLocator page (selectorFromText "iframe"))
+          waitFor owner WaitForVisible
+          assertEqual "name" (Just "frame1") =<< getAttribute owner "name"
     , testCase "should wait for frame" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions

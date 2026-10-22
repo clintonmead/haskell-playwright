@@ -213,6 +213,8 @@ module Playwright
   , childLocator
   , childFrameLocator
   , childFrames
+  , contentFrame
+  , frameLocatorOwner
   , chromium
   , clear
   , clearCookies
@@ -1299,6 +1301,8 @@ import Playwright.Locator
   , childFrameLocator
   , childLocator
   , clear
+  , contentFrame
+  , frameLocatorOwner
   , click
   , clickWith
   , describeLocator
