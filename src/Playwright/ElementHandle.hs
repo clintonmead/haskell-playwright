@@ -15,6 +15,10 @@ module Playwright.ElementHandle
   , innerTextHandle
   , inputValueHandle
   , isEditableHandle
+  , isDisabledHandle
+  , isEnabledHandle
+  , isHiddenHandle
+  , isVisibleHandle
   , scrollIntoViewIfNeeded
   , scrollIntoViewIfNeededWith
   , screenshotHandle
@@ -106,6 +110,9 @@ import Playwright.Protocol
   , ElementHandleInnerTextResult (elementHandleInnerTextResultValue)
   , ElementHandleInputValueResult (elementHandleInputValueResultValue)
   , ElementHandleIsEditableResult (elementHandleIsEditableResultValue)
+  , ElementHandleIsEnabledResult (elementHandleIsEnabledResultValue)
+  , ElementHandleIsHiddenResult (elementHandleIsHiddenResultValue)
+  , ElementHandleIsVisibleResult (elementHandleIsVisibleResultValue)
   , ElementHandleOwnerFrameResult (elementHandleOwnerFrameResultFrame)
   , ElementHandleScreenshotResult (elementHandleScreenshotResultBinary)
   , ElementHandleScrollIntoViewIfNeededResult
@@ -128,6 +135,9 @@ import Playwright.Protocol
   , mkElementHandleInnerTextParams
   , mkElementHandleInputValueParams
   , mkElementHandleIsEditableParams
+  , mkElementHandleIsEnabledParams
+  , mkElementHandleIsHiddenParams
+  , mkElementHandleIsVisibleParams
   , mkElementHandleOwnerFrameParams
   , mkElementHandleScreenshotParams
   , mkElementHandleScrollIntoViewIfNeededParams
@@ -292,6 +302,26 @@ isEditableHandle :: ElementHandle -> Playwright Bool
 isEditableHandle handle = do
   result <- handleSend handle "isEditable" mkElementHandleIsEditableParams
   pure (elementHandleIsEditableResultValue result)
+
+isEnabledHandle :: ElementHandle -> Playwright Bool
+isEnabledHandle handle = do
+  result <- handleSend handle "isEnabled" mkElementHandleIsEnabledParams
+  pure (elementHandleIsEnabledResultValue result)
+
+-- | The negation of 'isEnabledHandle', which is how the protocol defines
+-- disabled elements.
+isDisabledHandle :: ElementHandle -> Playwright Bool
+isDisabledHandle handle = not <$> isEnabledHandle handle
+
+isHiddenHandle :: ElementHandle -> Playwright Bool
+isHiddenHandle handle = do
+  result <- handleSend handle "isHidden" mkElementHandleIsHiddenParams
+  pure (elementHandleIsHiddenResultValue result)
+
+isVisibleHandle :: ElementHandle -> Playwright Bool
+isVisibleHandle handle = do
+  result <- handleSend handle "isVisible" mkElementHandleIsVisibleParams
+  pure (elementHandleIsVisibleResultValue result)
 
 contentFrameHandle :: ElementHandle -> Playwright (Maybe Frame)
 contentFrameHandle handle = do

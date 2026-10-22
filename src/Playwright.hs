@@ -453,6 +453,10 @@ module Playwright
   , isDisabled
   , isEditable
   , isEditableHandle
+  , isDisabledHandle
+  , isEnabledHandle
+  , isHiddenHandle
+  , isVisibleHandle
   , isEnabled
   , isHidden
   , isVisible
@@ -994,6 +998,10 @@ import Playwright.ElementHandle
   , innerTextHandle
   , inputValueHandle
   , isEditableHandle
+  , isDisabledHandle
+  , isEnabledHandle
+  , isHiddenHandle
+  , isVisibleHandle
   , ownerFrameHandle
   , scrollIntoViewIfNeeded
   , scrollIntoViewIfNeededWith

@@ -9,6 +9,14 @@ import Playwright
   , isChecked
   , isEditable
   , isEditableHandle
+  , isDisabled
+  , isDisabledHandle
+  , isEnabled
+  , isEnabledHandle
+  , isHidden
+  , isHiddenHandle
+  , isVisible
+  , isVisibleHandle
   , getAttribute
   , getAttributeHandle
   , innerHtml
@@ -98,4 +106,30 @@ tests =
           _ <- evaluate page "() => { document.querySelector('input').checked = false; }"
           assertEqual "unchecked" False =<< isChecked (locate page "input")
           assertProtocolContains "Not a checkbox or radio button" (isChecked (locate page "div"))
+    , testCase "isVisible and isHidden should work" $
+        withChromiumPage $ \page -> do
+          setContent page "<div>Hi</div><span></span>"
+          divHandle <- requireHandle =<< querySelector page (selectorFromText "div")
+          assertEqual "div visible" True =<< isVisibleHandle divHandle
+          assertEqual "div hidden" False =<< isHiddenHandle divHandle
+          assertEqual "div locator visible" True =<< isVisible (locate page "div")
+          spanHandle <- requireHandle =<< querySelector page (selectorFromText "span")
+          assertEqual "span visible" False =<< isVisibleHandle spanHandle
+          assertEqual "span hidden" True =<< isHiddenHandle spanHandle
+          assertEqual "span locator hidden" True =<< isHidden (locate page "span")
+    , testCase "isEnabled and isDisabled should work" $
+        withChromiumPage $ \page -> do
+          setContent page "<button disabled>button1</button><button>button2</button><div>div</div>"
+          divHandle <- requireHandle =<< querySelector page (selectorFromText "div")
+          assertEqual "div enabled" True =<< isEnabledHandle divHandle
+          assertEqual "div disabled" False =<< isDisabledHandle divHandle
+          assertEqual "div locator enabled" True =<< isEnabled (locate page "div")
+          assertEqual "div locator disabled" False =<< isDisabled (locate page "div")
+          button1 <- requireHandle =<< querySelector page (selectorFromText ":text(\"button1\")")
+          assertEqual "button1 enabled" False =<< isEnabledHandle button1
+          assertEqual "button1 disabled" True =<< isDisabledHandle button1
+          assertEqual "button1 locator enabled" False =<< isEnabled (locate page ":text(\"button1\")")
+          button2 <- requireHandle =<< querySelector page (selectorFromText ":text(\"button2\")")
+          assertEqual "button2 enabled" True =<< isEnabledHandle button2
+          assertEqual "button2 disabled" False =<< isDisabledHandle button2
     ]
