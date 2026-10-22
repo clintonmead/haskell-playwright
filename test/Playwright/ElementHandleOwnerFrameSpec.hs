@@ -2,6 +2,9 @@ module Playwright.ElementHandleOwnerFrameSpec
   ( tests
   ) where
 
+import Data.Text
+  ( replace
+  )
 import Playwright
   ( asElement
   , defaultGotoOptions
@@ -9,6 +12,7 @@ import Playwright
   , evaluateHandleOnFrame
   , frames
   , framesEqual
+  , frames
   , childFrames
   , evaluateHandleOnFrame
   , goto
@@ -105,4 +109,18 @@ tests =
           case (owner, children) of
             (Just frame, [child]) -> assertEqual "child" True (framesEqual frame child)
             _ -> assertFailure "expected the owner to be the one child frame"
+    , testCase "should work for cross-process iframes" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let cross = replace "127.0.0.1" "localhost" prefix
+          _ <- attachFrame page "frame1" (cross <> "/empty.html")
+          allFrames <- frames page
+          case drop 1 allFrames of
+            [] ->
+              assertFailure "expected a child frame"
+            child : _ -> do
+              jsHandle <- evaluateHandleOnFrame child "() => document.body"
+              element <- requireHandle =<< asElement jsHandle
+              owner <- ownerFrameHandle element
+              assertEqual "same frame" True (maybe False (`framesEqual` child) owner)
     ]
