@@ -111,7 +111,7 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 
 ## `tests/library` with no or thin coverage
 
-- **tap:** the binding has `tap` and `tapHandle` with no options, so the `modifiers` and `trial` cases are open (`tapWith` with `TapOptions` is needed). The touch-point and touchend-canceled cases depend on touch event data the binding does not return.
+- **tap:** the binding has `tap` and `tapHandle` with no options, so the `modifiers` and `trial` cases are open (`tapWith` with `TapOptions` is needed). The touch-point and touchend-canceled cases are not examined yet.
 - **browsercontext-basic:** skip "default user agent". It calls `browser._channel.defaultUserAgentForTest()`, a test-only channel method, not public API.
 - **popup:** skip "should not dispatch binding on a closed page". It reads `source.page.isClosed()` inside an exposed binding callback, and the Haskell binding callback has no source page.
 - **browsercontext-set-extra-http-headers:** "should throw for non-string header values" does not apply. Header values are typed as `Text`, so a non-string cannot be passed.
