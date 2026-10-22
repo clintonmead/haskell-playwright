@@ -10,6 +10,9 @@ import Playwright
   , Page
   , PermissionName (PermissionName)
   , clearPermissions
+  , contextBrowser
+  , newContext
+  , newPage
   , defaultGotoOptions
   , defaultNewContextOptions
   , evaluateTextWith
@@ -119,6 +122,21 @@ tests =
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           grantPermissions (pageContext page) [PermissionName "geolocation"]
           assertEqual "state" "granted" =<< permissionState page "geolocation"
+    , testCase "should isolate permissions between browser contexts" $
+        withAssets $ \prefix page -> do
+          let
+            empty = urlFromText (prefix <> "/empty.html")
+          _ <- goto page empty defaultGotoOptions
+          browser <- contextBrowser (pageContext page)
+          other <- newContext browser
+          otherPage <- newPage other
+          _ <- goto otherPage empty defaultGotoOptions
+          assertEqual "first prompt" "prompt" =<< permissionState page "geolocation"
+          assertEqual "other prompt" "prompt" =<< permissionState otherPage "geolocation"
+          grantPermissionsFor (pageContext page) [] empty
+          assertEqual "first denied" "denied" =<< permissionState page "geolocation"
+          grantPermissionsFor other [PermissionName "geolocation"] empty
+          assertEqual "other granted" "granted" =<< permissionState otherPage "geolocation"
     ]
 
 permissionState :: Page -> Text -> Playwright Text
