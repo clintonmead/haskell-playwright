@@ -126,6 +126,8 @@ module Playwright
   , SelectOptionOptions (..)
   , WaitForNavigationOptions (..)
   , defaultWaitForNavigationOptions
+  , WaitForURLOptions (..)
+  , defaultWaitForURLOptions
   , SetContentOptions (..)
   , defaultSetContentOptions
   , Selector
@@ -714,6 +716,7 @@ module Playwright
   , waitForLoadState
   , waitForLoadStateWith
   , waitForLoadStateFrame
+  , waitForURLFrame
   , waitForNavigation
   , waitForNavigationWith
   , waitForNavigationOptions
@@ -750,6 +753,7 @@ module Playwright
   , waitForTimeout
   , waitForURL
   , waitForURLWith
+  , waitForURLOptions
   , waitForWorker
   , armWorkerConsole
   , waitForWorkerConsole
@@ -1178,6 +1182,7 @@ import Playwright.Frame.Inspect
 import Playwright.Frame.Wait
   ( waitForLoadStateFrame
   , waitForSelectorHandleOnFrame
+  , waitForURLFrame
   )
 import Playwright.FulfillOptions
   ( ContentType (ContentType, contentTypeToText)
@@ -1520,6 +1525,7 @@ import Playwright.Page.Wait
   , waitForTimeout
   , waitForURL
   , waitForURLWith
+  , waitForURLOptions
   )
 import Playwright.Page.Query
   ( pageGetAttribute
@@ -1672,6 +1678,10 @@ import Playwright.SelectOption
 import Playwright.WaitForNavigationOptions
   ( WaitForNavigationOptions (WaitForNavigationOptions, waitForNavigationOptionsTimeout, waitForNavigationOptionsUrl, waitForNavigationOptionsWaitUntil)
   , defaultWaitForNavigationOptions
+  )
+import Playwright.WaitForURLOptions
+  ( WaitForURLOptions (WaitForURLOptions, waitForURLOptionsTimeout, waitForURLOptionsWaitUntil)
+  , defaultWaitForURLOptions
   )
 import Playwright.SetContentOptions
   ( SetContentOptions (SetContentOptions, setContentOptionsTimeout, setContentOptionsWaitUntil)

@@ -187,6 +187,7 @@ library
       Playwright.ViewportSize
       Playwright.WaitForNavigationOptions
       Playwright.WaitForState
+      Playwright.WaitForURLOptions
       Playwright.WaitId
       Playwright.WebSocket
       Playwright.WebSocketFrame

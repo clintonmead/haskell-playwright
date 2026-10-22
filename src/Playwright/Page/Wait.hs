@@ -53,6 +53,7 @@ module Playwright.Page.Wait
   , waitForTimeout
   , waitForURL
   , waitForURLWith
+  , waitForURLOptions
   ) where
 
 import Playwright.Monad
@@ -178,6 +179,9 @@ import Playwright.UrlMatch
 import Playwright.WaitForNavigationOptions
   ( WaitForNavigationOptions (waitForNavigationOptionsTimeout, waitForNavigationOptionsUrl, waitForNavigationOptionsWaitUntil)
   , defaultWaitForNavigationOptions
+  )
+import Playwright.WaitForURLOptions
+  ( WaitForURLOptions (waitForURLOptionsTimeout, waitForURLOptionsWaitUntil)
   )
 import Playwright.WaitForState
   ( WaitForState
@@ -336,11 +340,25 @@ waitForURL page glob = do
 
 waitForURLWith :: Page -> UrlMatch -> Timeout -> Playwright ()
 waitForURLWith page glob timeout =
+  waitForURLWithState page glob timeout LoadStateLoad
+
+waitForURLOptions :: Page -> UrlMatch -> WaitForURLOptions -> Playwright ()
+waitForURLOptions page glob opts = do
+  timeout <-
+    maybe (pageNavigationTimeout page) pure (waitForURLOptionsTimeout opts)
+  waitForURLWithState
+    page
+    glob
+    timeout
+    (fromMaybe LoadStateLoad (waitForURLOptionsWaitUntil opts))
+
+waitForURLWithState :: Page -> UrlMatch -> Timeout -> LoadState -> Playwright ()
+waitForURLWithState page glob timeout state =
   waitWithTimeout timeout $ do
     waitUntilUrl
       (channelGuid (frameChannel (pageMainFrame page)))
       (matchesUrlMatch glob)
-    waitForLoadState page LoadStateLoad
+    waitForLoadState page state
 
 waitForNavigation :: Page -> Playwright (Maybe Response)
 waitForNavigation page =

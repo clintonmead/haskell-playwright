@@ -6,20 +6,40 @@ import UnliftIO.Async
   ( wait
   , withAsync
   )
+import UnliftIO.MVar
+  ( newEmptyMVar
+  , putMVar
+  , takeMVar
+  )
 import Playwright
-  ( UrlMatch (UrlMatchGlob, UrlMatchRegex)
+  ( ContentType (ContentType)
+  , FulfillBody (FulfillText)
+  , FulfillOptions (fulfillBody, fulfillContentType)
+  , LoadState (LoadStateCommit, LoadStateDomContentLoaded, LoadStateLoad)
+  , UrlMatch (UrlMatchGlob, UrlMatchRegex)
+  , WaitForURLOptions (waitForURLOptionsWaitUntil)
   , click
+  , continueRoute
+  , defaultFulfillOptions
   , defaultGotoOptions
+  , defaultWaitForURLOptions
   , evaluate
+  , evaluateOnFrameText
+  , evaluateText
   , evaluateTextWith
+  , frames
+  , fulfillRoute
   , goto
   , milliseconds
+  , route
   , setContent
   , textArgument
   , url
   , urlFromText
   , urlToText
   , waitForURL
+  , waitForURLFrame
+  , waitForURLOptions
   , waitForURLWith
   )
 import Playwright.Harness
@@ -27,6 +47,7 @@ import Playwright.Harness
   , locate
   , withAssetPage
   , withAssets
+  , withChromiumPage
   , assertEqual
   , assertFailure
   , assertStillPending
@@ -106,4 +127,49 @@ tests =
             assertStillPending pending
             _ <- evaluate page "() => { history.pushState({}, '', '/third.html'); }"
             wait pending
+    , testCase "should work with both domcontentloaded and load" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          held <- newEmptyMVar
+          route page (UrlMatchGlob (prefix <> "/one-style.css")) $ \handled -> putMVar held handled
+          withAsync (goto page (urlFromText (prefix <> "/one-style.html")) defaultGotoOptions) $ \navigation ->
+            withAsync (waitForURLOptions page (UrlMatchGlob "**/one-style.html") (waitUntilOptions LoadStateDomContentLoaded)) $ \domContentLoaded ->
+              withAsync (waitForURLOptions page (UrlMatchGlob "**/one-style.html") (waitUntilOptions LoadStateLoad)) $ \bothFired -> do
+                handled <- takeMVar held
+                wait domContentLoaded
+                assertStillPending bothFired
+                continueRoute handled
+                wait bothFired
+                _ <- wait navigation
+                pure ()
+    , testCase "should work with commit" $
+        withAssets $ \prefix page -> do
+          route page (UrlMatchGlob (prefix <> "/script.js")) $ \_ -> pure ()
+          route page (UrlMatchGlob (prefix <> "/empty.html")) $ \handled ->
+            fulfillRoute
+              handled
+              defaultFulfillOptions
+                { fulfillContentType = Just (ContentType "text/html")
+                , fulfillBody = Just (FulfillText "<title>Hello</title><script src=\"script.js\"></script>")
+                }
+          withAsync (goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions) $ \_ -> do
+            waitForURLOptions page (UrlMatchGlob "**/empty.html") (waitUntilOptions LoadStateCommit)
+            assertEqual "title" "Hello" =<< evaluateText page "() => document.title"
+    , testCase "should work with commit and about:blank" $
+        withChromiumPage $ \page ->
+          waitForURLOptions page (UrlMatchGlob "about:blank") (waitUntilOptions LoadStateCommit)
+    , testCase "should work on frame" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/frames/one-frame.html")) defaultGotoOptions
+          allFrames <- frames page
+          case drop 1 allFrames of
+            [] ->
+              assertFailure "expected a child frame"
+            child : _ -> do
+              _ <- evaluateOnFrameText child ("() => { window.location.href = '" <> prefix <> "/grid.html'; return 'navigating'; }")
+              waitForURLFrame child (UrlMatchGlob "**/grid.html")
     ]
+
+waitUntilOptions :: LoadState -> WaitForURLOptions
+waitUntilOptions state =
+  defaultWaitForURLOptions {waitForURLOptionsWaitUntil = Just state}

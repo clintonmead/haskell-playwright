@@ -146,3 +146,19 @@ Decisions made without waiting for an answer. Each entry gives the question, the
 **Guess taken:** No. `contentFrame` and `frameLocatorOwner` return a `Locator`, the same type `frameLocator` already returns. `frameLocatorOwner` removes a trailing `enter-frame` step, so a locator that is not a frame locator comes back unchanged.
 
 **To change:** Add a `FrameLocator` newtype if callers need the two types kept apart at compile time.
+
+## Frame waitForURL uses the default timeout
+
+**Question:** Upstream `frame.waitForURL` takes its timeout from the page's navigation timeout. A `Frame` has no link back to its page in this binding, so it cannot read that setting. What timeout should `waitForURLFrame` use?
+
+**Guess taken:** The default timeout (30 s), the same one the other frame waits fall back to.
+
+**To change:** Pass the page's navigation timeout in as an argument, or add a frame-to-page accessor so the function can read it.
+
+## waitForURL waitUntil options
+
+**Question:** Upstream `waitForURL` accepts `waitUntil` (`load`, `domcontentloaded`, `commit`) and `timeout`. The binding had only the timeout form. How should the options be exposed?
+
+**Guess taken:** A `WaitForURLOptions` record (timeout and `waitUntil`) with `waitForURLOptions`, matching `WaitForNavigationOptions`. `waitForURLWith` still takes a plain timeout and waits for `load`.
+
+**To change:** Fold `waitForURLOptions` into `waitForURLWith` if callers would rather have one function.

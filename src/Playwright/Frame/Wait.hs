@@ -5,6 +5,7 @@ module Playwright.Frame.Wait
   , waitForSelectorHandleFrame
   , waitForSelectorHandleOnFrame
   , waitForTimeoutFrame
+  , waitForURLFrame
   ) where
 
 import Playwright.Monad
@@ -30,6 +31,7 @@ import Playwright.Channel
   )
 import Playwright.Connection
   ( waitForLifecycle
+  , waitUntilUrl
   )
 import Playwright.ElementHandle
   ( ElementHandle
@@ -45,8 +47,15 @@ import Playwright.JsHandle
   , jsHandleFromRef
   )
 import Playwright.LoadState
-  ( LoadState
+  ( LoadState (LoadStateLoad)
   , toLifecycle
+  )
+import Playwright.RaceTimeout
+  ( waitWithTimeout
+  )
+import Playwright.UrlMatch
+  ( UrlMatch
+  , matchesUrlMatch
   )
 import Playwright.Protocol
   ( FrameWaitForFunctionParams (frameWaitForFunctionParamsIsFunction, frameWaitForFunctionParamsPollingInterval)
@@ -138,6 +147,16 @@ waitForLoadStateFrame frame state =
   waitForLifecycle
     (channelGuid (frameChannel frame))
     (toLifecycle state)
+
+-- | Waits for the frame's URL to match, then for its load event. The timeout is
+-- the default one, since a frame has no page navigation timeout to read.
+waitForURLFrame :: Frame -> UrlMatch -> Playwright ()
+waitForURLFrame frame glob =
+  waitWithTimeout defaultTimeout $ do
+    waitUntilUrl
+      (channelGuid (frameChannel frame))
+      (matchesUrlMatch glob)
+    waitForLoadStateFrame frame LoadStateLoad
 
 toProtocolState :: WaitForState -> FrameWaitForSelectorParamsState
 toProtocolState state =
