@@ -5,6 +5,9 @@ module Playwright.PageNetworkResponseSpec
 import Codec.Compression.GZip
   ( compress
   )
+import Control.Monad
+  ( forM_
+  )
 import Data.Aeson
   ( object
   , (.=)
@@ -33,6 +36,7 @@ import Network.HTTP.Types
   )
 import Network.Wai
   ( Application
+  , Response
   , pathInfo
   , responseLBS
   , responseStream
@@ -45,8 +49,11 @@ import Playwright
   , Playwright
   , UrlMatch (UrlMatchGlob)
   , armResponse
+  , continueRoute
   , defaultGotoOptions
   , evaluate
+  , evaluateOnFrame
+  , frameByUrl
   , goto
   , onRequestFinished
   , requestRedirectedFrom
@@ -60,6 +67,7 @@ import Playwright
   , responseStatus
   , responseStatusText
   , responseText
+  , route
   , urlFromText
   , urlToText
   )
@@ -91,7 +99,9 @@ import UnliftIO.Exception
   ( try
   )
 import UnliftIO.IORef
-  ( newIORef
+  ( IORef
+  , modifyIORef'
+  , newIORef
   , readIORef
   , writeIORef
   )
@@ -262,6 +272,30 @@ tests =
                 assertFailure "missing response"
               Just value ->
                 assertEqual "body" "<div>hello</div>" =<< responseText value
+    , testCase "should bypass disk cache when page interception is enabled" $
+        withChromiumPage $ \page -> do
+          apiHits <- newIORef (0 :: Int)
+          frameHits <- newIORef (0 :: Int)
+          withLocalApp (cacheApp apiHits frameHits) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/frames/one-frame.html")) defaultGotoOptions
+            route page (UrlMatchGlob "**/api*") continueRoute
+            forM_ [1 .. 3 :: Int] $ \expected -> do
+              takeResponse <- armResponse page (UrlMatchGlob "**/api")
+              _ <- evaluate page "async () => (await fetch('/api')).status"
+              response <- takeResponse
+              assertEqual "main frame status" (HttpStatus 200) =<< responseStatus response
+              assertEqual "main frame requests" expected =<< readIORef apiHits
+            found <- frameByUrl page (UrlMatchGlob "**/frame.html")
+            case found of
+              Nothing ->
+                assertFailure "missing frame"
+              Just frame ->
+                forM_ [1 .. 3 :: Int] $ \expected -> do
+                  takeResponse <- armResponse page (UrlMatchGlob "**/frame/api")
+                  _ <- evaluateOnFrame frame "async () => (await fetch('/frame/api')).status"
+                  response <- takeResponse
+                  assertEqual "subframe status" (HttpStatus 200) =<< responseStatus response
+                  assertEqual "subframe requests" expected =<< readIORef frameHits
     ]
 
 headerValue :: Text -> [HttpHeader] -> Maybe Text
@@ -323,6 +357,30 @@ streamApp hit release request respond =
       respond (responseLBS status200 [(hContentType, "text/html")] LBS8.empty)
     _ ->
       respond (responseLBS status404 [] LBS8.empty)
+
+-- | Serves the two counted API routes with a cacheable response, plus the frame page.
+cacheApp :: IORef Int -> IORef Int -> Application
+cacheApp apiHits frameHits request respond =
+  case pathInfo request of
+    ["api"] -> do
+      modifyIORef' apiHits (+ 1)
+      respond cachedHello
+    ["frame", "api"] -> do
+      modifyIORef' frameHits (+ 1)
+      respond cachedHello
+    ["frames", "one-frame.html"] ->
+      respond (responseLBS status200 [(hContentType, "text/html")] (LBS8.pack "<iframe src='./frame.html'></iframe>"))
+    ["frames", "frame.html"] ->
+      respond (responseLBS status200 [(hContentType, "text/html")] LBS8.empty)
+    _ ->
+      respond (responseLBS status404 [] LBS8.empty)
+  where
+    cachedHello :: Response
+    cachedHello =
+      responseLBS
+        status200
+        [(hContentType, "text/plain"), ("cache-control", "public, max-age=31536000")]
+        (LBS8.pack "Hello")
 
 coolApp :: Application
 coolApp _ respond =
