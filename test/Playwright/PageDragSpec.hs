@@ -51,6 +51,7 @@ import Playwright.Harness
   , requireHandle
   , withAssetPage
   , withAssets
+  , attachFrame
   , withChromiumPage
   , assertEqual
   )
@@ -323,6 +324,34 @@ tests =
               "() => { document.querySelector('#target').addEventListener('dragover', event => { document.querySelector('button')?.remove(); }, false); document.querySelector('#target').addEventListener('drop', event => { document.querySelector('#target').textContent = 'dropped'; }, false); }"
           dragAndDrop (locate page "button") (locate page "div")
           assertEqual "text" "drop here" =<< evaluateOnLocatorText (locate page "div") "div => div.textContent"
+    , testCase "should drag into an iframe" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/drag-n-drop.html")) defaultGotoOptions
+          frame <- attachFrame page "oopif" (prefix <> "/drag-n-drop.html")
+          _ <-
+            evaluateText
+              page
+              "() => { const iframe = document.querySelector('iframe'); iframe.style.width = '500px'; iframe.style.height = '600px'; iframe.style.marginLeft = '500px'; iframe.style.marginTop = '60px'; return 'set'; }"
+          pageEvents <- trackEvents =<< bodyHandle (locate page "body")
+          frameEvents <- trackEvents =<< bodyHandle (locatorOnFrame page frame (selectorFromText "body"))
+          hover (locate page "#source")
+          mouseDown page
+          hover (locatorOnFrame page frame (selectorFromText "#target"))
+          mouseUp page
+          assertEqual "page events"
+            [ "mousemove at 120;86"
+            , "mousedown at 120;86"
+            , "mousemove at 742;412"
+            , "dragstart at 120;86"
+            , "dragend"
+            ]
+            =<< jsonValueTexts pageEvents
+          assertEqual "frame events"
+            [ "dragenter at 240;350"
+            , "dragover at 240;350"
+            , "drop at 240;350"
+            ]
+            =<< jsonValueTexts frameEvents
     ]
 
 -- | Asserts the drop landed: the source ended up inside the target.
