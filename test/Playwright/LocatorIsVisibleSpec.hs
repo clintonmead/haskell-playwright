@@ -4,6 +4,10 @@ module Playwright.LocatorIsVisibleSpec
 
 import Playwright
   ( WaitForState (WaitForHidden, WaitForVisible)
+  , Playwright
+  , goto
+  , defaultGotoOptions
+  , urlFromText
   , isHidden
   , isVisible
   , setContent
@@ -11,9 +15,16 @@ import Playwright
   )
 import Playwright.Harness
   ( assertProtocolContains
+  , withAssets
   , locate
   , withChromiumPage
   , assertEqual
+  )
+import Playwright.Error
+  ( PlaywrightError
+  )
+import UnliftIO.Exception
+  ( try
   )
 import Test.Tasty
   ( TestTree
@@ -64,4 +75,21 @@ tests =
           assertProtocolContains
             "Unknown engine \"hey\" while parsing selector hey=what"
             (isVisible (locate page "hey=what"))
+    , testCase "isVisible during navigation should not throw" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          mapM_
+            ( \_ -> do
+                _ <-
+                  try
+                    ( setContent
+                        page
+                        ( "<script>setTimeout(() => { window.location.href = '" <> prefix <> "/empty.html'; }, Math.random() * 50);</script>"
+                        )
+                    )
+                    :: Playwright (Either PlaywrightError ())
+                visible <- isVisible (locate page "div")
+                assertEqual "visible" False visible
+            )
+            [1 .. 20 :: Int]
     ]
