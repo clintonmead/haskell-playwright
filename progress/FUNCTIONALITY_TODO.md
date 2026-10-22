@@ -19,6 +19,7 @@ Next work: remaining `tests/page` specs that do not need `expect` matchers, then
 Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLocator` need Playwright `expect` (toHaveText, toHaveURL, aria snapshots, …).
 
 ## `tests/page` with no Haskell spec yet
+- locator-wait-for-function: the binding has no `Locator.waitForFunction`, so all ten upstream cases are open. The `page` version is ported in the page-wait-for-function spec.
 
 - page-click-during-navigation (JS `__testHookAfterStable` only)
 - page-evaluate-no-stall (JS `toImpl` / nonStallingRawEvaluate — not a public API)
