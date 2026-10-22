@@ -879,7 +879,7 @@ import Playwright.BrowserType
   , withBrowser
   )
 import Playwright.CheckOptions
-  ( CheckOptions (CheckOptions, checkOptionsForce, checkOptionsTimeout, checkOptionsTrial)
+  ( CheckOptions (CheckOptions, checkOptionsForce, checkOptionsPosition, checkOptionsTimeout, checkOptionsTrial)
   , defaultCheckOptions
   )
 import Playwright.ClearCookiesOptions

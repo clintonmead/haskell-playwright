@@ -7,7 +7,15 @@ import Data.Text
   , unpack
   )
 import Playwright
-  ( CheckOptions (checkOptionsTrial)
+  ( CheckOptions (checkOptionsPosition, checkOptionsTrial)
+  , CssPixel (CssPixel)
+  , Point (Point)
+  , boundingBox
+  , boundingBoxWidth
+  , cssPixelFromInt
+  , cssPixelToScientific
+  , querySelector
+  , selectorFromText
   , check
   , checkWith
   , defaultCheckOptions
@@ -21,8 +29,10 @@ import Playwright
   , uncheckWith
   )
 import Playwright.Harness
-  ( assertProtocolContains
+  ( assertFailure
+  , assertProtocolContains
   , locate
+  , requireHandle
   , withChromiumPage
   , assertEqual
   )
@@ -114,6 +124,24 @@ tests =
           withChromiumPage $ \page -> do
             setContent page "<input type='radio' name='test' checked id='radio'>"
             assertProtocolContains "Cannot uncheck radio button" (uncheck (locate page "#radio"))
+    , testCase "should check the label with position" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<input id='checkbox' type='checkbox' style='width: 5px; height: 5px;'><label for='checkbox'><a href=\"about:blank\">I am a long link that goes away so that nothing good will happen if you click on me</a>Click me</label>"
+          label <- requireHandle =<< querySelector page (selectorFromText "text=Click me")
+          box <- boundingBox label
+          case box of
+            Nothing ->
+              assertFailure "expected a bounding box"
+            Just found ->
+              checkWith
+                (locate page "text=Click me")
+                defaultCheckOptions
+                  { checkOptionsPosition =
+                      Just (Point (CssPixel (cssPixelToScientific (boundingBoxWidth found) - 10)) (cssPixelFromInt 2))
+                  }
+          assertEqual "checked" True =<< evaluateBool page "() => document.querySelector('input').checked"
       ]
         <> fmap checkAriaRole ariaRoles
         <> fmap uncheckAriaRole ariaRoles

@@ -35,7 +35,7 @@ import Data.Text
   ( Text
   )
 import Playwright.CheckOptions
-  ( CheckOptions (checkOptionsForce, checkOptionsTimeout, checkOptionsTrial)
+  ( CheckOptions (checkOptionsForce, checkOptionsPosition, checkOptionsTimeout, checkOptionsTrial)
   )
 import Playwright.ClickOptions
   ( ClickOptions (clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsNoWaitAfter, clickOptionsPosition, clickOptionsSteps, clickOptionsTrial)
@@ -94,7 +94,7 @@ import Playwright.Point
 import Playwright.Protocol
   ( FrameBlurParams (frameBlurParamsStrict)
   , FrameBlurResult
-  , FrameCheckParams (frameCheckParamsForce, frameCheckParamsStrict, frameCheckParamsTrial)
+  , FrameCheckParams (frameCheckParamsForce, frameCheckParamsPosition, frameCheckParamsStrict, frameCheckParamsTrial)
   , FrameCheckResult
   , FrameClickParams (frameClickParamsButton, frameClickParamsClickCount, frameClickParamsForce, frameClickParamsModifiers, frameClickParamsNoWaitAfter, frameClickParamsPosition, frameClickParamsSteps, frameClickParamsStrict, frameClickParamsTrial)
   , FrameClickParamsButton (FrameClickParamsButtonLeft, FrameClickParamsButtonMiddle, FrameClickParamsButtonRight)
@@ -286,6 +286,7 @@ checkFrame frame selector opts =
     (mkFrameCheckParams selector)
       { frameCheckParamsStrict = Just True
       , frameCheckParamsForce = checkOptionsForce opts
+      , frameCheckParamsPosition = fmap toProtocolPoint (checkOptionsPosition opts)
       , frameCheckParamsTrial = checkOptionsTrial opts
       }
 
