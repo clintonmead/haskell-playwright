@@ -17,6 +17,9 @@ import Data.ByteString.Builder
   )
 import Data.ByteString.Lazy qualified as LBS
 import Data.ByteString.Lazy.Char8 qualified as LBS8
+import Data.List
+  ( sort
+  )
 import Data.Maybe
   ( listToMaybe
   )
@@ -26,7 +29,10 @@ import Data.Text
   , toLower
   )
 import Network.HTTP.Types
-  ( hContentEncoding
+  ( Header
+  , Status
+  , hContentEncoding
+  , hContentLength
   , hContentType
   , hLocation
   , mkStatus
@@ -42,18 +48,23 @@ import Network.Wai
   , responseStream
   )
 import Playwright
-  ( HeaderName (headerNameToText)
-  , HeaderValue (headerValueToText)
-  , HttpHeader (httpHeaderName, httpHeaderValue)
+  ( ContentType (ContentType)
+  , FulfillBody (FulfillText)
+  , FulfillOptions (fulfillBody, fulfillContentType, fulfillHeaders, fulfillStatus)
+  , HeaderName (HeaderName, headerNameToText)
+  , HeaderValue (HeaderValue, headerValueToText)
+  , HttpHeader (HttpHeader, httpHeaderName, httpHeaderValue)
   , HttpStatus (HttpStatus)
   , Playwright
   , UrlMatch (UrlMatchGlob)
   , armResponse
   , continueRoute
+  , defaultFulfillOptions
   , defaultGotoOptions
   , evaluate
   , evaluateOnFrame
   , frameByUrl
+  , fulfillRoute
   , goto
   , onRequestFinished
   , requestRedirectedFrom
@@ -296,6 +307,55 @@ tests =
                   response <- takeResponse
                   assertEqual "subframe status" (HttpStatus 200) =<< responseStatus response
                   assertEqual "subframe requests" expected =<< readIORef frameHits
+    , testCase "should return headers after route.fulfill" $
+        withChromiumPage $ \page -> do
+          route page (UrlMatchGlob "**/*") $ \handled ->
+            fulfillRoute
+              handled
+              defaultFulfillOptions
+                { fulfillStatus = Just (HttpStatus 200)
+                , fulfillHeaders =
+                    [ HttpHeader (HeaderName "foo") (HeaderValue "bar")
+                    , HttpHeader (HeaderName "content-language") (HeaderValue "en")
+                    ]
+                , fulfillContentType = Just (ContentType "text/plain")
+                , fulfillBody = Just (FulfillText "done")
+                }
+          response <- goto page (urlFromText "http://playwright.test/empty.html") defaultGotoOptions
+          case response of
+            Nothing ->
+              assertFailure "missing response"
+            Just value -> do
+              headers <- responseAllHeaders value
+              assertEqual
+                "all headers"
+                [ ("content-language", "en")
+                , ("content-length", "4")
+                , ("content-type", "text/plain")
+                , ("foo", "bar")
+                ]
+                (sortedHeaders headers)
+    , testCase "should return body for prefetch script" $
+        withChromiumPage $ \page ->
+          withLocalApp prefetchApp $ \prefix -> do
+            takeResponse <- armResponse page (UrlMatchGlob "**/prefetch.js")
+            _ <- goto page (urlFromText (prefix <> "/prefetch.html")) defaultGotoOptions
+            response <- takeResponse
+            assertEqual "body" "// Scripts will be pre-fetched" =<< responseText response
+    , testCase "should return body for image with evicted body" $
+        withChromiumPage $ \page ->
+          withLocalApp evictedImageApp $ \prefix -> do
+            takeResponse <- armResponse page (UrlMatchGlob "**/pixel.gif")
+            _ <- goto page (urlFromText (prefix <> "/page.html")) defaultGotoOptions
+            response <- takeResponse
+            assertEqual "body" (LBS.toStrict truncatedGif) =<< responseBody response
+    ]
+
+sortedHeaders :: [HttpHeader] -> [(Text, Text)]
+sortedHeaders headers =
+  sort
+    [ (headerNameToText (httpHeaderName header), headerValueToText (httpHeaderValue header))
+    | header <- headers
     ]
 
 headerValue :: Text -> [HttpHeader] -> Maybe Text
@@ -381,6 +441,47 @@ cacheApp apiHits frameHits request respond =
         status200
         [(hContentType, "text/plain"), ("cache-control", "public, max-age=31536000")]
         (LBS8.pack "Hello")
+
+-- | A response with the Content-Length header that Node's servers send. The driver
+-- refetches a body that the browser has evicted only when that header is present.
+sizedResponse :: Status -> [Header] -> LBS.ByteString -> Response
+sizedResponse status headers body =
+  responseLBS status ((hContentLength, LBS.toStrict (LBS8.pack (show (LBS.length body)))) : headers) body
+
+-- | Serves a page that prefetches a script, so the browser requests it on its own.
+prefetchApp :: Application
+prefetchApp request respond =
+  case pathInfo request of
+    ["prefetch.html"] ->
+      respond
+        ( sizedResponse
+            status200
+            [(hContentType, "text/html")]
+            (LBS8.pack "<link rel='prefetch' href='./prefetch.js'>")
+        )
+    ["prefetch.js"] ->
+      respond (sizedResponse status200 [(hContentType, "application/javascript")] (LBS8.pack "// Scripts will be pre-fetched"))
+    _ ->
+      respond (responseLBS status404 [] LBS8.empty)
+
+-- | A 1x1 gif cut short after its header, which Chromium may evict from its cache.
+truncatedGif :: LBS.ByteString
+truncatedGif = LBS.pack [0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x2c]
+
+evictedImageApp :: Application
+evictedImageApp request respond =
+  case pathInfo request of
+    ["page.html"] ->
+      respond
+        ( sizedResponse
+            status200
+            [(hContentType, "text/html")]
+            (LBS8.pack "<html><body><img src=\"/pixel.gif\"></body></html>")
+        )
+    ["pixel.gif"] ->
+      respond (sizedResponse status200 [(hContentType, "image/gif")] truncatedGif)
+    _ ->
+      respond (responseLBS status404 [] LBS8.empty)
 
 coolApp :: Application
 coolApp _ respond =

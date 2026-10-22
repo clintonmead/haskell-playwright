@@ -170,3 +170,11 @@ Decisions made without waiting for an answer. Each entry gives the question, the
 **Guess taken:** A list of `HttpHeader`, the same type `responseHeaders` returns, so callers use one lookup for both. Names are lowercased and repeated values are merged, with `, ` for most headers and a newline for `set-cookie`, as upstream `RawHeaders` does.
 
 **To change:** Return a `Map HeaderName HttpHeader` or a `Map Text Text` if callers need keyed lookup. The merge rule stays the same.
+
+## route.fulfill set-cookie test is marked as an expected failure upstream
+
+**Question:** Upstream `should return set-cookie header after route.fulfill` is `it.fail` on chromium and webkit (microsoft/playwright#11035). It fulfills a route with a `set-cookie: a=b` header and expects `allHeaders()` to report it. Because the test is expected to fail on chromium, a plain port would fail in the suite. How should an expected-failure case be recorded?
+
+**Guess taken:** Leave it unported and list it as open in the TODO, rather than add a test that fails or a test that asserts the bug. The rest of the `route.fulfill` headers case is ported as a passing test.
+
+**To change:** Add an expected-failure helper to the harness (a `testCaseFail` that passes when the body throws) and port the case with that helper.
