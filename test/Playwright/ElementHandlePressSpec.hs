@@ -51,4 +51,13 @@ tests =
           setContent page "<input type='number' value=2 />"
           press (locate page "input") (Key "1")
           assertEqual "value" "12" =<< evaluateOnLocatorText (locate page "input") "input => input.value"
+    , testCase "should not modify selection when focused" $
+        withChromiumPage $ \page -> do
+          setContent page "<input type='text' value='hello' />"
+          _ <-
+            evaluateText
+              page
+              "() => { const input = document.querySelector('input'); input.focus(); input.selectionStart = 2; input.selectionEnd = 4; return 'set'; }"
+          press (locate page "input") (Key "w")
+          assertEqual "value" "hewo" =<< evaluateOnLocatorText (locate page "input") "input => input.value"
     ]
