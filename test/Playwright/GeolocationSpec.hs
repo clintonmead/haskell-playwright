@@ -2,8 +2,21 @@ module Playwright.GeolocationSpec
   ( tests
   ) where
 
+import Control.Concurrent
+  ( threadDelay
+  )
+import Control.Monad.IO.Class
+  ( liftIO
+  )
 import Data.Text
-  ( isInfixOf
+  ( Text
+  , isInfixOf
+  )
+import UnliftIO.IORef
+  ( IORef
+  , modifyIORef'
+  , newIORef
+  , readIORef
   )
 import Playwright
   ( ConsoleMessage (consoleMessageText)
@@ -23,11 +36,12 @@ import Playwright
   , longitudeFromInt
   , newContextWith
   , newPage
+  , onConsole
+  , Playwright
   , pageContext
   , setGeolocation
   , textArgument
   , urlFromText
-  , waitForConsoleWhere
   , waitForLoadState
   )
 import Playwright.Harness
@@ -36,6 +50,7 @@ import Playwright.Harness
   , withAssetsPrefix
   , withChromiumBrowser
   , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
@@ -121,53 +136,21 @@ tests =
             ctx = pageContext page
           grantPermissions ctx [PermissionName "geolocation"]
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-          setGeolocation
-            ctx
-            Geolocation
-              { geolocationAccuracy = Nothing
-              , geolocationLatitude = latitudeFromInt 0
-              , geolocationLongitude = longitudeFromInt 0
-              }
+          -- Record every console message from the start, so an update that
+          -- arrives before a waiter is registered is not missed.
+          messages <- newIORef []
+          onConsole page (\message -> modifyIORef' messages (<> [consoleMessageText message]))
+          setGeolocation ctx (geolocationAt 0 0)
           _ <-
             evaluateNumber
               page
               "() => { navigator.geolocation.watchPosition(pos => { console.log(`lat=${pos.coords.latitude} lng=${pos.coords.longitude}`); }, err => {}); return 0; }"
-          withAsync
-            (waitForConsoleWhere page (\message -> "lat=0 lng=10" `isInfixOf` consoleMessageText message))
-            $ \pending -> do
-              setGeolocation
-                ctx
-                Geolocation
-                  { geolocationAccuracy = Nothing
-                  , geolocationLatitude = latitudeFromInt 0
-                  , geolocationLongitude = longitudeFromInt 10
-                  }
-              _ <- wait pending
-              pure ()
-          withAsync
-            (waitForConsoleWhere page (\message -> "lat=20 lng=30" `isInfixOf` consoleMessageText message))
-            $ \pending -> do
-              setGeolocation
-                ctx
-                Geolocation
-                  { geolocationAccuracy = Nothing
-                  , geolocationLatitude = latitudeFromInt 20
-                  , geolocationLongitude = longitudeFromInt 30
-                  }
-              _ <- wait pending
-              pure ()
-          withAsync
-            (waitForConsoleWhere page (\message -> "lat=40 lng=50" `isInfixOf` consoleMessageText message))
-            $ \pending -> do
-              setGeolocation
-                ctx
-                Geolocation
-                  { geolocationAccuracy = Nothing
-                  , geolocationLatitude = latitudeFromInt 40
-                  , geolocationLongitude = longitudeFromInt 50
-                  }
-              _ <- wait pending
-              pure ()
+          setGeolocation ctx (geolocationAt 0 10)
+          awaitLogged messages "lat=0 lng=10"
+          setGeolocation ctx (geolocationAt 20 30)
+          awaitLogged messages "lat=20 lng=30"
+          setGeolocation ctx (geolocationAt 40 50)
+          awaitLogged messages "lat=40 lng=50"
     , testCase "should use context options for popup" $
         withAssets $ \prefix page -> do
           let
@@ -243,3 +226,28 @@ isolateContextsTest =
           "() => new Promise(resolve => navigator.geolocation.getCurrentPosition(position => resolve(position.coords.longitude)))"
       closeContext ctx2
       closeContext ctx
+
+-- | A geolocation fix at the given latitude and longitude.
+geolocationAt :: Int -> Int -> Geolocation
+geolocationAt latitude longitude =
+  Geolocation
+    { geolocationAccuracy = Nothing
+    , geolocationLatitude = latitudeFromInt latitude
+    , geolocationLongitude = longitudeFromInt longitude
+    }
+
+-- | Polls the console messages seen so far until one contains the text.
+awaitLogged :: IORef [Text] -> Text -> Playwright ()
+awaitLogged messages expected = go (200 :: Int)
+  where
+    go :: Int -> Playwright ()
+    go attempts = do
+      current <- readIORef messages
+      if any (expected `isInfixOf`) current
+        then pure ()
+        else
+          if attempts <= 0
+            then assertFailure ("no console message containing " <> show expected)
+            else do
+              liftIO (threadDelay 50000)
+              go (attempts - 1)
