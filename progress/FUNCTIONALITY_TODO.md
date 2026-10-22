@@ -119,7 +119,7 @@ Official `expect-*`, `page-aria-snapshot*`, `matchers.misc`, and locator `asLoca
 ## `tests/library` with no or thin coverage
 
 - **capabilities (environment):** "should support webgl" and "should support webgl 2" fail with the driver 1.64.1 Chromium in this sandbox (`getContext('webgl')` returns null). They passed on driver 1.61.1. The cause is the browser build or GPU setup, not the binding. Left failing until the browser setup is checked.
-- **capabilities (partial):** "should play video" and "should play webm video" are ported with local file URLs and pass. Still open: the SharedArrayBuffer case (HTTPS server), the WebSocket cases (no ws server), the audio and mp4 cases, and the avif and window.safari cases.
+- **capabilities (partial):** the video, webm, audio and mp4 playback cases are ported and pass. Still open: the SharedArrayBuffer case (HTTPS server), the WebSocket cases (no ws server), and the avif and window.safari cases.
 - **browsercontext-network-event:** "should not fire events for favicon or favicon redirects" is skipped upstream for headless Chromium (`headless && browserName !== 'firefox'`), so it does not apply to this suite.
 - **tap:** `tapWith` (Locator) and `tapHandleWith` take `TapOptions` (force, modifiers, position, timeout, trial). The modifiers and trial cases are ported and pass. Still open: the touch-point and touchend-canceled cases, which are not examined yet.
 - **browsercontext-basic:** skip "default user agent". It calls `browser._channel.defaultUserAgentForTest()`, a test-only channel method, not public API.

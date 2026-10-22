@@ -6,6 +6,7 @@ import Control.Concurrent
   ( Chan
   , newChan
   , readChan
+  , threadDelay
   , writeChan
   )
 import Control.Monad.IO.Class
@@ -44,6 +45,7 @@ import Playwright
   , defaultFulfillOptions
   , defaultGotoOptions
   , evaluate
+  , evaluateNumber
   , evaluateBool
   , evaluateOnFrame
   , evaluateOnFrameText
@@ -76,6 +78,7 @@ import Playwright.Harness
   , withChromiumPage
   , withLocalApp
   , testAssetsDir
+  , assertBool
   , assertEqual
   , assertFailure
   )
@@ -257,6 +260,18 @@ tests =
           _ <- evaluate page "() => document.querySelector('video').play()"
           _ <- evaluate page "() => document.querySelector('video').pause()"
           pure ()
+    , testCase "should play audio" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          setContent page ("<audio src=\"" <> prefix <> "/example.mp3\"></audio>")
+          _ <- evaluate page "() => document.querySelector('audio').play()"
+          liftIO (threadDelay 3000000)
+          _ <- evaluate page "() => document.querySelector('audio').pause()"
+          assertBool "played" . (> (0.1 :: Double)) =<< evaluateNumber page "() => document.querySelector('audio').currentTime"
+    , testCase "should not crash on page with mp4" $
+        withChromiumPage $ \page -> do
+          setContent page "<video><source src=\"movie.mp4\"/></video>"
+          liftIO (threadDelay 1000000)
     ]
 
 serviceWorkerIframe :: IO ()
