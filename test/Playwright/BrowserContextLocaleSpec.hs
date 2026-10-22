@@ -79,6 +79,12 @@ tests =
           defaultNewContextOptions {newContextLocale = Just (Locale "fr-FR")}
           $ \_ page ->
             assertEqual "language" "fr-FR" =<< evaluateText page "() => navigator.language"
+    , testCase "should affect Intl.DateTimeFormat().resolvedOptions().locale" $
+        withChromiumContextWith
+          defaultNewContextOptions {newContextLocale = Just (Locale "en-GB")}
+          $ \_ page ->
+            assertEqual "locale" "en-GB"
+              =<< evaluateText page "() => new Intl.DateTimeFormat().resolvedOptions().locale"
     , testCase "should format number" $
         withChromiumContextWith
           defaultNewContextOptions {newContextLocale = Just (Locale "en-US")}
