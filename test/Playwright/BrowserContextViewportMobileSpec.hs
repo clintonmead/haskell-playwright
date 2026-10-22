@@ -2,6 +2,9 @@ module Playwright.BrowserContextViewportMobileSpec
   ( tests
   ) where
 
+import Data.Text
+  ( replace
+  )
 import Playwright
   ( ConsoleMessage (consoleMessageText)
   , NewContextOptions (newContextDeviceScaleFactor, newContextHasTouch, newContextIsMobile, newContextUserAgent, newContextViewport)
@@ -96,6 +99,17 @@ tests =
             assertEqual "0" (0 :: Double) =<< evaluateNumber page "() => window.orientation"
             setViewportSize page (ViewportSize (ViewportWidth 400) (ViewportHeight 300))
             assertEqual "90" (90 :: Double) =<< evaluateNumber page "() => window.orientation"
+    , testCase "should preserve window.orientation override after navigation" $
+        withAssetsWith
+          defaultNewContextOptions
+            { newContextViewport = Just (ViewportSize (ViewportWidth 400) (ViewportHeight 300))
+            , newContextIsMobile = Just True
+            }
+          $ \prefix page -> do
+            _ <- goto page (urlFromText (prefix <> "/mobile.html")) defaultGotoOptions
+            assertEqual "same origin" (90 :: Double) =<< evaluateNumber page "() => window.orientation"
+            _ <- goto page (urlFromText (replace "127.0.0.1" "localhost" prefix <> "/mobile.html")) defaultGotoOptions
+            assertEqual "cross origin" (90 :: Double) =<< evaluateNumber page "() => window.orientation"
     , testCase "should fire orientationchange event" $
         withAssetsWith
           defaultNewContextOptions
