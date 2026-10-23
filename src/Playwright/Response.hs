@@ -17,6 +17,7 @@ module Playwright.Response
   , responseUrl
   , responseFromServiceWorker
   , requestResponse
+  , requestExistingResponse
   ) where
 
 import Playwright.Monad
@@ -32,6 +33,10 @@ import Data.ByteString
 import Data.List
   ( partition
   )
+import Data.Maybe
+  ( listToMaybe
+  , mapMaybe
+  )
 import Data.Text
   ( Text
   , intercalate
@@ -46,7 +51,8 @@ import Playwright.Channel
   , send
   )
 import Playwright.Connection
-  ( lookupObject
+  ( guidsOfType
+  , lookupObject
   )
 import Playwright.Error
   ( PlaywrightError (DecodeFailure)
@@ -61,10 +67,11 @@ import Playwright.HttpStatus
   , httpStatusOk
   )
 import Playwright.Json.ChannelRef
-  ( ChannelRef (channelRefGuid)
+  ( ChannelRef (ChannelRef, channelRefGuid)
   )
 import Playwright.Json.Decode
-  ( throwDecode
+  ( fromJsonValue
+  , throwDecode
   )
 import Playwright.Json.ProtocolBinary
   ( protocolBinaryToByteString
@@ -73,7 +80,8 @@ import Playwright.MethodName
   ( MethodName (MethodName)
   )
 import Playwright.Protocol
-  ( NameValue (nameValueName, nameValueValue)
+  ( ChannelType (ChannelTypeResponse)
+  , NameValue (nameValueName, nameValueValue)
   , ResponseBodyResult (responseBodyResultBinary)
   , ResponseInitializer (responseInitializerFromServiceWorker, responseInitializerHeaders, responseInitializerRequest, responseInitializerStatus, responseInitializerStatusText, responseInitializerUrl)
   , ResponseHttpVersionResult (responseHttpVersionResultValue)
@@ -83,10 +91,10 @@ import Playwright.Protocol
   , mkResponseRawResponseHeadersParams
   )
 import Playwright.RemoteObject
-  ( RemoteObject (remoteInitializer)
+  ( RemoteObject (remoteGuid, remoteInitializer)
   )
 import Playwright.Request
-  ( Request
+  ( Request (requestChannel)
   , requestFromRef
   , requestResponseRef
   )
@@ -123,6 +131,28 @@ requestResponse :: Request -> Playwright (Maybe Response)
 requestResponse request = do
   ref <- requestResponseRef request
   pure (fmap (responseFromRef) ref)
+
+-- | The response for a request if it has already been received, without waiting
+-- for it. Mirrors the client-side existingResponse accessor.
+requestExistingResponse :: Request -> Playwright (Maybe Response)
+requestExistingResponse request = do
+  let
+    requestGuid = channelGuid (requestChannel request)
+  objects <- traverse (lookupObject) =<< guidsOfType ChannelTypeResponse
+  pure
+    ( listToMaybe
+        ( mapMaybe
+            ( \obj ->
+                case fromJsonValue (remoteInitializer obj) of
+                  Right initializer
+                    | channelRefGuid (responseInitializerRequest initializer) == requestGuid ->
+                        Just (responseFromRef (ChannelRef (remoteGuid obj)))
+                  _ ->
+                    Nothing
+            )
+            objects
+        )
+    )
 
 responseStatus :: Response -> Playwright HttpStatus
 responseStatus response =

@@ -807,6 +807,7 @@ module Playwright
   , requestRedirectedTo
   , requestResourceType
   , requestResponse
+  , requestExistingResponse
   , requestServiceWorker
   , requestSizes
   , requestTiming
@@ -2116,6 +2117,7 @@ import Playwright.Response
   , responseJSON
   , responseOk
   , requestResponse
+  , requestExistingResponse
   , responseRequest
   , responseFromServiceWorker
   , responseStatus
