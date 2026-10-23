@@ -11,11 +11,21 @@ import Control.Concurrent
   , readChan
   , writeChan
   )
+import Data.Aeson
+  ( Value (Object)
+  , eitherDecodeStrict
+  , object
+  , (.=)
+  )
 import Data.ByteString
   ( ByteString
   )
+import Data.ByteString qualified as BS
 import Data.Char
   ( isDigit
+  )
+import Playwright.Json.OpenJson
+  ( OpenJson (OpenJson)
   )
 import Data.Text
   ( Text
@@ -49,7 +59,7 @@ import Playwright
   , CookieSameSite (CookieSameSiteLax)
   , CookieSecure (CookieSecure)
   , CookieValue (CookieValue, cookieValueToText)
-  , NewRequestOptions (newRequestStorageState)
+  , NewRequestOptions (newRequestStorageState, newRequestStorageStatePath)
   , OriginStorageState (OriginStorageState, originStateIndexedDB, originStateLocalStorage, originStateOpfs, originStateOrigin)
   , StorageItem (StorageItem, storageItemName, storageItemValue)
   , StorageName (StorageName)
@@ -67,9 +77,21 @@ import Playwright
   , urlFromText
   , runPlaywright
   , Playwright
+  , IndexedDBDatabase (IndexedDBDatabase, indexedDBDatabaseName, indexedDBDatabaseStores, indexedDBDatabaseVersion)
+  , IndexedDBDatabaseStores (IndexedDBDatabaseStores, indexedDBDatabaseStoresAutoIncrement, indexedDBDatabaseStoresIndexes, indexedDBDatabaseStoresKeyPath, indexedDBDatabaseStoresKeyPathArray, indexedDBDatabaseStoresName, indexedDBDatabaseStoresRecords)
+  , IndexedDBDatabaseStoresRecords (IndexedDBDatabaseStoresRecords, indexedDBDatabaseStoresRecordsKey, indexedDBDatabaseStoresRecordsKeyEncoded, indexedDBDatabaseStoresRecordsValue, indexedDBDatabaseStoresRecordsValueEncoded)
+  , OPFSEntry (OPFSEntry, oPFSEntryBase64, oPFSEntryPath, oPFSEntryType)
+  , OPFSEntryType (OPFSEntryTypeFile, OPFSEntryTypeDirectory)
+  , StorageStateOptions (storageStateOptionsIndexedDB, storageStateOptionsOpfs, storageStateOptionsPath)
+  , apiRequestStorageStateWith
+  , defaultStorageStateOptions
   )
 import Playwright.Harness
-  ( assertEqual
+  ( assertBool
+  , assertEqual
+  )
+import UnliftIO.Temporary
+  ( withSystemTempDirectory
   )
 import Test.Tasty
   ( TestTree
@@ -122,6 +144,10 @@ tests =
           exportCookiesTest
       , testCase "should send cookies from storage state" $
           sendFromStorageStateTest
+      , testCase "should preserve origin storage on import/export of storage state" $
+          originStorageRoundTripTest
+      , testCase "storage state should round-trip through file" $
+          storageStateFileRoundTripTest
       ]
 
 pathFilterTest :: IO ()
@@ -351,6 +377,117 @@ emptyStorageStateTest =
       response <- fetchGet request (urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/empty.html"))
       assertEqual "ok" True (apiResponseOk response)
       disposeAPIRequestContext request
+
+originStorageRoundTripTest :: IO ()
+originStorageRoundTripTest =
+  runPlaywright $ do
+    request <-
+      newRequestContextWith
+        defaultNewRequestOptions {newRequestStorageState = Just originSeededState}
+    exported <-
+      apiRequestStorageStateWith
+        defaultStorageStateOptions
+          { storageStateOptionsIndexedDB = True
+          , storageStateOptionsOpfs = True
+          }
+        request
+    assertEqual "cookies" (storageStateCookies originSeededState) (storageStateCookies exported)
+    assertEqual "origins" (storageStateOrigins originSeededState) (storageStateOrigins exported)
+    disposeAPIRequestContext request
+
+storageStateFileRoundTripTest :: IO ()
+storageStateFileRoundTripTest =
+  withSystemTempDirectory "pw-storage-state" $ \dir ->
+    runPlaywright $ do
+      let path = dir <> "/storage-state.json"
+      request1 <-
+        newRequestContextWith
+          defaultNewRequestOptions {newRequestStorageState = Just cookieOnlyState}
+      state1 <-
+        apiRequestStorageStateWith
+          defaultStorageStateOptions {storageStateOptionsPath = Just path}
+          request1
+      assertEqual "cookies" (storageStateCookies cookieOnlyState) (storageStateCookies state1)
+      assertEqual "origins" (storageStateOrigins cookieOnlyState) (storageStateOrigins state1)
+      written <- liftIO (BS.readFile path)
+      assertBool "file holds a JSON object" (isJsonObject written)
+      disposeAPIRequestContext request1
+      request2 <-
+        newRequestContextWith
+          defaultNewRequestOptions {newRequestStorageStatePath = Just path}
+      state2 <- apiRequestStorageState request2
+      assertEqual "cookies from file" (storageStateCookies cookieOnlyState) (storageStateCookies state2)
+      assertEqual "origins from file" (storageStateOrigins cookieOnlyState) (storageStateOrigins state2)
+      disposeAPIRequestContext request2
+
+isJsonObject :: BS.ByteString -> Bool
+isJsonObject bytes =
+  case eitherDecodeStrict bytes of
+    Right (Object _) -> True
+    _ -> False
+
+cookieOnlyState :: StorageState
+cookieOnlyState =
+  seededState {storageStateOrigins = []}
+
+originSeededState :: StorageState
+originSeededState =
+  seededState
+    { storageStateOrigins =
+        [ OriginStorageState
+            { originStateOrigin = urlFromText "https://www.example.com"
+            , originStateLocalStorage =
+                [ StorageItem
+                    { storageItemName = StorageName "name1"
+                    , storageItemValue = StorageValue "value1"
+                    }
+                ]
+            , originStateIndexedDB = Just [exampleIndexedDb]
+            , originStateOpfs = Just [helloFile, emptyDirectory]
+            }
+        ]
+    }
+
+exampleIndexedDb :: IndexedDBDatabase
+exampleIndexedDb =
+  IndexedDBDatabase
+    { indexedDBDatabaseName = "db"
+    , indexedDBDatabaseStores =
+        [ IndexedDBDatabaseStores
+            { indexedDBDatabaseStoresAutoIncrement = False
+            , indexedDBDatabaseStoresIndexes = []
+            , indexedDBDatabaseStoresKeyPath = Just "id"
+            , indexedDBDatabaseStoresKeyPathArray = Nothing
+            , indexedDBDatabaseStoresName = "store"
+            , indexedDBDatabaseStoresRecords =
+                [ IndexedDBDatabaseStoresRecords
+                    { indexedDBDatabaseStoresRecordsKey = Nothing
+                    , indexedDBDatabaseStoresRecordsKeyEncoded = Nothing
+                    , indexedDBDatabaseStoresRecordsValue =
+                        Just (OpenJson (object ["id" .= ("foo" :: Text), "name" .= ("John Doe" :: Text)]))
+                    , indexedDBDatabaseStoresRecordsValueEncoded = Nothing
+                    }
+                ]
+            }
+        ]
+    , indexedDBDatabaseVersion = 5
+    }
+
+helloFile :: OPFSEntry
+helloFile =
+  OPFSEntry
+    { oPFSEntryBase64 = Just "SGVsbG8sIHdvcmxkIQ=="
+    , oPFSEntryPath = "hello.txt"
+    , oPFSEntryType = OPFSEntryTypeFile
+    }
+
+emptyDirectory :: OPFSEntry
+emptyDirectory =
+  OPFSEntry
+    { oPFSEntryBase64 = Nothing
+    , oPFSEntryPath = "empty"
+    , oPFSEntryType = OPFSEntryTypeDirectory
+    }
 
 seededState :: StorageState
 seededState =
@@ -589,3 +726,8 @@ laterHttpDate =
 pastHttpDate :: ByteString
 pastHttpDate =
   "Thu, 01 Jan 1970 00:00:00 GMT"
+
+-- Upstream cases not ported here:
+--
+-- * "should send secure cookie over https": needs a TLS test server, and the
+--   harness has no TLS fixture (warp-tls is not a test dependency).
