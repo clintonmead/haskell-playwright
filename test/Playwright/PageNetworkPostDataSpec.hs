@@ -3,7 +3,8 @@ module Playwright.PageNetworkPostDataSpec
   ) where
 
 import UnliftIO.Exception
-  ( try
+  ( SomeException
+  , try
   )
 import Data.Aeson
   ( Value (String)
@@ -25,9 +26,13 @@ import Playwright
   , defaultGotoOptions
   , evaluate
   , goto
+  , HttpMethod (httpMethodToText)
+  , requestMethod
   , requestPostData
   , requestPostDataJSON
+  , requestUrl
   , urlFromText
+  , urlToText
   , armRequest
   , Playwright
   )
@@ -96,6 +101,37 @@ tests =
               assertFailure ("expected DecodeFailure, got: " <> show err)
             Right value ->
               assertFailure ("expected DecodeFailure, got: " <> show value)
+    , testCase "should get post data for file/blob" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          pending <- armRequest page (UrlMatchGlob "**/*")
+          _ <-
+            evaluate
+              page
+              "() => { const file = new File(['file-contents'], 'filename.txt'); void fetch('/data', { method: 'POST', headers: { 'content-type': 'application/octet-stream' }, body: file }); }"
+          request <- pending
+          -- Upstream marks this it.fail on Chromium: the file body is not
+          -- reported as post data there, so the expected text must not match.
+          expectUpstreamFailure $ do
+            payload <- requestPostData request
+            assertEqual "postData" (Just "file-contents") payload
+    , testCase "should get post data for navigator.sendBeacon api calls" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          pending <- armRequest page (UrlMatchGlob "**/*")
+          _ <-
+            evaluate
+              page
+              "() => navigator.sendBeacon(window.location.origin + '/api/foo', new Blob([JSON.stringify({ foo: 'bar' })]))"
+          request <- pending
+          -- Upstream marks this it.fail on Chromium: postData is empty there.
+          expectUpstreamFailure $ do
+            method <- httpMethodToText <$> requestMethod request
+            assertEqual "method" "POST" method
+            url <- urlToText <$> requestUrl request
+            assertEqual "url" (prefix <> "/api/foo") url
+            json <- requestPostDataJSON request
+            assertEqual "json" (Just (object ["foo" .= ("bar" :: Text)])) json
     , testCase "should return post data for PUT requests" $
         withAssets $ \prefix page -> do
           request <-
@@ -109,6 +145,15 @@ tests =
           json <- requestPostDataJSON request
           assertEqual "json" (Just (object ["value" .= (42 :: Int)])) json
     ]
+
+-- Mirrors Playwright's it.fail: the wrapped checks must throw, and a pass
+-- means the known Chromium defect is still present.
+expectUpstreamFailure :: Playwright () -> Playwright ()
+expectUpstreamFailure action = do
+  result <- try action :: Playwright (Either SomeException ())
+  case result of
+    Left _ -> pure ()
+    Right () -> assertFailure "expected the upstream it.fail check to fail"
 
 postTitle :: Page -> Text -> Text -> Playwright Request
 postTitle page prefix script = do
