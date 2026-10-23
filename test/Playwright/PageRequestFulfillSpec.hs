@@ -355,7 +355,7 @@ tests =
             Just value ->
               assertEqual "status" (HttpStatus 200) =<< responseStatus value
           assertEqual "title" "Woof-Woof" =<< title page
-    , testCase "should fulfill with unassigned status codes" $
+    , testCase "should fulfill with unuassigned status codes" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           route page (UrlMatchGlob "**/data.json") $ \handled ->
@@ -502,7 +502,7 @@ tests =
           -- The HAR has a POST for the css file, and the route matches it ignoring the method.
           background <- evaluateText page "() => getComputedStyle(document.body).backgroundColor"
           assertEqual "background" "rgb(0, 255, 255)" background
-    , testCase "should work with svg image and charset in content type" $
+    , testCase "should allow mocking svg with charset" $
         withChromiumPage $ \page ->
           withLocalApp emptyApp $ \prefix -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
@@ -575,7 +575,7 @@ tests =
                   pure ()
                 Right () ->
                   assertFailure "Set-Cookie survived interception; remove the known-failure wrapper"
-    , testCase "should work with preload link" $
+    , testCase "should fulfill preload link requests" $
         withAssets $ \prefix page -> do
           route page (UrlMatchGlob "**/one-style.css") $ \handled ->
             fulfillRoute
@@ -596,7 +596,7 @@ tests =
           _ <- waitForFunction page "() => window.preloadedStyles"
           background <- evaluateText page "() => getComputedStyle(document.body).backgroundColor"
           assertEqual "background" "rgb(0, 128, 0)" background
-    , testCase "should work with gzip content encoding through route fetch" $
+    , testCase "should fulfill with gzip and readback" $
         withChromiumPage $ \page ->
           withLocalApp gzipApp $ \prefix -> do
             route page (UrlMatchGlob "**/one-style.html") $ \handled -> do
@@ -610,12 +610,17 @@ tests =
                 defaultFulfillOptions
                   { fulfillResponse = Just apiResponse
                   }
-            _ <- goto page (urlFromText (prefix <> "/one-style.html")) defaultGotoOptions
+            navigated <- goto page (urlFromText (prefix <> "/one-style.html")) defaultGotoOptions
             text <- evaluateText page "() => document.querySelector('div').textContent"
             assertEqual "text" "hello, world!" text
             background <- evaluateText page "() => getComputedStyle(document.body).backgroundColor"
             assertEqual "background" "rgb(255, 192, 203)" background
-    , testCase "should not hit the network when a body is fulfilled" $ do
+            case navigated of
+              Nothing -> assertFailure "missing response"
+              Just response -> do
+                body <- responseText response
+                assertBool "response body" ("<div>hello, world!</div>" `isInfixOf` body)
+    , testCase "should not go to the network for fulfilled requests body" $ do
         served <- newIORef False
         withChromiumPage $ \page ->
           withLocalApp (styleApp served) $ \prefix -> do
@@ -634,7 +639,7 @@ tests =
             assertEqual "text" "Not Found! (mocked)" text
         requested <- readIORef served
         assertBool "stylesheet was requested from the server" (not requested)
-    , testCase "should return the fulfilled body for each status" $ do
+    , testCase "should return body for fulfilled responses" $ do
         served <- newIORef False
         withChromiumPage $ \page ->
           withLocalApp (styleApp served) $ \prefix ->
