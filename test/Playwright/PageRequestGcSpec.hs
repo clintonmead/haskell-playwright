@@ -41,4 +41,8 @@ tests =
           requestGC page
           assertEqual "collected" SpecialUndefined
             =<< evaluateSpecial page "() => globalThis.weakRef.deref()"
+    -- Skipped: "should collect element retained by locator hit-target interceptor after detach".
+    -- Upstream marks it fixme on Chromium (issue 41575: the last hit-tested element stays referenced
+    -- natively), and the Haskell spec runs on Chromium only, so there is no passing behaviour to port.
+    -- "should collect element retained by locator hit-target interceptor after detach"
     ]
