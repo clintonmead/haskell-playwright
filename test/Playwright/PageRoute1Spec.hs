@@ -6,8 +6,10 @@ import Control.Concurrent
   ( threadDelay
   )
 import Control.Monad
-  ( replicateM
+  ( forM_
+  , replicateM
   , replicateM_
+  , when
   )
 import Control.Monad.IO.Class
   ( liftIO
@@ -15,11 +17,17 @@ import Control.Monad.IO.Class
 import Data.Maybe
   ( isJust
   , isNothing
+  , listToMaybe
   )
 import Data.Text
   ( Text
   , isInfixOf
   , isSuffixOf
+  , unpack
+  )
+import Data.Text.Encoding
+  ( decodeUtf8
+  , encodeUtf8
   )
 import Playwright
   ( ContentType (ContentType)
@@ -95,11 +103,13 @@ import Playwright.Harness
   , withChromiumPage
   , testAssetsDir
   , withLocalApp
+  , Recorded (recordedHeaders, recordedPath)
   )
 import Playwright.PageRouteSupport
   ( attempt
   , calledTwiceCase
   , pathOf
+  , recordingOkApp
   , isCancelled
   , redirectChain
   , forwardChain
@@ -554,6 +564,38 @@ tests =
             continueRoute handled
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           assertBool "accept" . isJust . headerValue "accept" =<< readIORef headers
+    , testCase "should contain sec-fetch headers in route" $
+        withChromiumPage $ \page -> do
+          -- Upstream marks this it.fail on chromium (microsoft/playwright#42620): Fetch.requestPaused
+          -- fires before Chromium attaches the Fetch Metadata headers. The case passes while the
+          -- route still does not see them.
+          requests <- newIORef []
+          withLocalApp (recordingOkApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            routed <- newIORef []
+            route page (UrlMatchGlob "**/probe-*") $ \handled -> do
+              request <- routeRequest handled
+              url <- requestUrl request
+              headers <- requestHeaders request
+              allHeaders <- requestAllHeaders request
+              modifyIORef' routed ((pathOf (urlToText url), fetchMeta headers, fetchMeta allHeaders) :)
+              continueRoute handled
+            _ <-
+              evaluateText
+                page
+                "async () => { for (const mode of ['cors', 'no-cors', 'same-origin']) await (await fetch('/probe-' + mode, { mode: mode })).text(); return 'done'; }"
+            served <- readIORef requests
+            seen <- readIORef routed
+            forM_ fetchModes $ \mode -> do
+              let onServer = listToMaybe [serverMeta r | r <- served, decodeUtf8 (recordedPath r) == "/probe-" <> mode]
+              assertEqual ("server " <> unpack mode) (Just (expectedMeta mode)) onServer
+            let routeSeesMetadata =
+                  and
+                    [ any (\(p, h, a) -> p == "/probe-" <> mode && h == expectedMeta mode && a == expectedMeta mode) seen
+                    | mode <- fetchModes
+                    ]
+            when routeSeesMetadata $
+              assertFailure "route sees the sec-fetch headers; the upstream it.fail (issue 42620) has been fixed, so port this as a passing case"
     , testCase "should contain raw response header" $
         withAssets $ \prefix page -> do
           requests <- newIORef Nothing
@@ -604,3 +646,28 @@ tests =
               Right _ ->
                 assertFailure "expected the rejected fetch to fail"
     ]
+
+-- | The modes the sec-fetch probe is requested with, in order.
+fetchModes :: [Text]
+fetchModes = ["cors", "no-cors", "same-origin"]
+
+-- | The Fetch Metadata headers, by name.
+metaNames :: [Text]
+metaNames = ["sec-fetch-site", "sec-fetch-mode", "sec-fetch-dest"]
+
+-- | The Fetch Metadata values a route handler sees, read from the request headers.
+fetchMeta :: [HttpHeader] -> [(Text, Maybe Text)]
+fetchMeta headers = [(name, headerValue name headers) | name <- metaNames]
+
+-- | The Fetch Metadata the server should receive for a same-origin fetch in the given mode.
+expectedMeta :: Text -> [(Text, Maybe Text)]
+expectedMeta mode =
+  [ ("sec-fetch-site", Just "same-origin")
+  , ("sec-fetch-mode", Just mode)
+  , ("sec-fetch-dest", Just "empty")
+  ]
+
+-- | The Fetch Metadata the server received for a recorded request.
+serverMeta :: Recorded -> [(Text, Maybe Text)]
+serverMeta r =
+  [(name, decodeUtf8 <$> lookup (encodeUtf8 name) (recordedHeaders r)) | name <- metaNames]
