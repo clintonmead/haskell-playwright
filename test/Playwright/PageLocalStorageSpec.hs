@@ -7,6 +7,7 @@ import Data.List
   )
 import Data.Text
   ( Text
+  , replace
   )
 import Playwright
   ( StorageItem (storageItemName, storageItemValue)
@@ -112,7 +113,23 @@ tests =
           assertEqual "local empty" [] =<< storageItems (localStorage page)
           still <- storageGetItem (sessionStorage page) (StorageName "shared")
           assertEqual "session kept" (Just "session") (fmap storageValueToText still)
+    , testCase "storage methods are scoped to the current origin" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          storageSetItem (localStorage page) (StorageName "k") (StorageValue "origin-1")
+          _ <- goto page (urlFromText (crossOrigin prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "other origin items" [] =<< storageItems (localStorage page)
+          storageSetItem (localStorage page) (StorageName "k") (StorageValue "origin-2")
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          got <- storageGetItem (localStorage page) (StorageName "k")
+          assertEqual "original origin" (Just "origin-1") (fmap storageValueToText got)
     ]
+
+-- | The same test server reached through a different host name, which makes
+-- a different origin.
+crossOrigin :: Text -> Text
+crossOrigin =
+  replace "127.0.0.1" "localhost"
 
 pairItem :: StorageItem -> (Text, Text)
 pairItem item =

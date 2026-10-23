@@ -42,8 +42,8 @@ import Playwright
   , responseUrl
   , urlFromText
   , urlToText
-  , waitForRequestFinished
-  , waitForResponse
+  , armResponse
+  , armRequestFinished
   )
 import Playwright.Harness
   ( testAssetsDir
@@ -61,10 +61,6 @@ import Test.Tasty
 import Test.Tasty.HUnit
   ( testCase
   )
-import UnliftIO.Async
-  ( wait
-  , withAsync
-  )
 import UnliftIO.IORef
   ( modifyIORef'
   , newIORef
@@ -77,9 +73,9 @@ tests =
     "resource-timing"
     [ testCase "should work" $
         withAssets $ \prefix page ->
-          withAsync (waitForRequestFinished page) $ \pending -> do
+          armRequestFinished page >>= \pending -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-            request <- wait pending
+            request <- pending
             timing <- requestTiming request
             verifyConnectionTimingConsistency timing
             assertBool "requestStart" (resourceTimingRequestStart timing >= resourceTimingConnectEnd timing)
@@ -135,14 +131,16 @@ tests =
           assets <- testAssetsDir
           withLocalApp (cachedCssApp assets) $ \prefix -> do
             _ <- goto page (urlFromText (prefix <> "/one-style.html")) defaultGotoOptions
-            withAsync (waitForResponse page (UrlMatchGlob "**/one-style.css")) $ \pending -> do
+            armResponse page (UrlMatchGlob "**/one-style.css") >>= \pending -> do
               _ <- reload page
-              response <- wait pending
+              response <- pending
               responseFinished response
               timing <- requestTiming =<< responseRequest response
               verifyConnectionTimingConsistency timing
               assertEqual "cached" (resourceTimingResponseStart timing) (resourceTimingResponseEnd timing)
               assertBool "fast" (resourceTimingResponseEnd timing < 1000)
+    -- Skipped: "should work for SSL". It needs an HTTPS server, which the harness does not have.
+    -- "should work for SSL"
     ]
 
 verifyConnectionTimingConsistency :: ResourceTiming -> Playwright ()

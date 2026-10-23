@@ -4,7 +4,8 @@ module Playwright.FrameEvaluateSpec
 
 import Data.Text qualified as Text
 import Data.Text
-  ( isInfixOf
+  ( Text
+  , isInfixOf
   , replace
   )
 import UnliftIO.Exception
@@ -16,6 +17,7 @@ import Playwright
   , Playwright
   , asElement
   , childFrames
+  , currentUrl
   , defaultGotoOptions
   , elementArgument
   , evaluate
@@ -28,9 +30,13 @@ import Playwright
   , frames
   , goto
   , jsHandleArgument
+  , locatorCount
+  , locatorOnFrame
   , mainFrame
+  , selectorFromText
   , setContent
   , urlFromText
+  , urlToText
   )
 import Playwright.Error
   ( PlaywrightError (ProtocolRpc)
@@ -156,6 +162,59 @@ tests =
               assertFailure ("expected ProtocolRpc, got: " <> show err)
             Right _ ->
               assertFailure "expected the detached frame to reject"
+    , testCase "should work in iframes that failed initial navigation" $
+        withAssets $ \_ page -> do
+          setContent
+            page
+            "<meta http-equiv=\"Content-Security-Policy\" content=\"script-src 'none';\"><iframe src='javascript:\"\"'></iframe>"
+          _ <-
+            evaluate
+              page
+              "() => { const iframe = document.querySelector('iframe'); const div = iframe.contentDocument.createElement('div'); iframe.contentDocument.body.appendChild(div); }"
+          allFrames <- frames page
+          case allFrames of
+            [_, child] -> do
+              -- Chromium leaves the URL empty here (WebKit reports about:blank).
+              assertEqual "url" "" . urlToText =<< currentUrl child
+              -- Main world should work.
+              assertEqual "main world" "about:blank" =<< evaluateOnFrameText child "() => window.location.href"
+              -- Utility world should work (upstream checks `$('div')`).
+              assertEqual "div" 1 =<< locatorCount (locatorOnFrame page child (selectorFromText "div"))
+            _ ->
+              assertFailure ("expected 2 frames, got " <> show (length allFrames))
+    , testCase "should work in iframes that interrupted initial javascript url navigation" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          _ <-
+            evaluate
+              page
+              "() => { const iframe = document.createElement('iframe'); iframe.src = 'javascript:\"\"'; document.body.appendChild(iframe); iframe.contentDocument.open(); iframe.contentDocument.write('<div>hello</div>'); iframe.contentDocument.close(); }"
+          allFrames <- frames page
+          case allFrames of
+            [_, child] -> do
+              -- Main world should work.
+              assertEqual "top" (prefix <> "/empty.html") =<< evaluateOnFrameText child "() => window.top.location.href"
+              -- Utility world should work (upstream checks `$('div')`).
+              assertEqual "div" 1 =<< locatorCount (locatorOnFrame page child (selectorFromText "div"))
+            _ ->
+              assertFailure ("expected 2 frames, got " <> show (length allFrames))
+    , testCase "should not allow cross-frame element handles when frames do not script each other" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          frame1 <- attachFrame page "frame1" (replace "127.0.0.1" "localhost" prefix <> "/empty.html")
+          body <- requireHandle =<< asElement =<< evaluateHandleOnFrame frame1 "() => document.body"
+          result <-
+            try (evaluateTextWith page "body => body.innerHTML" (elementArgument body))
+              :: Playwright (Either PlaywrightError Text)
+          case result of
+            Left (ProtocolRpc failure) ->
+              assertBool
+                "adopt"
+                ("Unable to adopt element handle from a different document" `isInfixOf` protocolFailureMessage failure)
+            Left err ->
+              assertFailure ("expected ProtocolRpc, got: " <> show err)
+            Right _ ->
+              assertFailure "expected the cross-frame element handle to be rejected"
     ]
 
 -- | The first child frame of the main frame, which must exist.

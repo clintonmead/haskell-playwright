@@ -2,12 +2,14 @@ module Playwright.GetBy
   ( getByAltTextSelector
   , getByAltTextSelectorRegex
   , getByLabelSelector
+  , getByLabelSelectorRegex
   , getByPlaceholderSelector
   , getByPlaceholderSelectorRegex
   , getByRoleSelector
   , getByTestIdSelector
   , getByTestIdSelectorRegex
   , getByTextSelector
+  , getByTextSelectorRegex
   , getByTitleSelector
   , getByTitleSelectorRegex
   , hasNotTextSelector
@@ -51,6 +53,10 @@ getByTextSelector :: Text -> Exactness -> Selector
 getByTextSelector text exactness =
   selectorFromText ("internal:text=" <> escapeForTextSelector text exactness)
 
+getByTextSelectorRegex :: Text -> Selector
+getByTextSelectorRegex source =
+  selectorFromText ("internal:text=" <> escapeRegexForSelector source)
+
 hasTextSelector :: Text -> Exactness -> Selector
 hasTextSelector text exactness =
   selectorFromText ("internal:has-text=" <> escapeForTextSelector text exactness)
@@ -61,11 +67,15 @@ hasNotTextSelector text exactness =
 
 hasTextRegexSelector :: Text -> Selector
 hasTextRegexSelector source =
-  selectorFromText ("internal:has-text=" <> source)
+  selectorFromText ("internal:has-text=" <> escapeRegexForSelector source)
 
 getByLabelSelector :: Text -> Exactness -> Selector
 getByLabelSelector text exactness =
   selectorFromText ("internal:label=" <> escapeForTextSelector text exactness)
+
+getByLabelSelectorRegex :: Text -> Selector
+getByLabelSelectorRegex source =
+  selectorFromText ("internal:label=" <> escapeRegexForSelector source)
 
 getByAltTextSelector :: Text -> Exactness -> Selector
 getByAltTextSelector =
@@ -163,7 +173,20 @@ escapeForAttributeSelector value exactness =
 
 escapeRegexForSelector :: Text -> Text
 escapeRegexForSelector source =
-  replace ">>" "\\>\\>" source
+  replace ">>" "\\>\\>" (escapeRegexQuotes source)
+
+-- Mirrors upstream stringUtils.ts: a quote preceded by an even number of
+-- backslashes gets a backslash inserted before it.
+escapeRegexQuotes :: Text -> Text
+escapeRegexQuotes source =
+  Text.pack (go 0 (Text.unpack source))
+  where
+    go :: Int -> String -> String
+    go _ [] = []
+    go backslashes (c : cs)
+      | c `elem` ("\"'`" :: String) && even backslashes = '\\' : c : go 0 cs
+      | c == '\\' = c : go (backslashes + 1) cs
+      | otherwise = c : go 0 cs
 
 exactnessSuffix :: Exactness -> Text
 exactnessSuffix exactness =

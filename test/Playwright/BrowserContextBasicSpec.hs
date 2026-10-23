@@ -95,7 +95,7 @@ import Playwright
   , textContent
   , urlFromText
   , waitForContextClose
-  , waitForContextPage
+  , armContextPage
   , waitForFunction
   , waitForPopup
   , Playwright
@@ -295,9 +295,9 @@ tests =
           ctx <- newContext browser
           assertProtocolContains
             "Target page, context or browser has been closed"
-            ( withAsync (waitForContextPage ctx) $ \handle -> do
+            ( armContextPage ctx >>= \pending -> do
                 closeContext ctx
-                wait handle
+                pending
             )
     , testCase "close() should be callable twice" $
         withChromiumBrowser $ \browser -> do
@@ -519,6 +519,11 @@ tests =
           ctx3 <- newContext browser
           _ <- mapConcurrently newPage [ctx3, ctx3]
           closeContext ctx3
+    -- Skipped: upstream marks the first title `fixme` on Chromium (cross-process navigation does not
+    -- keep the offline state), and the second reads the internal `_channel.defaultUserAgentForTest`,
+    -- which the Haskell client does not expose. See QUESTIONS.md.
+    -- "should emulate navigator.onLine across navigations"
+    -- "default user agent"
     ]
 
 listedContexts :: [BrowserContext] -> [BrowserContext] -> Bool

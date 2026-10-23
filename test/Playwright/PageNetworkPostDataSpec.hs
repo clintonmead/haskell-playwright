@@ -2,10 +2,6 @@ module Playwright.PageNetworkPostDataSpec
   ( tests
   ) where
 
-import UnliftIO.Async
-  ( wait
-  , withAsync
-  )
 import UnliftIO.Exception
   ( try
   )
@@ -32,7 +28,7 @@ import Playwright
   , requestPostData
   , requestPostDataJSON
   , urlFromText
-  , waitForRequest
+  , armRequest
   , Playwright
   )
 import Playwright.Error
@@ -117,6 +113,6 @@ tests =
 postTitle :: Page -> Text -> Text -> Playwright Request
 postTitle page prefix script = do
   _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-  withAsync (waitForRequest page (UrlMatchGlob (prefix <> "/title.html"))) $ \pending -> do
+  armRequest page (UrlMatchGlob (prefix <> "/title.html")) >>= \pending -> do
     _ <- evaluate page script
-    wait pending
+    pending

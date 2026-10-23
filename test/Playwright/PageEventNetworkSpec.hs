@@ -2,10 +2,6 @@ module Playwright.PageEventNetworkSpec
   ( tests
   ) where
 
-import UnliftIO.Async
-  ( wait
-  , withAsync
-  )
 import Data.ByteString
   ( ByteString
   )
@@ -67,7 +63,7 @@ import Playwright
   , responseUrl
   , urlFromText
   , urlToText
-  , waitForRequestFinished
+  , armRequestFinished
   )
 import Playwright.Harness
   ( readTestAsset
@@ -168,9 +164,9 @@ tests =
     , testCase "Page.Events.RequestFinished" $
         withAssets $ \prefix page -> do
           let empty = prefix <> "/empty.html"
-          withAsync (waitForRequestFinished page) $ \pending -> do
+          armRequestFinished page >>= \pending -> do
             response <- goto page (urlFromText empty) defaultGotoOptions
-            finished <- wait pending
+            finished <- pending
             case response of
               Nothing ->
                 assertFailure "missing response"

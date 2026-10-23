@@ -69,10 +69,10 @@ import Playwright
   , setContent
   , urlFromText
   , urlToText
-  , waitForContextPage
+  , armContextPage
   , waitForContextRequestFinished
   , waitForLoadState
-  , waitForRequest
+  , armRequest
   , waitForResponse
   )
 import Playwright.Harness
@@ -115,12 +115,12 @@ tests =
             modifyIORef' seen (<> [url])
           _ <- goto page (urlFromText empty) defaultGotoOptions
           setContent page "<a target=_blank rel=noopener href=\"/one-style.html\">yo</a>"
-          withAsync (waitForContextPage ctx) $ \pending ->
-            withAsync (waitForRequest page (UrlMatchGlob "**/one-style.css")) $ \cssPending -> do
+          armContextPage ctx >>= \pending ->
+            armRequest page (UrlMatchGlob "**/one-style.css") >>= \cssPending -> do
               click (locate page "a")
-              other <- wait pending
+              other <- pending
               waitForLoadState other LoadStateLoad
-              _ <- wait cssPending
+              _ <- cssPending
               _ <- evaluate page "() => 0"
               pure ()
           urls <- readIORef seen
@@ -137,10 +137,10 @@ tests =
             modifyIORef' seen (<> [url])
           _ <- goto page (urlFromText empty) defaultGotoOptions
           setContent page "<a target=_blank rel=noopener href=\"/one-style.html\">yo</a>"
-          withAsync (waitForContextPage ctx) $ \pending ->
+          armContextPage ctx >>= \pending ->
             withAsync (waitForResponse page (UrlMatchGlob "**/one-style.css")) $ \cssPending -> do
               click (locate page "a")
-              other <- wait pending
+              other <- pending
               waitForLoadState other LoadStateLoad
               _ <- wait cssPending
               _ <- evaluate page "() => 0"

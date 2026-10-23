@@ -17,6 +17,9 @@ import Playwright
   , frameLocatorOwner
   , getAttribute
   , locator
+  , first
+  , lastLocator
+  , nth
   , ClickOptions (clickOptionsTimeout)
   , clickWith
   , defaultClickOptions
@@ -45,7 +48,8 @@ import Control.Monad.IO.Class
   ( liftIO
   )
 import UnliftIO.Async
-  ( withAsync
+  ( wait
+  , withAsync
   )
 import Playwright.Harness
   ( withAssets
@@ -193,6 +197,59 @@ tests =
           let
             button = childLocator (frameLocator page (selectorFromText "iframe")) (selectorFromText "button")
           assertProtocolContains "strict mode violation" (waitFor button WaitForVisible)
+    , testCase "should wait for frame to go" $
+        withAssets $ \prefix page -> do
+          routeIframe page
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let button = childLocator (frameLocator page (selectorFromText "iframe")) (selectorFromText "button")
+          withAsync
+            ( do
+                liftIO (threadDelay 300000)
+                _ <- evaluate page "() => document.querySelector('iframe').remove()"
+                pure ()
+            )
+            $ \_ -> waitFor button WaitForHidden
+    , testCase "waitFor should survive frame reattach" $
+        withAssets $ \prefix page -> do
+          routeIframe page
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let button = childLocator (frameLocator page (selectorFromText "iframe")) (selectorFromText "button:has-text(\"Hello nested iframe\")")
+          withAsync (waitFor button WaitForVisible) $ \promise -> do
+            _ <- evaluate page "() => document.querySelector('iframe').remove()"
+            _ <- evaluate page "() => { const iframe = document.createElement('iframe'); iframe.src = 'iframe-2.html'; document.body.appendChild(iframe); }"
+            wait promise
+    , testCase "click should survive frame reattach" $
+        withAssets $ \prefix page -> do
+          routeIframe page
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let button = childLocator (frameLocator page (selectorFromText "iframe")) (selectorFromText "button:has-text(\"Hello nested iframe\")")
+          withAsync (click button) $ \promise -> do
+            _ <- evaluate page "() => document.querySelector('iframe').remove()"
+            _ <- evaluate page "() => { const iframe = document.createElement('iframe'); iframe.src = 'iframe-2.html'; document.body.appendChild(iframe); }"
+            wait promise
+    , testCase "click should survive iframe navigation" $
+        withAssets $ \prefix page -> do
+          routeIframe page
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let button = childLocator (frameLocator page (selectorFromText "iframe")) (selectorFromText "button:has-text(\"Hello nested iframe\")")
+          withAsync (click button) $ \promise -> do
+            _ <- evaluate page "() => { document.querySelector('iframe').src = 'iframe-2.html'; }"
+            wait promise
+    , testCase "locator.frameLocator should not throw on first/last/nth" $
+        withAssets $ \prefix page -> do
+          routeAmbiguous page
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let
+            frames = childLocator (locator page (selectorFromText "body")) (selectorFromText "iframe")
+            button1 = childLocator (contentFrame (first frames)) (selectorFromText "button")
+            button2 = childLocator (contentFrame (nth frames 1)) (selectorFromText "button")
+            button3 = childLocator (contentFrame (lastLocator frames)) (selectorFromText "button")
+          waitFor button1 WaitForVisible
+          assertEqual "first" "Hello from iframe-1.html" =<< innerText button1
+          waitFor button2 WaitForVisible
+          assertEqual "second" "Hello from iframe-2.html" =<< innerText button2
+          waitFor button3 WaitForVisible
+          assertEqual "last" "Hello from iframe-3.html" =<< innerText button3
     ]
 
 routeIframe :: Page -> Playwright ()
@@ -237,10 +294,24 @@ routeAmbiguous page = do
                   "<iframe src=\"iframe-1.html\"></iframe><iframe src=\"iframe-2.html\"></iframe><iframe src=\"iframe-3.html\"></iframe>"
               )
         }
-  route page (UrlMatchGlob "**/iframe-*") $ \handled ->
+  route page (UrlMatchGlob "**/iframe-1.html") $ \handled ->
     fulfillRoute
       handled
       defaultFulfillOptions
         { fulfillContentType = Just (ContentType "text/html")
-        , fulfillBody = Just (FulfillText "<html><button>Hello from iframe</button></html>")
+        , fulfillBody = Just (FulfillText "<html><button>Hello from iframe-1.html</button></html>")
+        }
+  route page (UrlMatchGlob "**/iframe-2.html") $ \handled ->
+    fulfillRoute
+      handled
+      defaultFulfillOptions
+        { fulfillContentType = Just (ContentType "text/html")
+        , fulfillBody = Just (FulfillText "<html><button>Hello from iframe-2.html</button></html>")
+        }
+  route page (UrlMatchGlob "**/iframe-3.html") $ \handled ->
+    fulfillRoute
+      handled
+      defaultFulfillOptions
+        { fulfillContentType = Just (ContentType "text/html")
+        , fulfillBody = Just (FulfillText "<html><button>Hello from iframe-3.html</button></html>")
         }

@@ -71,7 +71,7 @@ import Playwright
   , urlFromText
   , urlToText
   , waitForContextClose
-  , waitForRequest
+  , armRequest
   )
 import Playwright.Harness
   ( assertBool
@@ -198,9 +198,9 @@ tests =
                   Just [HttpHeader (HeaderName "foo") (HeaderValue "bar")]
               }
             $ \_ page ->
-              withAsync (waitForRequest page (UrlMatchGlob "**/empty.html")) $ \pending -> do
+              armRequest page (UrlMatchGlob "**/empty.html") >>= \pending -> do
                 _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-                request <- wait pending
+                request <- pending
                 headers <- requestHeaders request
                 assertEqual "foo" (Just "bar") (lookupHeader "foo" headers)
     , testCase "should accept userDataDir" $

@@ -2,20 +2,39 @@ module Playwright.PageEventRequestSpec
   ( tests
   ) where
 
-import UnliftIO.Async
-  ( wait
-  , withAsync
+import Control.Concurrent
+  ( threadDelay
   )
 import Control.Monad
   ( forM_
+  , void
+  , when
+  )
+import Control.Monad.IO.Class
+  ( liftIO
   )
 import Data.ByteString.Char8 qualified as ByteString.Char8
 import Data.ByteString.Lazy.Char8 qualified as LBS8
+import UnliftIO.Async
+  ( race
+  )
 import UnliftIO.IORef
   ( IORef
   , modifyIORef'
   , newIORef
   , readIORef
+  )
+import UnliftIO.MVar
+  ( newEmptyMVar
+  , takeMVar
+  , tryPutMVar
+  )
+import UnliftIO.Exception
+  ( SomeException
+  , try
+  )
+import Data.Maybe
+  ( isNothing
   )
 import Data.Text
   ( Text
@@ -75,7 +94,19 @@ import Playwright
   , url
   , urlFromText
   , urlToText
-  , waitForRequest
+  , armRequest
+  , continueRoute
+  , requestServiceWorker
+  , responseFromServiceWorker
+  , responseUrl
+  , route
+  , routeRequest
+  , armRequestFailed
+  , evaluateBool
+  , reload
+  , requestFailureText
+  , onRequestFailed
+  , requestsEqual
   , Playwright
   )
 import Playwright.Harness
@@ -96,6 +127,86 @@ import Test.Tasty
 import Test.Tasty.HUnit
   ( testCase
   )
+
+serviceWorkerNavigation :: Text -> Page -> Playwright ()
+serviceWorkerNavigation prefix page = do
+  let
+    stub = prefix <> "/serviceworkers/stub/sw.html"
+    failing = prefix <> "/serviceworkers/stub/error.html"
+  _ <- goto page (urlFromText stub) defaultGotoOptions
+  _ <- evaluate page "() => window['activationPromise']"
+  reloaded <- reload page
+  case reloaded of
+    Nothing ->
+      assertFailure "missing reload response"
+    Just response ->
+      assertEqual "reload url" stub . urlToText =<< responseUrl response
+  assertBool "from sw" =<< evaluateBool page "() => window.fromSW"
+  _ <- evaluate page "() => window['activationPromise']"
+  pendingFailure <- armRequestFailed page
+  _ <- try (evaluateTextWith page "name => { window.location.href = name; return 'navigated'; }" (textArgument "/serviceworkers/stub/error.html")) :: Playwright (Either SomeException Text)
+  failed <- pendingFailure
+  assertEqual "failed url" failing . urlToText =<< requestUrl failed
+  failure <- requestFailure failed
+  assertBool "failure text" (maybe False (isInfixOf "net::ERR_FAILED" . requestFailureText) failure)
+  assertBool "failed no service worker" . isNothing =<< requestServiceWorker failed
+  assertBool "failed no response" . isNothing =<< requestResponse failed
+
+-- Stalled requests are aborted by the inline script, so each iframe fires
+-- request and then requestfailed. Every request must be seen exactly once
+-- per event, and requestfailed must arrive only after its request.
+interceptRaceTest :: Text -> Page -> Playwright ()
+interceptRaceTest empty page = do
+  violations <- newIORef ([] :: [Text])
+  alive <- newIORef ([] :: [Request])
+  failures <- newIORef ([] :: [Request])
+  counter <- newIORef (0 :: Int)
+  done <- newEmptyMVar
+  onRequest page $ \request -> do
+    isAlive <- any (requestsEqual request) <$> readIORef alive
+    isFailed <- any (requestsEqual request) <$> readIORef failures
+    when (isAlive || isFailed) $
+      modifyIORef' violations (<> ["request reported twice"])
+    modifyIORef' alive (<> [request])
+  onRequestFailed page $ \request -> do
+    isAlive <- any (requestsEqual request) <$> readIORef alive
+    isFailed <- any (requestsEqual request) <$> readIORef failures
+    when (isFailed || not isAlive) $
+      modifyIORef' violations (<> ["requestfailed out of order"])
+    modifyIORef' alive (filter (not . requestsEqual request))
+    modifyIORef' failures (<> [request])
+    modifyIORef' counter (+ 1)
+    seen <- readIORef counter
+    when (seen == 10) $
+      void (tryPutMVar done ())
+  outcome <- race (liftIO (threadDelay 30000000)) $ do
+    -- Stall requests to make sure we don't get requestfinished.
+    route page (UrlMatchGlob "**/*") (\_ -> pure ())
+    setContent page $
+      mconcat (replicate 10 ("<iframe src=\"" <> empty <> "\"></iframe>\n"))
+        <> "<script>\n"
+        <> "function abortAll() {\n"
+        <> "  const frames = document.querySelectorAll('iframe');\n"
+        <> "  for (const frame of frames)\n"
+        <> "    frame.src = 'about:blank';\n"
+        <> "}\n"
+        <> "abortAll();\n"
+        <> "</script>\n"
+    liftIO (takeMVar done)
+  case outcome of
+    Left () ->
+      assertFailure "requestfailed count not reached"
+    Right () ->
+      pure ()
+  assertEqual "violations" [] =<< readIORef violations
+
+emptyApp :: Application
+emptyApp request respond =
+  case pathInfo request of
+    ["empty.html"] ->
+      respond (responseLBS status200 [(hContentType, "text/html")] "")
+    _ ->
+      respond (responseLBS status404 [] "")
 
 tests :: TestTree
 tests =
@@ -128,6 +239,70 @@ tests =
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           _ <- evaluate page "() => fetch('/empty.html', { keepalive: true })"
           assertEqual "count" 2 =<< readIORef seen
+    , testCase "should report requests and responses handled by service worker" $
+        withAssets $ \prefix page -> do
+          let foo = prefix <> "/serviceworkers/fetchdummy/foo"
+          _ <- goto page (urlFromText (prefix <> "/serviceworkers/fetchdummy/sw.html")) defaultGotoOptions
+          _ <- evaluate page "() => window['activationPromise']"
+          pending <- armRequest page (UrlMatchGlob foo)
+          swResponse <- evaluateTextWith page "name => window['fetchDummy'](name)" (textArgument "foo")
+          request <- pending
+          assertEqual "sw response" "responseFromServiceWorker:foo" swResponse
+          assertEqual "url" foo . urlToText =<< requestUrl request
+          assertBool "no service worker" . isNothing =<< requestServiceWorker request
+          response <-
+            requestResponse request >>= \maybeResponse ->
+              case maybeResponse of
+                Nothing ->
+                  assertFailure "missing response"
+                Just value ->
+                  pure value
+          assertEqual "response url" foo . urlToText =<< responseUrl response
+          assertBool "from service worker" =<< responseFromServiceWorker response
+          assertEqual "text" "responseFromServiceWorker:foo" =<< responseText response
+    , testCase "should report requests and responses handled by service worker with routing" $
+        withAssets $ \prefix page -> do
+          let
+            sw = prefix <> "/serviceworkers/fetchdummy/sw.html"
+            foo = prefix <> "/serviceworkers/fetchdummy/foo"
+            failing = prefix <> "/serviceworkers/fetchdummy/error"
+          intercepted <- newIORef ([] :: [Text])
+          route page (UrlMatchGlob "**/*") $ \handled -> do
+            seenUrl <- urlToText <$> (routeRequest handled >>= requestUrl)
+            modifyIORef' intercepted (<> [seenUrl])
+            continueRoute handled
+          _ <- goto page (urlFromText sw) defaultGotoOptions
+          _ <- evaluate page "() => window['activationPromise']"
+          pending <- armRequest page (UrlMatchGlob foo)
+          swResponse <- evaluateTextWith page "name => window['fetchDummy'](name)" (textArgument "foo")
+          request <- pending
+          assertEqual "sw response" "responseFromServiceWorker:foo" swResponse
+          assertEqual "url" foo . urlToText =<< requestUrl request
+          assertBool "no service worker" . isNothing =<< requestServiceWorker request
+          response <-
+            requestResponse request >>= \maybeResponse ->
+              case maybeResponse of
+                Nothing ->
+                  assertFailure "missing response"
+                Just value ->
+                  pure value
+          assertEqual "response url" foo . urlToText =<< responseUrl response
+          assertBool "from service worker" =<< responseFromServiceWorker response
+          assertEqual "text" "responseFromServiceWorker:foo" =<< responseText response
+          pendingFailure <- armRequestFailed page
+          _ <- try (evaluateTextWith page "name => window['fetchDummy'](name)" (textArgument "error")) :: Playwright (Either SomeException Text)
+          failed <- pendingFailure
+          assertEqual "failed url" failing . urlToText =<< requestUrl failed
+          assertBool "failure" . not . isNothing =<< requestFailure failed
+          assertBool "failed no service worker" . isNothing =<< requestServiceWorker failed
+          assertBool "failed no response" . isNothing =<< requestResponse failed
+          assertEqual "intercepted" [sw] =<< readIORef intercepted
+    , testCase "should report navigation requests and responses handled by service worker" $
+        withAssets $ \prefix page -> serviceWorkerNavigation prefix page
+    , testCase "should report navigation requests and responses handled by service worker with routing" $
+        withAssets $ \prefix page -> do
+          route page (UrlMatchGlob "**/*") continueRoute
+          serviceWorkerNavigation prefix page
     , testCase "should return response body when Cross-Origin-Opener-Policy is set" $
         withChromiumPage $ \page ->
           withLocalApp coopApp $ \prefix -> do
@@ -150,22 +325,22 @@ tests =
     , testCase "main resource xhr should have type xhr" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-          withAsync (waitForRequest page (UrlMatchGlob (prefix <> "/title.html"))) $ \pending -> do
+          armRequest page (UrlMatchGlob (prefix <> "/title.html")) >>= \pending -> do
             _ <-
               evaluate
                 page
                 "() => { const x = new XMLHttpRequest(); x.open('GET', '/title.html', false); x.send(); }"
-            request <- wait pending
+            request <- pending
             assertEqual "nav" False =<< requestIsNavigation request
             assertEqual "type" "xhr" . resourceTypeToText =<< requestResourceType request
     , testCase "<picture> resource should have type image" $
         withAssets $ \prefix page -> do
           let image = prefix <> "/digits/1.png"
-          withAsync (waitForRequest page (UrlMatchGlob image)) $ \pending -> do
+          armRequest page (UrlMatchGlob image) >>= \pending -> do
             setContent
               page
               ("<picture><source><img src=\"" <> image <> "\"></source></picture>")
-            request <- wait pending
+            request <- pending
             assertEqual "type" "image" . resourceTypeToText =<< requestResourceType request
     , testCase "should not expose preflight OPTIONS request" $
         withChromiumPage $ \page -> do
@@ -190,6 +365,31 @@ tests =
               ["OPTIONS /cors", "POST /cors"]
               =<< readIORef serverHits
             assertEqual "client" ["POST " <> cross] =<< readIORef clientHits
+    , testCase "should not expose preflight OPTIONS request with network interception" $
+        withChromiumPage $ \page -> do
+          serverHits <- newIORef ([] :: [Text])
+          withLocalApp (corsApp serverHits) $ \prefix -> do
+            let
+              cross = replace "127.0.0.1" "localhost" prefix <> "/cors"
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            route page (UrlMatchGlob "**/*") continueRoute
+            clientHits <- newIORef ([] :: [Text])
+            onRequest page $ \request -> do
+              method <- httpMethodToText <$> requestMethod request
+              location <- urlToText <$> requestUrl request
+              modifyIORef' clientHits (<> [method <> " " <> location])
+            body <-
+              evaluateTextWith
+                page
+                "async url => { const response = await fetch(url, { method: 'POST', body: '', headers: { 'Content-Type': 'application/json', 'X-Custom-Header': 'test-value' } }); return await response.text(); }"
+                (textArgument cross)
+            assertEqual "body" "Hello there!" body
+            assertEqual "server" ["POST /cors"] =<< readIORef serverHits
+            assertEqual "client" ["POST " <> cross] =<< readIORef clientHits
+    , testCase "should fire requestfailed when intercepting race" $
+        withChromiumPage $ \page ->
+          withLocalApp emptyApp $ \prefix ->
+            interceptRaceTest (prefix <> "/empty.html") page
     , localOption (mkTimeout 120000000) $
         testCase "should return last requests" lastRequestsTest
     ]

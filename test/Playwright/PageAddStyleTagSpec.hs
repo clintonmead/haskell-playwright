@@ -3,7 +3,8 @@ module Playwright.PageAddStyleTagSpec
   ) where
 
 import Data.Text
-  ( replace
+  ( isInfixOf
+  , replace
   )
 import UnliftIO.Exception
   ( try
@@ -30,6 +31,7 @@ import Playwright.Harness
   ( assertProtocolContains
   , withAssetPage
   , testAssetsDir
+  , assertBool
   , assertFailure
   , withAssets
   , assertEqual
@@ -118,4 +120,10 @@ tests =
           _ <- addStyleTag page emptyStyleTag {styleTagPath = Just (assets <> "/injectedstyle.css")}
           assertEqual "background" "rgb(255, 0, 0)"
             =<< evaluateText page "() => window.getComputedStyle(document.querySelector('body')).getPropertyValue('background-color')"
+    , testCase "should include sourceURL when path is provided" $ do
+        assets <- testAssetsDir
+        withAssetPage "empty.html" $ \page -> do
+          _ <- addStyleTag page emptyStyleTag {styleTagPath = Just (assets <> "/injectedstyle.css")}
+          css <- evaluateText page "() => document.querySelector('style').innerHTML"
+          assertBool "sourceURL" ("assets/injectedstyle.css" `isInfixOf` css)
     ]

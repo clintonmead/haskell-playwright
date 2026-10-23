@@ -44,21 +44,27 @@ import Playwright
   , onPageClose
   , GotoOptions (gotoOptionsWaitUntil)
   , LoadState (LoadStateDomContentLoaded)
+  , Exactness (Inexact)
   , Page
   , Playwright
   , Point (Point)
   , Response
   , UrlMatch (UrlMatchGlob)
+  , addInitScript
+  , addLocatorHandler
   , bringToFront
   , click
   , closePage
   , continueRoute
+  , closePageReason
   , cssPixelFromInt
   , defaultGotoOptions
   , evaluate
   , evaluateText
   , exposeFunction
+  , getByText
   , goto
+  , hover
   , isClosed
   , mouseClick
   , newPage
@@ -76,7 +82,8 @@ import Playwright
   , waitForDialog
   , waitForDownload
   , waitForPopup
-  , waitForRequest
+  , armRequest
+  , armResponse
   , waitForResponse
   )
 import Playwright.Error
@@ -178,11 +185,11 @@ tests =
         withAssets $ \prefix page -> do
           let
             empty = UrlMatchGlob (prefix <> "/empty.html")
-          withAsync (waitForRequest page empty) $ \reqHandle ->
-            withAsync (waitForResponse page empty) $ \respHandle -> do
+          armRequest page empty >>= \reqHandle -> do
+            armResponse page empty >>= \respHandle -> do
               closePage page
-              assertClosedNotTimeout (wait reqHandle)
-              assertClosedNotTimeout (wait respHandle)
+              assertClosedNotTimeout reqHandle
+              assertClosedNotTimeout respHandle
     , testCase "should fail with error upon disconnect" $
         withChromiumPage $ \page ->
           assertClosedNotTimeout
@@ -203,13 +210,13 @@ tests =
     , testCase "interrupt request.response() and request.allHeaders() on page.close" $
         withChromiumPage $ \page ->
           withLocalApp hangingStyleApp $ \prefix -> do
-            withAsync (waitForRequest page (UrlMatchGlob "**/one-style.css")) $ \pending -> do
+            armRequest page (UrlMatchGlob "**/one-style.css") >>= \pending -> do
               _ <-
                 goto
                   page
                   (urlFromText (prefix <> "/one-style.html"))
                   defaultGotoOptions {gotoOptionsWaitUntil = Just LoadStateDomContentLoaded}
-              request <- wait pending
+              request <- pending
               withAsync (requestResponse request) $ \respHandle ->
                 withAsync (requestAllHeaders request) $ \headersHandle -> do
                   closePage page
@@ -289,7 +296,31 @@ tests =
           onPageClose page (modifyIORef' closed (const True))
           closePage page
           assertEqual "closed" True =<< awaitFlag closed 100
+    , testCase "addLocatorHandler should throw when page closes" $
+        withHandleLocator $ \page -> do
+          addLocatorHandler page (getByText page "This interstitial covers the button" Inexact) $ \_ ->
+            closePageReason page "custom reason"
+          hover (locate page "#aside")
+          _ <- evaluate page "() => { window.clicked = 0; window.setupAnnoyingInterstitial('mouseover', 1); }"
+          assertProtocolContains "custom reason" (click (locate page "#target"))
+        -- Skipped: "expect should not print timed out error message when page closes". It relies on
+        -- `expect(locator).toHaveText` timing out against a closing page, and the Haskell API has no
+        -- expect matcher.
+        -- "expect should not print timed out error message when page closes"
     ]
+
+withHandleLocator :: (Page -> Playwright a) -> IO a
+withHandleLocator action =
+  withAssets $ \prefix page -> do
+    addInitScript
+      page
+      "window.builtins = { setTimeout: window.setTimeout.bind(window), clearTimeout: window.clearTimeout.bind(window), requestAnimationFrame: window.requestAnimationFrame.bind(window) };"
+    _ <-
+      goto
+        page
+        (urlFromText (prefix <> "/input/handle-locator.html"))
+        defaultGotoOptions
+    action page
 
 clickButton :: Page -> Playwright ()
 clickButton page =

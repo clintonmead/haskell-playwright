@@ -91,7 +91,7 @@ import Playwright
   , title
   , undefinedArgument
   , urlFromText
-  , waitForContextPage
+  , armContextPage
   , waitForLoadState
   , waitForPopup
   )
@@ -153,6 +153,9 @@ tests =
     , testCase "should expose function from browser context" exposeFunctionOnPopup
     , testCase "should not throttle rAF in the opener page" rafNotThrottled
     , testCase "should not throw when click closes popup" clickClosesPopup
+    -- Skipped: "should not dispatch binding on a closed page". It needs `exposeBinding` to pass a
+    -- source page and check `source.page.isClosed()`. Bindings do not carry a page yet.
+    -- "should not dispatch binding on a closed page"
     ]
 
 inheritUserAgent :: IO ()
@@ -168,9 +171,9 @@ inheritUserAgent = do
         _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
         setContent page "<a target=_blank rel=noopener href=\"/popup/popup.html\">link</a>"
         withAsync (liftIO (readChan captured)) $ \headerPending ->
-          withAsync (waitForContextPage ctx) $ \pagePending -> do
+          armContextPage ctx >>= \pagePending -> do
             click (locate page "a")
-            popup <- wait pagePending
+            popup <- pagePending
             waitForLoadState popup LoadStateDomContentLoaded
             ua <- evaluateText popup "() => window['initialUserAgent']"
             headers <- wait headerPending
@@ -188,9 +191,9 @@ contextRoutesOnClick =
     contextRoute ctx (UrlMatchGlob "**/empty.html") $ \handled -> do
       continueRoute handled
       writeIORef intercepted True
-    withAsync (waitForContextPage ctx) $ \pending -> do
+    armContextPage ctx >>= \pending -> do
       click (locate page "a")
-      _ <- wait pending
+      _ <- pending
       pure ()
     assertEqual "intercepted" True =<< readIORef intercepted
 

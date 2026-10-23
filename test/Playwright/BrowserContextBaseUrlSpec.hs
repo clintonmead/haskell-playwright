@@ -8,18 +8,35 @@ import Data.Text
 import UnliftIO.IORef
   ( newIORef
   )
+import UnliftIO.Temporary
+  ( withSystemTempDirectory
+  )
 import Playwright
-  ( NewContextOptions (newContextBaseURL)
+  ( FulfillBody (FulfillText)
+  , FulfillOptions (fulfillBody)
+  , NewContextOptions (newContextBaseURL)
   , Page
+  , armRequest
+  , armResponse
+  , chromium
+  , closeContext
+  , defaultFulfillOptions
   , defaultGotoOptions
+  , defaultLaunchOptions
   , defaultNewContextOptions
+  , fulfillRoute
+  , launchPersistentContext
   , newContextWith
   , newPage
+  , requestUrl
+  , route
+  , responseText
+  , responseUrl
+  , runPlaywright
   , UrlMatch (UrlMatchGlob)
   , waitForURL
   , evaluateText
   , goto
-  , responseUrl
   , url
   , urlFromText
   , urlToText
@@ -154,6 +171,30 @@ tests =
             assertEqual "absolute" (prefix <> "/mypage.html") =<< landedAt page "/mypage.html"
             assertEqual "directory" (prefix <> "/url-construction/") =<< landedAt page "."
             assertEqual "root" (prefix <> "/") =<< landedAt page "/"
+    , testCase "should be able to match a URL relative to its given URL with urlMatcher" $ do
+        requests <- newIORef []
+        withChromiumBrowser $ \browser ->
+          withLocalApp (recordingPageApp requests) $ \prefix -> do
+            context <-
+              newContextWith browser defaultNewContextOptions {newContextBaseURL = Just (urlFromText (prefix <> "/foobar/"))}
+            page <- newPage context
+            _ <- goto page (urlFromText "/kek/index.html") defaultGotoOptions
+            waitForURL page (UrlMatchGlob "/kek/index.html")
+            assertEqual "page url" (prefix <> "/kek/index.html") . urlToText =<< url page
+            route page (UrlMatchGlob "./kek/index.html") $ \handled ->
+              fulfillRoute
+                handled
+                defaultFulfillOptions
+                  { fulfillBody = Just (FulfillText "base-url-matched-route")
+                  }
+            awaitRequest <- armRequest page (UrlMatchGlob "./kek/index.html")
+            awaitResponse <- armResponse page (UrlMatchGlob "./kek/index.html")
+            _ <- goto page (urlFromText "./kek/index.html") defaultGotoOptions
+            request <- awaitRequest
+            response <- awaitResponse
+            assertEqual "request url" (prefix <> "/foobar/kek/index.html") . urlToText =<< requestUrl request
+            assertEqual "response url" (prefix <> "/foobar/kek/index.html") . urlToText =<< responseUrl response
+            assertEqual "body" "base-url-matched-route" =<< responseText response
     , testCase "should not construct a new URL with baseURL when a glob was used" $ do
         requests <- newIORef []
         withChromiumBrowser $ \browser ->
@@ -163,6 +204,20 @@ tests =
             page <- newPage context
             _ <- goto page (urlFromText "./kek/index.html") defaultGotoOptions
             waitForURL page (UrlMatchGlob "**/foobar/kek/index.html")
+    , testCase "should construct a new URL when a baseURL in browserType.launchPersistentContext is passed to page.goto" $
+        withAssetsPrefix $ \prefix ->
+          withSystemTempDirectory "pw-user-data" $ \userDataDir ->
+            runPlaywright $ do
+              browserType <- chromium
+              ctx <-
+                launchPersistentContext
+                  browserType
+                  userDataDir
+                  defaultLaunchOptions
+                  defaultNewContextOptions {newContextBaseURL = Just (urlFromText prefix)}
+              page <- newPage ctx
+              expectGotoUrl page "/empty.html" (prefix <> "/empty.html")
+              closeContext ctx
     ]
 
 expectGotoUrl :: Page -> Text -> Text -> Playwright ()

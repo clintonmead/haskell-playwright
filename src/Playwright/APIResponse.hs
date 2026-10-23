@@ -178,9 +178,16 @@ collapseHeaders (header : rest) =
   let
     name = headerNameToText (httpHeaderName header)
     (same, others) = partition (\other -> headerNameToText (httpHeaderName other) == name) rest
+    -- Set-Cookie values are joined with newlines, as the JS client's headers() does,
+    -- so that fulfilling with this response keeps each cookie separate.
+    separator :: Text
+    separator =
+      if name == "set-cookie"
+        then "\n"
+        else ", "
     mergedValue =
       intercalate
-        ", "
+        separator
         (fmap (headerValueToText . httpHeaderValue) (header : same))
   in
     HttpHeader (httpHeaderName header) (HeaderValue mergedValue) : collapseHeaders others

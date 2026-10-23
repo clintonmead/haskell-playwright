@@ -1,9 +1,13 @@
 module Playwright.Frame
   ( Frame (..)
   , childFrames
+  , frameContextBaseUrl
   , frameContent
+  , frameNavigationTimeout
+  , mainFrameGuid
   , currentName
   , currentUrl
+  , isDetached
   , parentFrame
   , evalOnSelectorAllFrame
   , evalOnSelectorFrame
@@ -47,6 +51,7 @@ import Playwright.Guid
   )
 import Playwright.Connection
   ( guidsOfType
+  , isDetachedFrame
   , lookupContextBaseUrl
   , lookupMainFramePage
   , lookupObject
@@ -169,14 +174,27 @@ childFrames frame = do
   candidates <- traverse (\guid -> frameFromRef (ChannelRef guid)) guids
   pure (filter (isChildOf frame) candidates)
 
+-- | Whether the frame has been detached from its page, as upstream's
+-- @isDetached()@. The flag is set by the page's @frameDetached@ event, which
+-- can arrive before the frame's object is disposed.
+isDetached :: Frame -> Playwright Bool
+isDetached frame =
+  isDetachedFrame (channelGuid (frameChannel frame))
+
 isChildOf :: Frame -> Frame -> Bool
 isChildOf parent child =
   frameParent child == Just (ChannelRef (channelGuid (frameChannel parent)))
 
+-- | The base URL of the frame's browser context, which relative globs and
+-- URLs resolve against.
+frameContextBaseUrl :: Frame -> Playwright (Maybe Url)
+frameContextBaseUrl frame = do
+  frameObj <- lookupObject (channelGuid (frameChannel frame))
+  lookupContextBaseUrl (remoteParent frameObj)
+
 resolveFrameUrl :: Frame -> Url -> Playwright Url
 resolveFrameUrl frame url = do
-  frameObj <- lookupObject (channelGuid (frameChannel frame))
-  base <- lookupContextBaseUrl (remoteParent frameObj)
+  base <- frameContextBaseUrl frame
   pure (resolveAgainstBase base url)
 
 frameSend :: forall result params. (ToJSON params, FromJSON result) => Frame -> Text -> params -> Playwright result

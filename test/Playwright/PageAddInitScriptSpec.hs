@@ -17,6 +17,7 @@ import Data.Text
   , isPrefixOf
   , replace
   )
+import Data.Text.IO qualified as TIO
 import UnliftIO.IORef
   ( IORef
   , modifyIORef'
@@ -34,10 +35,13 @@ import Network.Wai
 import Playwright
   ( ConsoleMessage (consoleMessageText)
   , addInitScript
+  , addPageInitScriptExposing
   , addScriptTag
+  , dispose
   , onConsole
   , defaultGotoOptions
   , emptyScriptTag
+  , evaluateBool
   , evaluateNumber
   , goto
   , newContext
@@ -51,6 +55,7 @@ import Playwright.Error
   )
 import Playwright.Harness
   ( assertEqual
+  , testAssetsDir
   , withAssets
   , withChromiumBrowser
   , withLocalApp
@@ -122,6 +127,36 @@ tests =
           addInitScript page "window['injected'] = 123;"
           _ <- goto page (urlFromText (prefix <> "/tamperable.html")) defaultGotoOptions
           assertEqual "result" (123 :: Double) =<< evaluateNumber page "() => window.result"
+    , testCase "should work with a path" $ do
+        -- The library takes script text, not a path, so the test reads the file
+        -- itself and adds its contents as the init script.
+        assets <- testAssetsDir
+        script <- TIO.readFile (assets <> "/injectedfile.js")
+        withAssets $ \prefix page -> do
+          addInitScript page script
+          _ <- goto page (urlFromText (prefix <> "/tamperable.html")) defaultGotoOptions
+          assertEqual "result" (123 :: Double) =<< evaluateNumber page "() => window.result"
+    , testCase "should remove init script after dispose" $
+        withAssets $ \prefix page -> do
+          -- The function-expression source matches upstream; the empty function
+          -- list makes this the only page-level form that returns a dispose handle.
+          disposable <- addPageInitScriptExposing page "function() { window['injected'] = 123; }" []
+          _ <- goto page (urlFromText (prefix <> "/tamperable.html")) defaultGotoOptions
+          assertEqual "before" (123 :: Double) =<< evaluateNumber page "() => window.result"
+          dispose disposable
+          _ <- goto page (urlFromText (prefix <> "/tamperable.html")) defaultGotoOptions
+          assertEqual "after" True =<< evaluateBool page "() => window.result === undefined"
+    , testCase "should remove one of multiple init scripts after dispose" $
+        withAssets $ \prefix page -> do
+          disposable1 <- addPageInitScriptExposing page "function() { window['script1'] = 1; }" []
+          addInitScript page "window['script2'] = 2;"
+          _ <- goto page (urlFromText (prefix <> "/tamperable.html")) defaultGotoOptions
+          assertEqual "script1" (1 :: Double) =<< evaluateNumber page "() => window.script1"
+          assertEqual "script2" (2 :: Double) =<< evaluateNumber page "() => window.script2"
+          dispose disposable1
+          _ <- goto page (urlFromText (prefix <> "/tamperable.html")) defaultGotoOptions
+          assertEqual "script1 removed" True =<< evaluateBool page "() => window.script1 === undefined"
+          assertEqual "script2 kept" (2 :: Double) =<< evaluateNumber page "() => window.script2"
     ]
 
 -- | Serves every page with a Content-Security-Policy that only allows scripts

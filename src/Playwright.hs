@@ -101,6 +101,8 @@ module Playwright
   , Page (..)
   , PageError (..)
   , PdfOptions (..)
+  , WebError (..)
+  , WebErrorLocation (..)
   , PermissionName (..)
   , Playwright
   , Point (..)
@@ -163,8 +165,10 @@ module Playwright
   , acceptDialog
   , acceptDialogWith
   , addContextInitScript
+  , addContextInitScriptExposing
   , addCookies
   , addInitScript
+  , addPageInitScriptExposing
   , addLocatorHandler
   , addLocatorHandlerWith
   , addScriptTag
@@ -189,6 +193,7 @@ module Playwright
   , armConsole
   , armDialog
   , onDialog
+  , onPageDialogClosed
   , armDownload
   , armFileChooser
   , armFrameDetached
@@ -271,6 +276,7 @@ module Playwright
   , currentName
   , parentFrame
   , currentUrl
+  , isDetached
   , dblclick
   , defaultAddLocatorHandlerOptions
   , defaultCheckOptions
@@ -424,6 +430,7 @@ module Playwright
   , frameElement
   , frameLocator
   , frames
+  , framePage
   , framesEqual
   , fulfillRoute
   , getAttribute
@@ -431,6 +438,7 @@ module Playwright
   , getByAltText
   , getByAltTextRegex
   , getByLabel
+  , getByLabelRegex
   , getByPlaceholder
   , getByPlaceholderRegex
   , getByRole
@@ -439,6 +447,7 @@ module Playwright
   , getByTestIdAttrRegex
   , getByTestIdRegex
   , getByText
+  , getByTextRegex
   , getByTitle
   , getByTitleRegex
   , getProperty
@@ -465,6 +474,7 @@ module Playwright
   , inputValue
   , inputValueHandle
   , isChecked
+  , isCheckedHandle
   , isClosed
   , isContextClosed
   , isDisabled
@@ -501,10 +511,10 @@ module Playwright
   , locatorBoundingBox
   , locatorCount
   , locatorDescription
-  , locatorOnFrame
-  , locatorPage
   , locatorScreenshot
   , locatorScreenshotMasked
+  , locatorOnFrame
+  , locatorPage
   , locatorScrollIntoView
   , locatorSelectText
   , longitudeFromInt
@@ -546,6 +556,15 @@ module Playwright
   , onContextPage
   , onContextPageClose
   , onContextPageLoad
+  , onContextDialogClosed
+  , onContextDownload
+  , onContextFrameAttached
+  , onContextFrameDetached
+  , onContextFrameNavigated
+  , onFrameAttached
+  , onFrameDetached
+  , onFrameNavigated
+  , onContextWebError
   , onContextRequest
   , onContextRequestFailed
   , onContextRequestFinished
@@ -620,6 +639,9 @@ module Playwright
   , responseFinished
   , responseFromServiceWorker
   , responseAllHeaders
+  , responseHeaderValue
+  , responseHeaderValues
+  , responseHeadersArray
   , responseBody
   , responseHeaders
   , responseJSON
@@ -708,6 +730,7 @@ module Playwright
   , waitForConsoleWhere
   , waitForContextClose
   , waitForContextConsole
+  , armContextConsole
   , armContextDialog
   , waitForContextDialog
   , armContextPage
@@ -727,6 +750,9 @@ module Playwright
   , waitForFunctionPolling
   , waitForFunctionWith
   , waitForFunctionWithArg
+  , waitForFunctionOnLocator
+  , waitForFunctionOnLocatorWith
+  , waitForFunctionOnLocatorWithArg
   , waitForDomContentLoadedEvent
   , waitForLoadEvent
   , waitForLoadState
@@ -737,6 +763,9 @@ module Playwright
   , waitForNavigationWith
   , waitForNavigationOptions
   , armNavigationOptions
+  , waitForNavigationFrame
+  , waitForNavigationFrameOptions
+  , armNavigationFrame
   , waitForFrameNavigated
   , waitForFrameDetached
   , waitForNavigatedFrame
@@ -752,6 +781,7 @@ module Playwright
   , waitForRequestWhere
   , waitForRequestFailedWith
   , waitForRequestFinished
+  , armRequestFinished
   , waitForRequestWith
   , armResponse
   , armResponseWhere
@@ -862,8 +892,19 @@ import Playwright.Browser
   , withPageWith
   )
 import Playwright.ContextEvents
-  ( onContextPageClose
+  ( WebError (WebError, webErrorPage, webErrorError, webErrorLocation)
+  , WebErrorLocation (WebErrorLocation, webErrorLocationUrl, webErrorLocationLine, webErrorLocationColumn)
+  , onContextDialogClosed
+  , onContextDownload
+  , onContextFrameAttached
+  , onContextFrameDetached
+  , onContextFrameNavigated
+  , onContextPageClose
   , onContextPageLoad
+  , onContextWebError
+  , onFrameAttached
+  , onFrameDetached
+  , onFrameNavigated
   )
 import Playwright.BrowserContext
   ( BrowserContext (BrowserContext, browserContextChannel)
@@ -1056,6 +1097,7 @@ import Playwright.ElementHandle
   , innerHtmlHandle
   , innerTextHandle
   , inputValueHandle
+  , isCheckedHandle
   , isEditableHandle
   , isDisabledHandle
   , isEnabledHandle
@@ -1168,6 +1210,10 @@ import Playwright.Expose
   ( contextExposeFunction
   , exposeFunction
   )
+import Playwright.InitScript
+  ( addContextInitScriptExposing
+  , addPageInitScriptExposing
+  )
 import Playwright.FetchOptions
   ( FetchFormField (FetchFormField, fetchFormFieldName, fetchFormFieldValue)
   , FetchMultipartField (FetchMultipartField, FetchMultipartFileField)
@@ -1194,6 +1240,7 @@ import Playwright.Frame
   , currentName
   , parentFrame
   , currentUrl
+  , isDetached
   , framesEqual
   , gotoFrame
   , setContentOnFrame
@@ -1369,6 +1416,8 @@ import Playwright.Locator
   , locatorBoundingBox
   , locatorCount
   , locatorDescription
+  , locatorScreenshot
+  , locatorScreenshotMasked
   , locatorScrollIntoView
   , locatorSelectText
   , nth
@@ -1390,9 +1439,10 @@ import Playwright.Locator
   , uncheck
   , uncheckWith
   , waitFor
+  , waitForFunctionOnLocator
+  , waitForFunctionOnLocatorWith
+  , waitForFunctionOnLocatorWithArg
   , waitForWith
-  , locatorScreenshot
-  , locatorScreenshotMasked
   )
 import Playwright.LocatorHandler
   ( addLocatorHandler
@@ -1447,6 +1497,7 @@ import Playwright.Page
   , getByAltText
   , getByAltTextRegex
   , getByLabel
+  , getByLabelRegex
   , getByPlaceholder
   , getByPlaceholderRegex
   , getByRole
@@ -1455,6 +1506,7 @@ import Playwright.Page
   , getByTestIdAttrRegex
   , getByTestIdRegex
   , getByText
+  , getByTextRegex
   , getByTitle
   , getByTitleRegex
   , goBack
@@ -1495,12 +1547,14 @@ import Playwright.Page
   , frameByName
   , frameByUrl
   , frames
+  , framePage
   , mainFrame
   )
 import Playwright.Page.Wait
   ( armConsole
   , armDialog
   , onDialog
+  , onPageDialogClosed
   , armFrameDetached
   , armFrameNavigated
   , armLoadEvent
@@ -1525,6 +1579,9 @@ import Playwright.Page.Wait
   , waitForNavigationWith
   , waitForNavigationOptions
   , armNavigationOptions
+  , waitForNavigationFrame
+  , waitForNavigationFrameOptions
+  , armNavigationFrame
   , waitForFrameNavigated
   , waitForFrameDetached
   , waitForNavigatedFrame
@@ -1538,6 +1595,7 @@ import Playwright.Page.Wait
   , waitForRequestWhere
   , waitForRequestFailedWith
   , waitForRequestFinished
+  , armRequestFinished
   , waitForRequestWith
   , armResponse
   , armResponseWhere
@@ -1588,6 +1646,7 @@ import Playwright.BrowserContext.Network
   )
 import Playwright.BrowserContext.Wait
   ( waitForContextConsole
+  , armContextConsole
   , armContextDialog
   , waitForContextDialog
   )
@@ -1650,6 +1709,9 @@ import Playwright.ResourceType
 import Playwright.Response
   ( Response (Response, responseChannel)
   , responseAllHeaders
+  , responseHeaderValue
+  , responseHeaderValues
+  , responseHeadersArray
   , responseBody
   , responseHeaders
   , responseJSON

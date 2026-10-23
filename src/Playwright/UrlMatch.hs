@@ -1,6 +1,7 @@
 module Playwright.UrlMatch
   ( UrlMatch (..)
   , matchesUrlMatch
+  , resolveUrlMatch
   ) where
 
 import Data.String
@@ -11,8 +12,11 @@ import Data.Text
   , pack
   , unpack
   )
+import Data.Text qualified as Text
 import Playwright.Url
   ( Url
+  , resolveAgainstBase
+  , urlFromText
   , urlToText
   )
 import Text.Regex.Base
@@ -60,6 +64,18 @@ instance Show UrlMatch where
         showParen (precedence > 10) (showString "UrlMatchRegex " . showsPrec 11 source . showChar ' ' . showsPrec 11 flags)
       UrlMatchPredicate _ ->
         showString "UrlMatchPredicate <predicate>"
+
+-- | Resolves a relative glob such as @kek/index.html@ or @/foo@ against the
+-- context's base URL, as the driver does before it routes. A glob that starts
+-- with @*@ is left alone, as are absolute globs and regexes and predicates.
+resolveUrlMatch :: Maybe Url -> UrlMatch -> UrlMatch
+resolveUrlMatch base match =
+  case match of
+    UrlMatchGlob glob
+      | not (Text.isPrefixOf "*" glob) ->
+          UrlMatchGlob (urlToText (resolveAgainstBase base (urlFromText glob)))
+    _ ->
+      match
 
 matchesUrlMatch :: UrlMatch -> Url -> Bool
 matchesUrlMatch match url =

@@ -17,6 +17,7 @@ module Playwright.ElementHandle
   , innerHtmlHandle
   , innerTextHandle
   , inputValueHandle
+  , isCheckedHandle
   , isEditableHandle
   , isDisabledHandle
   , isEnabledHandle
@@ -139,6 +140,7 @@ import Playwright.Protocol
   , ElementHandleInnerHTMLResult (elementHandleInnerHTMLResultValue)
   , ElementHandleInnerTextResult (elementHandleInnerTextResultValue)
   , ElementHandleInputValueResult (elementHandleInputValueResultValue)
+  , ElementHandleIsCheckedResult (elementHandleIsCheckedResultValue)
   , ElementHandleIsEditableResult (elementHandleIsEditableResultValue)
   , ElementHandleIsEnabledResult (elementHandleIsEnabledResultValue)
   , ElementHandleIsHiddenResult (elementHandleIsHiddenResultValue)
@@ -173,6 +175,7 @@ import Playwright.Protocol
   , mkElementHandleInnerHTMLParams
   , mkElementHandleInnerTextParams
   , mkElementHandleInputValueParams
+  , mkElementHandleIsCheckedParams
   , mkElementHandleIsEditableParams
   , mkElementHandleIsEnabledParams
   , mkElementHandleIsHiddenParams
@@ -468,6 +471,13 @@ inputValueHandle :: ElementHandle -> Playwright Text
 inputValueHandle handle = do
   result <- handleSend handle "inputValue" mkElementHandleInputValueParams
   pure (elementHandleInputValueResultValue result)
+
+-- | Checks the handle's checked state. Non-checkbox, non-radio elements fail
+-- with the protocol's "Not a checkbox or radio button" error.
+isCheckedHandle :: ElementHandle -> Playwright Bool
+isCheckedHandle handle = do
+  result <- handleSend handle "isChecked" mkElementHandleIsCheckedParams
+  pure (elementHandleIsCheckedResultValue result)
 
 isEditableHandle :: ElementHandle -> Playwright Bool
 isEditableHandle handle = do

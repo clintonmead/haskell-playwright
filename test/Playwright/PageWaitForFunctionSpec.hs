@@ -5,16 +5,29 @@ module Playwright.PageWaitForFunctionSpec
 import Control.Monad.IO.Class
   ( liftIO
   )
+import Data.Maybe
+  ( isNothing
+  )
 import Data.Text
   ( Text
   , isInfixOf
+  , replace
   )
 import GHC.Clock
   ( getMonotonicTimeNSec
   )
+import Network.HTTP.Types
+  ( hContentType
+  , status200
+  )
+import Network.Wai
+  ( Application
+  , responseLBS
+  )
 import Playwright
   ( ConsoleMessage (consoleMessageText)
   , Frame
+  , JsHandle
   , Page
   , Playwright
   , addInitScript
@@ -30,6 +43,8 @@ import Playwright
   , jsonValueBool
   , jsonValueNumber
   , milliseconds
+  , newContext
+  , newPage
   , objectNumberArgument
   , onConsole
   , querySelector
@@ -53,7 +68,9 @@ import Playwright.Harness
   ( assertProtocolContains
   , requireHandle
   , withAssets
+  , withChromiumBrowser
   , withChromiumPage
+  , withLocalApp
   , assertBool
   , assertEqual
   , assertFailure
@@ -70,6 +87,7 @@ import UnliftIO
   )
 import UnliftIO.Async
   ( concurrently_
+  , poll
   , wait
   , withAsync
   )
@@ -267,7 +285,73 @@ tests =
                 assertFailure ("expected ProtocolRpc, got: " <> show err)
               Right _ ->
                 assertFailure "expected waitForFunction to fail"
+    , testCase "should not be called after finishing unsuccessfully" $
+        withAssets $ \prefix page -> do
+          gotoEmpty prefix page
+          seen <- newIORef ([] :: [Text])
+          onConsole page $ \message ->
+            modifyIORef' seen (<> [consoleMessageText message])
+          _ <- failingWait page "waitForFunction1"
+          _ <- reload page
+          _ <- failingWait page "waitForFunction2"
+          _ <- reload page
+          _ <- failingWait page "waitForFunction3"
+          logs <- readIORef seen
+          assertEqual
+            "logs"
+            ["waitForFunction1", "waitForFunction2", "waitForFunction3"]
+            (filter ("waitForFunction" `isInfixOf`) logs)
+    , testCase "should survive cross-process navigation" $
+        withAssets $ \prefix page ->
+          withAsync (waitForFunction page "() => window.__FOO === 1") $ \pending -> do
+            gotoEmpty prefix page
+            beforeReload <- poll pending
+            assertBool "pending after goto" (isNothing beforeReload)
+            _ <- reload page
+            afterReload <- poll pending
+            assertBool "pending after reload" (isNothing afterReload)
+            gotoPage (replace "127.0.0.1" "localhost" prefix) page "grid.html"
+            crossProcess <- poll pending
+            assertBool "pending after cross-process goto" (isNothing crossProcess)
+            _ <- evaluateBool page "() => { window.__FOO = 1; return true; }"
+            _ <- wait pending
+            pure ()
+    , testCase "should work with strict CSP policy" $
+        withChromiumBrowser $ \browser ->
+          withLocalApp strictCspApp $ \base -> do
+            strict <- newContext browser
+            strictPage <- newPage strict
+            gotoEmpty base strictPage
+            withAsync (waitForFunction strictPage "() => window.__FOO === 'hit'") $ \pending -> do
+              case milliseconds 1000 of
+                Nothing ->
+                  assertFailure "timeout"
+                Just pause ->
+                  waitForTimeout strictPage pause
+              _ <- evaluateBool strictPage "() => { window.__FOO = 'hit'; return true; }"
+              _ <- wait pending
+              pure ()
     ]
+
+failingWait :: Page -> Text -> Playwright (Either PlaywrightError JsHandle)
+failingWait page name =
+  try
+    ( waitForFunction
+        page
+        ( "() => { console.log('" <> name <> "'); throw new Error('" <> name <> "'); }"
+        )
+    )
+
+strictCspApp :: Application
+strictCspApp _ respond =
+  respond
+    ( responseLBS
+        status200
+        [ ("Content-Security-Policy", "script-src 'self'")
+        , (hContentType, "text/html")
+        ]
+        ""
+    )
 
 gotoEmpty :: Text -> Page -> Playwright ()
 gotoEmpty prefix page = do

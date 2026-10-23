@@ -14,7 +14,9 @@ import UnliftIO.IORef
 
   )
 import Data.Text
-  ( pack
+  ( Text
+  , isInfixOf
+  , pack
   )
 import Network.HTTP.Types
   ( hContentType
@@ -29,9 +31,9 @@ import Network.Wai.Handler.Warp
   ( withApplication
   )
 import Playwright
-  ( Cookie (cookieDomain, cookieExpires, cookieHttpOnly, cookieName, cookieSameSite, cookieValue)
+  ( Cookie (cookieDomain, cookieExpires, cookieHttpOnly, cookieName, cookiePath, cookieSameSite, cookieSecure, cookieValue)
   , CookieDomain (CookieDomain, cookieDomainToText)
-  , CookieSecure (CookieSecure)
+  , CookieSecure (CookieSecure, cookieSecureToBool)
   , CookieToSet
       ( CookieToSet
       , cookieToSetDomain
@@ -44,7 +46,7 @@ import Playwright
       , cookieToSetUrl
       , cookieToSetValue
       )
-  , CookiePath (CookiePath)
+  , CookiePath (CookiePath, cookiePathToText)
   , cookieForHost
   , cookieForUrl
   , addCookies
@@ -56,15 +58,33 @@ import Playwright
   , CookieExpires (CookieExpires, cookieExpiresToScientific)
   , cookiesFor
   , cookies
+  , ContentType (ContentType)
+  , FulfillBody (FulfillText)
+  , FulfillOptions (fulfillBody, fulfillContentType, fulfillHeaders)
+  , HeaderName (HeaderName)
+  , HeaderValue (HeaderValue)
+  , HttpHeader (HttpHeader)
+  , UrlMatch (UrlMatchGlob)
+  , childLocator
+  , defaultFulfillOptions
   , defaultGotoOptions
+  , evaluateNumber
   , evaluateText
+  , frameLocator
+  , fulfillRoute
   , goto
+  , route
+  , selectorFromText
+  , textContent
   , urlFromText
   )
 import Playwright.Harness
   ( Recorded
   , recordRequest
   , assertBool
+  , assertProtocolContains
+  , locate
+  , withChromiumPage
   , withLocalApp
   , withAssets
   , withChromiumContext
@@ -211,7 +231,110 @@ tests =
             ]
           jar <- cookies (pageContext page)
           assertEqual "names" ["username"] (fmap (cookieNameToText . cookieName) jar)
+    , testCase "should add cookies with an expiration" $
+        withChromiumPage $ \page -> do
+          expires <- evaluateNumber page "() => Math.floor(Date.now()/1000) + 3600"
+          addCookies
+            (pageContext page)
+            [ (cookieForUrl (urlFromText "https://foo.com") (CookieName "doggo") (CookieValue "woofs"))
+                { cookieToSetSameSite = Just CookieSameSiteNone
+                , cookieToSetExpires = Just (CookieExpires (realToFrac expires))
+                }
+            ]
+          jar <- cookiesFor (pageContext page) [urlFromText "https://foo.com"]
+          case jar of
+            [cookie] -> do
+              assertEqual "name" "doggo" (cookieNameToText (cookieName cookie))
+              assertEqual "value" "woofs" (cookieValueToText (cookieValue cookie))
+              assertEqual "domain" "foo.com" (cookieDomainToText (cookieDomain cookie))
+              assertEqual "path" "/" (cookiePathToText (cookiePath cookie))
+              assertEqual "expires" expires (realToFrac (cookieExpiresToScientific (cookieExpires cookie)))
+              assertEqual "httpOnly" False (cookieHttpOnlyToBool (cookieHttpOnly cookie))
+              assertEqual "secure" True (cookieSecureToBool (cookieSecure cookie))
+              assertEqual "sameSite" CookieSameSiteNone (cookieSameSite cookie)
+            _ ->
+              assertEqual "one cookie" 1 (length jar)
+          addCookies
+            (pageContext page)
+            [ (cookieForUrl (urlFromText "https://foo.com") (CookieName "doggo") (CookieValue "woofs"))
+                { cookieToSetSameSite = Just CookieSameSiteNone
+                , cookieToSetExpires = Just (CookieExpires 253402300799)
+                }
+            ]
+          assertProtocolContains "Cookie should have a valid expires" $
+            addCookies
+              (pageContext page)
+              [ (cookieForUrl (urlFromText "https://foo.com") (CookieName "doggo") (CookieValue "woofs"))
+                  { cookieToSetSameSite = Just CookieSameSiteNone
+                  , cookieToSetExpires = Just (CookieExpires 253402300800)
+                  }
+              ]
+          assertProtocolContains "Cookie should have a valid expires" $
+            addCookies
+              (pageContext page)
+              [ (cookieForUrl (urlFromText "https://foo.com") (CookieName "doggo") (CookieValue "woofs"))
+                  { cookieToSetSameSite = Just CookieSameSiteNone
+                  , cookieToSetExpires = Just (CookieExpires (-42))
+                  }
+              ]
+    , testCase "should parse cookie with large Max-Age correctly" $
+        withChromiumContext $ \ctx page ->
+          withLocalApp maxAgeApp $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/foobar")) defaultGotoOptions
+            documentCookie <- evaluateText page "() => document.cookie"
+            assertEqual "document" "cookie1=value1" documentCookie
+            jar <- cookies ctx
+            assertEqual "count" 1 (length jar)
+            case jar of
+              [cookie] -> do
+                assertEqual "name" "cookie1" (cookieNameToText (cookieName cookie))
+                assertEqual "domain" "127.0.0.1" (cookieDomainToText (cookieDomain cookie))
+                assertEqual "path" "/" (cookiePathToText (cookiePath cookie))
+                assertBool "expires is set" ((/= -1) (cookieExpiresToScientific (cookieExpires cookie)))
+                assertEqual "httpOnly" False (cookieHttpOnlyToBool (cookieHttpOnly cookie))
+                assertEqual "secure" False (cookieSecureToBool (cookieSecure cookie))
+                assertEqual "sameSite" CookieSameSiteLax (cookieSameSite cookie)
+              _ ->
+                assertEqual "one cookie" 1 (length jar)
+    , testCase "iframe should inherit cookies from parent" $
+        withChromiumPage $ \page -> do
+          route page (UrlMatchGlob "http://sub.example.test/**") $ \handled ->
+            fulfillRoute
+              handled
+              defaultFulfillOptions
+                { fulfillBody = Just (FulfillText iframeSubHtml)
+                , fulfillContentType = Just (ContentType "text/html")
+                }
+          route page (UrlMatchGlob "http://example.test/**") $ \handled ->
+            fulfillRoute
+              handled
+              defaultFulfillOptions
+                { fulfillBody = Just (FulfillText iframeMainHtml)
+                , fulfillContentType = Just (ContentType "text/html")
+                , fulfillHeaders =
+                    [ HttpHeader
+                        (HeaderName "set-cookie")
+                        (HeaderValue "testCookie=value; SameSite=Lax; Domain=example.test")
+                    ]
+                }
+          _ <- goto page (urlFromText "http://example.test/") defaultGotoOptions
+          mainBody <- textContent (locate page "body")
+          assertBool "main body has cookie" (maybe False ("testCookie=value" `isInfixOf`) mainBody)
+          frameBody <-
+            textContent
+              (childLocator (frameLocator page (selectorFromText "iframe")) (selectorFromText "body"))
+          assertBool "iframe body has cookie" (maybe False ("testCookie=value" `isInfixOf`) frameBody)
+    -- Upstream skips "should support requestStorageAccess" when the browser is
+    -- Chromium, and this harness only runs Chromium, so there is no case to port.
     ]
+
+iframeMainHtml :: Text
+iframeMainHtml =
+  "<p id=result></p><script>document.getElementById('result').textContent = document.cookie;</script><iframe src=\"http://sub.example.test/\"></iframe>"
+
+iframeSubHtml :: Text
+iframeSubHtml =
+  "<p id=result></p><script>document.getElementById('result').textContent = document.cookie || 'no cookies';</script>"
 
 emptyHtml :: Application
 emptyHtml _req respond =
@@ -254,3 +377,15 @@ emptyCookieApp requests request respond = do
       respond (responseLBS status200 [(hContentType, "text/html"), ("Set-Cookie", "name=;Path=/")] "")
     _ ->
       respond (responseLBS status200 [(hContentType, "text/html")] "")
+
+-- | Sets a cookie with a Max-Age far larger than any browser will store.
+maxAgeApp :: Application
+maxAgeApp _req respond =
+  respond
+    ( responseLBS
+        status200
+        [ (hContentType, BS8.pack "text/html")
+        , ("Set-Cookie", BS8.pack "cookie1=value1; Path=/; Expires=Thu, 08 Sep 2270 15:06:12 GMT; Max-Age=7776000000")
+        ]
+        (LBS8.pack "<html></html>")
+    )

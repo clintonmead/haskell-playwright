@@ -1,5 +1,108 @@
-module Playwright.BrowserContextFetchSpec
-  ( tests
+module Playwright.BrowserContextFetchSupport
+  ( assertSimpleJson
+  , methodPostDataTest
+  , assertNetworkError
+  , withAssetsContext
+  , withHangupApp
+  , hangupApp
+  , withRedirectJsonApp
+  , redirectJsonApp
+  , withSetCookieApp
+  , setCookieApp
+  , withSlowApp
+  , slowApp
+  , withMissingApp
+  , missingApp
+  , withCapturedSimple
+  , captureSimple
+  , objectParamsTest
+  , duplicateParamsTest
+  , encodedParamsTest
+  , queryParamsTest
+  , withQueryCapture
+  , queryApp
+  , decodeQueryText
+  , decodeQuery
+  , stripQuestion
+  , decodePair
+  , failOnStatusTest
+  , withPartialBodyApp
+  , partialBodyApp
+  , withCookieCapture
+  , cookieCaptureApp
+  , withUtf8RedirectApp
+  , utf8RedirectApp
+  , withOrderedCookieApp
+  , orderedCookieApp
+  , withEmptyCookieApp
+  , emptyCookieApp
+  , withSetCookieBodyApp
+  , setCookieBodyApp
+  , withNegativeMaxAgeApp
+  , negativeMaxAgeApp
+  , withPastExpiresApp
+  , pastExpiresApp
+  , cookieRedirectsTest
+  , cookieRedirectApp
+  , drainCookieChan
+  , cookieRedirectPair
+  , withRawHeadersApp
+  , rawHeadersApp
+  , headerNameContains
+  , withAuthApp
+  , authApp
+  , withHeaderCapture
+  , headerCaptureApp
+  , withRedirectHeaderCapture
+  , redirectHeaderCaptureApp
+  , withPropagatedRedirects
+  , propagatedRedirectApp
+  , drainCaptured
+  , lookupHeader
+  , compressionTest
+  , corruptedCompressionTest
+  , compressedApp
+  , withSlowThenDoneApp
+  , slowThenDoneApp
+  , withSlowRedirectApp
+  , slowRedirectApp
+  , disposeAfterContextClose
+  , overrideRequestParameters
+  , postCaptureApp
+  , withBodyCapture
+  , bodyCaptureApp
+  , sampleJson
+  , decodeBodyJson
+  , secureLocalhostCookieTest
+  , secureCookieApp
+  , localhostDomainCookieTest
+  , localhostDomainApp
+  , longSetCookieTest
+  , longSetCookieApp
+  , sameSiteOverHttpTest
+  , sameSiteApp
+  , abortOnContextClose
+  , hangForever
+  , disposeAfterContextReason
+  , retryHangupTest
+  , retryHangupApp
+  , retryGzipTest
+  , retryGzipApp
+  , hostHeaderRedirectTest
+  , hostRedirectApp
+  , httpCredentialsSendTest
+  , headerOnlyAuthApp
+  , multipartFileTest
+  , multipartAssetTest
+  , multipartOrderTest
+  , fieldOffset
+  , multipartRepeatingTest
+  , simpleJson
+  , cookiePair
+  , headerValue
+  , splitSemi
+  , trim
+  , dropOrigin
   ) where
 
 import Control.Monad.IO.Class
@@ -7,7 +110,6 @@ import Control.Monad.IO.Class
   , liftIO
   )
 import Codec.Compression.GZip qualified as GZip
-import Codec.Compression.Zlib qualified as Zlib
 import Control.Concurrent
   ( Chan
   , newChan
@@ -48,8 +150,8 @@ import Data.ByteString qualified as ByteString
 import Data.ByteString.Lazy qualified as LBS
 import UnliftIO.IORef
   ( IORef
-  , atomicModifyIORef'
   , newIORef
+  , atomicModifyIORef'
   )
 import Data.Maybe
   ( fromMaybe
@@ -109,16 +211,15 @@ import Playwright
   , CookieDomain (cookieDomainToText)
   , CookieExpires (cookieExpiresToScientific)
   , CookieHttpOnly (cookieHttpOnlyToBool)
-  , CookieName (CookieName, cookieNameToText)
+  , CookieName (cookieNameToText)
   , CookiePath (cookiePathToText)
   , CookieSameSite (CookieSameSiteLax, CookieSameSiteStrict)
   , CookieSecure (cookieSecureToBool)
-  , CookieValue (CookieValue, cookieValueToText)
-  , FetchFormField (FetchFormField)
+  , CookieValue (cookieValueToText)
   , FetchMultipartField (FetchMultipartField, FetchMultipartFileField)
   , FetchMultipartFile (FetchMultipartFile, fetchMultipartFileBytes, fetchMultipartFileMimeType, fetchMultipartFileName)
-  , FetchOptions (fetchEncodedParams, fetchFailOnStatusCode, fetchFormData, fetchHeaders, fetchMaxRetries, fetchMethod, fetchMultipart, fetchPostData, fetchQueryParams, fetchTimeout)
-  , FetchPostData (FetchPostBytes, FetchPostJson, FetchPostText)
+  , FetchOptions (fetchEncodedParams, fetchFailOnStatusCode, fetchHeaders, fetchMaxRetries, fetchMethod, fetchMultipart, fetchPostData, fetchQueryParams, fetchTimeout)
+  , FetchPostData (FetchPostText)
   , FetchQueryParam (FetchQueryParam)
   , HeaderName (HeaderName, headerNameToText)
   , HeaderValue (HeaderValue, headerValueToText)
@@ -129,17 +230,12 @@ import Playwright
   , HttpPassword (HttpPassword)
   , HttpStatus (httpStatusToInt)
   , HttpUsername (HttpUsername)
-  , NewContextOptions (newContextBaseURL, newContextHttpCredentials)
+  , NewContextOptions (newContextHttpCredentials)
   , Page
-  , StorageState (storageStateCookies)
   , Url
   , UrlMatch (UrlMatchGlob)
-  , addCookies
-  , apiRequestStorageState
   , apiResponseBody
-  , apiResponseDispose
   , apiResponseHeaders
-  , apiResponseHeadersArray
   , apiResponseJson
   , apiResponseOk
   , apiResponseStatus
@@ -149,34 +245,20 @@ import Playwright
   , closeContext
   , closeContextWith
   , contextRequest
-  , cookieForUrl
   , cookies
   , defaultFetchOptions
   , defaultGotoOptions
   , defaultNewContextOptions
-  , disposeAPIRequestContext
-  , evaluateText
-  , fetchDeleteWith
-  , fetchFromUrl
-  , fetchFromUrlWith
   , fetchGet
   , fetchGetWith
-  , fetchHeadWith
-  , fetchPatchWith
   , fetchPostWith
-  , fetchPutWith
   , fetchRequestWith
   , goto
   , newContextWith
-  , pageRequest
   , sessionExpires
-  , setContextDefaultTimeout
-  , setContextExtraHTTPHeaders
-  , setHTTPCredentials
-  , storageState
   , urlFromText
   , urlToText
-  , waitForRequest
+  , armRequest
   , Playwright
   )
 import Playwright.Error
@@ -197,529 +279,6 @@ import Playwright.Harness
   , assertEqual
   , assertFailure
   )
-import Test.Tasty
-  ( TestTree
-  , localOption
-  , mkTimeout
-  , testGroup
-  )
-import Test.Tasty.HUnit
-  ( testCase
-  )
-
-tests :: TestTree
-tests =
-  localOption (mkTimeout 30000000) $
-    testGroup
-      "browsercontext-fetch"
-      [ testCase "get should work" $
-          withAssetsContext $ \prefix ctx -> do
-            request <- contextRequest ctx
-            response <- fetchGet request (simpleJson prefix)
-            assertSimpleJson prefix response
-      , testCase "fetch should work" $
-          withAssetsContext $ \prefix ctx -> do
-            request <- contextRequest ctx
-            response <- fetchFromUrl request (simpleJson prefix)
-            assertSimpleJson prefix response
-      , testCase "should throw on network error" $
-          withHangupApp $ \prefix ctx -> do
-            request <- contextRequest ctx
-            assertNetworkError (fetchGet request (urlFromText (prefix <> "/test")))
-      , testCase "should throw on network error after redirect" $
-          withHangupApp $ \prefix ctx -> do
-            request <- contextRequest ctx
-            assertNetworkError (fetchGet request (urlFromText (prefix <> "/redirect")))
-      , testCase "should follow redirects" $
-          withRedirectJsonApp $ \prefix ctx -> do
-            request <- contextRequest ctx
-            response <- fetchGet request (urlFromText (prefix <> "/redirect1"))
-            assertEqual "url" (urlToText (simpleJson prefix)) (urlToText (apiResponseUrl response))
-            assertEqual "json" (object ["foo" .= ("bar" :: Text)]) =<< apiResponseJson response
-      , testCase "should add cookies from Set-Cookie header" $
-          withSetCookieApp $ \prefix ctx page -> do
-            request <- contextRequest ctx
-            _ <- fetchGet request (urlFromText (prefix <> "/setcookie.html"))
-            jar <- cookies ctx
-            assertEqual
-              "cookies"
-              [("foo", "bar"), ("session", "value")]
-              (sort (fmap cookiePair jar))
-            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-            documentCookie <- evaluateText page "() => document.cookie"
-            assertEqual
-              "document"
-              ["foo=bar", "session=value"]
-              (sort (fmap trim (splitSemi documentCookie)))
-      , testCase "should support timeout option" $
-          withSlowApp $ \prefix ctx -> do
-            request <- contextRequest ctx
-            timeout <- requireTimeout 10
-            assertProtocolContains
-              "Timeout 10ms exceeded"
-              (fetchGetWith request (urlFromText (prefix <> "/slow")) defaultFetchOptions {fetchTimeout = Just timeout})
-      , testCase "should dispose" $
-          withAssetsContext $ \prefix ctx -> do
-            request <- contextRequest ctx
-            response <- fetchGet request (simpleJson prefix)
-            _ <- apiResponseBody response
-            apiResponseDispose response
-            result <- try (apiResponseBody response)
-            case result of
-              Left (DecodeFailure message) ->
-                assertBool "disposed" ("disposed" `isInfixOf` message)
-              Left err ->
-                assertFailure ("expected disposed, got: " <> show err)
-              Right _ ->
-                assertFailure "expected disposed response body"
-      , testCase "should support failOnStatusCode" $
-          withMissingApp $ \prefix ctx -> do
-            request <- contextRequest ctx
-            assertProtocolContains
-              "404"
-              ( fetchGetWith
-                  request
-                  (urlFromText (prefix <> "/does-not-exist.html"))
-                  defaultFetchOptions {fetchFailOnStatusCode = Just True}
-              )
-      , testCase "delete should support post data" $
-          methodPostDataTest "DELETE" fetchDeleteWith
-      , testCase "get should support post data" $
-          methodPostDataTest "GET" fetchGetWith
-      , testCase "head should support post data" $
-          methodPostDataTest "HEAD" fetchHeadWith
-      , testCase "patch should support post data" $
-          methodPostDataTest "PATCH" fetchPatchWith
-      , testCase "post should support post data" $
-          methodPostDataTest "POST" fetchPostWith
-      , testCase "put should support post data" $
-          methodPostDataTest "PUT" fetchPutWith
-      , testCase "fetch should support params passed as object" $
-          objectParamsTest fetchFromUrlWith
-      , testCase "delete should support params passed as object" $
-          objectParamsTest fetchDeleteWith
-      , testCase "get should support params passed as object" $
-          objectParamsTest fetchGetWith
-      , testCase "head should support params passed as object" $
-          objectParamsTest fetchHeadWith
-      , testCase "patch should support params passed as object" $
-          objectParamsTest fetchPatchWith
-      , testCase "post should support params passed as object" $
-          objectParamsTest fetchPostWith
-      , testCase "put should support params passed as object" $
-          objectParamsTest fetchPutWith
-      , testCase "fetch should support params passed as URLSearchParams" $
-          duplicateParamsTest fetchFromUrlWith
-      , testCase "get should support params passed as URLSearchParams" $
-          duplicateParamsTest fetchGetWith
-      , testCase "fetch should support params passed as string" $
-          encodedParamsTest fetchFromUrlWith
-      , testCase "get should support params passed as string" $
-          encodedParamsTest fetchGetWith
-      , testCase "delete should support params passed as URLSearchParams" $
-          duplicateParamsTest fetchDeleteWith
-      , testCase "head should support params passed as URLSearchParams" $
-          duplicateParamsTest fetchHeadWith
-      , testCase "patch should support params passed as URLSearchParams" $
-          duplicateParamsTest fetchPatchWith
-      , testCase "post should support params passed as URLSearchParams" $
-          duplicateParamsTest fetchPostWith
-      , testCase "put should support params passed as URLSearchParams" $
-          duplicateParamsTest fetchPutWith
-      , testCase "delete should support params passed as string" $
-          encodedParamsTest fetchDeleteWith
-      , testCase "head should support params passed as string" $
-          encodedParamsTest fetchHeadWith
-      , testCase "patch should support params passed as string" $
-          encodedParamsTest fetchPatchWith
-      , testCase "post should support params passed as string" $
-          encodedParamsTest fetchPostWith
-      , testCase "put should support params passed as string" $
-          encodedParamsTest fetchPutWith
-      , testCase "fetch should support failOnStatusCode" $
-          failOnStatusTest fetchFromUrlWith True
-      , testCase "delete should support failOnStatusCode" $
-          failOnStatusTest fetchDeleteWith True
-      , testCase "get should support failOnStatusCode" $
-          failOnStatusTest fetchGetWith True
-      , testCase "head should support failOnStatusCode" $
-          failOnStatusTest fetchHeadWith False
-      , testCase "patch should support failOnStatusCode" $
-          failOnStatusTest fetchPatchWith True
-      , testCase "post should support failOnStatusCode" $
-          failOnStatusTest fetchPostWith True
-      , testCase "put should support failOnStatusCode" $
-          failOnStatusTest fetchPutWith True
-      , testCase "should throw on network error when sending body" $
-          withPartialBodyApp $ \prefix ctx -> do
-            request <- contextRequest ctx
-            assertNetworkError (fetchGet request (urlFromText (prefix <> "/test")))
-      , testCase "should throw on network error when sending body after redirect" $
-          withPartialBodyApp $ \prefix ctx -> do
-            request <- contextRequest ctx
-            assertNetworkError (fetchGet request (urlFromText (prefix <> "/redirect")))
-      , testCase "should not add context cookie if cookie header passed as a parameter" $
-          withCookieCapture $ \prefix captured ctx -> do
-            addCookies
-              ctx
-              [cookieForUrl (urlFromText (prefix <> "/empty.html")) (CookieName "username") (CookieValue "John Doe")]
-            request <- contextRequest ctx
-            _ <-
-              fetchGetWith
-                request
-                (urlFromText (prefix <> "/empty.html"))
-                defaultFetchOptions
-                  { fetchHeaders = Just [HttpHeader (HeaderName "Cookie") (HeaderValue "foo=bar")]
-                  }
-            cookie <- takeMVar captured
-            assertEqual "cookie" (Just "foo=bar") cookie
-      , testCase "should add session cookies to request" $
-          withCookieCapture $ \prefix captured ctx -> do
-            addCookies
-              ctx
-              [cookieForUrl (urlFromText (prefix <> "/empty.html")) (CookieName "username") (CookieValue "John Doe")]
-            request <- contextRequest ctx
-            _ <- fetchGet request (urlFromText (prefix <> "/empty.html"))
-            cookie <- takeMVar captured
-            assertEqual "cookie" (Just "username=John Doe") cookie
-      , testCase "should follow redirects correctly when Location header contains UTF-8 characters" $
-          withUtf8RedirectApp $ \prefix ctx -> do
-            request <- contextRequest ctx
-            response <- fetchGet request (urlFromText (prefix <> "/redirect"))
-            assertEqual
-              "query"
-              [("message", "マスクПривет")]
-              (decodeQueryText (urlToText (apiResponseUrl response)))
-      , testCase "should preserve cookie order from Set-Cookie header" $
-          withOrderedCookieApp $ \prefix captured ctx page -> do
-            request <- pageRequest page
-            _ <- fetchGet request (urlFromText (prefix <> "/setcookie.html"))
-            jar <- cookies ctx
-            assertEqual "cookies" [("cookie.0", "foo"), ("cookie.1", "bar")] (fmap cookiePair jar)
-            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-            assertEqual "document" "cookie.0=foo; cookie.1=bar" =<< evaluateText page "() => document.cookie"
-            _ <- fetchGet request (urlFromText (prefix <> "/empty.html"))
-            cookie <- takeMVar captured
-            assertEqual "header" (Just "cookie.0=foo; cookie.1=bar") cookie
-      , testCase "should support cookie with empty value" $
-          withEmptyCookieApp $ \prefix ctx page -> do
-            request <- contextRequest ctx
-            _ <- fetchGet request (urlFromText (prefix <> "/setcookie.html"))
-            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-            assertEqual "document" "first=" =<< evaluateText page "() => document.cookie"
-            jar <- cookies ctx
-            assertEqual "cookies" [("first", "")] (fmap cookiePair jar)
-      , testCase "should not lose body while handling Set-Cookie header" $
-          withSetCookieBodyApp $ \prefix ctx -> do
-            request <- contextRequest ctx
-            response <- fetchGet request (urlFromText (prefix <> "/setcookie.html"))
-            assertEqual "body" "text content" =<< apiResponseText response
-      , testCase "should remove cookie with negative max-age" $
-          withNegativeMaxAgeApp $ \prefix captured ctx -> do
-            request <- contextRequest ctx
-            _ <- fetchGet request (urlFromText (prefix <> "/setcookie.html"))
-            _ <- fetchGet request (urlFromText (prefix <> "/removecookie.html"))
-            _ <- fetchGet request (urlFromText (prefix <> "/empty.html"))
-            cookie <- takeMVar captured
-            assertEqual "cookie" (Just "c=v") cookie
-      , testCase "should remove cookie with expires far in the past" $
-          withPastExpiresApp $ \prefix captured ctx -> do
-            request <- contextRequest ctx
-            _ <- fetchGet request (urlFromText (prefix <> "/setcookie.html"))
-            _ <- fetchGet request (urlFromText (prefix <> "/removecookie.html"))
-            _ <- fetchGet request (urlFromText (prefix <> "/empty.html"))
-            cookie <- takeMVar captured
-            assertEqual "cookie" Nothing cookie
-      , testCase "should handle cookies on redirects" $
-          cookieRedirectsTest
-      , testCase "should return raw headers" $
-          withRawHeadersApp $ \prefix ctx -> do
-            request <- contextRequest ctx
-            response <- fetchGet request (urlFromText (prefix <> "/headers"))
-            assertEqual "status" 200 (httpStatusToInt (apiResponseStatus response))
-            assertEqual
-              "array"
-              [ HttpHeader (HeaderName "Name-A") (HeaderValue "v1")
-              , HttpHeader (HeaderName "name-b") (HeaderValue "v4")
-              , HttpHeader (HeaderName "Name-a") (HeaderValue "v2")
-              , HttpHeader (HeaderName "name-A") (HeaderValue "v3")
-              ]
-              (filter (headerNameContains "name-") (apiResponseHeadersArray response))
-            assertEqual "name-a" (Just "v1, v2, v3") (headerValue "name-a" (apiResponseHeaders response))
-            assertEqual "name-b" (Just "v4") (headerValue "name-b" (apiResponseHeaders response))
-      , testCase "should work with http credentials" $
-          withAuthApp $ \prefix captured ctx -> do
-            request <- contextRequest ctx
-            response <-
-              fetchGetWith
-                request
-                (urlFromText (prefix <> "/empty.html"))
-                defaultFetchOptions
-                  { fetchHeaders =
-                      Just [HttpHeader (HeaderName "authorization") (HeaderValue "Basic dXNlcjpwYXNz")]
-                  }
-            auth <- takeMVar captured
-            assertEqual "status" 200 (httpStatusToInt (apiResponseStatus response))
-            assertEqual "authorization" (Just "Basic dXNlcjpwYXNz") auth
-      , testCase "should work with setHTTPCredentials" $
-          withAuthApp $ \prefix _captured ctx -> do
-            request <- contextRequest ctx
-            first <- fetchGet request (urlFromText (prefix <> "/empty.html"))
-            assertEqual "unauthorized" 401 (httpStatusToInt (apiResponseStatus first))
-            setHTTPCredentials
-              ctx
-              HttpCredentials
-                { httpCredentialsUsername = HttpUsername "user"
-                , httpCredentialsPassword = HttpPassword "pass"
-                , httpCredentialsOrigin = Nothing
-                , httpCredentialsSend = Nothing
-                }
-            second <- fetchGet request (urlFromText (prefix <> "/empty.html"))
-            assertEqual "authorized" 200 (httpStatusToInt (apiResponseStatus second))
-      , testCase "should return error with wrong credentials" $
-          withAuthApp $ \prefix _captured ctx -> do
-            request <- contextRequest ctx
-            setHTTPCredentials
-              ctx
-              HttpCredentials
-                { httpCredentialsUsername = HttpUsername "user"
-                , httpCredentialsPassword = HttpPassword "wrong"
-                , httpCredentialsOrigin = Nothing
-                , httpCredentialsSend = Nothing
-                }
-            response <- fetchGet request (urlFromText (prefix <> "/empty.html"))
-            assertEqual "status" 401 (httpStatusToInt (apiResponseStatus response))
-      , testCase "should add default headers" $
-          withHeaderCapture $ \prefix captured ctx page -> do
-            request <- contextRequest ctx
-            _ <- fetchGet request (urlFromText (prefix <> "/empty.html"))
-            headers <- takeMVar captured
-            userAgent <- evaluateText page "() => navigator.userAgent"
-            assertEqual "accept" (Just "*/*") (lookupHeader "accept" headers)
-            assertEqual "user-agent" (Just (encodeUtf8 userAgent)) (lookupHeader "user-agent" headers)
-            assertEqual "accept-encoding" (Just "gzip,deflate,br") (lookupHeader "accept-encoding" headers)
-      , testCase "should send content-length" $
-          withHeaderCapture $ \prefix captured ctx _page -> do
-            request <- contextRequest ctx
-            _ <-
-              fetchPostWith
-                request
-                (urlFromText (prefix <> "/empty.html"))
-                defaultFetchOptions {fetchPostData = Just (FetchPostBytes (ByteString.pack [0 .. 255]))}
-            headers <- takeMVar captured
-            assertEqual "content-length" (Just "256") (lookupHeader "content-length" headers)
-            assertEqual "content-type" (Just "application/octet-stream") (lookupHeader "content-type" headers)
-      , testCase "should add default headers to redirects" $
-          withRedirectHeaderCapture $ \prefix captured ctx page -> do
-            request <- contextRequest ctx
-            _ <- fetchGet request (urlFromText (prefix <> "/redirect"))
-            headers <- takeMVar captured
-            userAgent <- evaluateText page "() => navigator.userAgent"
-            assertEqual "accept" (Just "*/*") (lookupHeader "accept" headers)
-            assertEqual "user-agent" (Just (encodeUtf8 userAgent)) (lookupHeader "user-agent" headers)
-            assertEqual "accept-encoding" (Just "gzip,deflate,br") (lookupHeader "accept-encoding" headers)
-      , testCase "should allow to override default headers" $
-          withHeaderCapture $ \prefix captured ctx _page -> do
-            request <- contextRequest ctx
-            _ <-
-              fetchGetWith
-                request
-                (urlFromText (prefix <> "/empty.html"))
-                defaultFetchOptions
-                  { fetchHeaders =
-                      Just
-                        [ HttpHeader (HeaderName "User-Agent") (HeaderValue "Playwright")
-                        , HttpHeader (HeaderName "Accept") (HeaderValue "text/html")
-                        , HttpHeader (HeaderName "Accept-Encoding") (HeaderValue "br")
-                        ]
-                  }
-            headers <- takeMVar captured
-            assertEqual "accept" (Just "text/html") (lookupHeader "accept" headers)
-            assertEqual "user-agent" (Just "Playwright") (lookupHeader "user-agent" headers)
-            assertEqual "accept-encoding" (Just "br") (lookupHeader "accept-encoding" headers)
-      , testCase "should propagate custom headers with redirects" $
-          withPropagatedRedirects $ \prefix captured ctx -> do
-            request <- contextRequest ctx
-            _ <-
-              fetchGetWith
-                request
-                (urlFromText (prefix <> "/a/redirect1"))
-                defaultFetchOptions {fetchHeaders = Just [HttpHeader (HeaderName "foo") (HeaderValue "bar")]}
-            got <- drainCaptured captured 3
-            assertEqual "foo" ["bar", "bar", "bar"] (fmap (fromMaybe "" . lookupHeader "foo") got)
-      , testCase "should propagate extra http headers with redirects" $
-          withPropagatedRedirects $ \prefix captured ctx -> do
-            setContextExtraHTTPHeaders ctx [HttpHeader (HeaderName "My-Secret") (HeaderValue "Value")]
-            request <- contextRequest ctx
-            _ <- fetchGet request (urlFromText (prefix <> "/a/redirect1"))
-            got <- drainCaptured captured 3
-            assertEqual "secret" ["Value", "Value", "Value"] (fmap (fromMaybe "" . lookupHeader "my-secret") got)
-      , testCase "should throw on invalid header value" $
-          withAssetsContext $ \prefix ctx -> do
-            request <- contextRequest ctx
-            assertProtocolContains
-              "Invalid character in header content"
-              ( fetchGetWith
-                  request
-                  (urlFromText (prefix <> "/empty.html"))
-                  defaultFetchOptions
-                    { fetchHeaders = Just [HttpHeader (HeaderName "foo") (HeaderValue "недопустимое значение")]
-                    }
-              )
-      , testCase "should throw on non-http(s) protocol" $
-          withChromiumContext $ \ctx _page -> do
-            request <- contextRequest ctx
-            assertProtocolContains "Protocol \"data:\" not supported" (fetchGet request (urlFromText "data:text/plain,test"))
-            assertProtocolContains "Protocol \"file:\" not supported" (fetchGet request (urlFromText "file:///tmp/foo"))
-      , testCase "should resolve url relative to baseURL" $
-          withAssetsPrefix $ \prefix ->
-            withChromiumContextWith defaultNewContextOptions {newContextBaseURL = Just (urlFromText prefix)} $ \ctx _page -> do
-              request <- contextRequest ctx
-              response <- fetchGet request (urlFromText "/empty.html")
-              assertEqual "url" (prefix <> "/empty.html") (urlToText (apiResponseUrl response))
-      , testCase "should support gzip compression" $
-          compressionTest "gzip" (GZip.compress "Hello, world!")
-      , testCase "should throw informative error on corrupted gzip body" $
-          corruptedCompressionTest "gzip"
-      , testCase "should support deflate compression" $
-          compressionTest "deflate" (Zlib.compress "Hello, world!")
-      , testCase "should throw informative error on corrupted deflate body" $
-          corruptedCompressionTest "deflate"
-      , testCase "should support a timeout of 0" $
-          withSlowThenDoneApp $ \prefix ctx -> do
-            request <- contextRequest ctx
-            timeout <- requireTimeout 0
-            response <-
-              fetchGetWith
-                request
-                (urlFromText (prefix <> "/slow"))
-                defaultFetchOptions {fetchTimeout = Just timeout}
-            assertEqual "body" "done" =<< apiResponseText response
-      , testCase "should respect timeout after redirects" $
-          withSlowRedirectApp $ \prefix ctx -> do
-            timeout <- requireTimeout 100
-            setContextDefaultTimeout ctx timeout
-            request <- contextRequest ctx
-            assertProtocolContains
-              "Timeout 100ms exceeded"
-              (fetchGet request (urlFromText (prefix <> "/redirect")))
-      , testCase "should dispose when context closes" $
-          disposeAfterContextClose
-      , testCase "should override request parameters" $
-          overrideRequestParameters
-      , testCase "should support application/x-www-form-urlencoded" $
-          withBodyCapture $ \prefix captured ctx -> do
-            request <- contextRequest ctx
-            _ <-
-              fetchPostWith
-                request
-                (urlFromText (prefix <> "/empty.html"))
-                defaultFetchOptions
-                  { fetchFormData =
-                      Just
-                        [ FetchFormField "firstName" "John"
-                        , FetchFormField "lastName" "Doe"
-                        , FetchFormField "file" "f.js"
-                        ]
-                  }
-            (headers, body) <- takeMVar captured
-            assertEqual "content-type" (Just "application/x-www-form-urlencoded") (lookupHeader "content-type" headers)
-            assertEqual
-              "body"
-              [("firstName", "John"), ("lastName", "Doe"), ("file", "f.js")]
-              (decodeQuery body)
-      , testCase "should support application/x-www-form-urlencoded with param lists" $
-          withBodyCapture $ \prefix captured ctx -> do
-            request <- contextRequest ctx
-            _ <-
-              fetchPostWith
-                request
-                (urlFromText (prefix <> "/empty.html"))
-                defaultFetchOptions
-                  { fetchFormData =
-                      Just
-                        [ FetchFormField "foo" "1"
-                        , FetchFormField "foo" "2"
-                        ]
-                  }
-            (headers, body) <- takeMVar captured
-            assertEqual "content-type" (Just "application/x-www-form-urlencoded") (lookupHeader "content-type" headers)
-            assertEqual "body" [("foo", "1"), ("foo", "2")] (decodeQuery body)
-      , testCase "should encode to application/json by default" $
-          withBodyCapture $ \prefix captured ctx -> do
-            request <- contextRequest ctx
-            _ <-
-              fetchPostWith
-                request
-                (urlFromText (prefix <> "/empty.html"))
-                defaultFetchOptions {fetchPostData = Just (FetchPostJson sampleJson)}
-            (headers, body) <- takeMVar captured
-            assertEqual "content-type" (Just "application/json") (lookupHeader "content-type" headers)
-            assertEqual "json" sampleJson =<< decodeBodyJson body
-      , testCase "should serialize data to json regardless of content-type" $
-          withBodyCapture $ \prefix captured ctx -> do
-            request <- contextRequest ctx
-            _ <-
-              fetchPostWith
-                request
-                (urlFromText (prefix <> "/empty.html"))
-                defaultFetchOptions
-                  { fetchHeaders = Just [HttpHeader (HeaderName "content-type") (HeaderValue "unknown")]
-                  , fetchPostData = Just (FetchPostJson (object ["firstName" .= ("John" :: Text), "lastName" .= ("Doe" :: Text)]))
-                  }
-            (headers, body) <- takeMVar captured
-            assertEqual "content-type" (Just "unknown") (lookupHeader "content-type" headers)
-            assertEqual
-              "json"
-              (object ["firstName" .= ("John" :: Text), "lastName" .= ("Doe" :: Text)])
-              =<< decodeBodyJson body
-      , testCase "context request should export same storage state as context" $
-          withSetCookieApp $ \prefix ctx page -> do
-            request <- contextRequest ctx
-            pageReq <- pageRequest page
-            _ <- fetchGet request (urlFromText (prefix <> "/setcookie.html"))
-            contextState <- storageState ctx
-            requestState <- apiRequestStorageState request
-            pageState <- apiRequestStorageState pageReq
-            assertEqual "count" 2 (length (storageStateCookies contextState))
-            assertEqual "request" contextState requestState
-            assertEqual "page" contextState pageState
-      , testCase "should send secure cookie over http for localhost" $
-          secureLocalhostCookieTest
-      , testCase "should set domain=localhost cookie" $
-          localhostDomainCookieTest
-      , testCase "fetch should not throw on long set-cookie value" $
-          longSetCookieTest
-      , testCase "should support set-cookie with SameSite and without Secure attribute over HTTP" $
-          sameSiteOverHttpTest
-      , testCase "should abort requests when browser context closes" $
-          abortOnContextClose
-      , testCase "should not work after dispose" $
-          withAssetsContext $ \prefix ctx -> do
-            request <- contextRequest ctx
-            disposeAPIRequestContext request
-            assertProtocolContains
-              "Target page, context or browser has been closed"
-              (fetchGet request (urlFromText (prefix <> "/empty.html")))
-      , testCase "should not work after context dispose" $
-          disposeAfterContextReason
-      , testCase "should retry on ECONNRESET" $
-          retryHangupTest 3 4 "Hello!"
-      , testCase "should retry ECONNRESET on compressed response" $
-          retryGzipTest
-      , testCase "should update host header on redirect" $
-          hostHeaderRedirectTest
-      , testCase "should support HTTPCredentials.send for newContext" $
-          httpCredentialsSendTest
-      , testCase "should support multipart/form-data" $
-          multipartFileTest
-      , testCase "should support multipart/form-data with file bytes" $
-          multipartAssetTest
-      , testCase "should support multipart/form-data and keep the order" $
-          multipartOrderTest
-      , testCase "should support repeating names in multipart/form-data" $
-          multipartRepeatingTest
-      ]
 
 assertSimpleJson :: Text -> APIResponse -> Playwright ()
 assertSimpleJson prefix response = do
@@ -1392,9 +951,9 @@ overrideRequestParameters = do
   withApplication (pure (postCaptureApp captured)) $ \port ->
     withChromiumContext $ \ctx page -> do
       let prefix = "http://127.0.0.1:" <> pack (show port)
-      withAsync (waitForRequest page (UrlMatchGlob (prefix <> "/empty.html"))) $ \handle -> do
+      armRequest page (UrlMatchGlob (prefix <> "/empty.html")) >>= \handle -> do
         _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-        pageReq <- wait handle
+        pageReq <- handle
         request <- contextRequest ctx
         _ <-
           fetchRequestWith

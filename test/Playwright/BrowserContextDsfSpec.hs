@@ -15,7 +15,7 @@ import Playwright
   , requestUrl
   , urlFromText
   , urlToText
-  , waitForRequest
+  , armRequest
   )
 import Playwright.Harness
   ( withAssetsWith
@@ -28,10 +28,6 @@ import Test.Tasty
 import Test.Tasty.HUnit
   ( testCase
   )
-import UnliftIO.Async
-  ( wait
-  , withAsync
-  )
 
 tests :: TestTree
 tests =
@@ -41,16 +37,16 @@ tests =
         withAssetsWith
           defaultNewContextOptions {newContextDeviceScaleFactor = Just (deviceScaleFactorFromInt 1)}
           $ \prefix page ->
-            withAsync (waitForRequest page (UrlMatchGlob "**/image*")) $ \pending -> do
+            armRequest page (UrlMatchGlob "**/image*") >>= \pending -> do
               _ <- goto page (urlFromText (prefix <> "/highdpi.html")) defaultGotoOptions
-              request <- wait pending
+              request <- pending
               assertBool "image1x" . ("image1x" `isInfixOf`) . urlToText =<< requestUrl request
     , testCase "should fetch hidpi assets" $
         withAssetsWith
           defaultNewContextOptions {newContextDeviceScaleFactor = Just (deviceScaleFactorFromInt 2)}
           $ \prefix page ->
-            withAsync (waitForRequest page (UrlMatchGlob "**/image*")) $ \pending -> do
+            armRequest page (UrlMatchGlob "**/image*") >>= \pending -> do
               _ <- goto page (urlFromText (prefix <> "/highdpi.html")) defaultGotoOptions
-              request <- wait pending
+              request <- pending
               assertBool "image2x" . ("image2x" `isInfixOf`) . urlToText =<< requestUrl request
     ]

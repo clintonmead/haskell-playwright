@@ -19,6 +19,7 @@ module Playwright.Page
   , getByAltText
   , getByAltTextRegex
   , getByLabel
+  , getByLabelRegex
   , getByPlaceholder
   , getByPlaceholderRegex
   , getByRole
@@ -27,6 +28,7 @@ module Playwright.Page
   , getByTestIdAttrRegex
   , getByTestIdRegex
   , getByText
+  , getByTextRegex
   , getByTitle
   , getByTitleRegex
   , goBack
@@ -44,6 +46,7 @@ module Playwright.Page
   , frameByUrl
   , frameLocator
   , frames
+  , framePage
   , mainFrame
   , addInitScript
   , addScriptTag
@@ -113,6 +116,8 @@ import Playwright.Channel
   )
 import Playwright.Connection
   ( closedGuids
+  , lookupContextBaseUrl
+  , lookupMainFramePage
   , lookupObject
   , lookupTimeoutDefaults
   , pageOwnsContext
@@ -129,6 +134,7 @@ import Playwright.SetContentOptions
 import Playwright.Frame
   ( Frame (frameChannel)
   , childFrames
+  , mainFrameGuid
   , frameContent
   , currentName
   , currentUrl
@@ -157,12 +163,14 @@ import Playwright.GetBy
   ( getByAltTextSelector
   , getByAltTextSelectorRegex
   , getByLabelSelector
+  , getByLabelSelectorRegex
   , getByPlaceholderSelector
   , getByPlaceholderSelectorRegex
   , getByRoleSelector
   , getByTestIdSelector
   , getByTestIdSelectorRegex
   , getByTextSelector
+  , getByTextSelectorRegex
   , getByTitleSelector
   , getByTitleSelectorRegex
   )
@@ -276,7 +284,7 @@ import Playwright.Protocol
   , mkPageSetViewportSizeParamsViewportSize
   )
 import Playwright.RemoteObject
-  ( RemoteObject (remoteInitializer)
+  ( RemoteObject (remoteInitializer, remoteParent)
   )
 import Playwright.Response
   ( Response
@@ -343,6 +351,7 @@ import Playwright.Timeout
 import Playwright.UrlMatch
   ( UrlMatch
   , matchesUrlMatch
+  , resolveUrlMatch
   )
 import Playwright.Url
   ( Url
@@ -699,9 +708,17 @@ getByText :: Page -> Text -> Exactness -> Locator
 getByText page text exactness =
   locator page (getByTextSelector text exactness)
 
+getByTextRegex :: Page -> Text -> Locator
+getByTextRegex page source =
+  locator page (getByTextSelectorRegex source)
+
 getByLabel :: Page -> Text -> Exactness -> Locator
 getByLabel page text exactness =
   locator page (getByLabelSelector text exactness)
+
+getByLabelRegex :: Page -> Text -> Locator
+getByLabelRegex page source =
+  locator page (getByLabelSelectorRegex source)
 
 getByRole :: Page -> AriaRole -> GetByRoleOptions -> Locator
 getByRole page role opts =
@@ -846,6 +863,20 @@ frames page =
       nested <- traverse collect children
       pure (current : concat nested)
 
+-- | The page a frame belongs to, as upstream's @frame.page()@. A frame reaches
+-- its page through the main frame, which was registered when the page was
+-- wrapped.
+framePage :: Frame -> Playwright Page
+framePage frame = do
+  mainGuid <- mainFrameGuid frame
+  pageGuid <- lookupMainFramePage mainGuid
+  case pageGuid of
+    Nothing ->
+      liftIO (throwIO (MissingObject mainGuid))
+    Just guid -> do
+      obj <- lookupObject guid
+      pageFromRef (Channel (remoteParent obj)) (ChannelRef guid)
+
 frameByName :: Page -> Text -> Playwright (Maybe Frame)
 frameByName page name = do
   allFrames <- frames page
@@ -861,7 +892,8 @@ frameByName page name = do
 frameByUrl :: Page -> UrlMatch -> Playwright (Maybe Frame)
 frameByUrl page match = do
   allFrames <- frames page
-  matching <- filterM (\frame -> matchesUrlMatch match <$> currentUrl frame) allFrames
+  base <- lookupContextBaseUrl (channelGuid (pageContextChannel page))
+  matching <- filterM (\frame -> matchesUrlMatch (resolveUrlMatch base match) <$> currentUrl frame) allFrames
   pure (listToMaybe matching)
 
 subscribeContext :: Page -> BrowserContextUpdateSubscriptionParamsEvent -> Playwright ()

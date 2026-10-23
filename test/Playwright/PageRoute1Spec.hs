@@ -1,0 +1,586 @@
+module Playwright.PageRoute1Spec
+  ( tests
+  ) where
+
+import Control.Concurrent
+  ( threadDelay
+  )
+import Control.Monad
+  ( replicateM
+  , replicateM_
+  )
+import Control.Monad.IO.Class
+  ( liftIO
+  )
+import Data.Maybe
+  ( isJust
+  , isNothing
+  )
+import Data.Text
+  ( isInfixOf
+  , isSuffixOf
+  )
+import Playwright
+  ( ContentType (ContentType)
+  , FulfillBody (FulfillText)
+  , FulfillOptions (fulfillBody, fulfillContentType, fulfillHeaders, fulfillStatus)
+  , HeaderName (HeaderName)
+  , HeaderValue (HeaderValue)
+  , HttpHeader (HttpHeader)
+  , HttpStatus (HttpStatus)
+  , HttpMethod (httpMethodToText)
+  , Request
+  , RequestFailure (requestFailureText)
+  , ResourceType (resourceTypeToText)
+  , RouteOptions (routeTimes)
+  , RouteTimes (RouteTimes)
+  , UrlMatch (UrlMatchGlob, UrlMatchPredicate, UrlMatchRegex)
+  , abortRoute
+  , abortRouteWith
+  , armRequestFailed
+  , continueRoute
+  , currentUrl
+  , defaultFulfillOptions
+  , defaultGotoOptions
+  , armNavigationOptions
+  , defaultRouteOptions
+  , defaultWaitForNavigationOptions
+  , evaluate
+  , evaluateText
+  , evaluateWith
+  , fallbackRoute
+  , fallbackRouteWith
+  , framesEqual
+  , fulfillRoute
+  , ContinueOptions (continueHeaders, continueUrl)
+  , continueRouteWith
+  , defaultContinueOptions
+  , responseOk
+  , setContent
+  , setExtraHTTPHeaders
+  , requestAllHeaders
+  , goto
+  , mainFrame
+  , requestFailure
+  , requestFrame
+  , requestHeaders
+  , requestIsNavigation
+  , requestMethod
+  , requestPostData
+  , requestResourceType
+  , requestUrl
+  , responseRequest
+  , responseUrl
+  , route
+  , routeRequest
+  , routeWith
+  , setExtraHTTPHeaders
+  , textArgument
+  , unroute
+  , unrouteAll
+  , urlFromText
+  , urlToText
+  )
+import Playwright.Error
+  ( PlaywrightError (ProtocolRpc)
+  , ProtocolFailure (protocolFailureMessage)
+  )
+import Playwright.Harness
+  ( assertBool
+  , assertEqual
+  , assertFailure
+  , assertProtocolContains
+  , withAssets
+  , withChromiumPage
+  , testAssetsDir
+  , withLocalApp
+  )
+import Playwright.PageRouteSupport
+  ( attempt
+  , calledTwiceCase
+  , pathOf
+  , isCancelled
+  , redirectChain
+  , forwardChain
+  , countingApp
+  , subresourceRedirectApp
+  , redirectChainApp
+  , postRedirectApp
+  , headerValue
+  , refererRecordingApp
+  , redirectingAssetsApp
+  , assertContentTypeOfResponse
+  )
+import Test.Tasty
+  ( testGroup
+  , TestTree
+  )
+import Test.Tasty.HUnit
+  ( testCase
+  )
+import UnliftIO.Async
+  ( wait
+  , withAsync
+  )
+import UnliftIO.Exception
+  ( try
+  )
+import UnliftIO.IORef
+  ( newIORef
+  , readIORef
+  , writeIORef
+  , modifyIORef'
+  )
+import UnliftIO.MVar
+  ( newEmptyMVar
+  , putMVar
+  , takeMVar
+  )
+
+tests :: TestTree
+tests =
+  testGroup
+    "page-route"
+    [ testCase "should intercept" $
+        withAssets $ \prefix page -> do
+          captured <- newIORef False
+          route page (UrlMatchGlob "**/empty.html") $ \handled -> do
+            request <- routeRequest handled
+            url <- requestUrl request
+            assertBool "empty.html" ("empty.html" `isInfixOf` urlToText url)
+            headers <- requestHeaders request
+            assertBool "user-agent" (isJust (headerValue "user-agent" headers))
+            method <- requestMethod request
+            assertEqual "method" "GET" (httpMethodToText method)
+            postData <- requestPostData request
+            assertBool "postData" (isNothing postData)
+            navigation <- requestIsNavigation request
+            assertEqual "navigation" True navigation
+            resourceType <- requestResourceType request
+            assertEqual "resource" "document" (resourceTypeToText resourceType)
+            frame <- requestFrame request
+            case frame of
+              Nothing ->
+                assertFailure "expected frame"
+              Just actual -> do
+                assertEqual "main frame" True (framesEqual actual (mainFrame page))
+                blank <- currentUrl actual
+                assertEqual "blank" "about:blank" (urlToText blank)
+            writeIORef captured True
+            continueRoute handled
+          response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          case response of
+            Nothing ->
+              assertFailure "missing response"
+            Just value ->
+              assertEqual "ok" True =<< responseOk value
+          assertEqual "intercepted" True =<< readIORef captured
+    , calledTwiceCase "fulfill" (\handled -> fulfillRoute handled defaultFulfillOptions)
+    , calledTwiceCase "continue" continueRoute
+    , calledTwiceCase "fallback" fallbackRoute
+    , calledTwiceCase "abort" abortRoute
+    , testCase "should show custom HTTP headers" $
+        withAssets $ \prefix page -> do
+          setExtraHTTPHeaders
+            page
+            [HttpHeader (HeaderName "foo") (HeaderValue "bar")]
+          route page (UrlMatchGlob "**/*") $ \handled -> do
+            request <- routeRequest handled
+            headers <- requestHeaders request
+            assertEqual "foo" (Just "bar") (headerValue "foo" headers)
+            continueRoute handled
+          response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          case response of
+            Nothing ->
+              assertFailure "missing response"
+            Just value ->
+              assertEqual "ok" True =<< responseOk value
+    , testCase "should contain referer header" $
+        withAssets $ \prefix page -> do
+          captured <- newIORef []
+          route page (UrlMatchGlob "**/*") $ \handled -> do
+            request <- routeRequest handled
+            modifyIORef' captured (request :)
+            continueRoute handled
+          _ <- goto page (urlFromText (prefix <> "/one-style.html")) defaultGotoOptions
+          requests <- reverse <$> readIORef captured
+          case requests of
+            (_ : css : _) -> do
+              url <- requestUrl css
+              assertBool "css" ("/one-style.css" `isInfixOf` urlToText url)
+              headers <- requestHeaders css
+              case headerValue "referer" headers of
+                Nothing ->
+                  assertFailure "missing referer"
+                Just referer ->
+                  assertBool "html" ("/one-style.html" `isInfixOf` referer)
+            _ ->
+              assertFailure "expected stylesheet request"
+    , testCase "should unroute" $
+        withAssets $ \prefix page -> do
+          intercepted <- newIORef ([] :: [Int])
+          route page (UrlMatchGlob "**/*") $ \handled -> do
+            modifyIORef' intercepted (1 :)
+            fallbackRoute handled
+          route page (UrlMatchGlob "**/empty.html") $ \handled -> do
+            modifyIORef' intercepted (2 :)
+            fallbackRoute handled
+          route page (UrlMatchGlob "**/empty.html") $ \handled -> do
+            modifyIORef' intercepted (3 :)
+            fallbackRoute handled
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "before" [3, 2, 1] . reverse =<< readIORef intercepted
+          writeIORef intercepted []
+          unroute page (UrlMatchGlob "**/empty.html")
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "after" [1] . reverse =<< readIORef intercepted
+    , testCase "page.unrouteAll removes all routes" $
+        withAssets $ \prefix page -> do
+          route page (UrlMatchGlob "**/*") abortRoute
+          route page (UrlMatchGlob "**/empty.html") abortRoute
+          unrouteAll page
+          response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          case response of
+            Nothing ->
+              assertFailure "missing response"
+            Just value ->
+              assertEqual "ok" True =<< responseOk value
+    , testCase "should be abortable" $
+        withAssets $ \prefix page -> do
+          route page (UrlMatchGlob "**/*.css") abortRoute
+          takeFailed <- armRequestFailed page
+          response <- goto page (urlFromText (prefix <> "/one-style.html")) defaultGotoOptions
+          case response of
+            Nothing ->
+              assertFailure "missing response"
+            Just value -> do
+              assertEqual "ok" True =<< responseOk value
+              request <- responseRequest value
+              failure <- requestFailure request
+              assertEqual "document not failed" Nothing (requestFailureText <$> failure)
+          failed <- takeFailed
+          url <- requestUrl failed
+          assertBool "stylesheet failed" (".css" `isInfixOf` urlToText url)
+    , testCase "should be abortable with custom error codes" $
+        withAssets $ \prefix page -> do
+          route page (UrlMatchGlob "**/*") (\handled -> abortRouteWith handled "internetdisconnected")
+          takeFailed <- armRequestFailed page
+          attempt (goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions)
+          failed <- takeFailed
+          reason <- requestFailure failed
+          assertEqual "error text" (Just "net::ERR_INTERNET_DISCONNECTED") (requestFailureText <$> reason)
+    , testCase "should fail navigation when aborting main resource" $
+        withAssets $ \prefix page -> do
+          route page (UrlMatchGlob "**/*") abortRoute
+          assertProtocolContains
+            "net::ERR_FAILED"
+            (goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions)
+    , testCase "should not throw if request was cancelled by the page" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          captured <- newEmptyMVar
+          route page (UrlMatchGlob "**/data.json") (putMVar captured)
+          withAsync
+            ( attempt
+                ( evaluateWith
+                    page
+                    "url => { globalThis.controller = new AbortController(); return fetch(url, { signal: globalThis.controller.signal }); }"
+                    (textArgument (prefix <> "/data.json"))
+                )
+            )
+            $ \fetching -> do
+              pending <- takeMVar captured
+              takeFailed <- armRequestFailed page
+              _ <- evaluate page "() => globalThis.controller.abort()"
+              failed <- takeFailed
+              reason <- requestFailure failed
+              assertBool "cancelled" (maybe False (isCancelled . requestFailureText) reason)
+              abortRoute pending
+              wait fetching
+    , testCase "should send referer" $ do
+        captured <- newIORef Nothing
+        withChromiumPage $ \page ->
+          withLocalApp (refererRecordingApp captured) $ \prefix -> do
+            setExtraHTTPHeaders
+              page
+              [HttpHeader (HeaderName "referer") (HeaderValue "http://google.com/")]
+            route page (UrlMatchGlob "**/*") continueRoute
+            _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+            assertEqual "server referer" (Just "http://google.com/") =<< readIORef captured
+    , testCase "should support the times parameter with route matching" $
+        withAssets $ \prefix page -> do
+          intercepted <- newIORef (0 :: Int)
+          routeWith
+            page
+            (UrlMatchGlob "**/empty.html")
+            defaultRouteOptions {routeTimes = Just (RouteTimes 1)}
+            $ \handled -> do
+              modifyIORef' intercepted (+ 1)
+              continueRoute handled
+          replicateM_ 3 (goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions)
+          assertEqual "intercepted once" (1 :: Int) =<< readIORef intercepted
+    , testCase "should support async handler w/ times" $
+        withAssets $ \prefix page -> do
+          routeWith
+            page
+            (UrlMatchGlob "**/empty.html")
+            defaultRouteOptions {routeTimes = Just (RouteTimes 1)}
+            $ \handled -> do
+              liftIO (threadDelay 100000)
+              fulfillRoute
+                handled
+                defaultFulfillOptions
+                  { fulfillBody = Just (FulfillText "<html>intercepted</html>")
+                  , fulfillContentType = Just (ContentType "text/html")
+                  }
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "first" "intercepted" =<< evaluateText page "() => document.body.textContent"
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          second <- evaluateText page "() => document.body.textContent"
+          assertEqual "second" False ("intercepted" == second)
+    , testCase "should chain fallback w/ dynamic URL" $
+        withAssets $ \prefix page -> do
+          intercepted <- newIORef ([] :: [Int])
+          route page (UrlMatchGlob "**/bar") $ \handled -> do
+            modifyIORef' intercepted (1 :)
+            fallbackRouteWith handled defaultContinueOptions {continueUrl = Just (urlFromText (prefix <> "/empty.html"))}
+          route page (UrlMatchGlob "**/foo") $ \handled -> do
+            modifyIORef' intercepted (2 :)
+            fallbackRouteWith handled defaultContinueOptions {continueUrl = Just (urlFromText "http://localhost/bar")}
+          route page (UrlMatchGlob "**/empty.html") $ \handled -> do
+            modifyIORef' intercepted (3 :)
+            fallbackRouteWith handled defaultContinueOptions {continueUrl = Just (urlFromText "http://localhost/foo")}
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "order" [3, 2, 1] . reverse =<< readIORef intercepted
+    , testCase "should be able to fetch dataURL and not fire dataURL requests" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          seen <- newIORef (0 :: Int)
+          route page (UrlMatchGlob "**/*") $ \handled -> do
+            modifyIORef' seen (+ 1)
+            continueRoute handled
+          text <- evaluateText page "() => fetch('data:text/html,<div>yo</div>').then(r => r.text())"
+          assertEqual "text" "<div>yo</div>" text
+          assertEqual "requests" (0 :: Int) =<< readIORef seen
+    , testCase "should navigate to dataURL and not fire dataURL requests" $
+        withChromiumPage $ \page -> do
+          seen <- newIORef (0 :: Int)
+          route page (UrlMatchGlob "**/*") $ \handled -> do
+            modifyIORef' seen (+ 1)
+            continueRoute handled
+          response <- goto page (urlFromText "data:text/html,<div>yo</div>") defaultGotoOptions
+          assertEqual "no response" True (isNothing response)
+          assertEqual "requests" (0 :: Int) =<< readIORef seen
+    , testCase "should work with equal requests" $ do
+        counter <- newIORef (1 :: Int)
+        withChromiumPage $ \page ->
+          withLocalApp (countingApp counter) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            alternate <- newIORef False
+            route page (UrlMatchGlob "**/*") $ \handled -> do
+              cancel <- readIORef alternate
+              writeIORef alternate (not cancel)
+              if cancel
+                then abortRoute handled
+                else continueRoute handled
+            results <-
+              replicateM 3 (evaluateText page "() => fetch('/zzz').then(response => response.text()).catch(() => 'FAILED')")
+            assertEqual "results" ["11", "FAILED", "22"] results
+    , testCase "should not work with redirects" $ do
+        withChromiumPage $ \page ->
+          withLocalApp redirectChainApp $ \prefix -> do
+            intercepted <- newIORef (0 :: Int)
+            route page (UrlMatchGlob "**/*") $ \handled -> do
+              modifyIORef' intercepted (+ 1)
+              continueRoute handled
+            response <- goto page (urlFromText (prefix <> "/non-existing-page.html")) defaultGotoOptions
+            case response of
+              Nothing ->
+                assertFailure "missing response"
+              Just value -> do
+                assertEqual "ok" True =<< responseOk value
+                finalUrl <- responseUrl value
+                assertBool "final url" ("/empty.html" `isInfixOf` urlToText finalUrl)
+                assertEqual "intercepted once" (1 :: Int) =<< readIORef intercepted
+                chain <- responseRequest value >>= redirectChain
+                assertEqual "chain length" (5 :: Int) (length chain)
+                paths <- mapM (fmap (pathOf . urlToText) . requestUrl) chain
+                assertEqual
+                  "chain"
+                  [ "/empty.html"
+                  , "/non-existing-page-4.html"
+                  , "/non-existing-page-3.html"
+                  , "/non-existing-page-2.html"
+                  , "/non-existing-page.html"
+                  ]
+                  paths
+    , testCase "should work when header manipulation headers with redirect" $
+        withChromiumPage $ \page ->
+          withLocalApp postRedirectApp $ \prefix -> do
+            route page (UrlMatchGlob "**/*") $ \handled -> do
+              request <- routeRequest handled
+              headers <- requestAllHeaders request
+              continueRouteWith
+                handled
+                defaultContinueOptions
+                  { continueHeaders =
+                      Just (headers <> [HttpHeader (HeaderName "foo") (HeaderValue "bar")])
+                  }
+            response <- goto page (urlFromText (prefix <> "/rredirect")) defaultGotoOptions
+            case response of
+              Nothing ->
+                assertFailure "missing response"
+              Just value -> do
+                assertEqual "ok" True =<< responseOk value
+                finalUrl <- responseUrl value
+                assertBool "final url" ("/empty.html" `isInfixOf` urlToText finalUrl)
+    , testCase "should work with redirects for subresources" $
+        withChromiumPage $ \page ->
+          withLocalApp subresourceRedirectApp $ \prefix -> do
+            intercepted <- newIORef ([] :: [Request])
+            route page (UrlMatchGlob "**/*") $ \handled -> do
+              request <- routeRequest handled
+              modifyIORef' intercepted (<> [request])
+              continueRoute handled
+            response <- goto page (urlFromText (prefix <> "/one-style.html")) defaultGotoOptions
+            case response of
+              Nothing ->
+                assertFailure "missing response"
+              Just value -> do
+                assertEqual "ok" True =<< responseOk value
+                finalUrl <- responseUrl value
+                assertBool "response url" ("one-style.html" `isInfixOf` urlToText finalUrl)
+            requests <- readIORef intercepted
+            case requests of
+              [document, stylesheet] -> do
+                assertEqual "document type" "document" . resourceTypeToText =<< requestResourceType document
+                assertEqual "document url" "/one-style.html" . pathOf . urlToText =<< requestUrl document
+                chain <- forwardChain stylesheet
+                assertEqual
+                  "chain"
+                  [ ("stylesheet", "/one-style.css")
+                  , ("stylesheet", "/two-style.css")
+                  , ("stylesheet", "/three-style.css")
+                  , ("stylesheet", "/four-style.css")
+                  ]
+                  chain
+              _ ->
+                assertFailure ("intercepted requests: " <> show (length requests))
+    , testCase "should work when POST is redirected with 302" $
+        withChromiumPage $ \page ->
+          withLocalApp postRedirectApp $ \prefix -> do
+            route page (UrlMatchGlob "**/*") $ \handled ->
+              continueRoute handled
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            setContent
+              page
+              ( "<form action=\""
+                  <> prefix
+                  <> "/rredirect\" method=\"POST\"><input type=\"hidden\" name=\"foo\" value=\"FOOBAR\"></form>"
+              )
+            takeNavigation <- armNavigationOptions page defaultWaitForNavigationOptions
+            _ <- evaluate page "() => document.querySelector('form').submit()"
+            _ <- takeNavigation
+            assertBool "final url" . isInfixOf "/empty.html" =<< evaluateText page "() => location.href"
+    , testCase "should work with regular expression" $
+        withAssets $ \prefix page -> do
+          route page (UrlMatchRegex "empty\\.html$" "") $ \handled ->
+            fulfillRoute
+              handled
+              defaultFulfillOptions {fulfillBody = Just (FulfillText "intercepted")}
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "body" "intercepted" =<< evaluateText page "() => document.body.textContent"
+    , testCase "should work with predicate" $
+        withAssets $ \prefix page -> do
+          let wanted = prefix <> "/digits/2.png"
+          route page (UrlMatchPredicate (\url -> urlToText url == wanted)) $ \handled ->
+            fulfillRoute
+              handled
+              defaultFulfillOptions {fulfillBody = Just (FulfillText "intercepted")}
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "matched" "intercepted"
+            =<< evaluateText page "() => fetch('/digits/2.png').then(r => r.text())"
+          other <- evaluateText page "() => fetch('/digits/1.png').then(r => r.text())"
+          assertBool "other request not intercepted" (other /= "intercepted")
+    , testCase "should not support ? in glob pattern" $
+        withAssets $ \prefix page -> do
+          -- In a glob, ? is a literal question mark, so ?hello matches only index?hello.
+          route page (UrlMatchGlob "**/index?hello") $ \handled ->
+            fulfillRoute handled defaultFulfillOptions {fulfillBody = Just (FulfillText "any character")}
+          route page (UrlMatchGlob "**/index\\?hello") $ \handled ->
+            fulfillRoute handled defaultFulfillOptions {fulfillBody = Just (FulfillText "question mark")}
+          _ <- goto page (urlFromText (prefix <> "/index?hello")) defaultGotoOptions
+          assertEqual "question mark" "question mark" =<< evaluateText page "() => document.body.textContent"
+          _ <- goto page (urlFromText (prefix <> "/index1hello")) defaultGotoOptions
+          body <- evaluateText page "() => document.body.textContent"
+          assertBool "index1hello is not intercepted" (body `notElem` ["any character", "question mark"])
+    , testCase "should work with redirect inside sync XHR" $ do
+        assets <- testAssetsDir
+        withChromiumPage $ \page ->
+          withLocalApp (redirectingAssetsApp assets) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            route page (UrlMatchGlob "**/*") continueRoute
+            status <-
+              evaluateText
+                page
+                "() => { const request = new XMLHttpRequest(); request.open('GET', '/logo.png', false); request.send(null); return String(request.status); }"
+            assertEqual "status" "200" status
+    , testCase "should contain raw request header" $
+        withAssets $ \prefix page -> do
+          headers <- newIORef []
+          route page (UrlMatchGlob "**/*") $ \handled -> do
+            request <- routeRequest handled
+            writeIORef headers =<< requestAllHeaders request
+            continueRoute handled
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertBool "accept" . isJust . headerValue "accept" =<< readIORef headers
+    , testCase "should contain raw response header" $
+        withAssets $ \prefix page -> do
+          requests <- newIORef Nothing
+          route page (UrlMatchGlob "**/*") $ \handled -> do
+            request <- routeRequest handled
+            writeIORef requests (Just request)
+            continueRoute handled
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertContentTypeOfResponse =<< readIORef requests
+    , testCase "should contain raw response header after fulfill" $
+        withAssets $ \prefix page -> do
+          requests <- newIORef Nothing
+          route page (UrlMatchGlob "**/*") $ \handled -> do
+            request <- routeRequest handled
+            writeIORef requests (Just request)
+            fulfillRoute
+              handled
+              defaultFulfillOptions
+                { fulfillBody = Just (FulfillText "Hello")
+                , fulfillContentType = Just (ContentType "text/html")
+                }
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertContentTypeOfResponse =<< readIORef requests
+    , testCase "should support cors with GET" $
+        withAssets $ \prefix page -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            route page (UrlMatchGlob "**/cars*") $ \handled -> do
+              request <- routeRequest handled
+              allowed <- isSuffixOf "allow" . urlToText <$> requestUrl request
+              fulfillRoute
+                handled
+                defaultFulfillOptions
+                  { fulfillStatus = Just (HttpStatus 200)
+                  , fulfillHeaders =
+                      [HttpHeader (HeaderName "access-control-allow-origin") (HeaderValue (if allowed then "*" else "none"))]
+                  , fulfillContentType = Just (ContentType "application/json")
+                  , fulfillBody = Just (FulfillText "[\"electric\", \"gas\"]")
+                  }
+            allowed <-
+              evaluateText page "async () => JSON.stringify(await (await fetch('https://example.com/cars?allow', {mode: 'cors'})).json())"
+            assertEqual "allowed" "[\"electric\",\"gas\"]" allowed
+            rejected <- try (evaluateText page "async () => (await fetch('https://example.com/cars?reject', {mode: 'cors'})).json()")
+            case rejected of
+              Left (ProtocolRpc failure) ->
+                assertBool "rejected" ("Failed" `isInfixOf` protocolFailureMessage failure)
+              Left err ->
+                assertFailure ("expected ProtocolRpc, got: " <> show err)
+              Right _ ->
+                assertFailure "expected the rejected fetch to fail"
+    ]

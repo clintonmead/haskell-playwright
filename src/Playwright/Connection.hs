@@ -6,6 +6,7 @@ module Playwright.Connection
   , sendCommandWithMetadata
   , guidsOfType
   , lookupObject
+  , registerDispatchEventHandler
   , registerEventHandler
   , registerEventWaiter
   , registerFreshEventWaiter
@@ -30,6 +31,7 @@ module Playwright.Connection
   , waitForLifecycle
   , waitUntilUrl
   , closedGuids
+  , isDetachedFrame
   , pushRouteHandler
   , removeRouteHandlers
   , clearRouteHandlers
@@ -170,6 +172,7 @@ import Playwright.Protocol
   , FrameNavigatedEvent (frameNavigatedEventName, frameNavigatedEventUrl)
   , JSHandlePreviewUpdatedEvent (jSHandlePreviewUpdatedEventPreview)
   , LifecycleEvent
+  , PageFrameDetachedEvent (pageFrameDetachedEventFrame)
   , SelectorEngine
   )
 import Playwright.RemoteObject
@@ -260,6 +263,10 @@ guidsOfType ty =
 closedGuids :: Playwright (Set Guid)
 closedGuids =
   inConnection Store.closedGuids
+
+isDetachedFrame :: Guid -> Playwright Bool
+isDetachedFrame guid =
+  inConnection (`Store.isDetachedFrame` guid)
 
 pushRouteHandler :: Guid -> UrlMatch -> (ChannelRef -> IO Bool) -> Playwright Bool
 pushRouteHandler guid glob run =
@@ -452,6 +459,17 @@ registerEventHandler guid method run = do
     Handlers.registerEventHandler conn guid method $ \params ->
       runPlaywrightWith conn (run params)
 
+-- | Like 'registerEventHandler', but the first callback runs on the reader
+-- thread as each event is read, before any queued run. It may register
+-- handlers, and those see the events that follow; it must not send a request.
+registerDispatchEventHandler :: Guid -> MethodName -> (Value -> Playwright ()) -> (Value -> Playwright ()) -> Playwright ()
+registerDispatchEventHandler guid method onDispatch run = do
+  conn <- askConnection
+  liftIO $
+    Handlers.registerDispatchHandler conn guid method
+      (\params -> runPlaywrightWith conn (onDispatch params))
+      (\params -> runPlaywrightWith conn (run params))
+
 storePlaywrightGuids :: Guid -> Guid -> Guid -> Guid -> Playwright ()
 storePlaywrightGuids playwrightGuid chromiumGuid firefoxGuid webkitGuid =
   inConnection $ \conn ->
@@ -603,7 +621,7 @@ dispatch conn incoming =
       atomically $
         modifySession conn $ \session ->
           session {sessionObjects = disposeTree guid (sessionObjects session)}
-    IncomingEvent guid method params ->
+    IncomingEvent guid method params -> do
       handleEvent conn guid method params
 
 handleEvent :: Connection -> Guid -> MethodName -> Value -> IO ()
@@ -626,12 +644,22 @@ handleEvent conn guid method params = do
             { sessionClosedGuids = Set.insert guid (sessionClosedGuids session)
             , sessionBrowserContexts = Map.map (filter (/= guid)) (sessionBrowserContexts session)
             }
+    MethodName "frameDetached" ->
+      applyFrameDetached conn params
     _ ->
       pure ()
   deliverEvent conn guid method params
   runEventHandlers conn guid method params
   when (method == MethodName "webSocket") $
     waitForDispatchedHandlers conn
+
+-- Records the detach when the page reports it, which upstream does in
+-- client/page.ts. The object's @__dispose__@ can arrive after this event, so
+-- the detached flag cannot wait for disposal.
+applyFrameDetached :: Connection -> Value -> IO ()
+applyFrameDetached conn params = do
+  event <- throwDecode params
+  Store.markFrameDetached conn (channelRefGuid (pageFrameDetachedEventFrame (event :: PageFrameDetachedEvent)))
 
 applyLoadstate :: Connection -> Guid -> Value -> IO ()
 applyLoadstate conn guid params = do

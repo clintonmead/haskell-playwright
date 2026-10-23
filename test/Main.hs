@@ -18,7 +18,8 @@ import Playwright.BrowserContextDsfSpec qualified as BrowserContextDsfSpec
 import Playwright.BrowserContextEventsSpec qualified as BrowserContextEventsSpec
 import Playwright.BrowserContextExposeFunctionSpec qualified as BrowserContextExposeFunctionSpec
 import Playwright.BrowserContextFetchAlgorithmsSpec qualified as BrowserContextFetchAlgorithmsSpec
-import Playwright.BrowserContextFetchSpec qualified as BrowserContextFetchSpec
+import Playwright.BrowserContextFetch1Spec qualified as BrowserContextFetch1Spec
+import Playwright.BrowserContextFetch2Spec qualified as BrowserContextFetch2Spec
 import Playwright.BrowserContextJavaScriptSpec qualified as BrowserContextJavaScriptSpec
 import Playwright.BrowserContextLocaleSpec qualified as BrowserContextLocaleSpec
 import Playwright.BrowserContextNetworkEventSpec qualified as BrowserContextNetworkEventSpec
@@ -68,7 +69,8 @@ import Playwright.FrameGotoSpec qualified as FrameGotoSpec
 import Playwright.FrameHierarchySpec qualified as FrameHierarchySpec
 import Playwright.GeolocationSpec qualified as GeolocationSpec
 import Playwright.GlobalFetchCookieSpec qualified as GlobalFetchCookieSpec
-import Playwright.GlobalFetchSpec qualified as GlobalFetchSpec
+import Playwright.GlobalFetch1Spec qualified as GlobalFetch1Spec
+import Playwright.GlobalFetch2Spec qualified as GlobalFetch2Spec
 import Playwright.HitTargetSpec qualified as HitTargetSpec
 import Playwright.IntegrationSpec qualified as IntegrationSpec
 import Playwright.InterceptionSpec qualified as InterceptionSpec
@@ -127,7 +129,8 @@ import Playwright.PageExposeFunctionSpec qualified as PageExposeFunctionSpec
 import Playwright.PageFileChooserSpec qualified as PageFileChooserSpec
 import Playwright.PageFillSpec qualified as PageFillSpec
 import Playwright.PageFocusSpec qualified as PageFocusSpec
-import Playwright.PageGotoSpec qualified as PageGotoSpec
+import Playwright.PageGoto1Spec qualified as PageGoto1Spec
+import Playwright.PageGoto2Spec qualified as PageGoto2Spec
 import Playwright.PageHistorySpec qualified as PageHistorySpec
 import Playwright.PageKeyboardSpec qualified as PageKeyboardSpec
 import Playwright.PageLocalStorageSpec qualified as PageLocalStorageSpec
@@ -145,7 +148,8 @@ import Playwright.PageRequestFallbackSpec qualified as PageRequestFallbackSpec
 import Playwright.PageRequestFulfillSpec qualified as PageRequestFulfillSpec
 import Playwright.PageRequestInterceptSpec qualified as PageRequestInterceptSpec
 import Playwright.PageRequestGcSpec qualified as PageRequestGcSpec
-import Playwright.PageRouteSpec qualified as PageRouteSpec
+import Playwright.PageRoute1Spec qualified as PageRoute1Spec
+import Playwright.PageRoute2Spec qualified as PageRoute2Spec
 import Playwright.PageScreenshotSpec qualified as PageScreenshotSpec
 import Playwright.PageSetContentSpec qualified as PageSetContentSpec
 import Playwright.PageTransitionSpec qualified as PageTransitionSpec
@@ -210,7 +214,8 @@ main =
         , BrowserContextEventsSpec.tests
         , BrowserContextExposeFunctionSpec.tests
         , BrowserContextFetchAlgorithmsSpec.tests
-        , BrowserContextFetchSpec.tests
+        , BrowserContextFetch1Spec.tests
+        , BrowserContextFetch2Spec.tests
         , BrowserContextJavaScriptSpec.tests
         , BrowserContextLocaleSpec.tests
         , BrowserContextNetworkEventSpec.tests
@@ -260,7 +265,8 @@ main =
         , FrameHierarchySpec.tests
         , GeolocationSpec.tests
         , GlobalFetchCookieSpec.tests
-        , GlobalFetchSpec.tests
+        , GlobalFetch1Spec.tests
+        , GlobalFetch2Spec.tests
         , HitTargetSpec.tests
         , IntegrationSpec.tests
         , InterceptionSpec.tests
@@ -319,7 +325,8 @@ main =
         , PageFileChooserSpec.tests
         , PageFillSpec.tests
         , PageFocusSpec.tests
-        , PageGotoSpec.tests
+        , PageGoto1Spec.tests
+        , PageGoto2Spec.tests
         , PageHistorySpec.tests
         , PageKeyboardSpec.tests
         , PageLocalStorageSpec.tests
@@ -337,7 +344,8 @@ main =
         , PageRequestFulfillSpec.tests
         , PageRequestInterceptSpec.tests
         , PageRequestGcSpec.tests
-        , PageRouteSpec.tests
+        , PageRoute1Spec.tests
+        , PageRoute2Spec.tests
         , PageSelectOptionSpec.tests
         , PageScreenshotSpec.tests
         , PageSetContentSpec.tests

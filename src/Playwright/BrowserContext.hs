@@ -68,7 +68,7 @@ import Playwright.Connection
   , setTimeoutNavigation
   , waitForChannelEvent
   , waitForFutureChannelEventUnlessClosed
-  , waitForWaiter
+  , waitForWaiterUnlessClosed
   )
 import Playwright.Error
   ( PlaywrightError (DecodeFailure)
@@ -313,9 +313,10 @@ contextPages ctx = do
 -- | Registers for the next new page before the action that opens it runs.
 armContextPage :: BrowserContext -> Playwright (Playwright Page)
 armContextPage ctx = do
-  waitId <- registerFutureEventWaiter (channelGuid (browserContextChannel ctx)) (MethodName "page")
+  let contextGuid = channelGuid (browserContextChannel ctx)
+  waitId <- registerFutureEventWaiter contextGuid (MethodName "page")
   pure $ waitWithTimeout defaultTimeout $ do
-    params <- waitForWaiter waitId
+    params <- waitForWaiterUnlessClosed waitId contextGuid
     event <- throwDecode params
     pageFromRef (browserContextChannel ctx) (browserContextPageEventPage event)
 

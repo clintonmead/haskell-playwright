@@ -609,7 +609,7 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 
 **To change:** If the record should stay minimal, add a separate `screenshotWith` builder instead of growing the record, and record that choice here.
 
-**Update (first slice):** `type`, `quality` and `omitBackground` are in, as `screenshotOptionsType :: Maybe ScreenshotType`, `screenshotOptionsQuality :: Maybe Int` and `screenshotOptionsOmitBackground :: Maybe Bool`. The fields are records, not a separate builder. Later slices closed `path`, `mask`, `caret`, `animations` and `scale`; see the sections below.
+**Update (first slice):** `type`, `quality` and `omitBackground` are in, as `screenshotOptionsType :: Maybe ScreenshotType`, `screenshotOptionsQuality :: Maybe Int` and `screenshotOptionsOmitBackground :: Maybe Bool`. The fields are records, not a separate builder. `path`, `mask`, `caret`, `animations` and `scale` are still open.
 
 **Update (clip):** `clip` is in as `screenshotOptionsClip :: Maybe BoundingBox`, not the `ScreenshotClip` record guessed above. It reuses the existing `BoundingBox`, whose fields are `CssPixel`, so the record is not duplicated. The clip test "should clip elements to the viewport" asserts the size the driver returns for a clip that runs past the viewport: 450x50 for a 1000x100 clip at (50, 450) in a 500x500 viewport. Guess: the driver's size is the expected one, since the upstream snapshot does not give a number. If upstream later pins a different size, update the test.
 
@@ -623,18 +623,6 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 
 **To change:** Rename the constructors if the group needs a different style. The mapping is one function in `Playwright.Page`, so the change is local.
 
-## page-screenshot: mask, maskColor and style
-
-**Question:** Upstream `mask` is an array of `{frame, selector}` locator pairs. `ScreenshotOptions` derives `Eq` and `Show`, and a `Locator` has neither, so `mask` cannot be a field of the record. What is the Haskell shape?
-
-**Guess taken:** `mask` is a separate function, `screenshotMasked :: Page -> [Locator] -> ScreenshotOptions -> Playwright ByteString`. `screenshot` is `screenshotMasked` with an empty list. `maskColor` and `style` are `Maybe Text` fields on `ScreenshotOptions`, and they only apply when masks are given, as upstream does.
-
-**Why not verified:** The record cannot hold the locators, so this is the only shape that keeps `Eq` and `Show` on the record.
-
-**To change:** If `ScreenshotOptions` should carry the masks, drop `Eq` and `Show` from it and add a `screenshotOptionsMask :: [Locator]` field. That is a larger change, and no caller depends on the record's `Eq` today.
-
-**Test check:** The mask case asserts that the masked bytes differ from the plain bytes, and that a later unmasked screenshot equals the plain one. Upstream compares rendered pixels, and the repo has no decoder, so this check is weaker. The `maskColor` case asserts that a red paint changes the bytes. The `style` case asserts that a `body` background rule changes the bytes. Each only checks that the option took effect.
-
 ## page-screenshot: image decoding for pixel checks
 
 **Question:** Upstream checks the webp lossless output and the transparent background by decoding the pixels. The repo has no PNG or WebP decoder. Should those cases be ported with a byte-level check, or skipped?
@@ -644,85 +632,3 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 **Why not verified:** Not decided with the user. The skip is recorded in the TODO.
 
 **To change:** Add a decoder dependency (for example `JuicyPixels`) and port the pixel cases, if the user wants that coverage.
-
-## page-screenshot: path error type and mime table
-
-**Question:** Upstream throws a plain error for an unsupported `path` extension (`path: unsupported mime type "..."`). Which Haskell constructor should carry it, and how much of the upstream mime table should the port carry?
-
-**Guess taken:** Raise `DecodeFailure` with the upstream message, because it is the existing client-side argument error (`PlaywrightError`). The mime table is partial: `png`, `jpg`, `jpeg`, `jpe`, `webp` and `txt`. Unknown extensions, and paths with no extension, resolve to `"null"` in the message, as upstream does. The extension match is case-sensitive, as upstream's is.
-
-**Why not verified:** Not decided with the user. The error text matches upstream, but no Haskell-side convention was checked against other client-side errors.
-
-**To change:** Give the path error its own constructor, or widen the mime table to the full upstream list.
-
-## page-screenshot: caret, animations and scale behaviour
-
-**Question:** The `caret`, `animations` and `scale` options are passed through to the protocol, but only acceptance and dimensions are tested. Is that enough, or should the port check the visual effect (caret hidden, animations finished, device pixels scaled)?
-
-**Guess taken:** Ship the three options with a test per enum value that asserts a PNG comes back, plus a device-scale-factor-2 pair that asserts `scale css` gives 300x300 and `scale device` gives 600x600 on a 300x300 viewport. The options are `Maybe` and omitted when unset, so the server defaults apply (`caret` hides the caret, `animations` disables them, `scale` is `device`).
-
-**Why not verified:** Pixel-level checks (caret visibility, a frozen animation frame) need image decoding, which the port does not have (see "page-screenshot: image decoding for pixel checks"). Those effects are not observed here.
-
-**To change:** Decode the PNG in the test and compare against a reference image, or a second screenshot taken with the animation paused.
-
-## build: InitScript overlay is not in HEAD
-
-**Question:** `src/Playwright/InitScript.hs` is staged as added (`AM`) but has working-tree changes, and HEAD does not contain it. Several committed-or-working modules import it, so a clean checkout of HEAD does not build (`Cabal-7554: can't find source for Playwright/InitScript`). Should the file go into a commit, and which version?
-
-**Guess taken:** Leave the file out of the page-screenshot commits, because it belongs to the init-script group and is not part of this slice. Every test run so far used the working tree, so it builds there.
-
-**Why not verified:** A clean build of HEAD+slice has not been run. The working-tree build is the only one checked.
-
-**To change:** Commit `InitScript.hs` with its init-script tests, or stash the importers until it is committed.
-
-## build: uncommitted specs break the build in three places
-
-**Question:** With the uncommitted specs present, the build breaks in `test/Playwright/LocatorWaitForFunctionSpec.hs`, `test/Playwright/PageAddInitScriptCallbackSpec.hs` and `test/Playwright/PageCacheStorageSpec.hs`. Are these in-progress specs to finish, or to hold back?
-
-**Guess taken:** Keep them uncommitted. Each one belongs to a group that is still open, so committing them would break HEAD.
-
-**Why not verified:** The page-screenshot runs used `PAT=` filters, which compile every spec. A clean-HEAD build was not run to confirm the break is limited to these three.
-
-**To change:** Tell me which of these groups should land first, and I will fix or commit them in that order.
-
-## page-screenshot: canvas case needs a byte-level check
-
-**Question:** Upstream `should work for canvas` screenshots a page with a drawn canvas and compares the decoded pixels. The repo has no decoder (see "page-screenshot: image decoding for pixel checks"). What should the port assert?
-
-**Guess taken:** Use a byte-level check. Draw the canvas, take a screenshot, and assert that the PNG signature comes back and that the bytes differ from a screenshot of the same page with the canvas left blank. That checks that the canvas content reaches the image, without decoding pixels. The case is written in `PageScreenshotSpec.hs` (`should work for canvas`). It clears the canvas with `clearRect` in the same page, which gives the blank comparison without a second page, and passes.
-
-**Why not verified:** The byte comparison only shows that the output changed. It does not show that the canvas colour is in the right place.
-
-**To change:** Add a PNG decoder and port the upstream pixel comparison, along with the other pixel cases.
-
-## build: HEAD test/Main.hs expects PageClickTimeoutSpec.tests
-
-**Question:** HEAD's `test/Main.hs:295` runs `PageClickTimeoutSpec.tests`, but HEAD's `test/Playwright/PageClickTimeoutSpec.hs` exports only `timeout1Tests` to `timeout4Tests`. Clean HEAD does not compile its test suite. The working-tree spec exports `tests` and fixes this, but that edit is not committed. Should it land with the page-click work?
-
-**Guess taken:** Use the working-tree spec in the scratch tree, and leave it uncommitted in the repo. It belongs to the page-click group, which is not part of the page-screenshot slice.
-
-**Why not verified:** The scratch build used the working-tree spec, so the screenshot run does not show that the uncommitted spec compiles cleanly on its own.
-
-**To change:** Commit the working-tree `PageClickTimeoutSpec.hs` with its page-click group, or revert `test/Main.hs` to match HEAD's export list.
-
-## browsercontext-credentials: widen the credentials API to a list?
-
-**Question:** Upstream `context.setHTTPCredentials` and the `httpCredentials` context option accept `HTTPCredentials | Array<HTTPCredentials>` (`upstream-typescript-playwright/packages/playwright-core/types/types.d.ts:25916`). Four upstream cases need the list form: "should work with setHTTPCredentials and multiple credentials", "should work with multiple credentials for different origins", "should fall back to credentials without origin", and "should use the first matching credential". The Haskell API takes one credential: `newContextHttpCredentials :: Maybe HttpCredentials` and `setHTTPCredentials :: BrowserContext -> HttpCredentials -> Playwright ()`. Should it accept a list?
-
-**Guess taken:** Keep the public API as it is and leave the four cases open in `progress/FUNCTIONALITY_TODO.md`. Widening the existing functions would break every current `Just creds` and `setHTTPCredentials ctx creds` caller. The wire format already takes a list: `toProtocolCredentials` wraps one value in a one-element list.
-
-**Why not verified:** Nothing has been built against a list signature, so the breakage count and the cost of each option are estimates. The single-credential case "should work with a single credential in an array" is marked covered, because the single-value case exercises the same wire shape. That covers the array shape, not the type.
-
-**To change:** Pick one of these. (a) Widen the existing functions to `HttpCredentials` or `[HttpCredentials]`, with a `Maybe` or list-typed field. This breaks callers, and this is a change to the API. (b) Add non-breaking variants, such as `setHTTPCredentialsList` and a `newContextHttpCredentialsList` field. (c) Leave the four cases skipped. Tell me which, and I will port the four cases against it.
-
-## browsercontext-events: console event for a popup that is already gone
-
-**Question:** Two upstream cases, "console event should work in popup 2" and "console event should work in immediately closed popup", fail with `MissingObject` in this port. The console event's `page` reference is decoded lazily: `consoleMessageFromEvent` (`src/Playwright/ConsoleMessage.hs`, around line 62) calls `pageFromRef` on the test thread when the waiter's result is read. By then the popup page has been disposed. `IncomingDispose` runs `disposeTree` in `Connection.hs` (around line 841), so `lookupObject` in `Connection/Store.hs` no longer finds it. The dialog equivalents ("dialog event should work in popup 2" and "dialog event should work in immediately closed popup") pass, because the dialog page is not disposed before decode. The existing "console event should work in popup" case passes because it waits for the popup page before the page closes.
-
-**Guess taken:** Skip the two console cases. Remove them from `BrowserContextEventsSpec.hs` and record them as skipped in the `browsercontext-events` entry of `progress/FUNCTIONALITY_TODO.md`, with the reason. Returning `Nothing` for the page would make them pass without checking anything, so I did not do that.
-
-**Options:**
-- (a) Resolve the console event's page reference when the event is delivered, in the connection layer (`Connection/Wait.hs` `deliverEvent` or the `IncomingEvent` path), so the page object is captured before `IncomingDispose` runs. This is a connection-layer change and touches every event that carries a ref.
-- (b) Keep the two cases skipped, the same way other TODO entries record skips.
-
-**To change:** Tell me (a) or (b). I will port the two cases once the page reference is captured at dispatch.

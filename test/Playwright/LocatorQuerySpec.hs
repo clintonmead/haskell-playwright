@@ -117,6 +117,11 @@ tests =
           setContent page "<div>Hello \"world\"</div><div>Hello world</div>"
           assertEqual "flags" "Hello \"world\""
             =<< innerText (filterHasTextRegex (locate page "div") "/hElLo \"world\"/i")
+    , testCase "should filter by regex with quotes" $
+        withChromiumPage $ \page -> do
+          setContent page "<div>Hello \"world\"</div><div>Hello world</div>"
+          assertEqual "quoted regex" "Hello \"world\""
+            =<< innerText (filterHasTextRegex (locate page "div") "/Hello \"world\"/")
     , testCase "should filter by case-insensitive regex in a child" $
         withChromiumPage $ \page -> do
           setContent page "<div class=\"test\"><h5>Title Text</h5></div>"
@@ -127,6 +132,11 @@ tests =
           setContent page "<div class=\"test\"><h5>Title</h5> <h2><i>Text</i></h2></div>"
           assertEqual "class" (Just "test")
             =<< getAttribute (filterHasTextRegex (locate page "div") "/^title text$/i") "class"
+    , testCase "should filter by regex with special symbols" $
+        withChromiumPage $ \page -> do
+          setContent page "<div class=\"test\"><h5>First/\"and\"</h5><h2><i>Second\\</i></h2></div>"
+          assertEqual "class" (Just "test")
+            =<< getAttribute (filterHasTextRegex (locate page "div") "/^first\\/\".*\"second\\\\$/si") "class"
     , testCase "should support has:locator" $
         withChromiumPage $ \page -> do
           setContent page "<div><span>hello</span></div><div><span>world</span></div>"

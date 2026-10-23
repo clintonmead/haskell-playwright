@@ -10,6 +10,7 @@ module Playwright.Download
   , downloadUrl
   , SuggestedFilename (..)
   , armDownload
+  , downloadFromEvent
   , waitForDownload
   ) where
 
@@ -90,15 +91,18 @@ armDownload page = do
   pure $ do
     params <- waitForWaiterUnlessClosed waitId guid
     event <- throwDecode params
-    pure
-      ( Download
-          { downloadPage = page
-          , downloadArtifact = Channel (channelRefGuid (pageDownloadEventArtifact event))
-          , downloadUrl = pageDownloadEventUrl event
-          , downloadSuggestedFilename =
-              SuggestedFilename (pageDownloadEventSuggestedFilename event)
-          }
-      )
+    pure (downloadFromEvent page event)
+
+-- | Builds the download for a page's @download@ event.
+downloadFromEvent :: Page -> PageDownloadEvent -> Download
+downloadFromEvent page event =
+  Download
+    { downloadPage = page
+    , downloadArtifact = Channel (channelRefGuid (pageDownloadEventArtifact event))
+    , downloadUrl = pageDownloadEventUrl event
+    , downloadSuggestedFilename =
+        SuggestedFilename (pageDownloadEventSuggestedFilename event)
+    }
 
 downloadPath :: Download -> Playwright FilePath
 downloadPath download = do

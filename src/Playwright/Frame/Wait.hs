@@ -1,5 +1,6 @@
 module Playwright.Frame.Wait
   ( waitForFunctionFrame
+  , waitForFunctionSelectorFrame
   , waitForLoadStateFrame
   , waitForSelectorFrame
   , waitForSelectorHandleFrame
@@ -39,6 +40,7 @@ import Playwright.ElementHandle
   )
 import Playwright.Frame
   ( Frame (frameChannel)
+  , frameContextBaseUrl
   , frameSend_
   , frameSendWithTimeout
   )
@@ -56,9 +58,10 @@ import Playwright.RaceTimeout
 import Playwright.UrlMatch
   ( UrlMatch
   , matchesUrlMatch
+  , resolveUrlMatch
   )
 import Playwright.Protocol
-  ( FrameWaitForFunctionParams (frameWaitForFunctionParamsIsFunction, frameWaitForFunctionParamsPollingInterval)
+  ( FrameWaitForFunctionParams (frameWaitForFunctionParamsIsFunction, frameWaitForFunctionParamsPollingInterval, frameWaitForFunctionParamsSelector, frameWaitForFunctionParamsStrict)
   , FrameWaitForFunctionResult (frameWaitForFunctionResultHandle)
   , FrameWaitForSelectorParams (frameWaitForSelectorParamsOmitReturnValue, frameWaitForSelectorParamsState, frameWaitForSelectorParamsStrict)
   , FrameWaitForSelectorParamsState (FrameWaitForSelectorParamsStateAttached, FrameWaitForSelectorParamsStateDetached, FrameWaitForSelectorParamsStateHidden, FrameWaitForSelectorParamsStateVisible)
@@ -142,6 +145,22 @@ waitForFunctionFrame frame expression arg timeout polling = do
     Nothing ->
       liftIO (throwIO (DecodeFailure "waitForFunction returned no handle"))
 
+-- With a selector, the server passes the matched element as the first argument and returns no handle.
+waitForFunctionSelectorFrame :: Frame -> Selector -> Text -> SerializedArgument -> Timeout -> Maybe Scientific -> Playwright ()
+waitForFunctionSelectorFrame frame selector expression arg timeout polling = do
+  _ :: FrameWaitForFunctionResult <-
+    frameSendWithTimeout
+      frame
+      "waitForFunction"
+      timeout
+      (mkFrameWaitForFunctionParams arg expression)
+        { frameWaitForFunctionParamsIsFunction = Just True
+        , frameWaitForFunctionParamsPollingInterval = polling
+        , frameWaitForFunctionParamsSelector = Just selector
+        , frameWaitForFunctionParamsStrict = Just True
+        }
+  pure ()
+
 waitForLoadStateFrame :: Frame -> LoadState -> Playwright ()
 waitForLoadStateFrame frame state =
   waitForLifecycle
@@ -153,9 +172,10 @@ waitForLoadStateFrame frame state =
 waitForURLFrame :: Frame -> UrlMatch -> Playwright ()
 waitForURLFrame frame glob =
   waitWithTimeout defaultTimeout $ do
+    base <- frameContextBaseUrl frame
     waitUntilUrl
       (channelGuid (frameChannel frame))
-      (matchesUrlMatch glob)
+      (matchesUrlMatch (resolveUrlMatch base glob))
     waitForLoadStateFrame frame LoadStateLoad
 
 toProtocolState :: WaitForState -> FrameWaitForSelectorParamsState

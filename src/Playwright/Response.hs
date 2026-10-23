@@ -3,7 +3,10 @@ module Playwright.Response
   , responseFromRef
   , responseAllHeaders
   , responseBody
+  , responseHeaderValue
+  , responseHeaderValues
   , responseHeaders
+  , responseHeadersArray
   , responseJSON
   , responseOk
   , responseRequest
@@ -134,16 +137,42 @@ responseHeaders response =
 -- (such as content-encoding). Names are lowercased, and repeated values are
 -- joined as upstream allHeaders() does.
 responseAllHeaders :: Response -> Playwright [HttpHeader]
-responseAllHeaders response = do
+responseAllHeaders response =
+  collapseHeaders . fmap lowercaseHeader <$> responseHeadersArray response
+
+-- | Every header line the browser received, in order and without merging, so a
+-- repeated name appears once per line. Names are as the server sent them.
+responseHeadersArray :: Response -> Playwright [HttpHeader]
+responseHeadersArray response = do
   result :: ResponseRawResponseHeadersResult <-
     send
       (responseChannel response)
       (MethodName "rawResponseHeaders")
       mkResponseRawResponseHeadersParams
+  pure (fmap fromNameValue (responseRawResponseHeadersResultHeaders result))
+
+-- | The merged value of one header, looked up case-insensitively. Repeated
+-- values are joined the way 'responseAllHeaders' joins them.
+responseHeaderValue :: Response -> HeaderName -> Playwright (Maybe Text)
+responseHeaderValue response name = do
+  headers <- responseAllHeaders response
   pure
-    ( collapseHeaders
-        (fmap (lowercaseHeader . fromNameValue) (responseRawResponseHeadersResultHeaders result))
+    ( lookup
+        (toLower (headerNameToText name))
+        [ (headerNameToText (httpHeaderName header), headerValueToText (httpHeaderValue header))
+        | header <- headers
+        ]
     )
+
+-- | Every value the browser received for one header name, in order.
+responseHeaderValues :: Response -> HeaderName -> Playwright [Text]
+responseHeaderValues response name = do
+  headers <- responseHeadersArray response
+  pure
+    [ headerValueToText (httpHeaderValue header)
+    | header <- headers
+    , toLower (headerNameToText (httpHeaderName header)) == toLower (headerNameToText name)
+    ]
 
 responseOk :: Response -> Playwright Bool
 responseOk response =

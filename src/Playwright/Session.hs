@@ -84,6 +84,7 @@ data Session = Session
   , sessionNextWaitId :: WaitId
   , sessionEventBuffer :: Map (Guid, MethodName) (Seq Aeson.Value)
   , sessionClosedGuids :: Set Guid
+  , sessionDetachedFrames :: Set Guid
   , sessionEventHandlers :: [EventHandler]
   , sessionRouteHandlers :: Map Guid [(UrlMatch, ChannelRef -> IO Bool)]
   , sessionRouteListening :: Set Guid
@@ -123,6 +124,7 @@ emptySession =
     , sessionNextWaitId = WaitId 1
     , sessionEventBuffer = Map.empty
     , sessionClosedGuids = Set.empty
+    , sessionDetachedFrames = Set.empty
     , sessionEventHandlers = []
     , sessionRouteHandlers = Map.empty
     , sessionRouteListening = Set.empty

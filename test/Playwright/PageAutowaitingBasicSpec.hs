@@ -16,6 +16,12 @@ import Data.ByteString
   ( ByteString
   )
 import Data.ByteString.Lazy qualified as LBS
+import Data.Char
+  ( isDigit
+  )
+import UnliftIO.Exception
+  ( try
+  )
 import UnliftIO.IORef
   ( IORef
   , modifyIORef'
@@ -38,7 +44,7 @@ import Network.Wai
   , responseLBS
   )
 import Playwright
-  ( ClickOptions (clickOptionsNoWaitAfter)
+  ( ClickOptions (clickOptionsNoWaitAfter, clickOptionsTimeout)
   , LoadState (LoadStateLoad)
   , Page
   , armLoadEvent
@@ -51,16 +57,23 @@ import Playwright
   , defaultTimeout
   , fill
   , goto
+  , milliseconds
   , setContent
   , urlFromText
   , waitForLoadState
   , Playwright
   )
+import Playwright.Error
+  ( PlaywrightError (ProtocolRpc)
+  , ProtocolFailure (protocolFailureMessage)
+  )
 import Playwright.RaceTimeout
   ( waitWithTimeout
   )
 import Playwright.Harness
-  ( locate
+  ( assertBool
+  , assertFailure
+  , locate
   , readTestAsset
   , withChromiumPage
   , withLocalApp
@@ -98,7 +111,41 @@ tests =
         clickThenLoad
     , testCase "should work with goto following click" $
         gotoAfterClick
+    , testCase "should report and collapse log in action" $
+        withChromiumPage $ \page -> do
+          setContent page "<input id='checkbox' type='checkbox' style=\"visibility: hidden\"></input>"
+          result <-
+            try (clickWith (locate page "input") defaultClickOptions {clickOptionsTimeout = milliseconds 5000})
+          case result of
+            Left (ProtocolRpc failure) -> do
+              let message = stripAnsi (protocolFailureMessage failure)
+              assertBool "call log" ("Call log:" `Text.isInfixOf` message)
+              assertBool "waiting count" (hasCountedWaitingLine message)
+              let logLines = Text.splitOn "\n" (snd (Text.breakOn "Call log:" message))
+              assertBool "log lines" (length logLines < 30)
+            Left err ->
+              assertFailure ("expected a protocol failure, got: " <> show err)
+            Right _ ->
+              assertFailure "expected the click on the hidden input to time out"
     ]
+
+-- | Whether the message holds a line counting waiting attempts, such as
+-- "2 × waiting for element to be visible".
+hasCountedWaitingLine :: Text -> Bool
+hasCountedWaitingLine message =
+  any
+    (\(before, _) -> not (Text.null (Text.takeWhileEnd isDigit (Text.dropWhileEnd (== ' ') before))))
+    (Text.breakOnAll "× waiting for" message)
+
+-- | Removes ANSI colour escape sequences, which the driver can include in
+-- error messages.
+stripAnsi :: Text -> Text
+stripAnsi = Text.pack . stripAnsiChars . Text.unpack
+
+stripAnsiChars :: String -> String
+stripAnsiChars ('\ESC' : '[' : rest) = stripAnsiChars (drop 1 (dropWhile (/= 'm') rest))
+stripAnsiChars (c : cs) = c : stripAnsiChars cs
+stripAnsiChars [] = []
 
 awaitAnchorClick :: Bool -> IO ()
 awaitAnchorClick cross =

@@ -113,7 +113,7 @@ tests =
         withChromiumPage $ \page -> do
           _ <- exposeFunction page (BindingName "cb") doubleIt
           assertEqual "result" (42 :: Double) =<< evaluateNumber page "async () => await window.cb(21)"
-    , testCase "should work with multiple callbacks" $
+    , testCase "should support multiple callbacks" $
         withChromiumPage $ \page -> do
           _ <- exposeFunction page (BindingName "add") (binaryNumber (+))
           _ <- exposeFunction page (BindingName "mul") (binaryNumber (*))

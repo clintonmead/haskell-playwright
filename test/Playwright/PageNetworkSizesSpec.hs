@@ -65,7 +65,7 @@ import Playwright
   , responseRequest
   , responseStatus
   , urlFromText
-  , waitForRequestFailed
+  , armRequestFailed
   , Playwright
   )
 import Playwright.Error
@@ -194,9 +194,9 @@ tests =
           html <- readTestAsset "one-style.html"
           withLocalApp (failedCssApp html) $ \prefix -> do
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-            withAsync (waitForRequestFailed page) $ \pending -> do
+            armRequestFailed page >>= \pending -> do
               _ <- goto page (urlFromText (prefix <> "/one-style.html")) defaultGotoOptions
-              request <- wait pending
+              request <- pending
               result <- try (requestSizes request)
               case result of
                 Left (DecodeFailure message) ->

@@ -107,7 +107,7 @@ import Playwright
   , waitForFrameDetached
   , waitForLoadStateFrame
   , waitForNavigatedFrame
-  , waitForRequest
+  , armRequest
   , waitForResponse
   )
 import Playwright.SerializedArgument
@@ -195,9 +195,9 @@ tests =
           assertEqual "offline" False =<< evaluateOnFrameBool oopif "() => navigator.onLine"
     , testCase "should support context options" $
         withAssetsLaunchWith sitePerProcess iPhoneOopif $ \prefix _ctx page -> do
-          withAsync (waitForRequest page (UrlMatchGlob "**/grid.html")) $ \pending -> do
+          armRequest page (UrlMatchGlob "**/grid.html") >>= \pending -> do
             _ <- goto page (urlFromText (prefix <> "/dynamic-oopif.html")) defaultGotoOptions
-            request <- wait pending
+            request <- pending
             oopif <- requireOopif page
             assertEqual "touch" True =<< evaluateOnFrameBool oopif "() => 'ontouchstart' in window"
             assertEqual

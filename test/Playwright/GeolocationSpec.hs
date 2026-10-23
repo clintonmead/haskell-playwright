@@ -101,6 +101,18 @@ tests =
                   , geolocationLongitude = longitudeFromInt 200
                   }
             )
+    -- Skipped: "should throw with missing latitude". Geolocation requires a latitude, so the call does not type-check.
+    -- "should throw with missing latitude"
+    , testCase "should not modify passed default options object" $
+        withChromiumBrowser $ \browser -> do
+          let
+            options = defaultNewContextOptions {newContextGeolocation = Just (geolocationAt 10 10)}
+          ctx <- newContextWith browser options
+          setGeolocation ctx (geolocationAt 20 20)
+          assertEqual "options" (Just (geolocationAt 10 10)) (newContextGeolocation options)
+          closeContext ctx
+    -- Skipped: "should throw with missing longitude in default options". Geolocation requires a longitude, so the options do not type-check.
+    -- "should throw with missing longitude in default options"
     , testCase "should isolate contexts" $
         isolateContextsTest
     , testCase "should use context options" $

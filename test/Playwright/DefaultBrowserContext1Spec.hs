@@ -78,7 +78,7 @@ import Playwright
   , setContent
   , urlFromText
   , waitForDownload
-  , waitForRequest
+  , armRequest
   )
 import Playwright.Harness
   ( locate
@@ -182,9 +182,9 @@ tests =
             defaultNewContextOptions {newContextUserAgent = Just (UserAgent "foobar")}
             $ \_ page -> do
               assertEqual "ua" "foobar" =<< evaluateText page "() => navigator.userAgent"
-              withAsync (waitForRequest page (UrlMatchGlob "**/empty.html")) $ \pending -> do
+              armRequest page (UrlMatchGlob "**/empty.html") >>= \pending -> do
                 _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-                request <- wait pending
+                request <- pending
                 headers <- requestHeaders request
                 assertEqual "header" (Just "foobar") (lookupHeader "user-agent" headers)
     , testCase "should support bypassCSP option" $

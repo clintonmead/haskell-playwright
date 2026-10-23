@@ -1,5 +1,6 @@
 module Playwright.Connection.Handlers
   ( handlerLoop
+  , registerDispatchHandler
   , registerEventHandler
   , runEventHandlers
   , waitForDispatchedHandlers
@@ -40,7 +41,7 @@ import Playwright.Connection.Types
   , readSession
   )
 import Playwright.EventHandler
-  ( EventHandler (EventHandler, eventHandlerGuid, eventHandlerMethod, eventHandlerRun)
+  ( EventHandler (EventHandler, eventHandlerGuid, eventHandlerMethod, eventHandlerOnDispatch, eventHandlerRun)
   )
 import Playwright.Guid
   ( Guid
@@ -54,9 +55,15 @@ import Playwright.Session
 
 registerEventHandler :: Connection -> Guid -> MethodName -> (Value -> IO ()) -> IO ()
 registerEventHandler conn guid method run =
+  registerDispatchHandler conn guid method (\_ -> pure ()) run
+
+-- | Registers a handler whose 'onDispatch' runs on the reader thread as the
+-- event is read, so a handler it registers sees the events that follow.
+registerDispatchHandler :: Connection -> Guid -> MethodName -> (Value -> IO ()) -> (Value -> IO ()) -> IO ()
+registerDispatchHandler conn guid method onDispatch run =
   atomically $
     modifySession conn $ \session ->
-      session {sessionEventHandlers = EventHandler guid method run : sessionEventHandlers session}
+      session {sessionEventHandlers = EventHandler guid method onDispatch run : sessionEventHandlers session}
 
 runEventHandlers :: Connection -> Guid -> MethodName -> Value -> IO ()
 runEventHandlers conn guid method params = do
@@ -68,7 +75,13 @@ runEventHandlers conn guid method params = do
             eventHandlerGuid handler == guid && eventHandlerMethod handler == method
         )
         (sessionEventHandlers session)
-  traverse_ (enqueueHandler conn params) matching
+  traverse_ (dispatchHandler conn params) matching
+
+dispatchHandler :: Connection -> Value -> EventHandler -> IO ()
+dispatchHandler conn params handler = do
+  eventHandlerOnDispatch handler params
+    `catch` (\(_ :: SomeException) -> pure ())
+  enqueueHandler conn params handler
 
 enqueueHandler :: Connection -> Value -> EventHandler -> IO ()
 enqueueHandler conn params handler =

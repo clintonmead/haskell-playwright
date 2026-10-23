@@ -7,7 +7,10 @@ import Data.Maybe
   , isNothing
   )
 import Playwright
-  ( evaluateOnElementText
+  ( evaluateHandle
+  , evaluateOnElementBoolWith
+  , evaluateOnElementText
+  , jsHandleArgument
   , querySelector
   , querySelectorAll
   , selectorFromText
@@ -17,6 +20,7 @@ import Playwright.Harness
   ( requireHandle
   , withChromiumPage
   , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
@@ -106,4 +110,16 @@ tests =
           setContent page "<div></div><div></div>"
           elements <- querySelectorAll page (selectorFromText "xpath=/html/body/div")
           assertEqual "count" 2 (length elements)
+    , testCase "$$ should work with bogus Array.from" $
+        withChromiumPage $ \page -> do
+          setContent page "<div>hello</div><div></div>"
+          div1 <- evaluateHandle page "() => { Array.from = () => []; return document.querySelector('div'); }"
+          elements <- querySelectorAll page (selectorFromText "div")
+          assertEqual "count" 2 (length elements)
+          case elements of
+            first : _ ->
+              assertEqual "same element" True
+                =<< evaluateOnElementBoolWith first "(div, div1) => div === div1" (jsHandleArgument div1)
+            [] ->
+              assertFailure "expected elements"
     ]

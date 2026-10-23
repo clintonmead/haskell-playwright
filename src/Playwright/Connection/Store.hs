@@ -6,7 +6,9 @@ module Playwright.Connection.Store
   , contextHasOwnerPage
   , deleteLocatorHandler
   , guidsOfType
+  , isDetachedFrame
   , locatorHandlerUidsMatching
+  , markFrameDetached
   , lookupBrowserTypeGuid
   , lookupContextBaseUrl
   , lookupContextBrowserGuid
@@ -83,7 +85,7 @@ import Playwright.RequestOverrides
   , emptyRequestOverrides
   )
 import Playwright.Session
-  ( Session (sessionBrowserContexts, sessionBrowserTypes, sessionClosedGuids, sessionContextBaseUrls, sessionContextBrowsers, sessionContextsWithOwnerPage, sessionLocatorHandlers, sessionLocatorListening, sessionMainFramePages, sessionObjects, sessionPagesOwningContext, sessionRequestEndTiming, sessionRequestFailures, sessionRequestOverrides, sessionRouteHandlers, sessionRouteListening, sessionSelectorEngines, sessionTimeoutDefaults)
+  ( Session (sessionBrowserContexts, sessionBrowserTypes, sessionClosedGuids, sessionContextBaseUrls, sessionDetachedFrames, sessionContextBrowsers, sessionContextsWithOwnerPage, sessionLocatorHandlers, sessionLocatorListening, sessionMainFramePages, sessionObjects, sessionPagesOwningContext, sessionRequestEndTiming, sessionRequestFailures, sessionRequestOverrides, sessionRouteHandlers, sessionRouteListening, sessionSelectorEngines, sessionTimeoutDefaults)
   )
 import Playwright.StoredLocatorHandler
   ( StoredLocatorHandler (storedLocatorHandlerFrame, storedLocatorHandlerSelector, storedLocatorHandlerTimes)
@@ -123,6 +125,17 @@ guidsOfType conn ty = do
 closedGuids :: Connection -> IO (Set Guid)
 closedGuids conn =
   atomically (sessionClosedGuids <$> readSession conn)
+
+markFrameDetached :: Connection -> Guid -> IO ()
+markFrameDetached conn frameGuid =
+  atomically $
+    modifySession conn $ \session ->
+      session {sessionDetachedFrames = Set.insert frameGuid (sessionDetachedFrames session)}
+
+isDetachedFrame :: Connection -> Guid -> IO Bool
+isDetachedFrame conn frameGuid =
+  atomically $
+    Set.member frameGuid . sessionDetachedFrames <$> readSession conn
 
 pushRouteHandler :: Connection -> Guid -> UrlMatch -> (ChannelRef -> IO Bool) -> IO Bool
 pushRouteHandler conn guid glob run =

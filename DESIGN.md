@@ -141,7 +141,7 @@ Keep track of how long full tests runs are running and how frequently you're run
 
 ### Go for it
 
-You've already a good amount of progress now. Continue to completely implement the Playwright API and all tests that the official Playwright tests have. Only stop if you have a question or need to ask me for guidance.
+You've already a good amount of progress now. Continue to completely implement the Playwright API and all tests that the official Playwright tests have. Do not stop to ask questions: make the best guess, record it in `QUESTIONS.md`, and keep going. Only end a turn when the work is finished or every remaining step needs an input only I can give (see the rules in CLAUDE.md).
 
 ### You can make commits
 
@@ -251,7 +251,7 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 - `requestPostDataJSON` parses `requestPostData` with Aeson; missing body is `Nothing`, invalid JSON is `DecodeFailure` (`POST data is not a valid JSON object: …`).
 - `dragAndDrop` / `dragAndDropWith` are locator functions. `DragAndDropOptions` maps `force`, `sourcePosition`, `targetPosition`, `steps`, `timeout`, and `trial` onto `Frame.dragAndDrop` (always `strict: true`, like `locator.dragTo`).
 - Test specs share the iframe helper `Playwright.Harness.attachFrame page frameId url`. Do not copy it into a spec.
-- `SelectOption` covers the JS option forms one at a time. `SelectMatching` (`SelectAttributes`) is the JS object with several of value, label and index, and every set attribute must match. `selectOptionWith` takes `SelectOptionOptions` (`force`, `timeout`). The element-handle form is `selectOptionElements` / `selectOptionElementsWith` on `Locator`, which takes `[ElementHandle]` and sends the protocol `elements` list. It is kept out of `SelectOption` because a handle is not a value.
+- `SelectOption` covers the JS option forms one at a time. `SelectMatching` (`SelectAttributes`) is the JS object with several of value, label and index, and every set attribute must match. `selectOptionWith` takes `SelectOptionOptions` (`force`, `timeout`). The element-handle form of `selectOption` is not ported yet.
 - `setContentWith` takes `SetContentOptions` (`timeout`, `waitUntil`). The frame's content is `Playwright.frameContent` (it was `contentFrame`, easy to confuse with `contentFrameHandle`).
 - Navigation waits take `WaitForNavigationOptions` (`timeout`, `url` glob, `waitUntil`). `armNavigationOptions` registers the waiter before the action runs, so a same-document or fast navigation is never missed. Prefer the armed form in tests over `withAsync`. `waitForLoadStateWith` adds the timeout.
 - `Harness.stallingStylesheetApp` serves the assets but holds `one-style.css` until a test releases it. It is the shared way to keep a page loading.
@@ -260,10 +260,19 @@ Reread this [document](DESIGN.md) occasionally so you don't forget about it's co
 
 ## Advice for working unattended
 
+
+**Standing instruction from the user (repeated many times): never wait or pause for a build or a test run.** Start builds and group runs in the background, keep porting the next case, and handle each result when its notification arrives. Do not call Monitor just to block, do not write "waiting for" and stop, and do not end the turn while work remains. When a result comes back with a failure, fix it or record it, then continue.
 These came from long sessions. Follow them unless the user says otherwise.
 
 - **Always wrap a test run in `timeout`.** Tasty has no per-test timeout, so one test that waits forever hangs the whole run. Use `timeout 400 $bin ...` and stream to a file, or use `--hide-successes` on small groups only.
 - **Test budget: full runs take at most ~20% of dev time.** The full suite is ~2.5 minutes, but is constantly getting long. Commit after the new or changed group passes (`playwright-test -p '/group/'`, with a few reruns for anything timing-sensitive). Run the full suite occasionally, and before a wide change to shared library code (`Connection*`, `Frame*`, `Page*`, `Locator*`, `Harness`). Make sure you're not spending more than 20% of your time on full test runs, check this by timing the full test run occasionally and checking how frequently they're running. Do not start a full run while a targeted loop still needs its result. 
+- **Keep working while a full run goes.** Start the full suite in the background (`full.sh` writing to a log), then keep porting or fixing. Do not sleep or poll for it. Read the result when its monitor reports the run has finished, and only then commit or fix what it found.
+- **Build and test in the background, and keep working.** Run `cabal build` and group runs in the background (`run_in_background`, or a script writing to a log with a done marker), then keep porting the next case while they run. Check the result from the monitor's notification. Do not sleep or poll in the foreground.
+- **Assume a full run passes while it runs.** Keep porting the next case without waiting on it. Read the result when its monitor reports, and fix any failure before the next commit that depends on it. Do not stop the turn to wait for a run.
+- **Do not stop to ask questions.** When a decision needs the user, make the best guess, carry on, and record the question and the guess in `QUESTIONS.md` at the repository root. Do not end the turn to wait for an answer.
+- **Do not stop at green checkpoints.** A full run passing, a commit landing, or a summary being ready is not a reason to end the turn. Keep porting the next upstream case or fixing the next gap. End the turn only when the user asks for a stop or nothing is left that can be done without them. Status goes in a short line between tool calls, not in a closing report.
+- **Never end a turn to ask the user a question.** This was repeated by the user and broke again in the last session: I stopped with "want me to…?" and waited. Decide, act, and log the question and my choice in `QUESTIONS.md`. Then keep going. If a step is blocked, do the next unblocked step first. Ending the turn is only for when the work is genuinely finished or every remaining step needs an input the user alone has.
+- **Never block on a build or test run.** Do not use Monitor with an `until` loop, a foreground `sleep`, or any command that waits for a background run. Start the run in the background with `nohup ... &`, keep porting the next item, and read the log tail when checking. The same rule is in CLAUDE.md.
 - **Prefer `armX` waiters over `withAsync`.** A `withAsync (wait...)` started after the action can miss an event that fires first. Register with `armX` (or `registerFutureEventWaiterWhere`), then run the action, then take the result. See `armNavigationOptions` and `armLoadEvent`.
 - **Lifecycle events can arrive in any order.** Never re-arm after a non-matching event: the next event can fire before the re-arm. Use an accept predicate on the waiter instead.
 - **Keep the `-Weverything` list clean.** New imports need explicit import lists (`-Wmissing-import-lists`). Unused imports are errors, so after moving helpers around, remove the imports the compiler reports.

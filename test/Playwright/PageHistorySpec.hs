@@ -3,8 +3,14 @@ module Playwright.PageHistorySpec
   ) where
 
 import UnliftIO.Async
-  ( wait
+  ( race
+  , wait
   , withAsync
+  )
+import UnliftIO.MVar
+  ( newEmptyMVar
+  , putMVar
+  , takeMVar
   )
 import UnliftIO.Exception
   ( catch
@@ -51,6 +57,8 @@ import Network.Wai
   )
 import Playwright
   ( ConsoleMessage (consoleMessageText)
+  , FulfillBody (FulfillText)
+  , FulfillOptions (fulfillBody)
   , LoadState (LoadStateLoad)
   , Page
   , Playwright
@@ -59,18 +67,21 @@ import Playwright
   , WaitForState (WaitForVisible)
   , click
   , content
+  , defaultFulfillOptions
   , defaultGotoOptions
   , defaultScreenshotOptions
   , evaluate
   , evaluateBool
   , evaluateNumber
   , evaluateSpecial
+  , fulfillRoute
   , goBack
   , goForward
   , goto
   , innerText
   , reload
   , responseOk
+  , responseText
   , responseUrl
   , route
   , screenshot
@@ -234,6 +245,33 @@ tests =
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/one-style.html")) defaultGotoOptions
           runRendererNavigation page (void (reload page))
+    , testCase "page.reload should not resolve with same-document navigation" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          _ <- evaluate page "() => 1"
+          -- The handler only stores the route. A blocking handler would stall the serial handler thread,
+          -- so the pushState commands below could not run.
+          held <- newEmptyMVar
+          route page (UrlMatchGlob (prefix <> "/empty.html")) $ \handled -> putMVar held handled
+          swallow (evaluate page "() => { window.history.pushState({}, ''); }")
+          withAsync (reload page) $ \pending ->
+            -- Run on its own thread: evaluate can wait on the pending navigation, which waits on the route.
+            withAsync (swallow (evaluate page "() => { window.history.pushState({}, ''); }")) $ \_ -> do
+              -- Bounded: a reload that never reaches the route must fail the test, not hang the run.
+              arrived <- race (liftIO (threadDelay 30000000)) (takeMVar held)
+              case arrived of
+                Left () ->
+                  assertFailure "the reload never reached the route"
+                Right handled -> do
+                  fulfillRoute handled defaultFulfillOptions {fulfillBody = Just (FulfillText "hello")}
+                  response <- race (liftIO (threadDelay 30000000)) (wait pending)
+                  case response of
+                    Left () ->
+                      assertFailure "the reload never resolved"
+                    Right Nothing ->
+                      assertFailure "expected reload response"
+                    Right (Just got) ->
+                      assertEqual "body" "hello" =<< responseText got
     , testCase "page.reload should work with same origin redirect" $
         reloadRedirect False
     , testCase "page.reload should work with cross-origin redirect" $

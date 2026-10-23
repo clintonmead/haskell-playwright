@@ -10,13 +10,19 @@ import Data.Text
   )
 import Data.Text qualified as Text
 import Data.ByteString.Char8 qualified as BS8
+import Data.ByteString.Lazy qualified as BSL
+import Data.Maybe
+  ( fromMaybe
+  )
 import Network.HTTP.Types
   ( hContentType
+  , hCookie
   , status200
   )
 import Network.Wai
   ( Application
   , pathInfo
+  , requestHeaders
   , responseLBS
   )
 import Playwright
@@ -51,6 +57,7 @@ import Playwright
   , frames
   , goto
   , pageContext
+  , responseText
   , urlFromText
   )
 import Playwright.Error
@@ -329,7 +336,39 @@ tests =
             fulfillRoute handled defaultFulfillOptions {fulfillBody = Just (FulfillText "<html></html>")}
           _ <- goto page (urlFromText "https://www.example.com") defaultGotoOptions
           assertEqual "document.cookie" "marker=" =<< evaluateText page "() => document.cookie"
+    , testCase "should allow unnamed cookies" $
+        withChromiumContext $ \ctx page ->
+          withLocalApp cookieEchoApp $ \prefix -> do
+            addCookies
+              ctx
+              [cookieForUrl (urlFromText (prefix <> "/empty.html")) (CookieName "") (CookieValue "unnamed-via-add-cookies")]
+            resp <- goto page (urlFromText (prefix <> "/cookies")) defaultGotoOptions
+            case resp of
+              Just response ->
+                assertEqual "server body" "unnamed-via-add-cookies" =<< responseText response
+              Nothing ->
+                assertFailure "expected a response for /cookies"
+            assertEqual "document.cookie" "unnamed-via-add-cookies" =<< evaluateText page "() => document.cookie"
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            _ <- evaluateText page "() => { document.cookie = '=unnamed-via-js;'; return document.cookie; }"
+            addCookies ctx . fmap cookieToSetFrom =<< cookies ctx
+            assertEqual "round trip" "unnamed-via-js" =<< evaluateText page "() => document.cookie"
+    -- Skipped: "should set secure cookies on secure WebSocket" needs an HTTPS server with a
+    -- WebSocket endpoint, and the harness only serves plain HTTP. See QUESTIONS.md (q-103).
+    -- "should set secure cookies on secure WebSocket"
     ]
+
+-- | Echoes the Cookie request header on /cookies, as the upstream server does.
+-- Any other path returns an empty HTML page.
+cookieEchoApp :: Application
+cookieEchoApp request respond =
+  case pathInfo request of
+    ["cookies"] ->
+      respond (responseLBS status200 [(hContentType, "text/plain")] echoed)
+    _ ->
+      respond (responseLBS status200 [(hContentType, "text/html")] "")
+  where
+    echoed = BSL.fromStrict (fromMaybe "undefined-on-server" (lookup hCookie (requestHeaders request)))
 
 -- | Records every request. Sets a session cookie on /setsession.html and a
 -- persistent cookie on /setpersistent.html, and answers every path with an

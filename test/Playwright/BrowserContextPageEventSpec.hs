@@ -2,10 +2,6 @@ module Playwright.BrowserContextPageEventSpec
   ( tests
   ) where
 
-import UnliftIO.Async
-  ( wait
-  , withAsync
-  )
 import Data.ByteString.Lazy.Char8 qualified as LBS8
 import Network.HTTP.Types
   ( hLocation
@@ -55,7 +51,6 @@ import Playwright
   , url
   , urlFromText
   , urlToText
-  , waitForContextPage
   , waitForLoadState
   )
 import Playwright.Harness
@@ -103,48 +98,48 @@ tests =
     "browsercontext-page-event"
     [ testCase "should have url" $
         withAssetsContextWith defaultNewContextOptions $ \prefix ctx page ->
-          withAsync (waitForContextPage ctx) $ \handle -> do
+          armContextPage ctx >>= \pending -> do
             _ <-
               evaluateWith
                 page
                 "url => window.open(url)"
                 (textArgument (prefix <> "/empty.html"))
-            other <- wait handle
+            other <- pending
             assertEqual "url" (prefix <> "/empty.html") . urlToText =<< url other
     , testCase "should have url after domcontentloaded" $
         withAssetsContextWith defaultNewContextOptions $ \prefix ctx page ->
-          withAsync (waitForContextPage ctx) $ \handle -> do
+          armContextPage ctx >>= \pending -> do
             _ <-
               evaluateWith
                 page
                 "url => window.open(url)"
                 (textArgument (prefix <> "/empty.html"))
-            other <- wait handle
+            other <- pending
             waitForLoadState other LoadStateDomContentLoaded
             assertEqual "url" (prefix <> "/empty.html") . urlToText =<< url other
     , testCase "should have about:blank url with domcontentloaded" $
         withChromiumContext $ \ctx page ->
-          withAsync (waitForContextPage ctx) $ \handle -> do
+          armContextPage ctx >>= \pending -> do
             _ <- evaluateWith page "url => window.open(url)" (textArgument "about:blank")
-            other <- wait handle
+            other <- pending
             waitForLoadState other LoadStateDomContentLoaded
             assertEqual "url" "about:blank" . urlToText =<< url other
     , testCase "should have about:blank for empty url with domcontentloaded" $
         withChromiumContext $ \ctx page ->
-          withAsync (waitForContextPage ctx) $ \handle -> do
+          armContextPage ctx >>= \pending -> do
             _ <- evaluate page "() => window.open()"
-            other <- wait handle
+            other <- pending
             waitForLoadState other LoadStateDomContentLoaded
             assertEqual "url" "about:blank" . urlToText =<< url other
     , testCase "should report when a new page is created and closed" $
         withAssetsContextWith defaultNewContextOptions $ \prefix ctx page ->
-          withAsync (waitForContextPage ctx) $ \handle -> do
+          armContextPage ctx >>= \pending -> do
             _ <-
               evaluateWith
                 page
                 "url => window.open(url)"
                 (textArgument (prefix <> "/empty.html"))
-            other <- wait handle
+            other <- pending
             assertEqual "hello" "Hello world" =<< evaluateText other "() => ['Hello', 'world'].join(' ')"
             body <- querySelector other (selectorFromText "body")
             case body of
@@ -161,21 +156,21 @@ tests =
             assertEqual "original remains" True (any (pagesEqual page) after)
     , testCase "should report initialized pages" $
         withChromiumContext $ \ctx _ ->
-          withAsync (waitForContextPage ctx) $ \handle -> do
+          armContextPage ctx >>= \pending -> do
             created <- newPage ctx
-            waited <- wait handle
+            waited <- pending
             assertEqual "same page" True (pagesEqual created waited)
             assertEqual "blank" "about:blank" . urlToText =<< url waited
-            withAsync (waitForContextPage ctx) $ \popupHandle -> do
+            armContextPage ctx >>= \popupPending -> do
               _ <- evaluate created "() => window.open('about:blank')"
-              popup <- wait popupHandle
+              popup <- popupPending
               assertEqual "popup blank" "about:blank" . urlToText =<< url popup
     , testCase "should have an opener" $
         withAssetsContextWith defaultNewContextOptions $ \prefix ctx page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
-          withAsync (waitForContextPage ctx) $ \handle -> do
+          armContextPage ctx >>= \pending -> do
             _ <- goto page (urlFromText (prefix <> "/popup/window-open.html")) defaultGotoOptions
-            popup <- wait handle
+            popup <- pending
             assertEqual "popup url" (prefix <> "/popup/popup.html") . urlToText =<< url popup
             matched <- opener popup
             case matched of

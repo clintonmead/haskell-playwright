@@ -28,6 +28,7 @@ import Data.Text
   ( Text
   , isInfixOf
   , isSuffixOf
+  , pack
   , toLower
   )
 import Network.HTTP.Types
@@ -77,8 +78,12 @@ import Playwright
   , responseAllHeaders
   , responseBody
   , responseFromServiceWorker
+  , responseHeaderValue
+  , responseHeaderValues
   , responseHeaders
+  , responseHeadersArray
   , responseJSON
+  , responseOk
   , responseRequest
   , responseStatus
   , responseStatusText
@@ -100,6 +105,7 @@ import Playwright.Harness
   , assertEqual
   , assertFailure
   , readTestAsset
+  , testAssetsDir
   )
 import Test.Tasty
   ( TestTree
@@ -374,6 +380,73 @@ tests =
             _ <- goto page (urlFromText (prefix <> "/page.html")) defaultGotoOptions
             response <- takeResponse
             assertEqual "body" (LBS.toStrict truncatedGif) =<< responseBody response
+    , testCase "should report all headers" $
+        withChromiumPage $ \page ->
+          withLocalApp
+            ( headersPathApp
+                [ ("header-a", "value-a")
+                , ("header-b", "value-b")
+                , ("header-a", "value-a-1")
+                , ("header-a", "value-a-2")
+                ]
+            )
+            $ \prefix -> do
+              takeResponse <- armResponse page (UrlMatchGlob "**/headers")
+              _ <- goto page (urlFromText (prefix <> "/headers")) defaultGotoOptions
+              response <- takeResponse
+              headers <- responseHeadersArray response
+              -- Warp also sends Date and Content-Length, so keep only the test headers.
+              let testHeaders =
+                    [ header
+                    | header <- headers
+                    , toLower (headerNameToText (httpHeaderName header)) `elem` ["header-a", "header-b"]
+                    ]
+              assertEqual
+                "header lines"
+                (sort [("header-a", "value-a"), ("header-a", "value-a-1"), ("header-a", "value-a-2"), ("header-b", "value-b")])
+                (sortedHeaders testHeaders)
+    , testCase "should report multiple set-cookie headers" $
+        withChromiumPage $ \page ->
+          withLocalApp (headersPathApp [("Set-Cookie", "a=b"), ("Set-Cookie", "c=d")]) $ \prefix -> do
+            takeResponse <- armResponse page (UrlMatchGlob "**/headers")
+            _ <- goto page (urlFromText (prefix <> "/headers")) defaultGotoOptions
+            response <- takeResponse
+            assertEqual "set-cookie lines" ["a=b", "c=d"] =<< responseHeaderValues response (HeaderName "set-cookie")
+            assertEqual "merged set-cookie" (Just "a=b\nc=d") =<< responseHeaderValue response (HeaderName "set-cookie")
+            assertEqual "missing header" Nothing =<< responseHeaderValue response (HeaderName "not-there")
+    , testCase "should behave the same way for headers and allHeaders" $
+        withChromiumPage $ \page ->
+          withLocalApp
+            ( headersPathApp
+                [ ("header-a", "a=b")
+                , ("header-a", "c=d")
+                , ("Name-A", "v1")
+                , ("name-b", "v4")
+                , ("Name-a", "v2")
+                , ("name-A", "v3")
+                ]
+            )
+            $ \prefix -> do
+              takeResponse <- armResponse page (UrlMatchGlob "**/headers")
+              _ <- goto page (urlFromText (prefix <> "/headers")) defaultGotoOptions
+              response <- takeResponse
+              -- Upstream also checks that headers() matches allHeaders(). That check is not
+              -- ported: responseHeaders returns the initializer's unmerged list. See the TODO.
+              allHeaders <- responseAllHeaders response
+              assertEqual "header-a" (Just "a=b, c=d") (headerValue "header-a" allHeaders)
+              assertEqual "name-a" (Just "v1, v2, v3") (headerValue "name-a" allHeaders)
+              assertEqual "name-b" (Just "v4") (headerValue "name-b" allHeaders)
+    , testCase "should provide a Response with a file URL" $
+        withChromiumPage $ \page -> do
+          assets <- testAssetsDir
+          response <-
+            goto page (urlFromText ("file://" <> pack (assets <> "/frames/two-frames.html"))) defaultGotoOptions
+          case response of
+            Nothing ->
+              assertFailure "missing response"
+            Just value -> do
+              assertEqual "status" (HttpStatus 200) =<< responseStatus value
+              assertEqual "ok" True =<< responseOk value
     ]
 
 sortedHeaders :: [HttpHeader] -> [(Text, Text)]
@@ -394,6 +467,15 @@ headerValue name headers =
 headerApp :: Application
 headerApp _ respond =
   respond (responseLBS status200 [("foo", "bar"), ("BaZ", "bAz")] LBS8.empty)
+
+-- | Serves /headers with the given headers, and 404 for anything else.
+headersPathApp :: [Header] -> Application
+headersPathApp headers request respond =
+  case pathInfo request of
+    ["headers"] ->
+      respond (responseLBS status200 headers LBS8.empty)
+    _ ->
+      respond (responseLBS status404 [] LBS8.empty)
 
 gzipApp :: Application
 gzipApp request respond =

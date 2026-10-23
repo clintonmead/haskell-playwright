@@ -249,8 +249,10 @@ test-suite playwright-test
       Playwright.BrowserContextDsfSpec
       Playwright.BrowserContextEventsSpec
       Playwright.BrowserContextExposeFunctionSpec
+      Playwright.BrowserContextFetch1Spec
+      Playwright.BrowserContextFetch2Spec
       Playwright.BrowserContextFetchAlgorithmsSpec
-      Playwright.BrowserContextFetchSpec
+      Playwright.BrowserContextFetchSupport
       Playwright.BrowserContextJavaScriptSpec
       Playwright.BrowserContextLocaleSpec
       Playwright.BrowserContextNetworkEventSpec
@@ -300,8 +302,10 @@ test-suite playwright-test
       Playwright.FrameGotoSpec
       Playwright.FrameHierarchySpec
       Playwright.GeolocationSpec
+      Playwright.GlobalFetch1Spec
+      Playwright.GlobalFetch2Spec
       Playwright.GlobalFetchCookieSpec
-      Playwright.GlobalFetchSpec
+      Playwright.GlobalFetchSupport
       Playwright.Harness
       Playwright.HitTargetSpec
       Playwright.IntegrationSpec
@@ -361,7 +365,9 @@ test-suite playwright-test
       Playwright.PageFileChooserSpec
       Playwright.PageFillSpec
       Playwright.PageFocusSpec
-      Playwright.PageGotoSpec
+      Playwright.PageGoto1Spec
+      Playwright.PageGoto2Spec
+      Playwright.PageGotoSupport
       Playwright.PageHistorySpec
       Playwright.PageKeyboardSpec
       Playwright.PageLocalStorageSpec
@@ -379,7 +385,9 @@ test-suite playwright-test
       Playwright.PageRequestFulfillSpec
       Playwright.PageRequestGcSpec
       Playwright.PageRequestInterceptSpec
-      Playwright.PageRouteSpec
+      Playwright.PageRoute1Spec
+      Playwright.PageRoute2Spec
+      Playwright.PageRouteSupport
       Playwright.PageScreenshotSpec
       Playwright.PageSelectOptionSpec
       Playwright.PageSetContentSpec

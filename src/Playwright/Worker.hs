@@ -22,6 +22,13 @@ import Playwright.Monad
 import UnliftIO.Exception
   ( throwIO
   )
+import Data.Aeson
+  ( Result (Error, Success)
+  , Value
+  , fromJSON
+  , object
+  , (.=)
+  )
 import Data.Maybe
   ( mapMaybe
   )
@@ -45,16 +52,20 @@ import Playwright.Connection
   , guidsOfType
   , lookupObject
   , registerEventHandler
+  , registerFutureEventWaiterWhere
   , waitForChannelEvent
-  , waitForChannelEventUnlessClosed
   , waitForFutureChannelEventUnlessClosed
+  , waitForWaiterUnlessClosed
   )
 import Playwright.ConsoleMessage
-  ( ConsoleMessage (consoleMessageWorkerRef)
+  ( ConsoleMessage
   , consoleMessageFromEvent
   )
 import Playwright.Error
   ( PlaywrightError (EvaluateUnexpected)
+  )
+import Playwright.Guid
+  ( Guid
   )
 import Playwright.Json.ChannelRef
   ( ChannelRef (channelRefGuid)
@@ -69,9 +80,10 @@ import Playwright.Page
   ( Page (pageChannel)
   )
 import Playwright.Protocol
-  ( BrowserContextServiceWorkerEvent (browserContextServiceWorkerEventWorker)
+  ( BrowserContextConsoleEvent (browserContextConsoleEventWorker)
+  , BrowserContextServiceWorkerEvent (browserContextServiceWorkerEventWorker)
   , BrowserContextUpdateSubscriptionParamsEvent (BrowserContextUpdateSubscriptionParamsEventConsole)
-  , ChannelType (ChannelTypeWorker)
+  , ChannelType (ChannelTypePage, ChannelTypeWorker)
   , PageWorkerEvent (pageWorkerEventWorker)
   , WorkerEvaluateExpressionParams (workerEvaluateExpressionParamsIsFunction)
   , WorkerEvaluateExpressionResult (workerEvaluateExpressionResultValue)
@@ -150,38 +162,63 @@ waitForServiceWorker ctx =
 contextFromWorker :: Worker -> Playwright BrowserContext
 contextFromWorker worker = do
   obj <- lookupObject (channelGuid (workerChannel worker))
-  pure (BrowserContext (Channel (remoteParent obj)))
+  parentObj <- lookupObject (remoteParent obj)
+  -- A page worker's parent is its page, and the page's parent is the context.
+  let
+    contextGuid =
+      if remoteType parentObj == ChannelTypePage
+        then remoteParent parentObj
+        else remoteParent obj
+  pure (BrowserContext (Channel contextGuid))
 
 waitForWorkerConsole :: Worker -> Playwright ConsoleMessage
 waitForWorkerConsole worker = do
   takeMessage <- armWorkerConsole worker
   takeMessage
 
--- | Subscribes now and returns the wait for the next console message from this
--- worker. Use it before the action that logs: messages logged before the
--- subscription are never sent, and messages sent while no waiter is registered
--- are buffered for the returned wait.
+-- | Subscribes and registers for the next console message from this worker
+-- before the action that logs runs. Console events from other sources on the
+-- same context are skipped, not consumed, so they stay available to their own
+-- waiters.
 armWorkerConsole :: Worker -> Playwright (Playwright ConsoleMessage)
 armWorkerConsole worker = do
   ctx <- contextFromWorker worker
+  subscribeWorkerConsole worker
   subscribeBrowserContext ctx BrowserContextUpdateSubscriptionParamsEventConsole
-  pure (waitWithTimeout defaultTimeout collect)
-  where
-    collect = do
-      ctx' <- contextFromWorker worker
-      params <-
-        waitForChannelEventUnlessClosed
-          (channelGuid (browserContextChannel ctx'))
-          (MethodName "console")
-          (channelGuid (workerChannel worker))
-      event <- throwDecode params
-      message <- consoleMessageFromEvent (browserContextChannel ctx') event
-      case consoleMessageWorkerRef message of
-        Just ref
-          | channelRefGuid ref == channelGuid (workerChannel worker) ->
-              pure message
-        _ ->
-          collect
+  let
+    workerGuid = channelGuid (workerChannel worker)
+  waitId <-
+    registerFutureEventWaiterWhere
+      (channelGuid (browserContextChannel ctx))
+      (MethodName "console")
+      (isWorkerConsoleEvent workerGuid)
+  pure $ waitWithTimeout defaultTimeout $ do
+    -- Fails when the worker closes, instead of waiting for a log that never comes.
+    params <- waitForWaiterUnlessClosed waitId workerGuid
+    event <- throwDecode params
+    consoleMessageFromEvent (browserContextChannel ctx) event
+
+-- | Asks the worker itself to dispatch its console events. Upstream's context
+-- dispatcher only forwards a dedicated worker's console event when the worker
+-- channel holds a 'console' subscription, which the context subscription alone
+-- does not create. The protocol type is not generated, so the params are raw JSON.
+subscribeWorkerConsole :: Worker -> Playwright ()
+subscribeWorkerConsole worker = do
+  _ :: Value <-
+    send
+      (workerChannel worker)
+      (MethodName "updateSubscription")
+      (object ["event" .= ("console" :: Text), "enabled" .= True])
+  pure ()
+
+-- | Whether a console event was logged by the worker with the given guid.
+isWorkerConsoleEvent :: Guid -> Value -> Bool
+isWorkerConsoleEvent workerGuid params =
+  case fromJSON params of
+    Success event ->
+      fmap channelRefGuid (browserContextConsoleEventWorker (event :: BrowserContextConsoleEvent)) == Just workerGuid
+    Error _ ->
+      False
 
 serviceWorkers :: BrowserContext -> Playwright [Worker]
 serviceWorkers ctx = do

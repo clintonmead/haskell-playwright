@@ -33,6 +33,7 @@ import Playwright
   , MouseButton (MouseButtonRight)
   , Page
   , Playwright
+  , WaitForState (WaitForVisible)
   , Point (Point)
   , SpecialJsValue (SpecialNull, SpecialUndefined)
   , StyleTag (styleTagContent)
@@ -83,6 +84,8 @@ import Playwright
   , setContent
   , setViewportSize
   , urlFromText
+  , requestGC
+  , waitFor
   , waitForConsoleWhere
   , waitForLoadState
   , waitForPopup
@@ -98,6 +101,7 @@ import Playwright.HoverOptions
 import Playwright.Error
   ( PlaywrightError
   )
+import Playwright.Locator qualified as Locator
 import Playwright.ScrollOption
   ( ScrollOption (ScrollNone)
   )
@@ -688,6 +692,27 @@ tests =
             (getByRole page (AriaRole "button") defaultGetByRoleOptions {getByRoleName = Just "Click me"})
             defaultClickOptions {clickOptionsButton = Just MouseButtonRight}
           assertEqual "order" ["mousedown", "contextmenu", "mouseup"] =<< readIORef entries
+    , testCase "should click after a right click" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<button>Click me</button><script>const button = document.querySelector('button'); button.addEventListener('click', () => button.textContent = 'Clicked!');</script>"
+          clickWith
+            (getByRole page (AriaRole "button") defaultGetByRoleOptions {getByRoleName = Just "Click me"})
+            defaultClickOptions {clickOptionsButton = Just MouseButtonRight}
+          click (getByRole page (AriaRole "button") defaultGetByRoleOptions {getByRoleName = Just "Click me"})
+          assertEqual "text" "Clicked!" =<< innerText (getByRole page (AriaRole "button") defaultGetByRoleOptions)
+    , testCase "should not retain removed iframe after clicking inside it" $
+        withChromiumPage $ \page -> do
+          setContent page "<iframe srcdoc=\"<button>Click</button>\"></iframe>"
+          let frameButton = Locator.getByRole (frameLocator page (selectorFromText "iframe")) (AriaRole "button") defaultGetByRoleOptions
+          waitFor frameButton WaitForVisible
+          _ <- evaluate page "() => { window.iframeRef = new WeakRef(document.querySelector('iframe')); }"
+          click frameButton
+          _ <- evaluate page "() => document.querySelector('iframe').remove()"
+          mouseMove page (Point (cssPixelFromInt 500) (cssPixelFromInt 500))
+          requestGC page
+          assertEqual "retained" False =<< evaluateBool page "() => Boolean(window.iframeRef.deref())"
     , testCase "should set PointerEvent.pressure on pointerdown" $
         withChromiumPage $ \page -> do
           setContent

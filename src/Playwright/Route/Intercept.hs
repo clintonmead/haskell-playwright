@@ -43,6 +43,7 @@ import Playwright.Channel
   )
 import Playwright.Connection
   ( clearRouteHandlers
+  , lookupContextBaseUrl
   , lookupRequestOverrides
   , pushRouteHandler
   , registerEventHandler
@@ -95,9 +96,13 @@ import Playwright.RouteOptions
   , RouteTimes (routeTimesToInt)
   , defaultRouteOptions
   )
+import Playwright.Url
+  ( Url
+  )
 import Playwright.UrlMatch
   ( UrlMatch (UrlMatchGlob, UrlMatchPredicate, UrlMatchRegex)
   , matchesUrlMatch
+  , resolveUrlMatch
   )
 
 route :: Page -> UrlMatch -> (Route -> Playwright ()) -> Playwright ()
@@ -184,9 +189,10 @@ dispatchPageRoute page params = do
     chan :: Channel RouteTag
     chan = Channel (channelRefGuid (pageRouteEventRoute event))
   request <- requestFromChannel chan
+  base <- lookupContextBaseUrl (channelGuid (pageContextChannel page))
   pageHandlers <- routeHandlersFor (channelGuid (pageChannel page))
   contextHandlers <- routeHandlersFor (channelGuid (pageContextChannel page))
-  chainRoutes chan request (pageHandlers <> contextHandlers)
+  chainRoutes base chan request (pageHandlers <> contextHandlers)
 
 dispatchContextRoute :: BrowserContext -> Value -> Playwright ()
 dispatchContextRoute ctx params = do
@@ -195,23 +201,26 @@ dispatchContextRoute ctx params = do
     chan :: Channel RouteTag
     chan = Channel (channelRefGuid (browserContextRouteEventRoute event))
   request <- requestFromChannel chan
+  base <- lookupContextBaseUrl (channelGuid (browserContextChannel ctx))
   handlers <- routeHandlersFor (channelGuid (browserContextChannel ctx))
-  chainRoutes chan request handlers
+  chainRoutes base chan request handlers
 
-chainRoutes :: Channel RouteTag -> Request -> [(UrlMatch, ChannelRef -> IO Bool)] -> Playwright ()
-chainRoutes chan request handlers =
+-- | The base URL resolves relative globs the way the driver does, so a route
+-- registered as @kek/index.html@ matches the same requests the driver sends.
+chainRoutes :: Maybe Url -> Channel RouteTag -> Request -> [(UrlMatch, ChannelRef -> IO Bool)] -> Playwright ()
+chainRoutes base chan request handlers =
   case handlers of
     [] -> do
       overrides <- lookupRequestOverrides (channelGuid (requestChannel request))
       sendContinue chan True overrides
     (glob, run) : rest -> do
       current <- requestUrl request
-      if matchesUrlMatch glob current
+      if matchesUrlMatch (resolveUrlMatch base glob) current
         then do
           done <- liftIO (run (ChannelRef (channelGuid chan)))
-          unless done (chainRoutes chan request rest)
+          unless done (chainRoutes base chan request rest)
         else
-          chainRoutes chan request rest
+          chainRoutes base chan request rest
 
 updateInterceptionPatterns :: Page -> Playwright ()
 updateInterceptionPatterns page = do

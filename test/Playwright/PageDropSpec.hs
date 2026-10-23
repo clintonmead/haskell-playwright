@@ -44,6 +44,9 @@ import Test.Tasty
 import Test.Tasty.HUnit
   ( testCase
   )
+import UnliftIO.Temporary
+  ( withSystemTempDirectory
+  )
 
 tests :: TestTree
 tests =
@@ -135,6 +138,26 @@ tests =
               assertFailure ("expected DecodeFailure, got: " <> show err)
             Right _ ->
               assertFailure "expected empty drop to fail"
+    , testCase "should drop a file by local path" $
+        -- The library takes file bytes, not a path, so the test reads the file
+        -- itself and drops it under the same name.
+        withSystemTempDirectory "page-drop" $ \dir -> do
+          let path = dir <> "/hello.txt"
+          writeFile path "path-content"
+          bytes <- BS8.readFile path
+          withChromiumPage $ \page -> do
+            setupDropzone page
+            dropOnto
+              (locate page "#dropzone")
+              emptyDropPayload
+                { dropPayloadFiles =
+                    [ DropFile (InputFileName "hello.txt") Nothing bytes
+                    ]
+                }
+            waitForDrop page
+            assertEqual "count" (1 :: Double) =<< evaluateNumber page "() => window.__dropInfo.files.length"
+            assertEqual "name" "hello.txt" =<< evaluateText page "() => window.__dropInfo.files[0].name"
+            assertEqual "text" "path-content" =<< evaluateText page "() => window.__dropInfo.files[0].text"
     ]
 
 setupDropzone :: Page -> Playwright ()

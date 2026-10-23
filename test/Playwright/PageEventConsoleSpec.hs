@@ -18,6 +18,7 @@ import Playwright
   , evaluate
   , defaultGotoOptions
   , evaluateNumber
+  , evaluateText
   , evaluateWith
   , goto
   , urlFromText
@@ -25,6 +26,7 @@ import Playwright
   , jsonValueText
   , onConsole
   , textArgument
+  , waitForPopup
   )
 import Playwright.Harness
   ( withChromiumPage
@@ -32,6 +34,10 @@ import Playwright.Harness
   , assertEqual
   , assertFailure
   , withAssets
+  )
+import UnliftIO.Async
+  ( wait
+  , withAsync
   )
 import UnliftIO.IORef
   ( IORef
@@ -187,7 +193,27 @@ tests =
           assertEqual "count" 3 (length seen)
           let stamps = map consoleMessageTimestamp seen
           assertBool "non-decreasing" (and (zipWith (<=) stamps (drop 1 stamps)))
+    , testCase "should not throw when there are console messages in detached iframes" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          withAsync (waitForPopup page) $ \popupPending -> do
+            _ <- evaluate page (detachedIframeScript prefix)
+            popup <- wait popupPending
+            assertEqual "popup" "2" =<< evaluateText popup "() => String(1 + 1)"
     ]
+
+-- | Opens a popup, logs from an iframe inside it, then removes the iframe.
+detachedIframeScript :: Text -> Text
+detachedIframeScript prefix =
+  "async () => { const win = window.open(''); window['_popup'] = win; "
+    <> "if (window.document.readyState !== 'complete') await new Promise(f => window.addEventListener('load', f)); "
+    <> "win.document.body.innerHTML = `<iframe src='"
+    <> prefix
+    <> "/consolelog.html'></iframe>`; "
+    <> "const frame = win.document.querySelector('iframe'); "
+    <> "if (!frame.contentDocument || frame.contentDocument.readyState !== 'complete') "
+    <> "await new Promise(f => frame.addEventListener('load', f)); "
+    <> "frame.remove(); }"
 
 -- | Collects every console message the page emits, in order. The handler runs
 -- before the command that caused the messages returns, so one evaluate is

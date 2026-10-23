@@ -1,186 +1,224 @@
 module Playwright.PageClickTimeoutSpec
-  ( timeout1Tests
-  , timeout2Tests
-  , timeout3Tests
-  , timeout4Tests
+  ( tests
   ) where
 
-import Control.Monad
-  ( unless
-  )
-import Data.Text
-  ( Text
-  )
 import Playwright
   ( ClickOptions (clickOptionsForce, clickOptionsTimeout)
-  , SpecialJsValue (SpecialUndefined)
+  , Page
+  , Playwright
   , ViewportHeight (ViewportHeight)
-  , ViewportSize (ViewportSize)
+  , ViewportSize (ViewportSize, viewportHeight, viewportWidth)
   , ViewportWidth (ViewportWidth)
-  , clickHandleWith
   , clickWith
   , defaultClickOptions
-  , evalOnSelector
   , evaluate
+  , evaluateBool
   , evaluateNumber
-  , evaluateOnElement
-  , evaluateSpecial
-  , querySelector
-  , selectorFromText
+  , milliseconds
   , setContent
   , setViewportSize
   )
 import Playwright.Harness
-  ( requireTimeout
-  , assertProtocolContains
+  ( assertBool
+  , assertProtocolContainsAll
   , locate
-  , requireHandle
-  , withAssetPage
+  , rafraf
   , withChromiumPage
-  , assertEqual
-  , assertFailure
   )
+import Data.Text
+  ( Text
+  )
+import Data.Text qualified as Text
 import Test.Tasty
   ( TestTree
-  , localOption
-  , mkTimeout
   , testGroup
   )
 import Test.Tasty.HUnit
   ( testCase
   )
 
-timeout1Tests :: TestTree
-timeout1Tests =
-  withLongTimeout $
-    testGroup
-      "page-click-timeout-1"
-      [ testCase "should timeout waiting for button to be enabled" $
-          withChromiumPage $ \page -> do
-            setContent
+tests :: TestTree
+tests =
+  testGroup
+    "page-click-timeout"
+    [ testCase "should timeout waiting for button to be enabled" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<button onclick=\"javascript:window.__CLICKED=true;\" disabled><span>Click target</span></button>"
+          assertProtocolContainsAll
+            [ "Timeout 3000ms exceeded"
+            , "element is not enabled"
+            , "retrying click action"
+            ]
+            $ clickWith
+              (locate page "text=Click target")
+              defaultClickOptions {clickOptionsTimeout = milliseconds 3000}
+          assertBool "not clicked" =<< evaluateBool page "() => window.__CLICKED === undefined"
+    , testCase "should timeout waiting for display:none to be gone" $
+        withButton $ \page -> do
+          _ <- evaluate page "() => { document.querySelector('button').style.display = 'none'; }"
+          assertWaitingForVisibleClick page 5000
+    , testCase "should timeout waiting for visibility:hidden to be gone" $
+        withButton $ \page -> do
+          _ <- evaluate page "() => { document.querySelector('button').style.visibility = 'hidden'; }"
+          assertWaitingForVisibleClick page 5000
+    , testCase "should timeout waiting for hit target" $
+        withButton $ \page -> do
+          addBlocker page "400px" "20px"
+          assertProtocolContainsAll
+            [ "Timeout 5000ms exceeded"
+            , "<div id=\"blocker\"></div> intercepts pointer events"
+            , "retrying click action"
+            , "waiting 500ms"
+            ]
+            $ clickWith
+              (locate page "button")
+              defaultClickOptions {clickOptionsTimeout = milliseconds 5000}
+    , testCase "should still click when force but hit target is obscured" $
+        withButton $ \page -> do
+          addBlocker page "400px" "200px"
+          clickWith
+            (locate page "button")
+            defaultClickOptions {clickOptionsForce = Just True}
+    , testCase "should report wrong hit target subtree" $
+        withButton $ \page -> do
+          _ <-
+            evaluate
               page
-              "<button onclick=\"javascript:window.__CLICKED=true;\" disabled><span>Click target</span></button>"
-            timeout <- requireTimeout 3000
-            assertProtocolContains
-              "Timeout 3000ms exceeded"
-              ( clickWith
-                  (locate page "text=Click target")
-                  defaultClickOptions {clickOptionsTimeout = Just timeout}
+              ( "() => {"
+                  <> " document.body.style.position = 'relative';"
+                  <> " const blocker = document.createElement('div');"
+                  <> " blocker.id = 'blocker';"
+                  <> " blocker.style.position = 'absolute';"
+                  <> " blocker.style.width = '400px';"
+                  <> " blocker.style.height = '20px';"
+                  <> " blocker.style.left = '0';"
+                  <> " blocker.style.top = '0';"
+                  <> " document.body.appendChild(blocker);"
+                  <> " const inner = document.createElement('div');"
+                  <> " inner.id = 'inner';"
+                  <> " inner.style.position = 'absolute';"
+                  <> " inner.style.left = '0';"
+                  <> " inner.style.top = '0';"
+                  <> " inner.style.right = '0';"
+                  <> " inner.style.bottom = '0';"
+                  <> " blocker.appendChild(inner);"
+                  <> " }"
               )
-            special <- evaluateSpecial page "() => window.__CLICKED"
-            assertEqual "not clicked" SpecialUndefined special
-      ]
+          assertProtocolContainsAll
+            [ "Timeout 5000ms exceeded"
+            , "<div id=\"inner\"></div> from <div id=\"blocker\">…</div> subtree intercepts pointer events"
+            , "retrying click action"
+            ]
+            $ clickWith
+              (locate page "button")
+              defaultClickOptions {clickOptionsTimeout = milliseconds 5000}
+    , testCase "should timeout waiting for stable position" $
+        withButton $ \page -> do
+          _ <-
+            evaluate
+              page
+              ( "() => {"
+                  <> " const button = document.querySelector('button');"
+                  <> " button.style.transition = 'margin 5s linear 0s';"
+                  <> " button.style.marginLeft = '200px';"
+                  <> " }"
+              )
+          -- Lets the animation start before the click measures the position.
+          rafraf page 2
+          assertProtocolContainsAll
+            [ "Timeout 3000ms exceeded"
+            , "waiting for element to be visible, enabled and stable"
+            , "element is not stable"
+            , "retrying click action"
+            ]
+            $ clickWith
+              (locate page "button")
+              defaultClickOptions {clickOptionsTimeout = milliseconds 3000}
+    , testCase "should fail to click the button behind a large header after scrolling around" $
+        withChromiumPage $ \page -> do
+          setViewportSize
+            page
+            ViewportSize
+              { viewportWidth = ViewportWidth 500
+              , viewportHeight = ViewportHeight 240
+              }
+          setContent page largeHeaderMarkup
+          _ <- evaluate page "() => document.querySelector('#li14').scrollIntoView()"
+          assertProtocolContainsAll
+            ["<div class=\"fixed\"></div> intercepts pointer events"]
+            $ clickWith
+              (locate page "#target")
+              defaultClickOptions {clickOptionsTimeout = milliseconds 3500}
+          assertBool "not clicked" =<< evaluateBool page "() => window.__clicked === undefined"
+          distinct <- evaluateNumber page "() => new Set(window.scrollTops).size"
+          assertBool "scroll positions" (distinct > 2)
+    ]
 
-timeout2Tests :: TestTree
-timeout2Tests =
-  withLongTimeout $
-    testGroup
-      "page-click-timeout-2"
-      [ testCase "should timeout waiting for display:none to be gone" $
-          hiddenButtonTimeout "b => { b.style.display = 'none'; }"
-      , testCase "should timeout waiting for visibility:hidden to be gone" $
-          hiddenButtonTimeout "b => { b.style.visibility = 'hidden'; }"
-      ]
+-- | Runs the test against a page holding one plain button.
+withButton :: (Page -> Playwright a) -> IO a
+withButton action =
+  withChromiumPage $ \page -> do
+    setContent page "<button>Click target</button>"
+    action page
 
-timeout3Tests :: TestTree
-timeout3Tests =
-  withLongTimeout $
-    testGroup
-      "page-click-timeout-3"
-      [ testCase "should timeout waiting for hit target" $
-          withAssetPage "input/button.html" $ \page -> do
-            button <- requireHandle =<< querySelector page (selectorFromText "button")
-            _ <-
-              evaluate
-                page
-                "() => { document.body.style.position = 'relative'; const blocker = document.createElement('div'); blocker.id = 'blocker'; blocker.style.position = 'absolute'; blocker.style.width = '400px'; blocker.style.height = '20px'; blocker.style.left = '0'; blocker.style.top = '0'; document.body.appendChild(blocker); }"
-            timeout <- requireTimeout 5000
-            assertProtocolContains
-              "Timeout 5000ms exceeded"
-              ( clickHandleWith
-                  button
-                  defaultClickOptions {clickOptionsTimeout = Just timeout}
-              )
-      , testCase "should still click when force but hit target is obscured" $
-          withAssetPage "input/button.html" $ \page -> do
-            button <- requireHandle =<< querySelector page (selectorFromText "button")
-            _ <-
-              evaluate
-                page
-                "() => { document.body.style.position = 'relative'; const blocker = document.createElement('div'); blocker.id = 'blocker'; blocker.style.position = 'absolute'; blocker.style.width = '400px'; blocker.style.height = '200px'; blocker.style.left = '0'; blocker.style.top = '0'; document.body.appendChild(blocker); }"
-            clickHandleWith
-              button
-              defaultClickOptions {clickOptionsForce = Just True}
-      , testCase "should report wrong hit target subtree" $
-          withAssetPage "input/button.html" $ \page -> do
-            button <- requireHandle =<< querySelector page (selectorFromText "button")
-            _ <-
-              evaluate
-                page
-                "() => { document.body.style.position = 'relative'; const blocker = document.createElement('div'); blocker.id = 'blocker'; blocker.style.position = 'absolute'; blocker.style.width = '400px'; blocker.style.height = '20px'; blocker.style.left = '0'; blocker.style.top = '0'; document.body.appendChild(blocker); const inner = document.createElement('div'); inner.id = 'inner'; inner.style.position = 'absolute'; inner.style.left = '0'; inner.style.top = '0'; inner.style.right = '0'; inner.style.bottom = '0'; blocker.appendChild(inner); }"
-            timeout <- requireTimeout 5000
-            assertProtocolContains
-              "Timeout 5000ms exceeded"
-              ( clickHandleWith
-                  button
-                  defaultClickOptions {clickOptionsTimeout = Just timeout}
-              )
-      ]
-
-timeout4Tests :: TestTree
-timeout4Tests =
-  withLongTimeout $
-    testGroup
-      "page-click-timeout-4"
-      [ testCase "should timeout waiting for stable position" $
-          withAssetPage "input/button.html" $ \page -> do
-            button <- requireHandle =<< querySelector page (selectorFromText "button")
-            _ <-
-              evaluateOnElement
-                button
-                "button => { button.style.transition = 'margin 5s linear 0s'; button.style.marginLeft = '200px'; }"
-            timeout <- requireTimeout 3000
-            assertProtocolContains
-              "Timeout 3000ms exceeded"
-              ( clickHandleWith
-                  button
-                  defaultClickOptions {clickOptionsTimeout = Just timeout}
-              )
-      , testCase "should fail to click the button behind a large header after scrolling around" $
-          withChromiumPage $ \page -> do
-            setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 240))
-            setContent page largeHeaderHtml
-            _ <- evalOnSelector page (selectorFromText "#li14") "e => e.scrollIntoView()"
-            timeout <- requireTimeout 3500
-            assertProtocolContains
-              "Timeout 3500ms exceeded"
-              ( clickWith
-                  (locate page "#target")
-                  defaultClickOptions {clickOptionsTimeout = Just timeout}
-              )
-            special <- evaluateSpecial page "() => window.__clicked"
-            assertEqual "not clicked" SpecialUndefined special
-            distinct <- evaluateNumber page "() => new Set(window.scrollTops).size"
-            unless (distinct > 2) $
-              assertFailure ("expected more than 2 scroll positions, got " <> show distinct)
-      ]
-
-hiddenButtonTimeout :: Text -> IO ()
-hiddenButtonTimeout hide =
-  withAssetPage "input/button.html" $ \page -> do
-    _ <- evalOnSelector page (selectorFromText "button") hide
-    timeout <- requireTimeout 5000
-    assertProtocolContains
-      "Timeout 5000ms exceeded"
-      ( clickWith
-          (locate page "button")
-          defaultClickOptions {clickOptionsTimeout = Just timeout}
+-- | Adds an absolutely positioned div over the page's top left corner, which
+-- then intercepts pointer events meant for the button.
+addBlocker :: Page -> Text -> Text -> Playwright ()
+addBlocker page width height = do
+  _ <-
+    evaluate
+      page
+      ( "() => {"
+          <> " document.body.style.position = 'relative';"
+          <> " const blocker = document.createElement('div');"
+          <> " blocker.id = 'blocker';"
+          <> " blocker.style.position = 'absolute';"
+          <> " blocker.style.width = '"
+          <> width
+          <> "';"
+          <> " blocker.style.height = '"
+          <> height
+          <> "';"
+          <> " blocker.style.left = '0';"
+          <> " blocker.style.top = '0';"
+          <> " document.body.appendChild(blocker);"
+          <> " }"
       )
+  pure ()
 
-withLongTimeout :: TestTree -> TestTree
-withLongTimeout =
-  localOption (mkTimeout 30000000)
+-- | Clicks a button hidden by the given style, and expects the click to time out
+-- with the visibility diagnostics.
+assertWaitingForVisibleClick :: Page -> Int -> Playwright ()
+assertWaitingForVisibleClick page timeout =
+  assertProtocolContainsAll
+    [ "Timeout " <> Text.pack (show timeout) <> "ms exceeded"
+    , "waiting for element to be visible, enabled and stable"
+    , "element is not visible"
+    , "retrying click action"
+    ]
+    $ clickWith
+      (locate page "button")
+      defaultClickOptions {clickOptionsTimeout = milliseconds (fromIntegral timeout)}
 
-largeHeaderHtml :: Text
-largeHeaderHtml =
-  "<style>* { padding: 0; margin: 0; } li { height: 80px; border: 1px solid black; } ol { padding-top: 160px; } div.fixed { position: fixed; z-index: 1001; width: 100%; background: rgba(255, 0, 0, 0.2); height: 2000px; }</style><div class=fixed></div><ol><li>hi1</li><li>hi2</li><li>hi3</li><li>hi4</li><li>hi5</li><li>hi6</li><li>hi7</li><li>hi8</li><li id=target onclick=\"window.__clicked = true\">hi9</li><li>hi10</li><li>hi11</li><li>hi12</li><li>hi13</li><li id=li14>hi14</li></ol><script>window.scrollTops = []; window.addEventListener('scroll', () => { window.scrollTops.push(window.scrollY); });</script>"
+largeHeaderMarkup :: Text
+largeHeaderMarkup =
+  Text.unlines
+    [ "<style>"
+    , "* { padding: 0; margin: 0; }"
+    , "li { height: 80px; border: 1px solid black; }"
+    , "ol { padding-top: 160px; }"
+    , "div.fixed { position: fixed; z-index: 1001; width: 100%; background: rgba(255, 0, 0, 0.2); height: 2000px; }"
+    , "</style>"
+    , "<div class=fixed></div>"
+    , "<ol>"
+    , "<li>hi1</li><li>hi2</li><li>hi3</li><li>hi4</li><li>hi5</li><li>hi6</li><li>hi7</li><li>hi8</li>"
+    , "<li id=target onclick=\"window.__clicked = true\">hi9</li>"
+    , "<li>hi10</li><li>hi11</li><li>hi12</li><li>hi13</li><li id=li14>hi14</li>"
+    , "</ol>"
+    , "<script>"
+    , "window.scrollTops = [];"
+    , "window.addEventListener('scroll', () => { window.scrollTops.push(window.scrollY); });"
+    , "</script>"
+    ]

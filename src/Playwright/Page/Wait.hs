@@ -2,6 +2,7 @@ module Playwright.Page.Wait
   ( armConsole
   , armDialog
   , onDialog
+  , onPageDialogClosed
   , armFrameDetached
   , armFrameNavigated
   , armNavigatedFrame
@@ -29,6 +30,9 @@ module Playwright.Page.Wait
   , waitForNavigationWith
   , waitForNavigationOptions
   , armNavigationOptions
+  , waitForNavigationFrame
+  , waitForNavigationFrameOptions
+  , armNavigationFrame
   , waitForPopup
   , armRequest
   , armRequestWhere
@@ -39,6 +43,7 @@ module Playwright.Page.Wait
   , waitForRequestFailedWith
   , armRequestFailed
   , waitForRequestFinished
+  , armRequestFinished
   , waitForRequestWith
   , armResponse
   , armResponseWhere
@@ -73,11 +78,19 @@ import Data.Scientific
 import Data.Text
   ( Text
   )
+import UnliftIO.Async
+  ( race
+  )
+import UnliftIO.Exception
+  ( throwIO
+  )
 import Playwright.Channel
   ( Channel (channelGuid)
   )
 import Playwright.Connection
-  ( registerEventHandler
+  ( lookupContextBaseUrl
+  , lookupMainFramePage
+  , registerEventHandler
   , registerEventWaiter
   , registerFreshEventWaiter
   , registerFutureEventWaiter
@@ -100,9 +113,16 @@ import Playwright.Dialog
 import Playwright.ElementHandle
   ( ElementHandle
   )
+import Playwright.Error
+  ( PlaywrightError (ProtocolRpc)
+  , ProtocolFailure (ProtocolFailure, protocolFailureMessage, protocolFailureName, protocolFailureStack)
+  )
 import Playwright.Frame
   ( Frame (frameChannel)
+  , frameContextBaseUrl
   , frameFromRef
+  , frameNavigationTimeout
+  , mainFrameGuid
   )
 import Playwright.Frame.Wait
   ( waitForFunctionFrame
@@ -111,6 +131,12 @@ import Playwright.Frame.Wait
   , waitForSelectorHandleFrame
   , waitForTimeoutFrame
   )
+import Playwright.Guid
+  ( Guid
+  )
+import Playwright.Json.ChannelRef
+  ( ChannelRef (channelRefGuid)
+  )
 import Playwright.Json.Decode
   ( throwDecode
   )
@@ -118,7 +144,7 @@ import Playwright.JsHandle
   ( JsHandle
   )
 import Playwright.LoadState
-  ( LoadState (LoadStateCommit, LoadStateLoad)
+  ( LoadState (LoadStateCommit, LoadStateDomContentLoaded, LoadStateLoad, LoadStateNetworkIdle)
   )
 import Playwright.MethodName
   ( MethodName (MethodName)
@@ -133,14 +159,15 @@ import Playwright.Page
   , subscribeContext
   )
 import Playwright.Protocol
-  ( BrowserContextDialogEvent (browserContextDialogEventDialog)
+  ( BrowserContextDialogClosedEvent (browserContextDialogClosedEventDialog)
+  , BrowserContextDialogEvent (browserContextDialogEventDialog)
   , LifecycleEvent (LifecycleEventDomcontentloaded, LifecycleEventLoad)
   , BrowserContextPageEvent (browserContextPageEventPage)
   , BrowserContextRequestEvent (browserContextRequestEventRequest)
   , BrowserContextRequestFailedEvent (browserContextRequestFailedEventRequest)
   , BrowserContextRequestFinishedEvent (browserContextRequestFinishedEventRequest)
   , BrowserContextResponseEvent (browserContextResponseEventResponse)
-  , BrowserContextUpdateSubscriptionParamsEvent (BrowserContextUpdateSubscriptionParamsEventConsole, BrowserContextUpdateSubscriptionParamsEventDialog, BrowserContextUpdateSubscriptionParamsEventRequest, BrowserContextUpdateSubscriptionParamsEventRequestFailed, BrowserContextUpdateSubscriptionParamsEventRequestFinished, BrowserContextUpdateSubscriptionParamsEventResponse)
+  , BrowserContextUpdateSubscriptionParamsEvent (BrowserContextUpdateSubscriptionParamsEventConsole, BrowserContextUpdateSubscriptionParamsEventDialog, BrowserContextUpdateSubscriptionParamsEventDialogClosed, BrowserContextUpdateSubscriptionParamsEventRequest, BrowserContextUpdateSubscriptionParamsEventRequestFailed, BrowserContextUpdateSubscriptionParamsEventRequestFinished, BrowserContextUpdateSubscriptionParamsEventResponse)
   , FrameLoadstateEvent (frameLoadstateEventAdd)
   , FrameNavigatedEvent (frameNavigatedEventNewDocument, frameNavigatedEventUrl)
   , FrameNavigatedEventNewDocument (frameNavigatedEventNewDocumentRequest)
@@ -172,9 +199,13 @@ import Playwright.Timeout
   ( Timeout
   , defaultTimeout
   )
+import Playwright.Url
+  ( Url
+  )
 import Playwright.UrlMatch
   ( UrlMatch
   , matchesUrlMatch
+  , resolveUrlMatch
   )
 import Playwright.WaitForNavigationOptions
   ( WaitForNavigationOptions (waitForNavigationOptionsTimeout, waitForNavigationOptionsUrl, waitForNavigationOptionsWaitUntil)
@@ -239,6 +270,19 @@ onDialog page run = do
     $ \params -> do
       event <- throwDecode params
       dialog <- dialogFromRef (browserContextDialogEventDialog event)
+      if maybe False (`pagesEqual` page) (dialogPage dialog)
+        then run dialog
+        else pure ()
+
+onPageDialogClosed :: Page -> (Dialog -> Playwright ()) -> Playwright ()
+onPageDialogClosed page run = do
+  subscribeContext page BrowserContextUpdateSubscriptionParamsEventDialogClosed
+  registerEventHandler
+    (channelGuid (pageContextChannel page))
+    (MethodName "dialogClosed")
+    $ \params -> do
+      event <- throwDecode params
+      dialog <- dialogFromRef (browserContextDialogClosedEventDialog event)
       if maybe False (`pagesEqual` page) (dialogPage dialog)
         then run dialog
         else pure ()
@@ -355,9 +399,10 @@ waitForURLOptions page glob opts = do
 waitForURLWithState :: Page -> UrlMatch -> Timeout -> LoadState -> Playwright ()
 waitForURLWithState page glob timeout state =
   waitWithTimeout timeout $ do
+    base <- lookupContextBaseUrl (channelGuid (pageContextChannel page))
     waitUntilUrl
       (channelGuid (frameChannel (pageMainFrame page)))
-      (matchesUrlMatch glob)
+      (matchesUrlMatch (resolveUrlMatch base glob))
     waitForLoadState page state
 
 waitForNavigation :: Page -> Playwright (Maybe Response)
@@ -441,8 +486,8 @@ collectNavigation page opts = do
 finishNavigation :: Page -> WaitForNavigationOptions -> Value -> Playwright (Maybe Response)
 finishNavigation page opts params = do
   event <- throwDecode params
-  let matches = maybe True (`matchesUrlMatch` frameNavigatedEventUrl event) (waitForNavigationOptionsUrl opts)
-  if matches
+  base <- lookupContextBaseUrl (channelGuid (pageContextChannel page))
+  if navigationMatches base opts event
     then completeNavigation page opts event
     else collectNavigation page opts
 
@@ -453,12 +498,116 @@ completeNavigation page opts event = do
       pure ()
     state ->
       waitForLoadState page state
+  navigatedResponse event
+
+-- | Frame-level counterpart of 'waitForNavigationOptions'. Fails if the frame
+-- detaches before the navigation completes, as upstream does.
+waitForNavigationFrame :: Frame -> Playwright (Maybe Response)
+waitForNavigationFrame frame =
+  waitForNavigationFrameOptions frame defaultWaitForNavigationOptions
+
+waitForNavigationFrameOptions :: Frame -> WaitForNavigationOptions -> Playwright (Maybe Response)
+waitForNavigationFrameOptions frame opts = do
+  takeNavigation <- armNavigationFrame frame opts
+  takeNavigation
+
+-- | Registers for the next navigation of the frame now, so it is not missed
+-- if it starts before the returned action runs. The returned action races the
+-- navigation against a detach of the frame.
+armNavigationFrame :: Frame -> WaitForNavigationOptions -> Playwright (Playwright (Maybe Response))
+armNavigationFrame frame opts = do
+  timeout <-
+    maybe (frameNavigationTimeout frame) pure (waitForNavigationOptionsTimeout opts)
+  let
+    frameGuid = channelGuid (frameChannel frame)
+  waitId <-
+    registerFutureEventWaiter frameGuid (MethodName "navigated")
+  mainGuid <- mainFrameGuid frame
+  pageGuid <- lookupMainFramePage mainGuid
+  detachId <-
+    case pageGuid of
+      Nothing ->
+        pure Nothing
+      Just page ->
+        Just <$> registerFutureEventWaiterWhere page (MethodName "frameDetached") (isDetachOf frameGuid)
+  pure $ do
+    let
+      navigation = waitWithTimeout timeout $ do
+        params <- waitForWaiter waitId
+        finishNavigationFrame frame opts params
+    case detachId of
+      Nothing ->
+        navigation
+      Just detached ->
+        either id id <$> race navigation (waitForWaiter detached >> frameDetachedError opts)
+
+finishNavigationFrame :: Frame -> WaitForNavigationOptions -> Value -> Playwright (Maybe Response)
+finishNavigationFrame frame opts params = do
+  event <- throwDecode params
+  base <- frameContextBaseUrl frame
+  if navigationMatches base opts event
+    then completeNavigationFrame frame opts event
+    else collectNavigationFrame frame opts
+
+collectNavigationFrame :: Frame -> WaitForNavigationOptions -> Playwright (Maybe Response)
+collectNavigationFrame frame opts = do
+  params <- waitForFutureChannelEvent (channelGuid (frameChannel frame)) (MethodName "navigated")
+  finishNavigationFrame frame opts params
+
+completeNavigationFrame :: Frame -> WaitForNavigationOptions -> FrameNavigatedEvent -> Playwright (Maybe Response)
+completeNavigationFrame frame opts event = do
+  case fromMaybe LoadStateLoad (waitForNavigationOptionsWaitUntil opts) of
+    LoadStateCommit ->
+      pure ()
+    state ->
+      waitForLoadStateFrame frame state
+  navigatedResponse event
+
+navigationMatches :: Maybe Url -> WaitForNavigationOptions -> FrameNavigatedEvent -> Bool
+navigationMatches base opts event =
+  maybe True (\glob -> matchesUrlMatch (resolveUrlMatch base glob) (frameNavigatedEventUrl event)) (waitForNavigationOptionsUrl opts)
+
+navigatedResponse :: FrameNavigatedEvent -> Playwright (Maybe Response)
+navigatedResponse event =
   case frameNavigatedEventNewDocument event >>= frameNavigatedEventNewDocumentRequest of
     Nothing ->
       pure Nothing
     Just requestRef -> do
       responseRef <- requestResponseRef (requestFromRef requestRef)
       pure (fmap responseFromRef responseRef)
+
+isDetachOf :: Guid -> Value -> Bool
+isDetachOf frameGuid params =
+  case fromJSON params of
+    Success event ->
+      channelRefGuid (pageFrameDetachedEventFrame event) == frameGuid
+    Error _ ->
+      False
+
+-- | The error upstream raises when the frame detaches mid-navigation. The
+-- wording matches Playwright's, and the call log names the requested load
+-- state.
+frameDetachedError :: WaitForNavigationOptions -> Playwright a
+frameDetachedError opts =
+  throwIO
+    ( ProtocolRpc
+        ProtocolFailure
+          { protocolFailureName = "Error"
+          , protocolFailureMessage =
+              "Navigating frame was detached!\nCall log:\n  - waiting for navigation until \""
+                <> loadStateName (fromMaybe LoadStateLoad (waitForNavigationOptionsWaitUntil opts))
+                <> "\""
+          , protocolFailureStack = Nothing
+          }
+    )
+
+loadStateName :: LoadState -> Text
+loadStateName state =
+  case state of
+    LoadStateCommit -> "commit"
+    LoadStateDomContentLoaded -> "domcontentloaded"
+    LoadStateLoad -> "load"
+    LoadStateNetworkIdle -> "networkidle"
 
 armDialog :: Page -> Playwright (Playwright Dialog)
 armDialog page = do
@@ -536,8 +685,11 @@ armResponse page glob = do
   armResponseWith page glob timeout
 
 armResponseWith :: Page -> UrlMatch -> Timeout -> Playwright (Playwright Response)
-armResponseWith page glob timeout =
-  armResponseWhereWith page (\response -> matchesUrlMatch glob <$> responseUrl response) timeout
+armResponseWith page glob timeout = do
+  base <- lookupContextBaseUrl (channelGuid (pageContextChannel page))
+  let
+    resolved = resolveUrlMatch base glob
+  armResponseWhereWith page (\response -> matchesUrlMatch resolved <$> responseUrl response) timeout
 
 -- | Waits for the next response that the predicate accepts.
 waitForResponseWhere :: Page -> (Response -> Playwright Bool) -> Playwright Response
@@ -589,8 +741,11 @@ armRequest page glob = do
   armRequestWith page glob timeout
 
 armRequestWith :: Page -> UrlMatch -> Timeout -> Playwright (Playwright Request)
-armRequestWith page glob timeout =
-  armRequestWhereWith page (\request -> matchesUrlMatch glob <$> requestUrl request) timeout
+armRequestWith page glob timeout = do
+  base <- lookupContextBaseUrl (channelGuid (pageContextChannel page))
+  let
+    resolved = resolveUrlMatch base glob
+  armRequestWhereWith page (\request -> matchesUrlMatch resolved <$> requestUrl request) timeout
 
 -- | Waits for the next request that the predicate accepts.
 waitForRequestWhere :: Page -> (Request -> Playwright Bool) -> Playwright Request
@@ -655,18 +810,20 @@ armRequestFailedWith page timeout = do
 
 waitForRequestFinished :: Page -> Playwright Request
 waitForRequestFinished page = do
+  takeFinished <- armRequestFinished page
+  takeFinished
+
+-- | Registers for the next finished request before the action that finishes it
+-- runs. See 'armRequestFailed'.
+armRequestFinished :: Page -> Playwright (Playwright Request)
+armRequestFinished page = do
   timeout <- pageActionTimeout page
-  waitWithTimeout timeout $ do
-    subscribeContext page BrowserContextUpdateSubscriptionParamsEventRequestFinished
-    params <-
-      waitForChannelEvent
-        (channelGuid (pageContextChannel page))
-        (MethodName "requestFinished")
+  subscribeContext page BrowserContextUpdateSubscriptionParamsEventRequestFinished
+  waitId <- registerEventWaiter (channelGuid (pageContextChannel page)) (MethodName "requestFinished")
+  pure $ waitWithTimeout timeout $ do
+    params <- waitForWaiter waitId
     event <- throwDecode params
-    pure
-      ( requestFromRef
-          (browserContextRequestFinishedEventRequest event)
-      )
+    pure (requestFromRef (browserContextRequestFinishedEventRequest event))
 
 waitForPopup :: Page -> Playwright Page
 waitForPopup page = do

@@ -37,6 +37,7 @@ module Playwright.Locator
   , getByAltText
   , getByAltTextRegex
   , getByLabel
+  , getByLabelRegex
   , getByPlaceholder
   , getByPlaceholderRegex
   , getByRole
@@ -45,6 +46,7 @@ module Playwright.Locator
   , getByTestIdAttrRegex
   , getByTestIdRegex
   , getByText
+  , getByTextRegex
   , getByTitle
   , getByTitleRegex
   , hover
@@ -86,6 +88,9 @@ module Playwright.Locator
   , uncheck
   , uncheckWith
   , waitFor
+  , waitForFunctionOnLocator
+  , waitForFunctionOnLocatorWith
+  , waitForFunctionOnLocatorWithArg
   , waitForWith
   ) where
 
@@ -141,6 +146,7 @@ import Playwright.DomEventType
   )
 import Playwright.SerializedArgument
   ( SerializedArgument
+  , undefinedArgument
   )
 import Playwright.DropPayload
   ( DropPayload
@@ -209,18 +215,21 @@ import Playwright.Frame.Inspect
   , textContentFrame
   )
 import Playwright.Frame.Wait
-  ( waitForSelectorFrame
+  ( waitForFunctionSelectorFrame
+  , waitForSelectorFrame
   )
 import Playwright.GetBy
   ( getByAltTextSelector
   , getByAltTextSelectorRegex
   , getByLabelSelector
+  , getByLabelSelectorRegex
   , getByPlaceholderSelector
   , getByPlaceholderSelectorRegex
   , getByRoleSelector
   , getByTestIdSelector
   , getByTestIdSelectorRegex
   , getByTextSelector
+  , getByTextSelectorRegex
   , getByTitleSelector
   , getByTitleSelectorRegex
   , hasNotTextSelector
@@ -411,9 +420,17 @@ getByText :: Locator -> Text -> Exactness -> Locator
 getByText loc text exactness =
   childLocator loc (getByTextSelector text exactness)
 
+getByTextRegex :: Locator -> Text -> Locator
+getByTextRegex loc source =
+  childLocator loc (getByTextSelectorRegex source)
+
 getByLabel :: Locator -> Text -> Exactness -> Locator
 getByLabel loc text exactness =
   childLocator loc (getByLabelSelector text exactness)
+
+getByLabelRegex :: Locator -> Text -> Locator
+getByLabelRegex loc source =
+  childLocator loc (getByLabelSelectorRegex source)
 
 getByTestId :: Locator -> Text -> Locator
 getByTestId loc =
@@ -753,6 +770,20 @@ waitFor loc state = do
 waitForWith :: Locator -> Timeout -> WaitForState -> Playwright ()
 waitForWith loc timeout state =
   waitForSelectorFrame (locatorFrame loc) (locatorSelector loc) state timeout (Just True)
+
+waitForFunctionOnLocator :: Locator -> Text -> Playwright ()
+waitForFunctionOnLocator loc expression = do
+  timeout <- locatorActionTimeout loc
+  waitForFunctionOnLocatorWith loc expression timeout
+
+waitForFunctionOnLocatorWith :: Locator -> Text -> Timeout -> Playwright ()
+waitForFunctionOnLocatorWith loc expression timeout =
+  waitForFunctionSelectorFrame (locatorFrame loc) (locatorSelector loc) expression undefinedArgument timeout Nothing
+
+waitForFunctionOnLocatorWithArg :: Locator -> Text -> SerializedArgument -> Playwright ()
+waitForFunctionOnLocatorWithArg loc expression arg = do
+  timeout <- locatorActionTimeout loc
+  waitForFunctionSelectorFrame (locatorFrame loc) (locatorSelector loc) expression arg timeout Nothing
 
 withLocatorElement :: Locator -> (ElementHandle -> Playwright a) -> Playwright a
 withLocatorElement loc action = do

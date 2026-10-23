@@ -2,21 +2,41 @@ module Playwright.PageDialogSpec
   ( tests
   ) where
 
+import Control.Monad.IO.Class
+  ( liftIO
+  )
+import Data.Maybe
+  ( fromMaybe
+  )
+import System.Timeout
+  ( timeout
+  )
 import UnliftIO.Async
   ( withAsync
   )
+import UnliftIO.Concurrent
+  ( threadDelay
+  )
+import UnliftIO.IORef
+  ( IORef
+  , modifyIORef'
+  , newIORef
+  , readIORef
+  )
 import Playwright
   ( Dialog (dialogDefaultValue, dialogMessage, dialogType)
-  , DialogType (DialogAlert, DialogPrompt)
+  , DialogType (DialogAlert, DialogConfirm, DialogPrompt)
   , SpecialJsValue (SpecialNull)
   , acceptDialog
   , acceptDialogWith
   , armDialog
+  , dialogsEqual
   , dismissDialog
   , evaluateBool
   , evaluateSpecial
   , evaluateText
   , onDialog
+  , onPageDialogClosed
   , setContent
   , click
   )
@@ -32,6 +52,18 @@ import Test.Tasty
 import Test.Tasty.HUnit
   ( testCase
   )
+
+-- Waits up to 30 seconds for the first entry to land in the ref.
+awaitClosed :: IORef [a] -> IO [a]
+awaitClosed ref =
+  fromMaybe [] <$> timeout 30000000 (poll ref)
+  where
+    poll :: IORef [a] -> IO [a]
+    poll r = do
+      items <- readIORef r
+      if null items
+        then threadDelay 50000 >> poll r
+        else pure items
 
 tests :: TestTree
 tests =
@@ -102,5 +134,45 @@ tests =
           setContent page "<div onclick=\"window.alert(123); window._clicked=true\">Click me</div>"
           click (locate page "div")
           assertEqual "clicked" True =<< evaluateBool page "() => window._clicked"
+    , testCase "should fire dialogclosed when dialog is accepted" $
+        withChromiumPage $ \page -> do
+          opened <- newIORef []
+          closed <- newIORef []
+          onDialog page $ \dialog -> do
+            liftIO (modifyIORef' opened (dialog :))
+            acceptDialog dialog
+          onPageDialogClosed page (\dialog -> liftIO (modifyIORef' closed (dialog :)))
+          _ <- evaluateBool page "() => { alert('yo'); return true; }"
+          closedDialogs <- liftIO (awaitClosed closed)
+          assertEqual "closed count" 1 (length closedDialogs)
+          openedDialogs <- liftIO (readIORef opened)
+          assertEqual "same dialog" True (and (zipWith dialogsEqual closedDialogs openedDialogs))
+          assertEqual "roundtrip" True =<< evaluateBool page "() => true"
+          assertEqual "roundtrip" True =<< evaluateBool page "() => true"
+          closedAfter <- liftIO (readIORef closed)
+          assertEqual "closed count after roundtrips" 1 (length closedAfter)
+    , testCase "should fire dialogclosed when dialog is dismissed" $
+        withChromiumPage $ \page -> do
+          closed <- newIORef []
+          onDialog page dismissDialog
+          onPageDialogClosed page (\dialog -> liftIO (modifyIORef' closed (dialog :)))
+          _ <- evaluateBool page "() => confirm('boolean?')"
+          closedDialogs <- liftIO (awaitClosed closed)
+          assertEqual "types" [DialogConfirm] (map dialogType closedDialogs)
+          assertEqual "messages" ["boolean?"] (map dialogMessage closedDialogs)
+    , testCase "should fire dialogclosed for auto-dismissed dialogs" $
+        withChromiumPage $ \page -> do
+          closed <- newIORef []
+          onPageDialogClosed page (\dialog -> liftIO (modifyIORef' closed (dialog :)))
+          _ <- evaluateBool page "() => { alert('yo'); return true; }"
+          closedDialogs <- liftIO (awaitClosed closed)
+          assertEqual "types" [DialogAlert] (map dialogType closedDialogs)
+          assertEqual "messages" ["yo"] (map dialogMessage closedDialogs)
+    , testCase "should be able to close context with open alert" $
+        withChromiumPage $ \page -> do
+          takeDialog <- armDialog page
+          _ <- evaluateBool page "() => { window.setTimeout(() => alert('hello'), 0); return true; }"
+          dialog <- takeDialog
+          assertEqual "message" "hello" (dialogMessage dialog)
 
     ]

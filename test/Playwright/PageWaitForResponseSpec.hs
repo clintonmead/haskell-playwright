@@ -17,6 +17,7 @@ import Playwright
   , evaluate
   , goto
   , milliseconds
+  , responseText
   , responseUrl
   , setDefaultTimeout
   , urlFromText
@@ -107,6 +108,25 @@ tests =
           url <- responseUrl response
           assertEqual "url" wanted (urlToText url)
           assertEqual "calls" 1 =<< readIORef calls
+    , testCase "should work with async predicate" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          takeFile <-
+            armResponseWhere page $ \response ->
+              ("contents of the file" `isInfixOf`) <$> responseText response
+          takeJson <-
+            armResponseWhere page $ \response ->
+              ("bar" `isInfixOf`) <$> responseText response
+          _ <-
+            evaluate
+              page
+              "() => { void fetch('/simple.json').then(r => r.json()); void fetch('/file-to-upload.txt').then(r => r.text()); }"
+          fileResponse <- takeFile
+          jsonResponse <- takeJson
+          fileUrl <- responseUrl fileResponse
+          jsonUrl <- responseUrl jsonResponse
+          assertEqual "file url" (prefix <> "/file-to-upload.txt") (urlToText fileUrl)
+          assertEqual "json url" (prefix <> "/simple.json") (urlToText jsonUrl)
     , testCase "should work with no timeout" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions

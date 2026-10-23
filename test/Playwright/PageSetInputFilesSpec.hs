@@ -95,6 +95,27 @@ tests =
             [InputFile (InputFileName "test.txt") "this is a test"]
           assertEqual "count" (1 :: Double) =<< evaluateOnLocatorNumber (locate page "input") "input => input.files.length"
           assertEqual "name" "test.txt" =<< evaluateOnLocatorText (locate page "input") "input => input.files[0].name"
+    , testCase "should upload the file with spaces in name" $
+        withAssetPage "input/fileupload.html" $ \page -> do
+          bytes <- readTestAsset "file to upload.txt"
+          handle <- requireHandle =<< querySelector page (selectorFromText "input")
+          setInputFilesHandle
+            handle
+            [InputFile (InputFileName "file to upload.txt") bytes]
+          assertEqual "name" "file to upload.txt"
+            =<< evaluateOnElementText handle "e => e.files[0].name"
+          assertEqual "contents" "contents of the file"
+            =<< evaluateOnElementText
+              handle
+              "e => { const reader = new FileReader(); const promise = new Promise(fulfill => reader.onload = fulfill); reader.readAsText(e.files[0]); return promise.then(() => reader.result); }"
+    , testCase "input event.composed should be true and cross shadow dom boundary" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<body><script>const div = document.createElement('div'); const shadowRoot = div.attachShadow({mode: 'open'}); shadowRoot.innerHTML = '<input type=file></input>'; document.body.appendChild(div); window.firedBodyEvents = []; window.firedEvents = []; for (const event of ['input', 'change']) { document.body.addEventListener(event, e => window.firedBodyEvents.push(e.type + ':' + e.composed), false); shadowRoot.querySelector('input').addEventListener(event, e => window.firedEvents.push(e.type + ':' + e.composed), false); }</script></body>"
+          setInputFiles (locate page "input") [InputFile (InputFileName "test.txt") "this is a test"]
+          assertEqual "input events" ["input:true", "change:false"] =<< evaluateTexts page "() => window.firedEvents"
+          assertEqual "body events" ["input:true"] =<< evaluateTexts page "() => window.firedBodyEvents"
     , testCase "should work with CSP" $
         withChromiumPage $ \page ->
           withLocalApp cspEmptyApp $ \base -> do

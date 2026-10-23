@@ -4,10 +4,12 @@ module Playwright.PageStrictSpec
 
 import Playwright
   ( DomEventType (DomEventType)
+  , Exactness (Inexact)
   , WaitForState (WaitForAttached)
   , dispatchEvent
   , fill
   , getAttribute
+  , getByText
   , hover
   , querySelectorStrict
   , selectorFromText
@@ -83,4 +85,20 @@ tests =
             page
             "<q:template> </q:template><span>special test description</span><q:template hidden=\"\" aria-hidden=\"true\"><span>special test description</span></q:template>"
           assertProtocolContains "strict mode violation" (hover (locate page "q\\:template"))
+    , testCase "should suggest getByText and filter in the tag-name strict message" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<q:template> </q:template><span>special test description</span><q:template hidden=\"\" aria-hidden=\"true\"><span>special test description</span></q:template>"
+          assertProtocolContains
+            "getByText('special test description').first()"
+            (hover (getByText page "special test description" Inexact))
+          assertProtocolContains
+            "locator('q\\\\:template').filter({ hasText: 'special test description' })"
+            (hover (locate page "q\\:template"))
+    , testCase "should keep the engine name for a \"text=..\" selector in strict mode" $
+        withChromiumPage $ \page -> do
+          setContent page "<div>..loading</div><div>..loading</div>"
+          assertProtocolContains "strict mode violation" (hover (locate page "text=..loading"))
+          assertProtocolContains "locator('text=..loading')" (hover (locate page "text=..loading"))
     ]

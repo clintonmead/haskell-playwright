@@ -1,5 +1,6 @@
 module Playwright.BrowserContext.Wait
-  ( armContextDialog
+  ( armContextConsole
+  , armContextDialog
   , waitForContextConsole
   , waitForContextDialog
   ) where
@@ -18,7 +19,6 @@ import Playwright.Channel
   )
 import Playwright.Connection
   ( registerEventWaiter
-  , waitForChannelEvent
   , waitForWaiter
   )
 import Playwright.ConsoleMessage
@@ -48,12 +48,17 @@ import Playwright.Timeout
 
 waitForContextConsole :: BrowserContext -> Playwright ConsoleMessage
 waitForContextConsole ctx = do
+  takeMessage <- armContextConsole ctx
+  takeMessage
+
+-- | Registers for the next console message before the action that logs runs.
+-- Two waiters only both see the event if both are registered before it fires.
+armContextConsole :: BrowserContext -> Playwright (Playwright ConsoleMessage)
+armContextConsole ctx = do
   subscribeBrowserContext ctx BrowserContextUpdateSubscriptionParamsEventConsole
-  waitWithTimeout defaultTimeout $ do
-    params <-
-      waitForChannelEvent
-        (channelGuid (browserContextChannel ctx))
-        (MethodName "console")
+  waitId <- registerEventWaiter (channelGuid (browserContextChannel ctx)) (MethodName "console")
+  pure $ waitWithTimeout defaultTimeout $ do
+    params <- waitForWaiter waitId
     event <- throwDecode params
     consoleMessageFromEvent (browserContextChannel ctx) event
 

@@ -18,9 +18,20 @@ import Network.Wai
   , responseLBS
   )
 import Playwright
-  ( LoadState (LoadStateCommit, LoadStateDomContentLoaded)
+  ( Frame
+  , LoadState (LoadStateCommit, LoadStateDomContentLoaded)
+  , Page
+  , Playwright
+  , Response
   , UrlMatch (UrlMatchGlob, UrlMatchRegex)
   , WaitForNavigationOptions (waitForNavigationOptionsUrl, waitForNavigationOptionsWaitUntil)
+  , armNavigationFrame
+  , childFrames
+  , evaluateOnFrameText
+  , framesEqual
+  , mainFrame
+  , responseFrame
+  , waitForNavigationFrame
   , waitForNavigationOptions
   , armNavigationOptions
   , click
@@ -41,8 +52,13 @@ import Playwright
   , waitForNavigation
   , waitForNavigationWith
   )
+import Playwright.Error
+  ( PlaywrightError (ProtocolRpc)
+  , ProtocolFailure (protocolFailureMessage)
+  )
 import Playwright.Harness
   ( assertBool
+  , attachFrame
   , locate
   , assertEqual
   , assertFailure
@@ -65,6 +81,9 @@ import Test.Tasty.HUnit
 import UnliftIO.Async
   ( wait
   , withAsync
+  )
+import UnliftIO.Exception
+  ( try
   )
 import UnliftIO.MVar
   ( MVar
@@ -204,7 +223,66 @@ tests =
             _ <- evaluate page "() => { history.pushState({}, '', '/third.html'); }"
             _ <- wait pending
             pure ()
+    , testCase "should work on frame" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/frames/one-frame.html")) defaultGotoOptions
+          child <- firstChild page
+          withAsync (waitForNavigationFrame child) $ \nav -> do
+            _ <-
+              evaluateOnFrameText
+                child
+                ("() => { window.location.href = '" <> prefix <> "/grid.html'; return ''; }")
+            response <- wait nav
+            case response of
+              Nothing ->
+                assertFailure "expected navigation response"
+              Just value -> do
+                assertEqual "ok" True =<< responseOk value
+                url' <- responseUrl value
+                assertBool "grid.html" ("grid.html" `isInfixOf` urlToText url')
+                frame <- responseFrame value
+                assertEqual "response frame" True (maybe False (framesEqual child) frame)
+            current <- url page
+            assertBool "page url" ("/frames/one-frame.html" `isInfixOf` urlToText current)
+    , testCase "should fail when frame detaches" $ do
+        assets <- testAssetsDir
+        arrived <- newEmptyMVar
+        release <- newEmptyMVar
+        withChromiumPage $ \page ->
+          withLocalApp (stallingStylesheetApp assets arrived release) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            frame <- attachFrame page "frame1" (prefix <> "/empty.html")
+            takeNavigation <- armNavigationFrame frame defaultWaitForNavigationOptions
+            withAsync takeNavigation $ \pending -> do
+              _ <-
+                evaluateTextWith
+                  page
+                  "url => { document.querySelector('iframe').src = url; return url; }"
+                  (textArgument (prefix <> "/one-style.html"))
+              takeMVar arrived
+              _ <- evaluate page "() => setTimeout(() => document.querySelector('iframe').remove(), 0)"
+              result <-
+                try (wait pending)
+                  :: Playwright (Either PlaywrightError (Maybe Response))
+              putMVar release ()
+              case result of
+                Left (ProtocolRpc failure) -> do
+                  let
+                    message = protocolFailureMessage failure
+                  assertBool "waiting" ("waiting for navigation until \"load\"" `isInfixOf` message)
+                  assertBool "detached" ("frame was detached" `isInfixOf` message)
+                Left err ->
+                  assertFailure ("expected ProtocolRpc, got: " <> show err)
+                Right _ ->
+                  assertFailure "expected the frame detach to fail the wait"
     ]
+
+firstChild :: Page -> Playwright Frame
+firstChild page = do
+  children <- childFrames (mainFrame page)
+  case children of
+    child : _ -> pure child
+    [] -> assertFailure "expected a child frame"
 
 -- | Serves a page whose script never finishes until the test releases it.
 stallingScriptApp :: MVar () -> Application

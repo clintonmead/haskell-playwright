@@ -4,16 +4,20 @@ module Playwright.PageMouseSpec
 
 import Control.Monad
   ( forM_
+  , void
   )
 import Data.Text
   ( Text
   )
 import Playwright
-  ( Key (Key)
+  ( BoundingBox (boundingBoxHeight, boundingBoxWidth, boundingBoxX, boundingBoxY)
+  , CssPixel (cssPixelToScientific)
+  , Key (Key)
   , MouseButton (MouseButtonLeft, MouseButtonMiddle, MouseButtonRight)
   , Page
   , Playwright
   , Point (Point)
+  , WaitForState (WaitForAttached)
   , cssPixelFromDouble
   , cssPixelFromInt
   , click
@@ -24,9 +28,13 @@ import Playwright
   , evaluateNumbersWith
   , evaluateText
   , evaluateTexts
+  , focus
+  , frames
   , hover
   , keyboardDown
+  , keyboardType
   , keyboardUp
+  , locatorBoundingBox
   , mouseClick
   , mouseClickWith
   , mouseDblclick
@@ -39,12 +47,16 @@ import Playwright
   , selectorFromText
   , setContent
   , undefinedArgument
+  , waitForFunction
+  , waitForSelector
+  , waitForSelectorHandleOnFrame
   )
 import Playwright.Harness
   ( locate
   , withAssetPage
   , withChromiumPage
   , assertEqual
+  , assertFailure
   )
 import Test.Tasty
   ( TestTree
@@ -209,6 +221,85 @@ tests =
             "events"
             ("[{\"type\":\"pointermove\",\"pointerType\":\"mouse\"},{\"type\":\"pointerdown\",\"pointerType\":\"mouse\"},{\"type\":\"pointerup\",\"pointerType\":\"mouse\"}]" :: Text)
             =<< evaluateText page "() => JSON.stringify(window.__EVENTS)"
+    , testCase "should dispatch mouse move after context menu was opened" $
+        withChromiumPage $ \page -> do
+          _ <-
+            evaluate
+              page
+              "() => { window.contextMenuPromise = new Promise(resolve => { window.addEventListener('contextmenu', resolve, false); }); }"
+          mouseMove page (Point (cssPixelFromInt 100) (cssPixelFromInt 100))
+          mouseDownWith page (Just MouseButtonRight)
+          _ <- evaluateBool page "() => window.contextMenuPromise.then(() => true)"
+          forM_ [10, 30, 60, 90 :: Int] $ \radius ->
+            forM_ [0 .. 19 :: Int] $ \i -> do
+              let angle = 2 * pi * fromIntegral i / 20 :: Double
+                  x = 100 + round (fromIntegral radius * cos angle) :: Int
+                  y = 100 + round (fromIntegral radius * sin angle) :: Int
+              mouseMove page (Point (cssPixelFromInt x) (cssPixelFromInt y))
+    , testCase "should select the text with mouse" $
+        withAssetPage "input/textarea.html" $ \page -> do
+          focus (locate page "textarea")
+          let text :: Text
+              text = "This is the text that we are going to try to select. Let's see how it goes."
+          keyboardType page text
+          -- Firefox needs an extra frame here after typing or it will fail to set the scrollTop
+          _ <-
+            evaluateBool
+              page
+              "() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))"
+          _ <- evaluate page "() => document.querySelector('textarea').scrollTop = 0"
+          x <- evaluateNumber page "() => document.querySelector('textarea').getBoundingClientRect().left"
+          y <- evaluateNumber page "() => document.querySelector('textarea').getBoundingClientRect().top"
+          mouseMove page (Point (cssPixelFromDouble (x + 2)) (cssPixelFromDouble (y + 2)))
+          mouseDown page
+          mouseMove page (Point (cssPixelFromInt 200) (cssPixelFromInt 200))
+          mouseUp page
+          selected <-
+            evaluateText
+              page
+              "() => { const textarea = document.querySelector('textarea'); return textarea.value.substring(textarea.selectionStart, textarea.selectionEnd); }"
+          assertEqual "selected text" text selected
+    , -- Upstream skips this test unless it runs headless. The harness has no headless option, so this assumes headless.
+      testCase "should track hover across iframe boundaries" $
+        withChromiumPage $ \page -> do
+          setContent page $
+            mconcat
+              [ "<style>body, html { margin: 0; padding: 0; }"
+              , " #parentBox { position: absolute; left: 10px; top: 10px; width: 100px; height: 100px; }"
+              , " iframe { position: absolute; left: 200px; top: 10px; width: 200px; height: 200px; border: none; }</style>"
+              , "<div id=\"parentBox\"></div>"
+              , "<iframe srcdoc=\""
+              , "<style>body, html { margin: 0; padding: 0; } #childBox { width: 180px; height: 180px; }</style>"
+              , "<div id='childBox'></div>"
+              , "<script>"
+              , "const box = document.querySelector('#childBox');"
+              , "box.addEventListener('mouseenter', () => window.top.__log.push('child:enter'));"
+              , "box.addEventListener('mouseleave', () => window.top.__log.push('child:leave'));"
+              , "</script>"
+              , "\"></iframe>"
+              , "<script>"
+              , "window.__log = [];"
+              , "const box = document.querySelector('#parentBox');"
+              , "box.addEventListener('mouseenter', () => window.__log.push('parent:enter'));"
+              , "box.addEventListener('mouseleave', () => window.__log.push('parent:leave'));"
+              , "</script>"
+              ]
+          waitForSelector page (selectorFromText "iframe") WaitForAttached
+          frameList <- frames page
+          child <- case drop 1 frameList of
+            (frame : _) -> pure frame
+            [] -> assertFailure "expected a child frame"
+          _ <- waitForSelectorHandleOnFrame child (selectorFromText "#childBox") WaitForAttached
+          parentBox <- requireBox =<< locatorBoundingBox (locate page "#parentBox")
+          iframeBox <- requireBox =<< locatorBoundingBox (locate page "iframe")
+          let (parentX, parentY) = centre parentBox
+              (childX, childY) = (pixels (boundingBoxX iframeBox) + 90, pixels (boundingBoxY iframeBox) + 90)
+          mouseMove page (pointAt parentX parentY)
+          waitForLog page "parent:enter"
+          mouseMove page (pointAt childX childY)
+          waitForLog page "parent:enter,parent:leave,child:enter"
+          mouseMove page (pointAt parentX parentY)
+          waitForLog page "parent:enter,parent:leave,child:enter,child:leave,parent:enter"
     ]
 
 modifiers :: [(Text, Text)]
@@ -222,3 +313,25 @@ modifiers =
 clickButton3 :: Page -> Playwright ()
 clickButton3 page =
   click (locate page "#button-3")
+
+waitForLog :: Page -> Text -> Playwright ()
+waitForLog page expected =
+  void (waitForFunction page ("() => window.__log.join(',') === '" <> expected <> "'"))
+
+requireBox :: Maybe BoundingBox -> Playwright BoundingBox
+requireBox =
+  maybe (assertFailure "expected a bounding box") pure
+
+pixels :: CssPixel -> Double
+pixels =
+  realToFrac . cssPixelToScientific
+
+centre :: BoundingBox -> (Double, Double)
+centre box =
+  ( pixels (boundingBoxX box) + pixels (boundingBoxWidth box) / 2
+  , pixels (boundingBoxY box) + pixels (boundingBoxHeight box) / 2
+  )
+
+pointAt :: Double -> Double -> Point
+pointAt x y =
+  Point (cssPixelFromDouble x) (cssPixelFromDouble y)

@@ -5,6 +5,7 @@ module Playwright.Harness
   , assertFailure
   , assertStillPending
   , assertProtocolContains
+  , assertProtocolContainsAll
   , assertWaitTimeout
   , attachFrame
   , locate
@@ -366,6 +367,25 @@ assertProtocolContains needle action = do
       assertFailure ("expected ProtocolRpc, got: " <> show err)
     Right _ ->
       assertFailure ("expected protocol error containing " <> unpack needle)
+
+assertProtocolContainsAll :: [Text] -> Playwright a -> Playwright ()
+assertProtocolContainsAll needles action = do
+  result <- try action
+  case result of
+    Left (ProtocolRpc failure) ->
+      case filter (\needle -> not (needle `isInfixOf` protocolFailureMessage failure)) needles of
+        [] -> pure ()
+        missing ->
+          assertFailure
+            ( "expected protocol error to contain "
+                <> show (fmap unpack missing)
+                <> ", got: "
+                <> unpack (protocolFailureMessage failure)
+            )
+    Left err ->
+      assertFailure ("expected ProtocolRpc, got: " <> show err)
+    Right _ ->
+      assertFailure ("expected protocol error containing " <> show (fmap unpack needles))
 
 assertWaitTimeout :: Playwright a -> Playwright ()
 assertWaitTimeout action = do

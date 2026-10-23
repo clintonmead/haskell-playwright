@@ -2,6 +2,10 @@ module Playwright.EmulationFocusSpec
   ( tests
   ) where
 
+import Data.ByteString
+  ( ByteString
+  )
+import Data.ByteString qualified as BS
 import Data.Text
   ( Text
   )
@@ -10,11 +14,15 @@ import Playwright
   , Page
   , Playwright
   , Point (Point)
+  , ViewportHeight (ViewportHeight)
+  , ViewportSize (ViewportSize)
+  , ViewportWidth (ViewportWidth)
   , click
   , cssPixelFromInt
   , defaultGotoOptions
   , defaultLaunchOptions
   , defaultNewContextOptions
+  , defaultScreenshotOptions
   , evaluate
   , evaluateBool
   , evaluateHandleOnFrame
@@ -32,8 +40,10 @@ import Playwright
   , newBrowserPage
   , newContextWith
   , newPage
+  , screenshot
   , selectorFromText
   , setContent
+  , setViewportSize
   , textArgument
   , urlFromText
   , waitForPopup
@@ -49,6 +59,7 @@ import Playwright.Harness
   , withChromiumBrowser
   , withChromiumContext
   , withChromiumPage
+  , assertBool
   , assertEqual
   )
 import Test.Tasty
@@ -181,7 +192,36 @@ tests =
             assertEqual "p1 again" (2 :: Double) =<< evaluateNumber page1 "() => window.clicked"
             assertEqual "p2 again" (2 :: Double) =<< evaluateNumber page2 "() => window.clicked"
             assertEqual "p3 again" (2 :: Double) =<< evaluateNumber page3 "() => window.clicked"
+    , testCase "should not affect screenshots" $
+        withAssetsContextWith defaultNewContextOptions $ \prefix ctx page -> do
+          page2 <- newPage ctx
+          setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 500))
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          setViewportSize page2 (ViewportSize (ViewportWidth 50) (ViewportHeight 50))
+          _ <- goto page2 (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          focus (locate page "body")
+          focus (locate page2 "body")
+          sanity <- screenshot page defaultScreenshotOptions
+          cell <- screenshot page2 defaultScreenshotOptions
+          -- Upstream compares these against snapshots; a PNG signature and IHDR size check is the closest byte-level check here.
+          assertBool "sanity screenshot is a png" (pngMagic `BS.isPrefixOf` sanity)
+          assertEqual "sanity size" (500, 500) (pngSize sanity)
+          assertBool "grid cell screenshot is a png" (pngMagic `BS.isPrefixOf` cell)
+          assertEqual "grid cell size" (50, 50) (pngSize cell)
     ]
+
+pngMagic :: ByteString
+pngMagic =
+  "\137PNG\r\n\26\n"
+
+-- Width and height come from the IHDR chunk: big-endian u32 at bytes 16-19 and 20-23.
+pngSize :: ByteString -> (Int, Int)
+pngSize image =
+  (bigEndian32 (BS.take 4 (BS.drop 16 image)), bigEndian32 (BS.take 4 (BS.drop 20 image)))
+
+bigEndian32 :: ByteString -> Int
+bigEndian32 =
+  BS.foldl' (\acc byte -> acc * 256 + fromIntegral byte) 0
 
 setHoverContent :: Page -> Playwright ()
 setHoverContent page =
