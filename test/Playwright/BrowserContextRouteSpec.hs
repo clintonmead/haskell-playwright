@@ -132,6 +132,11 @@ import Test.Tasty.HUnit
   ( testCase
   )
 
+-- Upstream cases not ported here:
+--   should work with ignoreHTTPSErrors: needs the HTTPS test server, which the harness does not have.
+--   should work if handler with times parameter was removed from another handler: unrouteContext
+--     removes every handler for a pattern, not one handler, so the second handler cannot remove only the first.
+
 tests :: TestTree
 tests =
   testGroup
