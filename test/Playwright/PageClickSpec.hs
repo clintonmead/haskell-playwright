@@ -868,6 +868,18 @@ tests =
           assertProtocolContains
             "<div id=\"inner\"></div> from <div id=\"blocker\">…</div> subtree intercepts pointer events"
             (clickHandleWith button defaultClickOptions {clickOptionsTimeout = milliseconds 5000})
+    , testCase "should click a button that is overlaid by a permission popup" $
+        withAssets $ \prefix page -> do
+          setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 500))
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          setContent
+            page
+            "<style>body, html { padding: 0; margin: 0; }</style><script type='text/javascript'>window.addEventListener('DOMContentLoaded', () => { for (let i = 0; i < 100; ++i) { const button = document.createElement('button'); button.textContent = i; button.style.setProperty('width', '50px'); button.style.setProperty('height', '50px'); document.body.append(button); } }, false);</script>"
+          -- Issue a geolocation request. This should show a browser popup.
+          _ <- evaluate page "() => { navigator.geolocation.getCurrentPosition(position => { }); }"
+          -- If popup blocks the click, then some of the clicks below will hang.
+          forM_ [0 :: Int .. 29] $ \i ->
+            clickWith (locate page ("text=\"" <> pack (show i) <> "\"")) defaultClickOptions {clickOptionsTimeout = milliseconds 5000}
     ]
 
 waitUntilEnabled :: Text -> Text -> Text -> IO ()
