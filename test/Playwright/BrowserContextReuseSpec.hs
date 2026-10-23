@@ -7,7 +7,8 @@ module Playwright.BrowserContextReuseSpec
 -- Not ported:
 --   * the connect scenario for every case (src has no launchServer or connect);
 --   * "should reset tracing" (src has no tracing API);
---   * "should work with routeWebSocket" (src has no routeWebSocket).
+--   * "should work with routeWebSocket" (src now has routeWebSocket, but this
+--     case has not been ported yet; it is left for a follow-up port).
 
 import Control.Concurrent
   ( threadDelay
