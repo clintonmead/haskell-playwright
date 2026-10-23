@@ -68,12 +68,12 @@ import Playwright.Protocol
   , PageScreencastFrameAckResult
   , PageScreencastFrameEvent (pageScreencastFrameEventData, pageScreencastFrameEventFrameId, pageScreencastFrameEventTimestamp, pageScreencastFrameEventViewportHeight, pageScreencastFrameEventViewportWidth)
   , PageScreencastStartParams (pageScreencastStartParamsFps, pageScreencastStartParamsQuality, pageScreencastStartParamsRecord, pageScreencastStartParamsSendFrames, pageScreencastStartParamsSize)
+  , PageScreencastStartParamsSize (PageScreencastStartParamsSize, pageScreencastStartParamsSizeHeight, pageScreencastStartParamsSizeWidth)
   , PageScreencastStartResult (pageScreencastStartResultArtifact)
   , PageScreencastStopResult
   , mkArtifactSaveAsParams
   , mkPageScreencastFrameAckParams
   , mkPageScreencastStartParams
-  , mkPageScreencastStartParamsSize
   , mkPageScreencastStopParams
   )
 import Playwright.Session
@@ -182,9 +182,10 @@ screencastStart page options = do
   pure (ScreencastHandle page generation)
   where
     sizeParams size =
-      mkPageScreencastStartParamsSize
-        (screencastSizeWidth size)
-        (screencastSizeHeight size)
+      PageScreencastStartParamsSize
+        { pageScreencastStartParamsSizeWidth = screencastSizeWidth size
+        , pageScreencastStartParamsSizeHeight = screencastSizeHeight size
+        }
 
 -- | Stops the screencast on the page. Does nothing when none is running. When
 -- the screencast recorded to a path, the recording is saved there.
