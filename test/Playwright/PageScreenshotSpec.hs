@@ -10,8 +10,11 @@ import Data.Text
   ( isInfixOf
   )
 import Playwright
-  ( ScreenshotOptions
-      ( screenshotOptionsOmitBackground
+  ( BoundingBox (BoundingBox)
+  , ScreenshotOptions
+      ( screenshotOptionsClip
+      , screenshotOptionsFullPage
+      , screenshotOptionsOmitBackground
       , screenshotOptionsQuality
       , screenshotOptionsType
       )
@@ -19,8 +22,10 @@ import Playwright
   , ViewportHeight (ViewportHeight)
   , ViewportSize (ViewportSize)
   , ViewportWidth (ViewportWidth)
+  , cssPixelFromInt
   , defaultGotoOptions
   , defaultScreenshotOptions
+  , evaluate
   , goto
   , screenshot
   , setViewportSize
@@ -33,6 +38,7 @@ import Playwright.Error
 import Playwright.Harness
   ( withAssets
   , assertBool
+  , assertEqual
   , assertFailure
   )
 import Test.Tasty
@@ -41,6 +47,9 @@ import Test.Tasty
   )
 import Test.Tasty.HUnit
   ( testCase
+  )
+import UnliftIO.Async
+  ( mapConcurrently
   )
 import UnliftIO.Exception
   ( try
@@ -129,7 +138,86 @@ tests =
               assertFailure ("expected ProtocolRpc, got: " <> show err)
             Right _ ->
               assertFailure "expected webp quality 101 to throw"
+    , testCase "should clip rect" $
+        withAssets $ \prefix page -> do
+          setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 500))
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          image <- screenshot page (withClip 50 100 150 100)
+          assertEqual "clipped png size" (150, 100) (pngSize image)
+    , testCase "should clip rect with fullPage" $
+        withAssets $ \prefix page -> do
+          setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 500))
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          _ <- evaluate page "() => window.scrollBy(150, 200)"
+          image <- screenshot page ((withClip 50 100 150 100) {screenshotOptionsFullPage = Just True})
+          assertEqual "clipped fullPage png size" (150, 100) (pngSize image)
+    , testCase "should clip elements to the viewport" $
+        withAssets $ \prefix page -> do
+          setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 500))
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          image <- screenshot page (withClip 50 450 1000 100)
+          assertEqual "clipped to the viewport" (450, 50) (pngSize image)
+    , testCase "should throw on clip outside the viewport" $
+        withAssets $ \prefix page -> do
+          setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 500))
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          result <- try (screenshot page (withClip 50 650 100 100))
+          case result of
+            Left (ProtocolRpc failure) ->
+              assertBool
+                "clip outside the viewport"
+                ("Clipped area is either empty or outside the resulting image" `isInfixOf` protocolFailureMessage failure)
+            Left err ->
+              assertFailure ("expected ProtocolRpc, got: " <> show err)
+            Right _ ->
+              assertFailure "expected clip outside the viewport to throw"
+    , testCase "should throw on a negative clip size" $
+        withAssets $ \prefix page -> do
+          setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 500))
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          result <- try (screenshot page (withClip 50 50 (-100) 100))
+          case result of
+            Left (ProtocolRpc failure) ->
+              assertBool
+                "negative clip width"
+                ("Expected options.clip.width to be greater than 0" `isInfixOf` protocolFailureMessage failure)
+            Left err ->
+              assertFailure ("expected ProtocolRpc, got: " <> show err)
+            Right _ ->
+              assertFailure "expected negative clip width to throw"
+    , testCase "should run in parallel" $
+        withAssets $ \prefix page -> do
+          setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 500))
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          images <- mapConcurrently (\i -> screenshot page (withClip (50 * i) 0 50 50)) [0, 1, 2]
+          mapM_ (assertEqual "grid cell size" (50, 50) . pngSize) images
+    , testCase "should work with odd clip size" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          image <- screenshot page (withClip 0 0 11 11)
+          assertEqual "odd clip png size" (11, 11) (pngSize image)
     ]
+
+withClip :: Int -> Int -> Int -> Int -> ScreenshotOptions
+withClip x y width height =
+  defaultScreenshotOptions
+    { screenshotOptionsClip =
+        Just
+          ( BoundingBox
+              (cssPixelFromInt x)
+              (cssPixelFromInt y)
+              (cssPixelFromInt width)
+              (cssPixelFromInt height)
+          )
+    }
+
+pngSize :: ByteString -> (Int, Int)
+pngSize image =
+  (bigEndian32 (BS.take 4 (BS.drop 16 image)), bigEndian32 (BS.take 4 (BS.drop 20 image)))
+
+bigEndian32 :: ByteString -> Int
+bigEndian32 =
+  BS.foldl' (\acc byte -> acc * 256 + fromIntegral byte) 0
 
 withType :: ScreenshotType -> ScreenshotOptions
 withType screenshotType =

@@ -1682,6 +1682,7 @@ import Playwright.RouteOptions
 import Playwright.ScreenshotOptions
   ( ScreenshotOptions
       ( ScreenshotOptions
+      , screenshotOptionsClip
       , screenshotOptionsFullPage
       , screenshotOptionsOmitBackground
       , screenshotOptionsQuality

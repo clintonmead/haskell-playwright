@@ -11,15 +11,27 @@ import Autodocodec
   , bimapCodec
   , object
   , optionalField'
+  , optionalFieldWith'
   , requiredField'
+  , requiredFieldWith'
   , (.=)
   )
 import Data.Aeson
   ( FromJSON
   , ToJSON
   )
+import Data.Scientific
+  ( Scientific
+  )
 import Data.Text
   ( Text
+  )
+import Playwright.BoundingBox
+  ( BoundingBox (BoundingBox, boundingBoxHeight, boundingBoxWidth, boundingBoxX, boundingBoxY)
+  )
+import Playwright.CssPixel
+  ( CssPixel (CssPixel)
+  , cssPixelToScientific
   )
 import Playwright.Timeout
   ( Timeout
@@ -32,6 +44,7 @@ data ScreenshotOptions = ScreenshotOptions
   , screenshotOptionsType :: Maybe ScreenshotType
   , screenshotOptionsQuality :: Maybe Int
   , screenshotOptionsOmitBackground :: Maybe Bool
+  , screenshotOptionsClip :: Maybe BoundingBox
   }
   deriving stock (Eq, Show)
   deriving (FromJSON, ToJSON) via (Autodocodec ScreenshotOptions)
@@ -50,6 +63,7 @@ defaultScreenshotOptions =
     , screenshotOptionsType = Nothing
     , screenshotOptionsQuality = Nothing
     , screenshotOptionsOmitBackground = Nothing
+    , screenshotOptionsClip = Nothing
     }
 
 instance HasCodec ScreenshotOptions where
@@ -61,6 +75,20 @@ instance HasCodec ScreenshotOptions where
         <*> optionalField' "type" .= screenshotOptionsType
         <*> optionalField' "quality" .= screenshotOptionsQuality
         <*> optionalField' "omitBackground" .= screenshotOptionsOmitBackground
+        <*> optionalFieldWith' "clip" boundingBoxCodec .= screenshotOptionsClip
+
+boundingBoxCodec :: JSONCodec BoundingBox
+boundingBoxCodec =
+  object "ScreenshotClip" $
+    BoundingBox
+      <$> requiredFieldWith' "x" cssPixelCodec .= boundingBoxX
+      <*> requiredFieldWith' "y" cssPixelCodec .= boundingBoxY
+      <*> requiredFieldWith' "width" cssPixelCodec .= boundingBoxWidth
+      <*> requiredFieldWith' "height" cssPixelCodec .= boundingBoxHeight
+
+cssPixelCodec :: JSONCodec CssPixel
+cssPixelCodec =
+  bimapCodec (Right . CssPixel) cssPixelToScientific (codec :: JSONCodec Scientific)
 
 instance HasCodec ScreenshotType where
   codec =

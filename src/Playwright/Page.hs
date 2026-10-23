@@ -221,7 +221,8 @@ import Playwright.Protocol
   , PageReloadResult (pageReloadResultResponse)
   , PageRequestGCResult
   , PageScreenshotParams
-      ( pageScreenshotParamsFullPage
+      ( pageScreenshotParamsClip
+      , pageScreenshotParamsFullPage
       , pageScreenshotParamsOmitBackground
       , pageScreenshotParamsQuality
       , pageScreenshotParamsType
@@ -234,6 +235,7 @@ import Playwright.Protocol
   , PageScreenshotResult (pageScreenshotResultBinary)
   , PageSetExtraHTTPHeadersResult
   , PageSetViewportSizeResult
+  , Rect (Rect, rectHeight, rectWidth, rectX, rectY)
   , mkBrowserContextCloseParams
   , mkBrowserContextUpdateSubscriptionParams
   , mkFrameAddScriptTagParams
@@ -269,9 +271,16 @@ import Playwright.PdfOptions
   ( PdfOptions (pdfOptionsOutline, pdfOptionsTagged)
   , defaultPdfOptions
   )
+import Playwright.BoundingBox
+  ( BoundingBox (boundingBoxHeight, boundingBoxWidth, boundingBoxX, boundingBoxY)
+  )
+import Playwright.CssPixel
+  ( CssPixel (cssPixelToScientific)
+  )
 import Playwright.ScreenshotOptions
   ( ScreenshotOptions
-      ( screenshotOptionsFullPage
+      ( screenshotOptionsClip
+      , screenshotOptionsFullPage
       , screenshotOptionsOmitBackground
       , screenshotOptionsQuality
       , screenshotOptionsTimeout
@@ -499,9 +508,17 @@ screenshot page opts = do
         , pageScreenshotParamsType = screenshotTypeParam <$> screenshotOptionsType opts
         , pageScreenshotParamsQuality = screenshotOptionsQuality opts
         , pageScreenshotParamsOmitBackground = screenshotOptionsOmitBackground opts
+        , pageScreenshotParamsClip = screenshotClipParam <$> screenshotOptionsClip opts
         }
   pure (protocolBinaryToByteString (pageScreenshotResultBinary result))
   where
+    screenshotClipParam clip =
+      Rect
+        { rectX = cssPixelToScientific (boundingBoxX clip)
+        , rectY = cssPixelToScientific (boundingBoxY clip)
+        , rectWidth = cssPixelToScientific (boundingBoxWidth clip)
+        , rectHeight = cssPixelToScientific (boundingBoxHeight clip)
+        }
     screenshotTypeParam screenshotType =
       case screenshotType of
         ScreenshotPng ->
