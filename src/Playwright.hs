@@ -730,6 +730,8 @@ module Playwright
   , requestFailure
   , requestGC
   , requestHeaders
+  , requestHeaderValue
+  , requestHeadersArray
   , requestIsNavigation
   , requestMethod
   , requestPostData
@@ -1923,6 +1925,8 @@ import Playwright.Request
   , requestAllHeaders
   , requestFailure
   , requestHeaders
+  , requestHeaderValue
+  , requestHeadersArray
   , requestIsNavigation
   , requestMethod
   , requestPostData

@@ -5,6 +5,8 @@ module Playwright.Request
   , requestFrameRef
   , requestFailure
   , requestHeaders
+  , requestHeaderValue
+  , requestHeadersArray
   , requestIsNavigation
   , requestMethod
   , requestPostData
@@ -279,6 +281,30 @@ requestHeaders request = do
       pure headers
     Nothing ->
       fmap (fmap fromNameValue . requestInitializerHeaders) (requestInitializer request)
+
+-- | The request headers as sent, one entry per line, so a repeated name
+-- appears once for each line. Names are as the browser sent them.
+requestHeadersArray :: Request -> Playwright [HttpHeader]
+requestHeadersArray =
+  requestHeaders
+
+-- | The merged value of one request header, looked up case-insensitively.
+-- Repeated lines are joined with ', ' as upstream headerValue() does.
+requestHeaderValue :: Request -> HeaderName -> Playwright (Maybe Text)
+requestHeaderValue request name = do
+  headers <- requestHeadersArray request
+  let
+    wanted = Text.toLower (headerNameToText name)
+    values =
+      [ headerValueToText (httpHeaderValue header)
+      | header <- headers
+      , Text.toLower (headerNameToText (httpHeaderName header)) == wanted
+      ]
+  pure
+    ( if null values
+        then Nothing
+        else Just (Text.intercalate ", " values)
+    )
 
 requestAllHeaders :: Request -> Playwright [HttpHeader]
 requestAllHeaders request = do
