@@ -214,6 +214,8 @@ tests =
               assertEqual "url" (prefix <> "/empty.html") (urlToText (apiResponseUrl response))
       , testCase "should support gzip compression" $
           compressionTest "gzip" (GZip.compress "Hello, world!")
+      , testCase "should support case-insensitive content-encoding" $
+          compressionTest "GZIP" (GZip.compress "Hello, world!")
       , testCase "should throw informative error on corrupted gzip body" $
           corruptedCompressionTest "gzip"
       , testCase "should support deflate compression" $
