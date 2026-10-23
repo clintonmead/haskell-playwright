@@ -13,6 +13,7 @@ module Playwright.GlobalFetchSupport
   , authorizationRedirectApp
   , withAuthApp
   , authApp
+  , withTwoUser1Apps
   , validCredentials
   , credentialsOriginTest
   , credentialsOriginPortTest
@@ -361,6 +362,21 @@ authApp :: Application
 authApp request respond =
   case lookupHeader "authorization" (requestHeaders request) of
     Just "Basic dXNlcjpwYXNz" ->
+      respond (responseLBS status200 [(hContentType, "text/html")] "<html></html>")
+    _ ->
+      respond (responseLBS status401 [("WWW-Authenticate", "Basic realm=\"test\"")] "")
+
+-- | Two servers on 127.0.0.1 with different ports, both requiring user1:pass1.
+withTwoUser1Apps :: (Text -> Text -> IO a) -> IO a
+withTwoUser1Apps action =
+  withApplication (pure user1App) $ \port1 ->
+    withApplication (pure user1App) $ \port2 ->
+      action ("http://127.0.0.1:" <> pack (show port1)) ("http://127.0.0.1:" <> pack (show port2))
+
+user1App :: Application
+user1App request respond =
+  case lookupHeader "authorization" (requestHeaders request) of
+    Just "Basic dXNlcjE6cGFzczE=" ->
       respond (responseLBS status200 [(hContentType, "text/html")] "<html></html>")
     _ ->
       respond (responseLBS status401 [("WWW-Authenticate", "Basic realm=\"test\"")] "")

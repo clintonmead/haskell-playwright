@@ -12,10 +12,11 @@ import Data.Text
   )
 import Playwright
   ( HttpCredentials (HttpCredentials, httpCredentialsOrigin, httpCredentialsPassword, httpCredentialsSend, httpCredentialsUsername)
+  , HttpCredentialsSend (HttpCredentialsSendAlways, HttpCredentialsSendUnauthorized)
   , HttpPassword (HttpPassword)
   , HttpStatus (httpStatusToInt)
   , HttpUsername (HttpUsername)
-  , NewRequestOptions (newRequestHttpCredentials, newRequestTimeout, newRequestUserAgent)
+  , NewRequestOptions (newRequestHttpCredentials, newRequestHttpCredentialsList, newRequestTimeout, newRequestUserAgent)
   , UserAgent (UserAgent)
   , apiResponseJson
   , apiResponseOk
@@ -50,6 +51,7 @@ import Playwright.GlobalFetchSupport
   , extraHeadersRedirects
   , authorizationRedirectTest
   , withAuthApp
+  , withTwoUser1Apps
   , validCredentials
   , lookupHeader
   )
@@ -159,6 +161,65 @@ tests =
                 second <- fetchGet request2 (urlFromText (prefix <> "/empty.html"))
                 assertEqual "authorized" 200 (httpStatusToInt (apiResponseStatus second))
                 disposeAPIRequestContext request2
+        , testCase "should support multiple httpCredentials" $
+            withTwoUser1Apps $ \prefix1 prefix2 ->
+              runPlaywright $ do
+                request <-
+                  newRequestContextWith
+                    defaultNewRequestOptions
+                      { newRequestHttpCredentialsList =
+                          [ HttpCredentials
+                              { httpCredentialsUsername = HttpUsername "user1"
+                              , httpCredentialsPassword = HttpPassword "pass1"
+                              , httpCredentialsOrigin = Just (urlFromText prefix1)
+                              , httpCredentialsSend = Nothing
+                              }
+                          , HttpCredentials
+                              { httpCredentialsUsername = HttpUsername "user2"
+                              , httpCredentialsPassword = HttpPassword "pass2"
+                              , httpCredentialsOrigin = Just (urlFromText prefix2)
+                              , httpCredentialsSend = Nothing
+                              }
+                          ]
+                      }
+                response1 <- fetchGet request (urlFromText (prefix1 <> "/empty.html"))
+                assertEqual "first origin" 200 (httpStatusToInt (apiResponseStatus response1))
+                -- Wrong credentials are picked for the other origin.
+                response2 <- fetchGet request (urlFromText (prefix2 <> "/empty.html"))
+                assertEqual "second origin" 401 (httpStatusToInt (apiResponseStatus response2))
+                disposeAPIRequestContext request
+        , testCase "should support HTTPCredentials.send with multiple httpCredentials" $
+            withHeaderCapture $ \prefix1 captured1 ->
+              withHeaderCapture $ \prefix2 captured2 ->
+                runPlaywright $ do
+                  request <-
+                    newRequestContextWith
+                      defaultNewRequestOptions
+                        { newRequestHttpCredentialsList =
+                            [ HttpCredentials
+                                { httpCredentialsUsername = HttpUsername "user1"
+                                , httpCredentialsPassword = HttpPassword "pass1"
+                                , httpCredentialsOrigin = Just (urlFromText prefix1)
+                                , httpCredentialsSend = Just HttpCredentialsSendAlways
+                                }
+                            , HttpCredentials
+                                { httpCredentialsUsername = HttpUsername "user2"
+                                , httpCredentialsPassword = HttpPassword "pass2"
+                                , httpCredentialsOrigin = Just (urlFromText prefix2)
+                                , httpCredentialsSend = Just HttpCredentialsSendUnauthorized
+                                }
+                            ]
+                        }
+                  response1 <- fetchGet request (urlFromText (prefix1 <> "/empty.html"))
+                  auth1 <- lookupHeader "authorization" <$> takeCaptured captured1
+                  assertEqual "first status" 200 (httpStatusToInt (apiResponseStatus response1))
+                  assertEqual "first auth" (Just "Basic dXNlcjE6cGFzczE=") auth1
+                  response2 <- fetchGet request (urlFromText (prefix2 <> "/empty.html"))
+                  auth2 <- lookupHeader "authorization" <$> takeCaptured captured2
+                  assertEqual "second status" 200 (httpStatusToInt (apiResponseStatus response2))
+                  -- This origin has send: unauthorized, so credentials are not sent proactively.
+                  assertEqual "second auth" Nothing auth2
+                  disposeAPIRequestContext request
         , testCase "should return error with wrong credentials" $
             withAuthApp $ \prefix ->
               runPlaywright $ do
