@@ -176,6 +176,24 @@ tests =
                 =<< evaluateText
                   page
                   "async () => { const response = await fetch('/echo-auth', { headers: { 'Authorization': 'Bearer my-own-app-token' } }); return await response.text(); }"
+    , testCase "should work with correct credentials and matching origin" $
+        withAuthServer $ \port ->
+          withChromiumContextWith
+            defaultNewContextOptions
+              {newContextHttpCredentials = Just (credentialsWithOrigin ("http://127.0.0.1:" <> pack (show port)))}
+            $ \_ page -> do
+              response <-
+                goto page (urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/empty.html")) defaultGotoOptions
+              assertEqual "status" 200 =<< statusCode response
+    , testCase "should work with correct credentials and matching origin case insensitive" $
+        withAuthServer $ \port ->
+          withChromiumContextWith
+            defaultNewContextOptions
+              {newContextHttpCredentials = Just (credentialsWithOrigin ("HTTP://127.0.0.1:" <> pack (show port)))}
+            $ \_ page -> do
+              response <-
+                goto page (urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/empty.html")) defaultGotoOptions
+              assertEqual "status" 200 =<< statusCode response
     ]
 
 -- | Answers /echo-auth with the Authorization header the request sent, and

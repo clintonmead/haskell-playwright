@@ -704,3 +704,13 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 **Why not verified:** The scratch build used the working-tree spec, so the screenshot run does not show that the uncommitted spec compiles cleanly on its own.
 
 **To change:** Commit the working-tree `PageClickTimeoutSpec.hs` with its page-click group, or revert `test/Main.hs` to match HEAD's export list.
+
+## browsercontext-credentials: widen the credentials API to a list?
+
+**Question:** Upstream `context.setHTTPCredentials` and the `httpCredentials` context option accept `HTTPCredentials | Array<HTTPCredentials>` (`upstream-typescript-playwright/packages/playwright-core/types/types.d.ts:25916`). Four upstream cases need the list form: "should work with setHTTPCredentials and multiple credentials", "should work with multiple credentials for different origins", "should fall back to credentials without origin", and "should use the first matching credential". The Haskell API takes one credential: `newContextHttpCredentials :: Maybe HttpCredentials` and `setHTTPCredentials :: BrowserContext -> HttpCredentials -> Playwright ()`. Should it accept a list?
+
+**Guess taken:** Keep the public API as it is and leave the four cases open in `progress/FUNCTIONALITY_TODO.md`. Widening the existing functions would break every current `Just creds` and `setHTTPCredentials ctx creds` caller. The wire format already takes a list: `toProtocolCredentials` wraps one value in a one-element list.
+
+**Why not verified:** Nothing has been built against a list signature, so the breakage count and the cost of each option are estimates. The single-credential case "should work with a single credential in an array" is marked covered, because the single-value case exercises the same wire shape. That covers the array shape, not the type.
+
+**To change:** Pick one of these. (a) Widen the existing functions to `HttpCredentials` or `[HttpCredentials]`, with a `Maybe` or list-typed field. This breaks callers, and this is a change to the API. (b) Add non-breaking variants, such as `setHTTPCredentialsList` and a `newContextHttpCredentialsList` field. (c) Leave the four cases skipped. Tell me which, and I will port the four cases against it.
