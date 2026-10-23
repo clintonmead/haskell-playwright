@@ -6,6 +6,9 @@ import Data.ByteString
   ( ByteString
   )
 import Data.ByteString qualified as BS
+import Control.Monad.IO.Class
+  ( liftIO
+  )
 import Data.Text
   ( isInfixOf
   )
@@ -15,6 +18,7 @@ import Playwright
       ( screenshotOptionsClip
       , screenshotOptionsFullPage
       , screenshotOptionsOmitBackground
+      , screenshotOptionsPath
       , screenshotOptionsQuality
       , screenshotOptionsType
       )
@@ -32,7 +36,7 @@ import Playwright
   , urlFromText
   )
 import Playwright.Error
-  ( PlaywrightError (ProtocolRpc)
+  ( PlaywrightError (DecodeFailure, ProtocolRpc)
   , ProtocolFailure (protocolFailureMessage)
   )
 import Playwright.Harness
@@ -53,6 +57,9 @@ import UnliftIO.Async
   )
 import UnliftIO.Exception
   ( try
+  )
+import UnliftIO.Temporary
+  ( withSystemTempDirectory
   )
 
 tests :: TestTree
@@ -196,6 +203,70 @@ tests =
           _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
           image <- screenshot page (withClip 0 0 11 11)
           assertEqual "odd clip png size" (11, 11) (pngSize image)
+    , testCase "path option should work" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          withSystemTempDirectory "pw-screenshot-path" $ \dir -> do
+            let path = dir <> "/shot.png"
+            image <- screenshot page defaultScreenshotOptions {screenshotOptionsPath = Just path}
+            saved <- liftIO (BS.readFile path)
+            assertBool "png signature" (pngMagic `BS.isPrefixOf` saved)
+            assertEqual "saved bytes match returned bytes" image saved
+    , testCase "path option should create subdirectories" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          withSystemTempDirectory "pw-screenshot-path" $ \dir -> do
+            let path = dir <> "/nested/deeper/shot.png"
+            image <- screenshot page defaultScreenshotOptions {screenshotOptionsPath = Just path}
+            saved <- liftIO (BS.readFile path)
+            assertEqual "saved bytes match returned bytes" image saved
+    , testCase "path option should detect jpeg" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          withSystemTempDirectory "pw-screenshot-path" $ \dir -> do
+            let path = dir <> "/shot.jpeg"
+            image <- screenshot page defaultScreenshotOptions {screenshotOptionsPath = Just path}
+            saved <- liftIO (BS.readFile path)
+            assertBool "jpeg signature" (jpegMagic `BS.isPrefixOf` saved)
+            assertEqual "saved bytes match returned bytes" image saved
+    , testCase "path option should detect webp" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          withSystemTempDirectory "pw-screenshot-path" $ \dir -> do
+            let path = dir <> "/shot.webp"
+            image <- screenshot page defaultScreenshotOptions {screenshotOptionsPath = Just path}
+            saved <- liftIO (BS.readFile path)
+            assertBool "webp signature" (isWebp saved)
+            assertEqual "saved bytes match returned bytes" image saved
+    , testCase "path option should throw for unsupported mime type" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          withSystemTempDirectory "pw-screenshot-path" $ \dir -> do
+            result <-
+              try
+                (screenshot page defaultScreenshotOptions {screenshotOptionsPath = Just (dir <> "/shot.txt")})
+            case result of
+              Left (DecodeFailure message) ->
+                assertEqual "unsupported mime type" "path: unsupported mime type \"text/plain\"" message
+              Left err ->
+                assertFailure ("expected DecodeFailure, got: " <> show err)
+              Right _ ->
+                assertFailure "expected unsupported mime type to throw"
+    , testCase "should prefer type over extension" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          withSystemTempDirectory "pw-screenshot-path" $ \dir -> do
+            let path = dir <> "/shot.png"
+            image <-
+              screenshot
+                page
+                defaultScreenshotOptions
+                  { screenshotOptionsType = Just ScreenshotJpeg
+                  , screenshotOptionsPath = Just path
+                  }
+            saved <- liftIO (BS.readFile path)
+            assertBool "jpeg signature" (jpegMagic `BS.isPrefixOf` image)
+            assertEqual "saved bytes match returned bytes" image saved
     ]
 
 withClip :: Int -> Int -> Int -> Int -> ScreenshotOptions

@@ -26,6 +26,7 @@ import Data.Scientific
 import Data.Text
   ( Text
   )
+import Data.Text qualified as Text
 import Playwright.BoundingBox
   ( BoundingBox (BoundingBox, boundingBoxHeight, boundingBoxWidth, boundingBoxX, boundingBoxY)
   )
@@ -45,6 +46,7 @@ data ScreenshotOptions = ScreenshotOptions
   , screenshotOptionsQuality :: Maybe Int
   , screenshotOptionsOmitBackground :: Maybe Bool
   , screenshotOptionsClip :: Maybe BoundingBox
+  , screenshotOptionsPath :: Maybe FilePath
   }
   deriving stock (Eq, Show)
   deriving (FromJSON, ToJSON) via (Autodocodec ScreenshotOptions)
@@ -64,6 +66,7 @@ defaultScreenshotOptions =
     , screenshotOptionsQuality = Nothing
     , screenshotOptionsOmitBackground = Nothing
     , screenshotOptionsClip = Nothing
+    , screenshotOptionsPath = Nothing
     }
 
 instance HasCodec ScreenshotOptions where
@@ -76,6 +79,11 @@ instance HasCodec ScreenshotOptions where
         <*> optionalField' "quality" .= screenshotOptionsQuality
         <*> optionalField' "omitBackground" .= screenshotOptionsOmitBackground
         <*> optionalFieldWith' "clip" boundingBoxCodec .= screenshotOptionsClip
+        <*> optionalFieldWith' "path" filePathCodec .= screenshotOptionsPath
+
+filePathCodec :: JSONCodec FilePath
+filePathCodec =
+  bimapCodec (Right . Text.unpack) Text.pack (codec :: JSONCodec Text)
 
 boundingBoxCodec :: JSONCodec BoundingBox
 boundingBoxCodec =

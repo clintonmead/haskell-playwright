@@ -1685,6 +1685,7 @@ import Playwright.ScreenshotOptions
       , screenshotOptionsClip
       , screenshotOptionsFullPage
       , screenshotOptionsOmitBackground
+      , screenshotOptionsPath
       , screenshotOptionsQuality
       , screenshotOptionsTimeout
       , screenshotOptionsType

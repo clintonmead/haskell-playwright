@@ -632,3 +632,13 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 **Why not verified:** Not decided with the user. The skip is recorded in the TODO.
 
 **To change:** Add a decoder dependency (for example `JuicyPixels`) and port the pixel cases, if the user wants that coverage.
+
+## page-screenshot: path error type and mime table
+
+**Question:** Upstream throws a plain error for an unsupported `path` extension (`path: unsupported mime type "..."`). Which Haskell constructor should carry it, and how much of the upstream mime table should the port carry?
+
+**Guess taken:** Raise `DecodeFailure` with the upstream message, because it is the existing client-side argument error (`PlaywrightError`). The mime table is partial: `png`, `jpg`, `jpeg`, `jpe`, `webp` and `txt`. Unknown extensions, and paths with no extension, resolve to `"null"` in the message, as upstream does. The extension match is case-sensitive, as upstream's is.
+
+**Why not verified:** Not decided with the user. The error text matches upstream, but no Haskell-side convention was checked against other client-side errors.
+
+**To change:** Give the path error its own constructor, or widen the mime table to the full upstream list.

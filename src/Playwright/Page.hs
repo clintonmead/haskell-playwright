@@ -76,7 +76,14 @@ import Control.Monad
   ( filterM
   )
 import Data.Maybe
-  ( listToMaybe
+  ( fromMaybe
+  , listToMaybe
+  )
+import System.Directory
+  ( createDirectoryIfMissing
+  )
+import System.FilePath
+  ( takeDirectory
   )
 import Data.List
   ( find
@@ -146,7 +153,7 @@ import Playwright.ElementHandle
   , elementHandleFromRef
   )
 import Playwright.Error
-  ( PlaywrightError (MissingObject)
+  ( PlaywrightError (DecodeFailure, MissingObject)
   , ignoreTargetClosed
   )
 import Playwright.Exactness
@@ -282,6 +289,7 @@ import Playwright.ScreenshotOptions
       ( screenshotOptionsClip
       , screenshotOptionsFullPage
       , screenshotOptionsOmitBackground
+      , screenshotOptionsPath
       , screenshotOptionsQuality
       , screenshotOptionsTimeout
       , screenshotOptionsType
@@ -498,6 +506,7 @@ setViewportSize page size = do
 
 screenshot :: Page -> ScreenshotOptions -> Playwright ByteString
 screenshot page opts = do
+  resolvedType <- either (throwIO . DecodeFailure) pure (resolveScreenshotType opts)
   result <-
     sendWithTimeout
       (pageChannel page)
@@ -505,13 +514,49 @@ screenshot page opts = do
       (screenshotOptionsTimeout opts)
       (mkPageScreenshotParams)
         { pageScreenshotParamsFullPage = screenshotOptionsFullPage opts
-        , pageScreenshotParamsType = screenshotTypeParam <$> screenshotOptionsType opts
+        , pageScreenshotParamsType = screenshotTypeParam <$> resolvedType
         , pageScreenshotParamsQuality = screenshotOptionsQuality opts
         , pageScreenshotParamsOmitBackground = screenshotOptionsOmitBackground opts
         , pageScreenshotParamsClip = screenshotClipParam <$> screenshotOptionsClip opts
         }
-  pure (protocolBinaryToByteString (pageScreenshotResultBinary result))
+  let bytes = protocolBinaryToByteString (pageScreenshotResultBinary result)
+  mapM_ (\filePath -> liftIO (writeScreenshotFile filePath bytes)) (screenshotOptionsPath opts)
+  pure bytes
   where
+    resolveScreenshotType options =
+      case (screenshotOptionsType options, screenshotOptionsPath options) of
+        (Nothing, Just filePath) ->
+          typeFromPath filePath
+        (screenshotType, _) ->
+          Right screenshotType
+    typeFromPath filePath =
+      case fromMaybe "null" (mimeTypeForPath filePath) of
+        "image/png" ->
+          Right (Just ScreenshotPng)
+        "image/jpeg" ->
+          Right (Just ScreenshotJpeg)
+        "image/webp" ->
+          Right (Just ScreenshotWebp)
+        mimeType ->
+          Left ("path: unsupported mime type \"" <> mimeType <> "\"")
+    mimeTypeForPath filePath =
+      case break (== '.') (reverse filePath) of
+        (reversedExtension, '.' : _) ->
+          lookup (Text.pack (reverse reversedExtension)) mimeTypes
+        _ ->
+          Nothing
+    mimeTypes :: [(Text, Text)]
+    mimeTypes =
+      [ ("png", "image/png")
+      , ("jpg", "image/jpeg")
+      , ("jpeg", "image/jpeg")
+      , ("jpe", "image/jpeg")
+      , ("webp", "image/webp")
+      , ("txt", "text/plain")
+      ]
+    writeScreenshotFile filePath bytes = do
+      createDirectoryIfMissing True (takeDirectory filePath)
+      ByteString.writeFile filePath bytes
     screenshotClipParam clip =
       Rect
         { rectX = cssPixelToScientific (boundingBoxX clip)
