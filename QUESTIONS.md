@@ -135,3 +135,9 @@ Each line below links to the full entry in [progress/QUESTIONS-ARCHIVE.md](progr
 - **launchServer is not added as a separate method.** Upstream `BrowserType.launchServer` is client-side: it launches and then calls `browser.bind`. Guess: the Haskell API exposes `bindBrowser` / `bindBrowserWith` / `unbindBrowser` (driver channels `Browser.startServer` / `Browser.stopServer`) and leaves `launchServer` as a launch-then-bind composition for later.
 - **Connect is not implemented.** `BrowserType.connect` needs LocalUtils.connect and a second Connection. Cases that call `browserType.connect` are skipped until that exists.
 - **PWTEST_SERVER_REGISTRY is set with setEnv in the test process before the driver spawns.** The driver reads the variable at start (it is inherited from the process environment). Guess: the descriptor case must not run in parallel with other cases that spawn drivers.
+
+## browser-server / launcher / channels / signals (feat-browser-server)
+
+- Q: Should `launchServer` be its own method? A: No. Haskell exposes `bindBrowser`, `bindBrowserWith` and `unbindBrowser` over `Browser.startServer` and `Browser.stopServer`. Best guess: launch-then-bind composition comes later.
+- Q: The launcher headed-no-xserver case. A: Skipped. The message is only produced when Chromium logs "Missing X server", and Chromium 1248 starts headed with DISPLAY unset on this host, so the assertion cannot pass here. Best guess: a port needs a host where Chromium fails without a display.
+- Q: channels and signals cases. A: All skipped, since they need `_debugScopeState()`, Node's `domain` module, or the Node-side `launchServer` child process. Best guess: revisit once the driver exposes an introspection channel and a launch-server path exists.
