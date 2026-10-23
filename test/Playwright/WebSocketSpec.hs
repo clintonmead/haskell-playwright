@@ -391,6 +391,8 @@ tests =
                 assertEqual "foo header" (Just "bar") (headerNamed "foo" headers)
             else
               pure ()
+    -- Skipped: "should turn off when offline". Upstream calls `it.fixme()` unconditionally,
+    -- so there is no active upstream behaviour to match.
     ]
 
 -- | Upstream marks extra handshake headers as fixme for Chromium before 151,
