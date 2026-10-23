@@ -177,6 +177,7 @@ module Playwright
   , PropertyName (..)
   , ProxyHost (..)
   , ProxySettings (..)
+  , parseProxyPattern
   , RegisterSelectorOptions (..)
   , ReducedMotion (..)
   , Request (..)
@@ -2011,6 +2012,9 @@ import Playwright.PropertyName
 import Playwright.ProxySettings
   ( ProxyHost (ProxyHost, proxyHostToText)
   , ProxySettings (ProxySettings, proxySettingsBypass, proxySettingsPassword, proxySettingsServer, proxySettingsUsername)
+  )
+import Playwright.ProxyPattern
+  ( parseProxyPattern
   )
 import Playwright.Request
   ( Request (Request, requestChannel)
