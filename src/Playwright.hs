@@ -660,6 +660,8 @@ module Playwright
   , onLoad
   , onBrowserContext
   , onConsole
+  , removeAllConsoleListeners
+  , ListenerRemoval (..)
   , onContextClose
   , onContextPage
   , onContextPageClose
@@ -1790,6 +1792,9 @@ import Playwright.Page
   , framePage
   , mainFrame
   )
+import Playwright.EventHandler
+  ( ListenerRemoval (RemoveListeners, RemoveIgnoringErrors, RemoveWaiting)
+  )
 import Playwright.Page.Wait
   ( armConsole
   , armDialog
@@ -1803,6 +1808,7 @@ import Playwright.Page.Wait
   , armPopup
   , onLoad
   , onConsole
+  , removeAllConsoleListeners
   , waitForConsole
   , waitForConsoleWhere
   , waitForDialog

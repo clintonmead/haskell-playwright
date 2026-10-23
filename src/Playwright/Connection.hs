@@ -8,6 +8,8 @@ module Playwright.Connection
   , lookupObject
   , registerDispatchEventHandler
   , registerEventHandler
+  , registerScopedEventHandler
+  , removeScopedEventHandlers
   , registerEventWaiter
   , registerFreshEventWaiter
   , waitForChannelEvent
@@ -131,6 +133,9 @@ import Playwright.Connection.Handlers
   , waitForDispatchedHandlers
   )
 import Playwright.Connection.Handlers qualified as Handlers
+import Playwright.EventHandler
+  ( ListenerRemoval
+  )
 import Playwright.Connection.Store qualified as Store
 import Playwright.Connection.Types
   ( Connection (Connection, connectionHandlerQueue, connectionSession, connectionTransport)
@@ -487,6 +492,21 @@ registerDispatchEventHandler guid method onDispatch run = do
     Handlers.registerDispatchHandler conn guid method
       (\params -> runPlaywrightWith conn (onDispatch params))
       (\params -> runPlaywrightWith conn (run params))
+
+-- | Registers a handler under a scope, such as a page, so its listeners can be
+-- removed with 'removeScopedEventHandlers'.
+registerScopedEventHandler :: Guid -> Guid -> MethodName -> (Value -> Playwright ()) -> Playwright ()
+registerScopedEventHandler scope guid method run = do
+  conn <- askConnection
+  liftIO $
+    Handlers.registerScopedEventHandler conn scope guid method $ \params ->
+      runPlaywrightWith conn (run params)
+
+-- | Removes the handlers registered under the scope for the method. See
+-- 'ListenerRemoval' for how runs still in flight are treated.
+removeScopedEventHandlers :: Guid -> MethodName -> ListenerRemoval -> Playwright ()
+removeScopedEventHandlers scope method removal =
+  inConnection $ \conn -> Handlers.removeScopedEventHandlers conn scope method removal
 
 storePlaywrightGuids :: Guid -> Guid -> Guid -> Guid -> Playwright ()
 storePlaywrightGuids playwrightGuid chromiumGuid firefoxGuid webkitGuid =

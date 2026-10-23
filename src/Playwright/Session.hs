@@ -2,12 +2,16 @@ module Playwright.Session
   ( Session (..)
   , ScreencastSession (..)
   , HarRecorder (..)
+  , ScopedRuns (..)
   , emptySession
   , removeWaiter
   ) where
 
 import Control.Concurrent
   ( ThreadId
+  )
+import Control.Exception
+  ( SomeException
   )
 import Data.Aeson qualified as Aeson
 import Data.Map.Strict
@@ -125,6 +129,7 @@ data Session = Session
   , sessionDisposedObjects :: Map Guid RemoteObject
   , sessionRequestEndTiming :: Map Guid Scientific
   , sessionRequestFailures :: Map Guid Text
+  , sessionScopedRuns :: Map (Guid, MethodName) ScopedRuns
   , sessionPendingHandlers :: Int
   , sessionHandlerThreads :: Set ThreadId
   , sessionLocatorHandlers :: Map Guid (Map Int StoredLocatorHandler)
@@ -133,6 +138,13 @@ data Session = Session
   , sessionChromiumGuid :: Maybe Guid
   , sessionFirefoxGuid :: Maybe Guid
   , sessionWebkitGuid :: Maybe Guid
+  }
+
+-- | Runs queued for one scope and method: how many are still pending, and the
+-- errors the finished ones raised, newest first.
+data ScopedRuns = ScopedRuns
+  { scopedRunsPending :: Int
+  , scopedRunsErrors :: [SomeException]
   }
 
 emptySession :: Session
@@ -170,6 +182,7 @@ emptySession =
     , sessionDisposedObjects = Map.empty
     , sessionRequestEndTiming = Map.empty
     , sessionRequestFailures = Map.empty
+    , sessionScopedRuns = Map.empty
     , sessionPendingHandlers = 0
     , sessionHandlerThreads = Set.empty
     , sessionLocatorHandlers = Map.empty

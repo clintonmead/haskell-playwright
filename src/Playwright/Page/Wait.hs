@@ -10,6 +10,7 @@ module Playwright.Page.Wait
   , armPopup
   , onLoad
   , onConsole
+  , removeAllConsoleListeners
   , waitForConsole
   , waitForConsoleWhere
   , waitForDialog
@@ -87,11 +88,16 @@ import UnliftIO.Exception
 import Playwright.Channel
   ( Channel (channelGuid)
   )
+import Playwright.EventHandler
+  ( ListenerRemoval
+  )
 import Playwright.Connection
   ( lookupContextBaseUrl
   , lookupMainFramePage
   , registerEventHandler
   , registerEventWaiter
+  , registerScopedEventHandler
+  , removeScopedEventHandlers
   , registerFreshEventWaiter
   , registerFutureEventWaiter
   , registerFutureEventWaiterWhere
@@ -290,7 +296,8 @@ onPageDialogClosed page run = do
 onConsole :: Page -> (ConsoleMessage -> Playwright ()) -> Playwright ()
 onConsole page run = do
   subscribeContext page BrowserContextUpdateSubscriptionParamsEventConsole
-  registerEventHandler
+  registerScopedEventHandler
+    (channelGuid (pageChannel page))
     (channelGuid (pageContextChannel page))
     (MethodName "console")
     $ \params -> do
@@ -302,6 +309,13 @@ onConsole page run = do
               run message
         _ ->
           pure ()
+
+-- | Removes every console listener added with 'onConsole' for this page, as
+-- upstream's @removeAllListeners('console')@ does. 'RemoveWaiting' waits for
+-- listeners still running and rethrows the first error one of them raised.
+removeAllConsoleListeners :: Page -> ListenerRemoval -> Playwright ()
+removeAllConsoleListeners page =
+  removeScopedEventHandlers (channelGuid (pageChannel page)) (MethodName "console")
 
 waitForLoadEvent :: Page -> Playwright ()
 waitForLoadEvent page = do
