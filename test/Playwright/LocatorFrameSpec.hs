@@ -3,9 +3,19 @@ module Playwright.LocatorFrameSpec
   ) where
 
 import Playwright
-  ( ContentType (ContentType)
+  ( AriaRole (AriaRole)
+  , ContentType (ContentType)
+  , Exactness (Inexact)
   , FulfillBody (FulfillText)
-  , FulfillOptions (fulfillBody, fulfillContentType)
+  , HeaderName (HeaderName)
+  , HeaderValue (HeaderValue)
+  , HttpHeader (HttpHeader)
+  , defaultGetByRoleOptions
+  , evaluateOnFrameBool
+  , frames
+  , inputValue
+  , childFrameLocator
+  , FulfillOptions (fulfillBody, fulfillContentType, fulfillHeaders)
   , Page
   , UrlMatch (UrlMatchGlob)
   , WaitForState (WaitForAttached, WaitForDetached, WaitForHidden, WaitForVisible)
@@ -41,8 +51,12 @@ import Playwright
   , waitFor
   , Playwright
   )
+import Playwright.Locator qualified as Locator
 import Control.Concurrent
   ( threadDelay
+  )
+import Data.Text
+  ( replace
   )
 import Control.Monad.IO.Class
   ( liftIO
@@ -54,6 +68,7 @@ import UnliftIO.Async
 import Playwright.Harness
   ( withAssets
   , assertEqual
+  , assertFailure
   , assertProtocolContains
   , requireTimeout
   )
@@ -240,16 +255,90 @@ tests =
           routeAmbiguous page
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           let
-            frames = childLocator (locator page (selectorFromText "body")) (selectorFromText "iframe")
-            button1 = childLocator (contentFrame (first frames)) (selectorFromText "button")
-            button2 = childLocator (contentFrame (nth frames 1)) (selectorFromText "button")
-            button3 = childLocator (contentFrame (lastLocator frames)) (selectorFromText "button")
+            iframes = childLocator (locator page (selectorFromText "body")) (selectorFromText "iframe")
+            button1 = childLocator (contentFrame (first iframes)) (selectorFromText "button")
+            button2 = childLocator (contentFrame (nth iframes 1)) (selectorFromText "button")
+            button3 = childLocator (contentFrame (lastLocator iframes)) (selectorFromText "button")
           waitFor button1 WaitForVisible
           assertEqual "first" "Hello from iframe-1.html" =<< innerText button1
           waitFor button2 WaitForVisible
           assertEqual "second" "Hello from iframe-2.html" =<< innerText button2
           waitFor button3 WaitForVisible
           assertEqual "last" "Hello from iframe-3.html" =<< innerText button3
+    , testCase "should not wait for frame 3" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let spanLocator = childLocator (frameLocator page (selectorFromText "iframe")) (selectorFromText "span")
+          assertEqual "count" 0 =<< locatorCount spanLocator
+    , testCase "locator.frameLocator should work for iframe" $
+        withAssets $ \prefix page -> do
+          routeIframe page
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let
+            button =
+              childLocator
+                (childFrameLocator (locator page (selectorFromText "body")) (selectorFromText "iframe"))
+                (selectorFromText "button")
+          waitFor button WaitForVisible
+          assertEqual "text" "Hello iframe" =<< innerText button
+          click button
+    , testCase "getBy coverage" $
+        withAssets $ \prefix page -> do
+          routeIframe page
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let
+            frame = frameLocator page (selectorFromText "iframe")
+            button1 = Locator.getByRole frame (AriaRole "button") defaultGetByRoleOptions
+            button2 = Locator.getByText frame "Hello" Inexact
+            button3 = Locator.getByTestId frame "buttonId"
+            input1 = Locator.getByLabel frame "Name" Inexact
+            input2 = Locator.getByPlaceholder frame "Placeholder" Inexact
+            input3 = Locator.getByAltText frame "Alternative" Inexact
+            input4 = Locator.getByTitle frame "Title" Inexact
+          assertEqual "button1" "Hello iframe" =<< innerText button1
+          assertEqual "button2" "Hello iframe" =<< innerText button2
+          assertEqual "button3" "Hello iframe" =<< innerText button3
+          assertEqual "input1" "" =<< inputValue input1
+          assertEqual "input2" "" =<< inputValue input2
+          assertEqual "input3" "" =<< inputValue input3
+          assertEqual "input4" "" =<< inputValue input4
+    , testCase "should work with COEP/COOP/CORP isolated iframe" $
+        withAssets $ \prefix page -> do
+          let
+            remote = replace "127.0.0.1" "localhost" prefix
+            isolationHeaders =
+              [ HttpHeader (HeaderName "cross-origin-embedder-policy") (HeaderValue "require-corp")
+              , HttpHeader (HeaderName "cross-origin-opener-policy") (HeaderValue "same-origin")
+              , HttpHeader (HeaderName "cross-origin-resource-policy") (HeaderValue "cross-origin")
+              ]
+          route page (UrlMatchGlob "**/empty.html") $ \handled ->
+            fulfillRoute
+              handled
+              defaultFulfillOptions
+                { fulfillContentType = Just (ContentType "text/html")
+                , fulfillBody =
+                    Just
+                      ( FulfillText
+                          ( "<iframe src=\"" <> remote <> "/btn.html\" allow=\"cross-origin-isolated; fullscreen\" "
+                              <> "sandbox=\"allow-same-origin allow-scripts allow-popups\"></iframe>"
+                          )
+                      )
+                , fulfillHeaders = isolationHeaders
+                }
+          route page (UrlMatchGlob "**/btn.html") $ \handled ->
+            fulfillRoute
+              handled
+              defaultFulfillOptions
+                { fulfillContentType = Just (ContentType "text/html")
+                , fulfillBody = Just (FulfillText "<button onclick=\"window.__clicked=true\">Click target</button>")
+                , fulfillHeaders = isolationHeaders
+                }
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          click (Locator.getByRole (frameLocator page (selectorFromText "iframe")) (AriaRole "button") defaultGetByRoleOptions)
+          allFrames <- frames page
+          case drop 1 allFrames of
+            childFrame : _ -> assertEqual "clicked" True =<< evaluateOnFrameBool childFrame "() => window.__clicked === true"
+            [] -> assertFailure "expected a child frame"
     ]
 
 routeIframe :: Page -> Playwright ()
@@ -269,7 +358,7 @@ routeIframe page = do
         , fulfillBody =
             Just
               ( FulfillText
-                  "<html><div><button data-testid=\"buttonId\">Hello iframe</button><iframe src=\"iframe-2.html\"></iframe></div><span>1</span><span>2</span></html>"
+                  "<html><div><button data-testid=\"buttonId\">Hello iframe</button><iframe src=\"iframe-2.html\"></iframe></div><span>1</span><span>2</span><label for=target>Name</label><input id=target type=text placeholder=Placeholder title=Title alt=Alternative></html>"
               )
         }
   route page (UrlMatchGlob "**/iframe-2.html") $ \handled ->
