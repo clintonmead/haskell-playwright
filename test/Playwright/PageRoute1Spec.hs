@@ -17,7 +17,8 @@ import Data.Maybe
   , isNothing
   )
 import Data.Text
-  ( isInfixOf
+  ( Text
+  , isInfixOf
   , isSuffixOf
   )
 import Playwright
@@ -338,6 +339,25 @@ tests =
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           second <- evaluateText page "() => document.body.textContent"
           assertEqual "second" False ("intercepted" == second)
+    , testCase "should work if handler with times parameter was removed from another handler" $
+        withAssets $ \prefix page -> do
+          intercepted <- newIORef ([] :: [Text])
+          routeWith
+            page
+            (UrlMatchGlob "**/*")
+            defaultRouteOptions {routeTimes = Just (RouteTimes 1)}
+            $ \handled -> do
+              modifyIORef' intercepted (<> ["first"])
+              continueRoute handled
+          route page (UrlMatchGlob "**/empty.html") $ \handled -> do
+            modifyIORef' intercepted (<> ["second"])
+            unroute page (UrlMatchGlob "**/*")
+            fallbackRoute handled
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "first navigation" ["second"] =<< readIORef intercepted
+          writeIORef intercepted []
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "second navigation" ["second"] =<< readIORef intercepted
     , testCase "should chain fallback w/ dynamic URL" $
         withAssets $ \prefix page -> do
           intercepted <- newIORef ([] :: [Int])
