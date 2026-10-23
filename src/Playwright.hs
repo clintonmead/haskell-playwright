@@ -21,6 +21,7 @@ module Playwright
   , BoundingBox (..)
   , BodySize (..)
   , BindingName (..)
+  , BindingThrow (..)
   , CheckOptions (..)
   , ClearCookiesOptions (..)
   , ClickOptions (..)
@@ -1436,6 +1437,7 @@ import Playwright.Exactness
   )
 import Playwright.Expose
   ( BindingSource (BindingSource, bindingSourceContext, bindingSourceFrame, bindingSourcePage)
+  , BindingThrow (BindingThrow)
   , contextExposeBinding
   , contextExposeFunction
   , exposeFunction

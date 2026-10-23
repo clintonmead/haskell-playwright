@@ -1,5 +1,6 @@
 module Playwright.Expose
   ( BindingSource (..)
+  , BindingThrow (..)
   , contextExposeBinding
   , contextExposeFunction
   , exposeFunction
@@ -86,8 +87,10 @@ import Playwright.SerializedValue
   ( SerializedValue
   )
 import UnliftIO.Exception
-  ( SomeException
+  ( Exception
+  , SomeException
   , displayException
+  , fromException
   , throwIO
   , try
   )
@@ -99,6 +102,14 @@ data BindingSource = BindingSource
   , bindingSourcePage :: Page
   , bindingSourceFrame :: Frame
   }
+
+-- | Thrown from an exposed function's handler to reject the call with an
+-- arbitrary JavaScript value, such as @null@, rather than an @Error@. The page
+-- sees the wrapped value as the thrown value.
+newtype BindingThrow = BindingThrow SerializedValue
+  deriving stock (Show)
+
+instance Exception BindingThrow
 
 exposeFunction :: Page -> BindingName -> ([SerializedValue] -> Playwright SerializedArgument) -> Playwright Disposable
 exposeFunction page name handler = do
@@ -222,10 +233,17 @@ rejectBinding call err = do
         , serializedErrorInfoStack = Nothing
         }
     payload =
-      SerializedError
-        { serializedErrorError = Just info
-        , serializedErrorValue = Nothing
-        }
+      case fromException err of
+        Just (BindingThrow value) ->
+          SerializedError
+            { serializedErrorError = Nothing
+            , serializedErrorValue = Just value
+            }
+        Nothing ->
+          SerializedError
+            { serializedErrorError = Just info
+            , serializedErrorValue = Nothing
+            }
   _ :: BindingCallRejectResult <-
     send call (MethodName "reject") (mkBindingCallRejectParams payload)
   pure ()
