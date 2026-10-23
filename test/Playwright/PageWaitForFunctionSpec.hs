@@ -53,6 +53,7 @@ import Playwright
   , setContent
   , setDefaultTimeout
   , urlFromText
+  , waitForExpression
   , waitForFunction
   , waitForFunctionOnFrame
   , waitForFunctionPolling
@@ -120,6 +121,11 @@ tests =
         withChromiumPage $ \page ->
           concurrently_
             (waitForFunction page "() => window.__FOO === 1")
+            (evaluateBool page "() => { window.__FOO = 1; return true; }")
+    , testCase "should accept a string" $
+        withChromiumPage $ \page ->
+          concurrently_
+            (waitForExpression page "window.__FOO === 1")
             (evaluateBool page "() => { window.__FOO = 1; return true; }")
     , testCase "should work when resolved right before execution context disposal" $
         withChromiumPage $ \page -> do
