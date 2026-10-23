@@ -243,6 +243,7 @@ test-suite playwright-test
       Playwright.BrowserContextBasicSpec
       Playwright.BrowserContextClearCookiesSpec
       Playwright.BrowserContextCookiesSpec
+      Playwright.BrowserContextCookiesThirdPartySpec
       Playwright.BrowserContextCredentialsSpec
       Playwright.BrowserContextCspSpec
       Playwright.BrowserContextDeviceSpec

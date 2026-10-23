@@ -11,6 +11,7 @@ import Playwright.BrowserContextBaseUrlSpec qualified as BrowserContextBaseUrlSp
 import Playwright.BrowserContextBasicSpec qualified as BrowserContextBasicSpec
 import Playwright.BrowserContextClearCookiesSpec qualified as BrowserContextClearCookiesSpec
 import Playwright.BrowserContextCookiesSpec qualified as BrowserContextCookiesSpec
+import Playwright.BrowserContextCookiesThirdPartySpec qualified as BrowserContextCookiesThirdPartySpec
 import Playwright.BrowserContextCredentialsSpec qualified as BrowserContextCredentialsSpec
 import Playwright.BrowserContextCspSpec qualified as BrowserContextCspSpec
 import Playwright.BrowserContextDeviceSpec qualified as BrowserContextDeviceSpec
@@ -210,6 +211,7 @@ main =
         , BrowserContextBasicSpec.tests
         , BrowserContextClearCookiesSpec.tests
         , BrowserContextCookiesSpec.tests
+        , BrowserContextCookiesThirdPartySpec.tests
         , BrowserContextCredentialsSpec.tests
         , BrowserContextCspSpec.tests
         , BrowserContextDeviceSpec.tests
