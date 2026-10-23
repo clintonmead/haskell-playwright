@@ -361,6 +361,16 @@ module Playwright
   , screencastDispose
   , screencastStart
   , screencastStop
+  , ActionCursor (..)
+  , ActionPosition (..)
+  , ActionStyle (..)
+  , ScreencastActionsHandle
+  , ScreencastActionsOptions (..)
+  , defaultActionStyle
+  , defaultScreencastActionsOptions
+  , screencastActionsDispose
+  , screencastHideActions
+  , screencastShowActions
   , downloadUrl
   , dragAndDrop
   , dragAndDropWith
@@ -1853,6 +1863,18 @@ import Playwright.Screencast
   , screencastDispose
   , screencastStart
   , screencastStop
+  )
+import Playwright.ScreencastActions
+  ( ActionCursor (CursorNone, CursorPointer)
+  , ActionPosition (PositionBottom, PositionBottomLeft, PositionBottomRight, PositionTop, PositionTopLeft, PositionTopRight)
+  , ActionStyle (actionStyleHighlight, actionStylePoint, actionStyleTitle)
+  , ScreencastActionsHandle
+  , ScreencastActionsOptions (screencastActionsOptionsCursor, screencastActionsOptionsDuration, screencastActionsOptionsFontSize, screencastActionsOptionsPosition, screencastActionsOptionsStyle)
+  , defaultActionStyle
+  , defaultScreencastActionsOptions
+  , screencastActionsDispose
+  , screencastHideActions
+  , screencastShowActions
   )
 import Playwright.Route
   ( Route
