@@ -1,5 +1,11 @@
 module Playwright
   ( Browser (..)
+  , BrowserServer (..)
+  , BrowserServerOptions (BrowserServerOptions, browserServerHost, browserServerPort, browserServerWsPath, browserServerWorkspaceDir, browserServerMetadata)
+  , bindBrowser
+  , bindBrowserWith
+  , defaultBrowserServerOptions
+  , unbindBrowser
   , BrowserContext (..)
   , BrowserName (..)
   , BrowserType (..)
@@ -962,6 +968,14 @@ import Playwright.BindingName
   )
 import Playwright.BoundingBox
   ( BoundingBox (BoundingBox, boundingBoxHeight, boundingBoxWidth, boundingBoxX, boundingBoxY)
+  )
+import Playwright.BrowserServer
+  ( BrowserServer (BrowserServer, browserServerEndpoint)
+  , BrowserServerOptions (BrowserServerOptions, browserServerHost, browserServerPort, browserServerWsPath, browserServerWorkspaceDir, browserServerMetadata)
+  , bindBrowser
+  , bindBrowserWith
+  , defaultBrowserServerOptions
+  , unbindBrowser
   )
 import Playwright.Browser
   ( Browser (Browser, browserChannel)

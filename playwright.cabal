@@ -36,6 +36,7 @@ library
       Playwright.BrowserContext.Network
       Playwright.BrowserContext.Wait
       Playwright.BrowserName
+      Playwright.BrowserServer
       Playwright.BrowserType
       Playwright.Channel
       Playwright.CheckOptions

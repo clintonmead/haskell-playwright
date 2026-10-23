@@ -130,3 +130,8 @@ Each line below links to the full entry in [progress/QUESTIONS-ARCHIVE.md](progr
 - **Overlay pixel cases are skipped (4 cases).** The top-layer tests in `screencast-overlay.spec.ts` (dialog and popover, before and after) decode `page.screenshot()` as PNG and sample pixel (100, 100). The harness has no PNG decoder. Guess: skip them for this slice and add a minimal decoder (8-bit RGB/RGBA, filter types 0-4, zlib IDAT) in a later slice. Tests that need them are not in `ScreencastOverlaySpec.hs`.
 - **Overlay spec count.** The upstream file has 9 plain cases and 4 pixel cases (13 in total), not 11 as first noted. The 9 plain cases are ported.
 - **Action annotation gaps.** "should render annotation styles" and `cursor: "none"` are not ported. The highlight and action-point elements are gone before the poll sees them. See `progress/FUNCTIONALITY_TODO.md`.
+## browser-server slice (feat-browser-server)
+
+- **launchServer is not added as a separate method.** Upstream `BrowserType.launchServer` is client-side: it launches and then calls `browser.bind`. Guess: the Haskell API exposes `bindBrowser` / `bindBrowserWith` / `unbindBrowser` (driver channels `Browser.startServer` / `Browser.stopServer`) and leaves `launchServer` as a launch-then-bind composition for later.
+- **Connect is not implemented.** `BrowserType.connect` needs LocalUtils.connect and a second Connection. Cases that call `browserType.connect` are skipped until that exists.
+- **PWTEST_SERVER_REGISTRY is set with setEnv in the test process before the driver spawns.** The driver reads the variable at start (it is inherited from the process environment). Guess: the descriptor case must not run in parallel with other cases that spawn drivers.
