@@ -300,6 +300,7 @@ test-suite playwright-test
       Playwright.CapabilitiesSpec
       Playwright.ChannelsSpec
       Playwright.ChromiumSpec
+      Playwright.ClientCertificatesSpec
       Playwright.ComponentParserSpec
       Playwright.ConnectionSpec
       Playwright.DefaultBrowserContext1Spec
@@ -492,6 +493,7 @@ test-suite playwright-test
     , http-types
     , network
     , playwright
+    , process
     , stm
     , tasty
     , tasty-hedgehog

@@ -162,6 +162,7 @@ import Playwright.PageNetworkResponseSpec qualified as PageNetworkResponseSpec
 import Playwright.PageNetworkSizesSpec qualified as PageNetworkSizesSpec
 import Playwright.PagePdfSpec qualified as PagePdfSpec
 import Playwright.PageRequestAbortSpec qualified as PageRequestAbortSpec
+import Playwright.ClientCertificatesSpec qualified as ClientCertificatesSpec
 import Playwright.PageRequestContinueSpec qualified as PageRequestContinueSpec
 import Playwright.PageRequestFallbackSpec qualified as PageRequestFallbackSpec
 import Playwright.PageRequestFulfillSpec qualified as PageRequestFulfillSpec
@@ -389,6 +390,7 @@ main =
         , PageRequestFallbackSpec.tests
         , PageRequestFulfillSpec.tests
         , PageRequestInterceptSpec.tests
+        , ClientCertificatesSpec.tests
         , PageRequestGcSpec.tests
         , PageRoute1Spec.tests
         , PageRoute2Spec.tests
