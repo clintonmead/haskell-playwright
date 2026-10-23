@@ -32,6 +32,7 @@ import Playwright
   )
 import Playwright.Harness
   ( assertProtocolContains
+  , assertProtocolContainsAll
   , withAssets
   , withChromiumPage
   , assertEqual
@@ -273,5 +274,15 @@ tests =
             setContextDefaultNavigationTimeout (pageContext page) timeout
             assertProtocolContains
               "Timeout 2ms exceeded"
+              (goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions)
+    , testCase "should fail when exceeding browser context navigation timeout" $
+        withChromiumPage $ \page ->
+          withHangServer $ \prefix -> do
+            timeout <- requireMs 2
+            setContextDefaultNavigationTimeout (pageContext page) timeout
+            assertProtocolContainsAll
+              [ "Timeout 2ms exceeded."
+              , prefix <> "/empty.html"
+              ]
               (goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions)
     ]
