@@ -92,6 +92,13 @@ tests =
             methodSmoke fetchPost False
         , testCase "put should work" $
             methodSmoke fetchPut False
+        , testCase "should be able to construct with context options" $
+            withHeaderCapture $ \prefix _captured ->
+              runPlaywright $ do
+                request <- newRequestContextWith defaultNewRequestOptions
+                response <- fetchGet request (urlFromText (prefix <> "/empty.html"))
+                assertEqual "ok" True (apiResponseOk response)
+                disposeAPIRequestContext request
         , testCase "should dispose global request" $
             withGlobalSimple $ \request url -> do
               response <- fetchGet request url
