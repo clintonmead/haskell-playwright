@@ -580,3 +580,23 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 **Why not ported:** Passing the source means a new handler type or a new `exposeBinding` function. That changes the public API, which is a design decision and not a port. The cases also check `source.frame` and `source.context`, so they need a frame handle the binding does not carry today.
 
 **To change:** Add a function such as `exposeBindingWithSource` that passes a source record (frame and context) to the handler. The `log` and `add` cases can then be ported as written.
+
+## selectors-get-by: regex forms of internal:text and internal:label
+
+**Question:** Does the driver accept `internal:text=/pattern/flags` and `internal:label=/pattern/flags`, as the regex variants of getByText and getByLabel need? The Haskell wrappers `getByTextRegex` and `getByLabelRegex` are new. Their selectors use `escapeRegexForSelector` and pass the `/pattern/flags` text through as-is.
+
+**Guess taken:** Yes. The driver parses `/pattern/flags` in `internal:text=` and `internal:label=` the same way it does for `internal:attr=` and `internal:testid=`, which the existing regex variants already use.
+
+**Why not verified:** The build and run were not done when this was logged. If the guess is wrong, the `getByText regex` and `getByLabelRegex` assertions in `test/Playwright/SelectorsGetBySpec.hs` will fail with a driver error.
+
+**To change:** If the driver rejects these forms, build the regex wrappers from `internal:has-text=` or drop the regex assertions and skip them in the TODO.
+
+## selectors-get-by: v-flag regex in getByRoleNameRegex
+
+**Question:** Does the driver accept the `v` flag in `getByRoleNameRegex` (`/Click me/v`), as upstream `selectors-get-by.spec.ts` (line 289) expects?
+
+**Guess taken:** Yes. The name regex is forwarded to the driver, which parses flags the same way for every `/pattern/flags` text. The case is in `test/Playwright/SelectorsGetBySpec.hs`.
+
+**Why not verified:** Not run yet. If the driver's JavaScript engine rejects the `v` flag, that case will fail with a driver error.
+
+**To change:** If the `v` flag is rejected, skip the three v-flag assertions in the TODO and log the Chromium version that rejects it.
