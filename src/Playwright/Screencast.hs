@@ -11,6 +11,7 @@ module Playwright.Screencast
 
 import Control.Monad
   ( forM_
+  , void
   , when
   )
 import Control.Monad.IO.Class
@@ -81,6 +82,9 @@ import Playwright.Session
   )
 import System.Directory
   ( makeAbsolute
+  )
+import UnliftIO.Async
+  ( async
   )
 import UnliftIO.Exception
   ( finally
@@ -170,8 +174,13 @@ screencastStart page options = do
             , screencastFrameViewportWidth = pageScreencastFrameEventViewportWidth event
             , screencastFrameViewportHeight = pageScreencastFrameEventViewportHeight event
             }
-      forM_ (screencastOptionsOnFrame options) (\onFrame -> onFrame frame)
-        `finally` ackFrame page (pageScreencastFrameEventFrameId event)
+      -- The callback runs off the handler queue, as upstream's async callback does,
+      -- so the queue keeps serving RPC replies while it is pending. The ack waits
+      -- for the callback, which is the backpressure.
+      void $
+        async $
+          forM_ (screencastOptionsOnFrame options) (\onFrame -> onFrame frame)
+            `finally` ackFrame page (pageScreencastFrameEventFrameId event)
   putScreencast
     pageGuid
     ScreencastSession
