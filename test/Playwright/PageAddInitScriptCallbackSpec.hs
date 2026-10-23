@@ -16,6 +16,7 @@ import UnliftIO.IORef
   )
 import Playwright
   ( Playwright
+  , addInitScript
   , addPageInitScriptExposing
   , defaultGotoOptions
   , dispose
@@ -50,7 +51,14 @@ tests :: TestTree
 tests =
   testGroup
     "page-add-init-script-callback"
-    [ testCase "should call a function passed as an argument" $
+    [ testCase "should drop functions without the exposeFunctions option" $
+        withAssets $ \prefix page -> do
+          -- A plain init script takes only source text, so no function is passed
+          -- in and the script sees the callback name as undefined.
+          addInitScript page "window.cbType = typeof cb;"
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "cbType" True =<< evaluateBool page "() => window.cbType === 'undefined'"
+    , testCase "should call a function passed as an argument" $
         withAssets $ \prefix page -> do
           received <- newIORef []
           _ <-
