@@ -117,6 +117,13 @@ module Playwright
   , expectLocatorRole
   , TextExpectation (..)
   , TextProperty (..)
+  , expectHaveText
+  , expectHaveTextArray
+  , expectContainText
+  , expectContainTextArray
+  , expectHaveValue
+  , expectHaveValues
+  , ExpectedText (..)
   , LocatorHandlerTimes (..)
   , Longitude (..)
   , MediaType (..)
@@ -1598,6 +1605,15 @@ import Playwright.Expect
   , expectLocator
   , expectLocatorCount
   , expectLocatorWith
+  , expectHaveText
+  , expectHaveTextArray
+  , expectContainText
+  , expectContainTextArray
+  , expectHaveValue
+  , expectHaveValues
+  )
+import Playwright.ExpectedText
+  ( ExpectedText (ExpectedString, ExpectedRegex)
   )
 import Playwright.ExpectText
   ( TextMatchOptions (TextMatchOptions, textMatchIgnoreCase)

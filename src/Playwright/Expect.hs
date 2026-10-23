@@ -5,6 +5,12 @@ module Playwright.Expect
   , expectLocatorWith
   , expectLocatorCount
   , sendExpect
+  , expectHaveText
+  , expectHaveTextArray
+  , expectContainText
+  , expectContainTextArray
+  , expectHaveValue
+  , expectHaveValues
   ) where
 
 import Data.Aeson
@@ -12,6 +18,10 @@ import Data.Aeson
   )
 import Data.Text
   ( Text
+  )
+import Playwright.ExpectedText
+  ( ExpectedText
+  , expectedTextValue
   )
 import Playwright.Frame
   ( Frame
@@ -25,9 +35,12 @@ import Playwright.Monad
   ( Playwright
   )
 import Playwright.Protocol
-  ( FrameExpectParams
+  ( ExpectedTextValue
+  , FrameExpectParams
   , frameExpectParamsExpectedNumber
+  , frameExpectParamsExpectedText
   , frameExpectParamsSelector
+  , frameExpectParamsUseInnerText
   , mkFrameExpectParams
   )
 import Playwright.Timeout
@@ -38,9 +51,14 @@ import Playwright.Timeout
 --
 -- 'expectIsNot' inverts the matcher, and 'expectTimeout' bounds the
 -- driver-side polling. 'Nothing' leaves the timeout to the driver default.
+--
+-- 'expectIgnoreCase' and 'expectUseInnerText' apply only to the text
+-- matchers. 'Nothing' leaves them to the driver default.
 data ExpectOptions = ExpectOptions
   { expectIsNot :: Bool
   , expectTimeout :: Maybe Timeout
+  , expectIgnoreCase :: Maybe Bool
+  , expectUseInnerText :: Maybe Bool
   }
   deriving stock (Eq, Show)
 
@@ -49,6 +67,8 @@ defaultExpectOptions =
   ExpectOptions
     { expectIsNot = False
     , expectTimeout = Nothing
+    , expectIgnoreCase = Nothing
+    , expectUseInnerText = Nothing
     }
 
 -- | Run a boolean locator matcher such as @to.be.visible@ through the
@@ -75,6 +95,61 @@ expectLocatorCount options locator count =
     (mkFrameExpectParams "to.have.count" (expectIsNot options))
       { frameExpectParamsSelector = Just (locatorSelector locator)
       , frameExpectParamsExpectedNumber = Just (fromIntegral count)
+      }
+
+-- | The element text equals the expectation, with whitespace normalized.
+expectHaveText :: ExpectOptions -> Locator -> ExpectedText -> Playwright ()
+expectHaveText options locator expected =
+  expectTextWith options locator "to.have.text" $
+    [expectedTextValue False True (expectIgnoreCase options) expected]
+
+-- | The element list texts equal the expectations, one per element.
+expectHaveTextArray :: ExpectOptions -> Locator -> [ExpectedText] -> Playwright ()
+expectHaveTextArray options locator expected =
+  expectTextWith options locator "to.have.text.array" $
+    map (expectedTextValue False True (expectIgnoreCase options)) expected
+
+-- | The element text contains the expectation as a substring.
+expectContainText :: ExpectOptions -> Locator -> ExpectedText -> Playwright ()
+expectContainText options locator expected =
+  expectTextWith options locator "to.have.text" $
+    [expectedTextValue True True (expectIgnoreCase options) expected]
+
+-- | Each expectation is a substring of the matching element text.
+expectContainTextArray :: ExpectOptions -> Locator -> [ExpectedText] -> Playwright ()
+expectContainTextArray options locator expected =
+  expectTextWith options locator "to.contain.text.array" $
+    map (expectedTextValue True True (expectIgnoreCase options)) expected
+
+-- | The input value equals the expectation.
+expectHaveValue :: ExpectOptions -> Locator -> ExpectedText -> Playwright ()
+expectHaveValue options locator expected =
+  expectTextWith (valueOptions options) locator "to.have.value" $
+    [expectedTextValue False False Nothing expected]
+
+-- | The select element's selected values equal the expectations.
+expectHaveValues :: ExpectOptions -> Locator -> [ExpectedText] -> Playwright ()
+expectHaveValues options locator expected =
+  expectTextWith (valueOptions options) locator "to.have.values" $
+    map (expectedTextValue False False Nothing) expected
+
+-- | Value matchers ignore the text-only options, as upstream does.
+valueOptions :: ExpectOptions -> ExpectOptions
+valueOptions options =
+  options
+    { expectIgnoreCase = Nothing
+    , expectUseInnerText = Nothing
+    }
+
+expectTextWith :: ExpectOptions -> Locator -> Text -> [ExpectedTextValue] -> Playwright ()
+expectTextWith options locator expression values =
+  sendExpect
+    options
+    (locatorFrame locator)
+    (mkFrameExpectParams expression (expectIsNot options))
+      { frameExpectParamsSelector = Just (locatorSelector locator)
+      , frameExpectParamsExpectedText = Just values
+      , frameExpectParamsUseInnerText = expectUseInnerText options
       }
 
 -- | Send a raw @expect@ call to the driver, honouring the optional timeout.
