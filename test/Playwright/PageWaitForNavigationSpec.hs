@@ -99,6 +99,12 @@ import UnliftIO.MVar
   , takeMVar
   )
 
+-- Skipped: "should work with clicking on links which do not commit navigation".
+-- The upstream case links to an https fixture and expects waitForNavigation to
+-- reject with the SSL certificate error. This harness has no TLS fixture. A
+-- refused-port link (https://127.0.0.1:1) was tried as a stand-in, but there the
+-- driver resolves waitForNavigation with no response and no error, so the
+-- upstream rejection cannot be reproduced.
 tests :: TestTree
 tests =
   testGroup
