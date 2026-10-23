@@ -609,7 +609,9 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 
 **To change:** If the record should stay minimal, add a separate `screenshotWith` builder instead of growing the record, and record that choice here.
 
-**Update (first slice):** `type`, `quality` and `omitBackground` are in, as `screenshotOptionsType :: Maybe ScreenshotType`, `screenshotOptionsQuality :: Maybe Int` and `screenshotOptionsOmitBackground :: Maybe Bool`. The fields are records, not a separate builder. `clip`, `path`, `mask`, `caret`, `animations` and `scale` are still open.
+**Update (first slice):** `type`, `quality` and `omitBackground` are in, as `screenshotOptionsType :: Maybe ScreenshotType`, `screenshotOptionsQuality :: Maybe Int` and `screenshotOptionsOmitBackground :: Maybe Bool`. The fields are records, not a separate builder. `path`, `mask`, `caret`, `animations` and `scale` are still open.
+
+**Update (clip):** `clip` is in as `screenshotOptionsClip :: Maybe BoundingBox`, not the `ScreenshotClip` record guessed above. It reuses the existing `BoundingBox`, whose fields are `CssPixel`, so the record is not duplicated. The clip test "should clip elements to the viewport" asserts the size the driver returns for a clip that runs past the viewport: 450x50 for a 1000x100 clip at (50, 450) in a 500x500 viewport. Guess: the driver's size is the expected one, since the upstream snapshot does not give a number. If upstream later pins a different size, update the test.
 
 ## page-screenshot: enum constructor names and quality type
 
