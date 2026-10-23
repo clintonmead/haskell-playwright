@@ -69,6 +69,7 @@ module Playwright.Locator
   , locatorDescription
   , locatorScreenshot
   , locatorScreenshotMasked
+  , screenshotHandleMasked
   , locatorScrollIntoView
   , locatorSelectText
   , nth
@@ -810,7 +811,12 @@ locatorScreenshot loc opts =
 -- | Screenshot of the element with the given locators painted over; the options' 'screenshotOptionsMaskColor' and 'screenshotOptionsStyle' apply to them.
 locatorScreenshotMasked :: Locator -> [Locator] -> ScreenshotOptions -> Playwright ByteString
 locatorScreenshotMasked loc masks opts =
-  withLocatorElement loc (\handle -> screenshotHandleWith handle (map maskParam masks) opts)
+  withLocatorElement loc (\handle -> screenshotHandleMasked handle masks opts)
+
+-- | Screenshot of an element handle with the given locators painted over; the options' 'screenshotOptionsMaskColor' and 'screenshotOptionsStyle' apply to them.
+screenshotHandleMasked :: ElementHandle -> [Locator] -> ScreenshotOptions -> Playwright ByteString
+screenshotHandleMasked handle masks opts =
+  screenshotHandleWith handle (map maskParam masks) opts
   where
     maskParam target =
       mkElementHandleScreenshotParamsMask

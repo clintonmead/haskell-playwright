@@ -660,6 +660,7 @@ module Playwright
   , screenshot
   , screenshotHandle
   , screenshotHandleWith
+  , screenshotHandleMasked
   , screenshotMasked
   , scrollIntoViewIfNeeded
   , scrollIntoViewIfNeededWith
@@ -1420,6 +1421,7 @@ import Playwright.Locator
   , locatorDescription
   , locatorScreenshot
   , locatorScreenshotMasked
+  , screenshotHandleMasked
   , locatorScrollIntoView
   , locatorSelectText
   , nth
