@@ -9,7 +9,6 @@ import Data.Text
 import Playwright
   ( AriaRole (AriaRole)
   , Exactness (Exact, Inexact)
-  , GetByRoleOptions (getByRoleExact, getByRoleName, getByRoleNameRegex)
   , Locator
   , Playwright
   , defaultGetByRoleOptions
@@ -35,6 +34,9 @@ import Playwright
   , selectorFromText
   , setContent
   )
+import Playwright.GetByRoleOptions
+  ( GetByRoleOptions (getByRoleDescription, getByRoleDescriptionRegex, getByRoleExact, getByRoleName, getByRoleNameRegex)
+  )
 import Playwright.Harness
   ( withChromiumPage
   , assertEqual
@@ -54,6 +56,10 @@ idOf loc =
 outerHtmlsOf :: Locator -> Playwright [Text]
 outerHtmlsOf loc =
   evaluateOnLocatorAllTexts loc "els => els.map(e => e.outerHTML)"
+
+textsOf :: Locator -> Playwright [Text]
+textsOf loc =
+  evaluateOnLocatorAllTexts loc "els => els.map(e => e.textContent)"
 
 roleSetup :: Text
 roleSetup =
@@ -280,4 +286,120 @@ tests =
           assertEqual "inexact" 2 =<< locatorCount (getByTitle page "hello" Inexact)
           assertEqual "exact" 1 =<< locatorCount (getByTitle page "Hello" Exact)
           assertEqual "regex" 1 =<< locatorCount (getByTitleRegex page "/wor/i")
+    , testCase "getByLabel should ignore empty aria-label" $
+        withChromiumPage $ \page -> do
+          setContent page "<label for=target>Last Name</label><input id=target type=text aria-label>"
+          assertEqual "last name" "target" =<< idOf (getByLabel page "Last Name" Inexact)
+    , testCase "getByLabel should prioritize aria-labelledby over aria-label" $
+        withChromiumPage $ \page -> do
+          setContent page "<label id=other-label>Other</label><input id=target aria-label=\"Name\" aria-labelledby=other-label>"
+          assertEqual "other" "target" =<< idOf (getByLabel page "Other" Inexact)
+    , testCase "getBy escaping" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<label id=label for=control>Hello my\nwo\"rld</label><input id=control placeholder='hello my&#10;wo&quot;rld' title='hello my&#10;wo&quot;rld' alt='hello my&#10;wo&quot;rld'>"
+          assertEqual "text" "label" =<< idOf (getByText page "hello my\nwo\"rld" Inexact)
+          assertEqual "text with spaces" "label" =<< idOf (getByText page "hello       my     wo\"rld" Inexact)
+          assertEqual "label" "control" =<< idOf (getByLabel page "hello my\nwo\"rld" Inexact)
+          assertEqual "placeholder" "control" =<< idOf (getByPlaceholder page "hello my\nwo\"rld" Inexact)
+          assertEqual "alt" "control" =<< idOf (getByAltText page "hello my\nwo\"rld" Inexact)
+          assertEqual "title" "control" =<< idOf (getByTitle page "hello my\nwo\"rld" Inexact)
+          setContent
+            page
+            "<label id=label for=control>Hello my\nworld</label><input id=control placeholder='hello my&#10;world' title='hello my&#10;world' alt='hello my&#10;world'>"
+          assertEqual "newline text" "label" =<< idOf (getByText page "hello my\nworld" Inexact)
+          assertEqual "collapsed text" "label" =<< idOf (getByText page "hello        my    world" Inexact)
+          assertEqual "newline label" "control" =<< idOf (getByLabel page "hello my\nworld" Inexact)
+          assertEqual "newline placeholder" "control" =<< idOf (getByPlaceholder page "hello my\nworld" Inexact)
+          assertEqual "newline alt" "control" =<< idOf (getByAltText page "hello my\nworld" Inexact)
+          assertEqual "newline title" "control" =<< idOf (getByTitle page "hello my\nworld" Inexact)
+          setContent page "<div id=target title=\"my title\">Text here</div>"
+          -- JS 'my t\itle' is the plain string "my title", so it matches
+          assertEqual "exact title" 1 =<< locatorCount (getByTitle page "my title" Exact)
+          assertEqual "one backslash title" 0 =<< locatorCount (getByTitle page "my t\\itle" Exact)
+          assertEqual "two backslashes title" 0 =<< locatorCount (getByTitle page "my t\\\\itle" Exact)
+          setContent
+            page
+            "<label for=target>foo &gt;&gt; bar</label><input id=target placeholder='foo &gt;&gt; bar' title='foo &gt;&gt; bar' alt='foo &gt;&gt; bar'>"
+          assertEqual "arrow text" "foo >> bar" =<< innerText (getByText page "foo >> bar" Inexact)
+          assertEqual "arrow locator" "foo >> bar" =<< innerText (locator page (selectorFromText "label"))
+          assertEqual "arrow text regex" "foo >> bar" =<< innerText (getByTextRegex page "/foo >> bar/")
+          assertEqual "arrow label" "target" =<< idOf (getByLabel page "foo >> bar" Inexact)
+          assertEqual "arrow label regex" "target" =<< idOf (getByLabelRegex page "/foo >> bar/")
+          assertEqual "arrow placeholder" "target" =<< idOf (getByPlaceholder page "foo >> bar" Inexact)
+          assertEqual "arrow placeholder regex" "target" =<< idOf (getByPlaceholderRegex page "/foo >> bar/")
+          assertEqual "arrow alt" "target" =<< idOf (getByAltText page "foo >> bar" Inexact)
+          assertEqual "arrow alt regex" "target" =<< idOf (getByAltTextRegex page "/foo >> bar/")
+          assertEqual "arrow title" "target" =<< idOf (getByTitle page "foo >> bar" Inexact)
+          assertEqual "arrow title regex" "target" =<< idOf (getByTitleRegex page "/foo >> bar/")
+    , testCase "getByRole escaping" $
+        withChromiumPage $ \page -> do
+          setContent page roleSetup
+          assertEqual "buttons" [buttonHtml] =<< outerHtmlsOf (getByRole page (AriaRole "button") defaultGetByRoleOptions)
+          assertEqual "links" [issuesLink, heLink] =<< outerHtmlsOf (getByRole page (AriaRole "link") defaultGetByRoleOptions)
+          assertEqual "name issues 123" [issuesLink]
+            =<< outerHtmlsOf (getByRole page (AriaRole "link") (defaultGetByRoleOptions { getByRoleName = Just "issues 123" }))
+          assertEqual "name sues" [issuesLink]
+            =<< outerHtmlsOf (getByRole page (AriaRole "link") (defaultGetByRoleOptions { getByRoleName = Just "sues" }))
+          assertEqual "name whitespace" [heLink]
+            =<< outerHtmlsOf (getByRole page (AriaRole "link") (defaultGetByRoleOptions { getByRoleName = Just "  he    \n  llo " }))
+          assertEqual "button issues" []
+            =<< outerHtmlsOf (getByRole page (AriaRole "button") (defaultGetByRoleOptions { getByRoleName = Just "issues" }))
+          assertEqual "exact sues" []
+            =<< outerHtmlsOf (getByRole page (AriaRole "link") (defaultGetByRoleOptions { getByRoleName = Just "sues", getByRoleExact = Exact }))
+          assertEqual "exact whitespace" [heLink]
+            =<< outerHtmlsOf (getByRole page (AriaRole "link") (defaultGetByRoleOptions { getByRoleName = Just "   he \n llo 56 ", getByRoleExact = Exact }))
+          -- JS 'Click \me' is the plain string "Click me"
+          assertEqual "exact click me" [buttonHtml]
+            =<< outerHtmlsOf (getByRole page (AriaRole "button") (defaultGetByRoleOptions { getByRoleName = Just "Click me", getByRoleExact = Exact }))
+          assertEqual "one backslash" []
+            =<< outerHtmlsOf (getByRole page (AriaRole "button") (defaultGetByRoleOptions { getByRoleName = Just "Click \\me", getByRoleExact = Exact }))
+          assertEqual "two backslashes" []
+            =<< outerHtmlsOf (getByRole page (AriaRole "button") (defaultGetByRoleOptions { getByRoleName = Just "Click \\\\me", getByRoleExact = Exact }))
+    , testCase "getByRole with description" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<div role=\"alert\" aria-label=\"Upload successful\" aria-description=\"File doc-2025.pdf was uploaded successfully\">Alert 1</div><div role=\"alert\" aria-label=\"Upload successful\" aria-description=\"File report-2026.pdf was uploaded successfully\">Alert 2</div><div role=\"alert\" aria-label=\"Invalid file\" aria-description=\"File demo.doc has an invalid file format\">Alert 3</div>"
+          let alerts opts = textsOf (getByRole page (AriaRole "alert") opts)
+          assertEqual "substring doc" ["Alert 1"]
+            =<< alerts (defaultGetByRoleOptions { getByRoleDescription = Just "doc-2025" })
+          assertEqual "substring report" ["Alert 2"]
+            =<< alerts (defaultGetByRoleOptions { getByRoleDescription = Just "report-2026" })
+          assertEqual "name and description doc" ["Alert 1"]
+            =<< alerts (defaultGetByRoleOptions { getByRoleName = Just "Upload successful", getByRoleDescription = Just "doc-2025" })
+          assertEqual "name and description report" ["Alert 2"]
+            =<< alerts (defaultGetByRoleOptions { getByRoleName = Just "Upload successful", getByRoleDescription = Just "report-2026" })
+          assertEqual "other name" []
+            =<< alerts (defaultGetByRoleOptions { getByRoleName = Just "Invalid file", getByRoleDescription = Just "doc-2025" })
+          assertEqual "exact partial" []
+            =<< alerts (defaultGetByRoleOptions { getByRoleDescription = Just "doc-2025", getByRoleExact = Exact })
+          assertEqual "exact full" ["Alert 1"]
+            =<< alerts (defaultGetByRoleOptions { getByRoleDescription = Just "File doc-2025.pdf was uploaded successfully", getByRoleExact = Exact })
+          assertEqual "regex report" ["Alert 2"]
+            =<< alerts (defaultGetByRoleOptions { getByRoleDescriptionRegex = Just "/report-\\d+/" })
+          assertEqual "regex suffix" ["Alert 1", "Alert 2"]
+            =<< alerts (defaultGetByRoleOptions { getByRoleDescriptionRegex = Just "/uploaded successfully$/" })
+    , testCase "getByRole with description via aria-describedby" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<button aria-describedby=\"desc1\">Submit</button><span id=\"desc1\">Submits the form data</span><button aria-describedby=\"desc2\">Submit</button><span id=\"desc2\">Saves as draft</span>"
+          assertEqual "form data" ["Submit"]
+            =<< textsOf (getByRole page (AriaRole "button") (defaultGetByRoleOptions { getByRoleName = Just "Submit", getByRoleDescription = Just "form data" }))
+          assertEqual "draft" ["Submit"]
+            =<< textsOf (getByRole page (AriaRole "button") (defaultGetByRoleOptions { getByRoleName = Just "Submit", getByRoleDescription = Just "draft" }))
+    , testCase "getByRole with description via title fallback" $
+        withChromiumPage $ \page -> do
+          setContent page "<button title=\"Submits the form\">Submit</button><button title=\"Resets the form\">Reset</button>"
+          assertEqual "submits" ["Submit"]
+            =<< textsOf (getByRole page (AriaRole "button") (defaultGetByRoleOptions { getByRoleDescription = Just "Submits" }))
+          assertEqual "resets" ["Reset"]
+            =<< textsOf (getByRole page (AriaRole "button") (defaultGetByRoleOptions { getByRoleDescription = Just "Resets" }))
+    , testCase "getByRole with description whitespace normalization" $
+        withChromiumPage $ \page -> do
+          setContent page "<div role=\"alert\" aria-description=\"File  doc-2025.pdf   was uploaded   successfully\">Alert</div>"
+          assertEqual "normalized" ["Alert"]
+            =<< textsOf (getByRole page (AriaRole "alert") (defaultGetByRoleOptions { getByRoleDescription = Just "  doc-2025.pdf \n was  uploaded " }))
     ]
