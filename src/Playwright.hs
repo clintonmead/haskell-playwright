@@ -320,6 +320,8 @@ module Playwright
   , downloadUrl
   , dragAndDrop
   , dragAndDropWith
+  , dragTo
+  , dragToWith
   , dropOnto
   , dismissDialog
   , dialogsEqual
@@ -1388,6 +1390,8 @@ import Playwright.Locator
   , dispatchEventWith
   , dragAndDrop
   , dragAndDropWith
+  , dragTo
+  , dragToWith
   , dropOnto
   , elementHandle
   , elementHandles

@@ -20,6 +20,8 @@ module Playwright.Locator
   , dispatchEventWith
   , dragAndDrop
   , dragAndDropWith
+  , dragTo
+  , dragToWith
   , dropOnto
   , elementHandle
   , elementHandles
@@ -664,6 +666,16 @@ dragAndDropWith source target opts = do
     (locatorSelector target)
     timeout
     opts
+
+-- | Drags this locator onto the target, as @locator.dragTo@ does upstream.
+dragTo :: Locator -> Locator -> Playwright ()
+dragTo source target =
+  dragAndDrop source target
+
+-- | 'dragTo' with the same options as 'dragAndDropWith'.
+dragToWith :: Locator -> Locator -> DragAndDropOptions -> Playwright ()
+dragToWith source target opts =
+  dragAndDropWith source target opts
 
 dropOnto :: Locator -> DropPayload -> Playwright ()
 dropOnto loc payload =
