@@ -29,6 +29,7 @@ import Playwright
   , PageError (pageErrorMessage, pageErrorName, pageErrorStack)
   , Playwright
   , SpecialJsValue (SpecialNull, SpecialUndefined)
+  , ListenerRemoval (RemoveListeners)
   , clearPageErrors
   , defaultGotoOptions
   , evaluate
@@ -37,6 +38,7 @@ import Playwright
   , numberArgument
   , onConsole
   , pageErrors
+  , removeAllPageErrorListeners
   , setContent
   , specialArgument
   , textArgument
@@ -169,11 +171,9 @@ tests =
           remaining <- map pageErrorMessage <$> pageErrors page
           assertEqual "one error" 1 (length remaining)
           assertBool "error3" (any ("error3" `isInfixOf`) remaining)
-    -- Skipped: "should remove a listener of a non-existing event handler". Upstream calls
-    -- `page.removeListener('pageerror', ...)`. The Haskell client has no listener
-    -- registry for page errors (only one-shot `waitForPageError` waiters), so there is no
-    -- `removeListener` to call.
-    -- "should remove a listener of a non-existing event handler"
+    , testCase "should remove a listener of a non-existing event handler" $
+        withChromiumPage $ \page ->
+          removeAllPageErrorListeners page RemoveListeners
     ]
 
 -- | Throws the given value from a timeout and checks the page error's message.
