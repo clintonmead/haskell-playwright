@@ -335,6 +335,8 @@ test-suite playwright-test
       Playwright.EvalOnSelectorSpec
       Playwright.ExpectBooleanSpec
       Playwright.ExpectToHaveAccessibleSpec
+      Playwright.ExpectToHaveTextSpec
+      Playwright.ExpectToHaveValueSpec
       Playwright.FetchProxySpec
       Playwright.FrameEvaluateSpec
       Playwright.FrameFrameElementSpec
