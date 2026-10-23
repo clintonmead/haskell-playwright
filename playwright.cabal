@@ -62,6 +62,7 @@ library
       Playwright.CookieSameSite
       Playwright.CssPixel
       Playwright.DblclickOptions
+      Playwright.Debugger
       Playwright.DeviceScaleFactor
       Playwright.Dialog
       Playwright.DialogType

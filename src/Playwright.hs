@@ -34,6 +34,21 @@ module Playwright
   , ClockMillis (..)
   , ClockTicks (..)
   , ClockTime (..)
+  , Debugger
+  , DebuggerLocation (..)
+  , PausedDetails (..)
+  , ApiCallStatus (..)
+  , ApiCallUpdate (..)
+  , armPausedStateChanged
+  , debuggerEnable
+  , debuggerFromContext
+  , debuggerNext
+  , debuggerRequestPause
+  , debuggerResume
+  , debuggerRunTo
+  , onApiCallsUpdated
+  , onPausedStateChanged
+  , pausePage
   , ColorScheme (..)
   , Contrast (..)
   , ConsoleLocation (..)
@@ -1203,6 +1218,23 @@ import Playwright.Clock
   , clockRunFor
   , clockSetFixedTime
   , clockSetSystemTime
+  )
+import Playwright.Debugger
+  ( ApiCallStatus (ApiCallRunning, ApiCallSuccess, ApiCallError)
+  , ApiCallUpdate (ApiCallUpdate, apiCallUpdateId, apiCallUpdateTitle, apiCallUpdateLocation, apiCallUpdateStatus, apiCallUpdateError, apiCallUpdateActionPoint, apiCallUpdateNewLogEntries)
+  , Debugger
+  , DebuggerLocation (DebuggerLocation, debuggerLocationFile, debuggerLocationLine, debuggerLocationColumn)
+  , PausedDetails (PausedDetails, pausedDetailsLocation, pausedDetailsTitle, pausedDetailsStack)
+  , armPausedStateChanged
+  , debuggerEnable
+  , debuggerFromContext
+  , debuggerNext
+  , debuggerRequestPause
+  , debuggerResume
+  , debuggerRunTo
+  , onApiCallsUpdated
+  , onPausedStateChanged
+  , pausePage
   )
 import Playwright.Tracing
   ( Tracing

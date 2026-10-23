@@ -22,6 +22,7 @@ module Playwright.Channel
   , WebSocketTag
   , WebSocketRouteTag
   , TracingTag
+  , DebuggerTag
   , send
   , sendWithTimeout
   ) where
@@ -73,6 +74,7 @@ data APIRequestContextTag
 data WebSocketTag
 data WebSocketRouteTag
 data TracingTag
+data DebuggerTag
 
 type Channel :: Type -> Type
 newtype Channel a = Channel
