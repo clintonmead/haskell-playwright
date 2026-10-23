@@ -513,6 +513,10 @@ tests =
               Just found -> do
                 headers <- responseAllHeaders found
                 assertBool "content-type header" (isJust (headerNamed "content-type" headers))
+    -- Skipped: "should report worker script as network request after redirect". Upstream marks it
+    -- fixme on Chromium (the redirect is not plumbed to the worker target), and this spec runs on
+    -- Chromium only, so there is no passing behaviour to port.
+    -- "should report worker script as network request after redirect"
     ]
 
 -- | Waits for the finished request of the worker script. Another request can finish
