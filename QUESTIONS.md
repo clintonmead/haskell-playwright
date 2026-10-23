@@ -587,7 +587,7 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 
 **Guess taken:** Yes. The driver parses `/pattern/flags` in `internal:text=` and `internal:label=` the same way it does for `internal:attr=` and `internal:testid=`, which the existing regex variants already use.
 
-**Why not verified:** The build and run were not done when this was logged. If the guess is wrong, the `getByText regex` and `getByLabelRegex` assertions in `test/Playwright/SelectorsGetBySpec.hs` will fail with a driver error.
+**Resolved:** The guess held. `test/Playwright/SelectorsGetBySpec.hs` built, and all 28 cases in the group passed (commit 9975669), including the regex `getByTextRegex` and `getByLabelRegex` assertions.
 
 **To change:** If the driver rejects these forms, build the regex wrappers from `internal:has-text=` or drop the regex assertions and skip them in the TODO.
 
@@ -597,6 +597,14 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 
 **Guess taken:** Yes. The name regex is forwarded to the driver, which parses flags the same way for every `/pattern/flags` text. The case is in `test/Playwright/SelectorsGetBySpec.hs`.
 
-**Why not verified:** Not run yet. If the driver's JavaScript engine rejects the `v` flag, that case will fail with a driver error.
+**Resolved:** The guess held. The v-flag case passed in the same run as the other selectors-get-by cases (commit 9975669), so the driver accepts the `v` flag in `getByRoleNameRegex`.
 
-**To change:** If the `v` flag is rejected, skip the three v-flag assertions in the TODO and log the Chromium version that rejects it.
+## page-screenshot: ScreenshotOptions fields
+
+**Question:** `ScreenshotOptions` has only `timeout` and `fullPage`. Upstream `page-screenshot.spec.ts` (65 of 67 cases missing) needs `clip`, `type`, `quality`, `path`, `omitBackground`, `mask`, `caret`, `animations`, and `scale`. What is the Haskell shape for them?
+
+**Guess taken:** Add each option as a `Maybe` record field on `ScreenshotOptions`, with the default left as `Nothing`, so existing record updates keep compiling. Shapes: `screenshotOptionsClip :: Maybe ScreenshotClip` (a record with `Double` fields `x`, `y`, `width`, `height`), `screenshotOptionsType :: Maybe ScreenshotType` (sum type `ScreenshotPng | ScreenshotJpeg | ScreenshotWebp`), `screenshotOptionsQuality :: Maybe Int`, and `screenshotOptionsPath :: Maybe FilePath`. The boolean options take `Maybe Bool`. `caret` and `animations` take small sum types, following the existing `Exactness` style.
+
+**Why not verified:** Nothing is implemented yet. The field names follow the upstream names, but the Haskell types are a guess.
+
+**To change:** If the record should stay minimal, add a separate `screenshotWith` builder instead of growing the record, and record that choice here.
