@@ -17,9 +17,20 @@ import UnliftIO.IORef
   , readIORef
   , writeIORef
   )
+import Data.Aeson
+  ( Value
+  , object
+  , (.=)
+  )
 import Data.Maybe
   ( isJust
   , isNothing
+  )
+import Playwright.Channel
+  ( send
+  )
+import Playwright.MethodName
+  ( MethodName (MethodName)
   )
 import Data.Text
   ( Text
@@ -28,9 +39,10 @@ import Data.Text
   , toLower
   )
 import Playwright
-  ( Frame
+  ( Frame (frameChannel)
   , Page
   , WaitForState (WaitForAttached, WaitForDetached, WaitForHidden, WaitForVisible)
+  , mainFrame
   , asElement
   , contentFrameHandle
   , defaultGotoOptions
@@ -369,7 +381,32 @@ tests =
             waitForTimeout page =<< requireTimeout 100
             _ <- evaluate page "() => { document.body.innerText = ''; }"
             void (wait pending)
+    , testCase "should throw for unknown state option" $
+        withChromiumPage $ \page -> do
+          setContent page "<section>test</section>"
+          assertProtocolContains
+            "state: expected one of (attached|detached|visible|hidden)"
+            (rawWaitForSelector page (object ["selector" .= ("section" :: Text), "state" .= ("foo" :: Text)]))
+    , testCase "should throw for true state option" $
+        withChromiumPage $ \page -> do
+          setContent page "<section>test</section>"
+          assertProtocolContains
+            "state: expected one of (attached|detached|visible|hidden)"
+            (rawWaitForSelector page (object ["selector" .= ("section" :: Text), "state" .= True]))
+    , testCase "should throw for false state option" $
+        withChromiumPage $ \page -> do
+          setContent page "<section>test</section>"
+          assertProtocolContains
+            "state: expected one of (attached|detached|visible|hidden)"
+            (rawWaitForSelector page (object ["selector" .= ("section" :: Text), "state" .= False]))
     ]
+
+-- | Sends waitForSelector straight to the main frame channel, so tests can
+-- pass options the typed API does not model. The protocol validator rejects
+-- the bad state values, which is what the upstream state-option cases check.
+rawWaitForSelector :: Page -> Value -> Playwright Value
+rawWaitForSelector page params =
+  send (frameChannel (mainFrame page)) (MethodName "waitForSelector") params
 
 attachFrame :: Page -> Text -> Text -> Playwright Frame
 attachFrame page prefix frameId = do
