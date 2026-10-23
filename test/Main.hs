@@ -200,6 +200,7 @@ import Playwright.PageWaitForUrlSpec qualified as PageWaitForUrlSpec
 import Playwright.UrlMatchSpec qualified as UrlMatchSpec
 import Playwright.PermissionsSpec qualified as PermissionsSpec
 import Playwright.PopupSpec qualified as PopupSpec
+import Playwright.ProxyPatternSpec qualified as ProxyPatternSpec
 import Playwright.ProxySpec qualified as ProxySpec
 import Playwright.QuerySelectorSpec qualified as QuerySelectorSpec
 import Playwright.RetargetSpec qualified as RetargetSpec
@@ -435,6 +436,7 @@ main =
         , UrlMatchSpec.tests
         , PermissionsSpec.tests
         , PopupSpec.tests
+        , ProxyPatternSpec.tests
         , ProxySpec.tests
         , QuerySelectorSpec.tests
         , RetargetSpec.tests

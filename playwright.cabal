@@ -150,6 +150,7 @@ library
       Playwright.Point
       Playwright.PropertyName
       Playwright.Protocol
+      Playwright.ProxyPattern
       Playwright.ProxySettings
       Playwright.RaceTimeout
       Playwright.ReadStream
@@ -461,6 +462,7 @@ test-suite playwright-test
       Playwright.PageWaitForUrlSpec
       Playwright.PermissionsSpec
       Playwright.PopupSpec
+      Playwright.ProxyPatternSpec
       Playwright.ProxySocksSupport
       Playwright.ProxySpec
       Playwright.QuerySelectorSpec
