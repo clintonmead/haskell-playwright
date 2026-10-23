@@ -88,6 +88,8 @@ module Playwright.BrowserContextFetchSupport
   , retryHangupApp
   , retryGzipTest
   , retryGzipApp
+  , retryMidstreamGzipTest
+  , retryMidstreamGzipApp
   , hostHeaderRedirectTest
   , hostRedirectApp
   , httpCredentialsSendTest
@@ -1196,6 +1198,44 @@ retryGzipApp count _request respond = do
             status200
             [("Content-Encoding", "gzip"), (hContentType, "text/plain")]
             (GZip.compress "compressed-retry-ok")
+        )
+
+-- Sends the gzip response headers and then drops the connection before any
+-- body arrives, so the client fails mid-stream and must retry.
+retryMidstreamGzipTest :: IO ()
+retryMidstreamGzipTest = do
+  count <- newIORef (0 :: Int)
+  withApplication (pure (retryMidstreamGzipApp count)) $ \port ->
+    withChromiumContext $ \ctx _page -> do
+      request <- contextRequest ctx
+      response <-
+        fetchGetWith
+          request
+          (urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/test-gzip-midstream"))
+          defaultFetchOptions {fetchMaxRetries = Just 3}
+      hits <- atomicModifyIORef' count (\n -> (n, n))
+      assertEqual "status" 200 (httpStatusToInt (apiResponseStatus response))
+      assertEqual "body" "midstream-retry-ok" =<< apiResponseText response
+      assertEqual "hits" 3 hits
+
+retryMidstreamGzipApp :: IORef Int -> Application
+retryMidstreamGzipApp count _request respond = do
+  n <- atomicModifyIORef' count (\x -> (x + 1, x + 1))
+  if n <= 2
+    then
+      respond
+        ( responseRaw
+            ( \_ write ->
+                write "HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Type: text/plain\r\nTransfer-Encoding: chunked\r\n\r\n"
+            )
+            (responseLBS status200 [] "")
+        )
+    else
+      respond
+        ( responseLBS
+            status200
+            [("Content-Encoding", "gzip"), (hContentType, "text/plain")]
+            (GZip.compress "midstream-retry-ok")
         )
 
 hostHeaderRedirectTest :: IO ()

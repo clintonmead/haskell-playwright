@@ -78,6 +78,7 @@ import Playwright.BrowserContextFetchSupport
   , disposeAfterContextReason
   , retryHangupTest
   , retryGzipTest
+  , retryMidstreamGzipTest
   , hostHeaderRedirectTest
   , httpCredentialsSendTest
   , multipartFileTest
@@ -344,6 +345,8 @@ tests =
           retryHangupTest 3 4 "Hello!"
       , testCase "should retry ECONNRESET on compressed response" $
           retryGzipTest
+      , testCase "should retry ECONNRESET mid-stream during gzip decompression" $
+          retryMidstreamGzipTest
       , testCase "should update host header on redirect" $
           hostHeaderRedirectTest
       , testCase "should support HTTPCredentials.send for newContext" $
