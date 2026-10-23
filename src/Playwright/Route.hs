@@ -23,6 +23,7 @@ import Control.Concurrent.STM
   , isEmptyTMVar
   , putTMVar
   , throwSTM
+  , tryReadTMVar
   )
 import Control.Monad.IO.Class
   ( liftIO
@@ -147,8 +148,21 @@ continueRoute :: Route -> Playwright ()
 continueRoute handled =
   continueRouteWith handled defaultContinueOptions
 
+-- | Raises RouteAlreadyHandled before anything is sent. Without this check the
+-- server rejects a second action with its own error, so the local error would
+-- only appear for fallback, which sends nothing.
+ensureUnhandled :: Route -> Playwright ()
+ensureUnhandled handled = do
+  outcome <- liftIO (atomically (tryReadTMVar (routeOutcome handled)))
+  case outcome of
+    Nothing ->
+      pure ()
+    Just _ ->
+      throwIO RouteAlreadyHandled
+
 continueRouteWith :: Route -> ContinueOptions -> Playwright ()
 continueRouteWith handled opts = do
+  ensureUnhandled handled
   overrides <- continueOverrides handled opts
   sendContinue (routeChannel handled) False overrides
   settleRoute handled True
@@ -159,6 +173,7 @@ fallbackRoute handled =
 
 fallbackRouteWith :: Route -> ContinueOptions -> Playwright ()
 fallbackRouteWith handled opts = do
+  ensureUnhandled handled
   _ <- continueOverrides handled opts
   settleRoute handled False
 
@@ -194,6 +209,7 @@ abortRouteWith handled code =
 
 abortRouteWithCode :: Route -> Maybe Text -> Playwright ()
 abortRouteWithCode handled code = do
+  ensureUnhandled handled
   ignoreTargetClosed $ do
     _ :: RouteAbortResult <-
       send
@@ -207,6 +223,7 @@ abortRouteWithCode handled code = do
 
 fulfillRoute :: Route -> FulfillOptions -> Playwright ()
 fulfillRoute handled opts = do
+  ensureUnhandled handled
   let
     (bodyText, isBase64, byteLength) = encodeFulfillBody (fulfillBody opts)
     fetchUid = fulfillFetchUid opts
