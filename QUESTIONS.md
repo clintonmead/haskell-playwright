@@ -552,3 +552,23 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 **Why not ported:** Sending the navigation right after forking the evaluate would race. The case could pass or fail depending on timing, and that would not test the error.
 
 **To change:** Add a page-side barrier, for example a script that sets a flag once the first evaluate has started, then wait on that flag before the navigation. The case can then be ported as written.
+
+## Handle preview cases (elementhandle-convenience)
+
+**Question:** Upstream "should have a nice preview" and "should have a non-ASCII preview" (`tests/page/elementhandle-convenience.spec.ts`, lines 20–37) check `String(handle)`, which is the JS client's `toString` output (`JSHandle@<div id="outer" name="value">…</div>`). Can the Haskell `ElementHandle` expose that text?
+
+**Guess taken:** No, skip them. The text is produced by the JS client's `toString`, which the Haskell binding does not have. A handle is an opaque channel. The library has no call that returns a handle's preview, and the protocol does not return one either.
+
+**Why not ported:** Making the preview would mean inventing a Haskell-side rendering of the element, which is not what upstream tests. Any port would check the wrong thing.
+
+**To change:** If a `handlePreview` accessor is added, the two cases can be ported as written. The non-ASCII case also needs the same accessor.
+
+## page-evaluate usable-message cases with a JS function argument
+
+**Question:** Upstream `tests/page/page-evaluate.spec.ts` (lines 456–471) has three usable-message cases that pass a JS function as the argument (`() => { }`, `{ aProperty: () => { } }`, and the nested and array-nested forms). Can `SerializedArgument` carry them?
+
+**Guess taken:** No. `SerializedArgument` has no constructor for a function. The cases are skipped as type-level in `progress/FUNCTIONALITY_TODO.md`.
+
+**Why not ported:** The cases only test the JS client's error message for an unserializable function argument. Haskell's type rules that out before anything is sent, so there is no message to check.
+
+**To change:** Only a `SerializedArgument` constructor that carries a function would make these reachable. Adding one would be a different API decision, not a port.
