@@ -82,6 +82,7 @@ library
       Playwright.EventWaiter
       Playwright.Exactness
       Playwright.Expect
+      Playwright.ExpectText
       Playwright.Expose
       Playwright.FetchOptions
       Playwright.FileChooser
@@ -193,6 +194,8 @@ library
       Playwright.StoredLocatorHandler
       Playwright.StyleTag
       Playwright.TapOptions
+      Playwright.TextExpectation
+      Playwright.TextProperty
       Playwright.Timeout
       Playwright.TimeoutDefaults
       Playwright.TimezoneId
@@ -330,6 +333,7 @@ test-suite playwright-test
       Playwright.EvalOnSelectorAllSpec
       Playwright.EvalOnSelectorSpec
       Playwright.ExpectBooleanSpec
+      Playwright.ExpectToHaveAccessibleSpec
       Playwright.FetchProxySpec
       Playwright.FrameEvaluateSpec
       Playwright.FrameFrameElementSpec
