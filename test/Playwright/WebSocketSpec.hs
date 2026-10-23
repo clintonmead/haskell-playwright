@@ -17,19 +17,24 @@ import Data.ByteString qualified as ByteString
 import Data.Maybe
   ( fromMaybe
   )
+import Data.CaseInsensitive qualified as CI
 import Data.Text
   ( Text
+  , breakOn
   , isInfixOf
   , stripPrefix
+  , unpack
   )
 import Network.HTTP.Types
-  ( hContentType
+  ( Header
+  , hContentType
   , status200
   , status400
   )
 import Network.Wai
   ( Application
   , pathInfo
+  , requestHeaders
   , responseLBS
   )
 import Network.Wai.Handler.WebSockets
@@ -45,13 +50,25 @@ import Network.WebSockets
   , sendTextData
   )
 import Playwright
-  ( Playwright
+  ( HeaderName (HeaderName)
+  , HeaderValue (HeaderValue)
+  , HttpHeader (HttpHeader)
+  , Page
+  , Playwright
   , WebSocket
   , WebSocketFrame (WebSocketBinary, WebSocketText)
+  , browserVersion
   , closePage
+  , contextBrowser
+  , defaultGotoOptions
   , evaluate
+  , evaluateText
   , evaluateTextWith
   , evaluateWith
+  , goto
+  , pageContext
+  , setExtraHTTPHeaders
+  , urlFromText
   , isWebSocketClosed
   , onWebSocket
   , onWebSocketClose
@@ -102,6 +119,7 @@ import UnliftIO.MVar
   , newEmptyMVar
   , putMVar
   , takeMVar
+  , tryPutMVar
   )
 import UnliftIO.Timeout
   ( timeout
@@ -325,7 +343,74 @@ tests =
                       assertFailure ("expected target closed, got: " <> show err)
                     Right _ ->
                       assertFailure "expected target closed"
+    , testCase "should not tear down the page when a WebSocket is opened inside a worker" $
+        withChromiumPage $ \page ->
+          withLocalApp (wsApp (sendThenListen "incoming")) $ \prefix -> do
+            _ <- goto page (urlFromText prefix) defaultGotoOptions
+            received <-
+              evaluateTextWith
+                page
+                "host => { const code = `const ws = new WebSocket(${JSON.stringify('ws://' + host + '/ws')}); ws.addEventListener('message', event => self.postMessage(event.data));`; const worker = new Worker(URL.createObjectURL(new Blob([code], { type: 'text/javascript' }))); return new Promise(resolve => worker.addEventListener('message', event => resolve(event.data))); }"
+                (textArgument (httpHost prefix))
+            assertEqual "received" "incoming" received
+            alive <- evaluateText page "() => String(1 + 1)"
+            assertEqual "page alive" "2" alive
+    , testCase "should send extra HTTP headers on WebSocket handshake" $
+        withChromiumPage $ \page -> do
+          supported <- chromiumSupportsHandshakeHeaders page
+          if supported
+            then do
+              setExtraHTTPHeaders page [HttpHeader (HeaderName "foo") (HeaderValue "bar")]
+              seen <- newEmptyMVar
+              withLocalApp (recordHandshake seen (wsApp keepListening)) $ \prefix -> do
+                _ <- goto page (urlFromText prefix) defaultGotoOptions
+                _ <-
+                  evaluateWith
+                    page
+                    "host => { new WebSocket(`ws://${host}/ws`); }"
+                    (textArgument (httpHost prefix))
+                headers <- awaitValue seen
+                assertEqual "foo header" (Just "bar") (headerNamed "foo" headers)
+            else
+              pure ()
+    , testCase "should send extra HTTP headers on WebSocket handshake from a worker" $
+        withChromiumPage $ \page -> do
+          supported <- chromiumSupportsHandshakeHeaders page
+          if supported
+            then do
+              setExtraHTTPHeaders page [HttpHeader (HeaderName "foo") (HeaderValue "bar")]
+              seen <- newEmptyMVar
+              withLocalApp (recordHandshake seen (wsApp keepListening)) $ \prefix -> do
+                _ <- goto page (urlFromText prefix) defaultGotoOptions
+                _ <-
+                  evaluateWith
+                    page
+                    "host => { const code = `new WebSocket(${JSON.stringify('ws://' + host + '/ws')});`; new Worker(URL.createObjectURL(new Blob([code], { type: 'text/javascript' }))); }"
+                    (textArgument (httpHost prefix))
+                headers <- awaitValue seen
+                assertEqual "foo header" (Just "bar") (headerNamed "foo" headers)
+            else
+              pure ()
     ]
+
+-- | Upstream marks extra handshake headers as fixme for Chromium before 151,
+-- so these cases only assert on newer builds.
+chromiumSupportsHandshakeHeaders :: Page -> Playwright Bool
+chromiumSupportsHandshakeHeaders page = do
+  browser <- contextBrowser (pageContext page)
+  version <- browserVersion browser
+  let major = read (unpack (fst (breakOn "." version))) :: Int
+  pure (major >= 151)
+
+-- | Records the headers of each WebSocket handshake before handing the request on.
+recordHandshake :: MVar [Header] -> Application -> Application
+recordHandshake seen app request respond = do
+  _ <- tryPutMVar seen (requestHeaders request)
+  app request respond
+
+headerNamed :: ByteString -> [Header] -> Maybe ByteString
+headerNamed name headers =
+  lookup name [(CI.foldedCase key, value) | (key, value) <- headers]
 
 httpHost :: Text -> Text
 httpHost prefix =
