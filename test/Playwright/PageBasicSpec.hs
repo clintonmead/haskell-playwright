@@ -18,6 +18,7 @@ import Playwright
   , armConsole
   , armDomContentLoadedEvent
   , armLoadEvent
+  , abortRoute
   , armPopup
   , consoleMessageText
   , defaultGotoOptions
@@ -27,16 +28,19 @@ import Playwright
   , evaluateText
   , frameByName
   , frameByUrl
-  , UrlMatch (UrlMatchRegex)
+  , UrlMatch (UrlMatchGlob, UrlMatchRegex)
   , frames
   , currentUrl
   , framesEqual
   , goto
   , locatorOnFrame
+  , onDomContentLoadedEvent
+  , onLoadEvent
   , onPageClose
   , opener
   , pagesEqual
   , press
+  , route
   , selectorFromText
   , setContent
   , title
@@ -48,6 +52,7 @@ import Playwright.Harness
   ( assertBool
   , assertEqual
   , assertFailure
+  , assertProtocolContainsAll
   , locate
   , withAssetPage
   , withAssets
@@ -68,13 +73,23 @@ import UnliftIO.MVar
   ( newEmptyMVar
   , putMVar
   , takeMVar
+  , tryPutMVar
   )
 
 tests :: TestTree
 tests =
   testGroup
     "page-basic"
-    [ testCase "page.press should work" $
+    [ testCase "async stacks should work" $
+        withAssets $ \prefix page -> do
+          -- Upstream drops the socket and checks the JS Error.stack names the test file. A
+          -- Haskell exception has no JS stack, so this aborts the request instead and checks
+          -- the driver error names the network failure and the navigation call log.
+          route page (UrlMatchGlob (prefix <> "/empty.html")) abortRoute
+          assertProtocolContainsAll
+            ["net::ERR_FAILED", "navigating to"]
+            (goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions)
+    , testCase "page.press should work" $
         withAssetPage "input/textarea.html" $ \page -> do
           press (locate page "textarea") (Key "a")
           assertEqual "value" "a" =<< evaluateText page "() => document.querySelector('textarea').value"
@@ -113,6 +128,20 @@ tests =
           takeDomContentLoaded <- armDomContentLoadedEvent page
           _ <- goto page (urlFromText "about:blank") defaultGotoOptions
           takeDomContentLoaded
+    , testCase "should pass self as argument to domcontentloaded event" $
+        withChromiumPage $ \page -> do
+          received <- newEmptyMVar
+          onDomContentLoadedEvent page (\eventPage -> () <$ tryPutMVar received eventPage)
+          _ <- goto page (urlFromText "about:blank") defaultGotoOptions
+          eventPage <- takeMVar received
+          assertEqual "event page is the page" True (pagesEqual eventPage page)
+    , testCase "should pass self as argument to load event" $
+        withChromiumPage $ \page -> do
+          received <- newEmptyMVar
+          onLoadEvent page (\eventPage -> () <$ tryPutMVar received eventPage)
+          _ <- goto page (urlFromText "about:blank") defaultGotoOptions
+          eventPage <- takeMVar received
+          assertEqual "event page is the page" True (pagesEqual eventPage page)
     , testCase "should provide access to the opener page" $
         withChromiumPage $ \page -> do
           popup <- openPopup page "() => { window.open('about:blank'); }"
