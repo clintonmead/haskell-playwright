@@ -323,6 +323,8 @@ module Playwright
   , clearCookiesWith
   , clearGeolocation
   , clearPageErrors
+  , onPageError
+  , removeAllPageErrorListeners
   , clearPermissions
   , click
   , clickHandle
@@ -1992,8 +1994,10 @@ import Playwright.PageConsole
 import Playwright.PageError
   ( PageError (PageError, pageErrorMessage, pageErrorName, pageErrorStack)
   , clearPageErrors
+  , onPageError
   , pageErrors
   , pageErrorsWith
+  , removeAllPageErrorListeners
   , waitForPageError
   )
 import Playwright.PdfOptions

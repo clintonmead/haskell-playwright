@@ -1,9 +1,11 @@
 module Playwright.PageError
   ( PageError (..)
   , clearPageErrors
+  , onPageError
   , pageErrorFromSerialized
   , pageErrors
   , pageErrorsWith
+  , removeAllPageErrorListeners
   , waitForPageError
   ) where
 
@@ -19,7 +21,12 @@ import Playwright.Channel
   , send
   )
 import Playwright.Connection
-  ( waitForChannelEvent
+  ( registerScopedEventHandler
+  , removeScopedEventHandlers
+  , waitForChannelEvent
+  )
+import Playwright.EventHandler
+  ( ListenerRemoval
   )
 import Playwright.Json.ChannelRef
   ( ChannelRef (channelRefGuid)
@@ -89,6 +96,27 @@ pageErrorsWith page filterChoice = do
       (MethodName "pageErrors")
       (mkPagePageErrorsParams {pagePageErrorsParamsFilter = Just (consoleFilterProtocol filterChoice)})
   pure (fmap pageErrorFromSerialized (pagePageErrorsResultErrors result))
+
+-- | Runs the given action for every error raised on this page, as upstream's
+-- @page.on('pageerror')@ does. Remove the listeners with
+-- 'removeAllPageErrorListeners'.
+onPageError :: Page -> (PageError -> Playwright ()) -> Playwright ()
+onPageError page run =
+  registerScopedEventHandler
+    (channelGuid (pageChannel page))
+    (channelGuid (pageContextChannel page))
+    (MethodName "pageError")
+    $ \params -> do
+      event <- throwDecode params
+      if channelRefGuid (browserContextPageErrorEventPage event) == channelGuid (pageChannel page)
+        then run (pageErrorFromSerialized (browserContextPageErrorEventError event))
+        else pure ()
+
+-- | Removes every 'onPageError' listener added for this page, as upstream's
+-- @removeAllListeners('pageerror')@ does. Removing when none was added is a no-op.
+removeAllPageErrorListeners :: Page -> ListenerRemoval -> Playwright ()
+removeAllPageErrorListeners page =
+  removeScopedEventHandlers (channelGuid (pageChannel page)) (MethodName "pageError")
 
 clearPageErrors :: Page -> Playwright ()
 clearPageErrors page = do
