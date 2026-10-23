@@ -7,7 +7,7 @@ Upstream gap report: `scripts/upstream-gaps page` (or `library`, or `SHOW=1 scri
 
 ## After compaction
 
-Before doing anything else after a compaction or a context summary, reread this file (CLAUDE.md), `DESIGN.md`, and the memory index (`MEMORY.md`). The summary does not carry these rules reliably. A summary that says "stopped" or "waiting for the user" does not end the task: check the TODO and continue.
+Before doing anything else after a compaction or a context summary, follow `progress/RESUME.md` ("Post-compaction reads"): reread this file (CLAUDE.md) and `MEMORY.md` in full, and read `DESIGN.md` (the short index) in full, and the TODO by heading or grep, not in full. Do not reread the TODO, QUESTIONS.md or the `progress/design/` topic files in full, since that thrashes autocompact. The summary does not carry these rules reliably. A summary that says "stopped" or "waiting for the user" does not end the task: check the TODO and continue.
 
 ## Keep working until the task is done
 

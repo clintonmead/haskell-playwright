@@ -4,11 +4,15 @@
 //   scripts/upstream-gaps page                    # every spec in tests/page
 //   scripts/upstream-gaps library                 # every spec in tests/library
 //   SHOW=1 scripts/upstream-gaps page page-drag   # one spec, with the names
+//   ALL=1 scripts/upstream-gaps page              # also list specs with nothing missing
 //
-// A case matches when a Haskell testCase name is equal to it, or is a prefix
-// of it (or it of the Haskell name), once letters and digits are compared.
-// "@tag" suffixes are ignored. A miss can still be a rewording, so read the
-// upstream file before porting. A spec with no Haskell file is NO HS FILE.
+// By default specs with nothing missing are hidden, and a total line is printed.
+//
+// A case matches when its title (letters and digits only) appears in the Haskell
+// spec, or when a template name `testCase ("..." <> x)` has a literal prefix that
+// starts the title. A bare prefix such as "should intercept" does not match a
+// longer title. "@tag" suffixes are ignored. A miss can still be a rewording, so
+// read the upstream file before porting. A spec with no Haskell file is NO HS FILE.
 const fs = require('fs');
 const path = require('path');
 
@@ -16,7 +20,15 @@ const ROOT = path.resolve(__dirname, '..');
 const norm = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 const hsDir = path.join(ROOT, 'test/Playwright');
 const hsSpecs = fs.readdirSync(hsDir).filter((f) => f.endsWith('Spec.hs'));
-const hsByNorm = new Map(hsSpecs.map((f) => [norm(f.replace(/Spec\.hs$/, '')), f]));
+// A numbered split spec (`BrowserContextFetch1Spec.hs`) is one part of the
+// upstream spec `browser-context-fetch`, so it is listed under both names.
+const hsByNorm = new Map();
+const addHs = (key, f) => hsByNorm.set(key, [...(hsByNorm.get(key) || []), f]);
+for (const f of hsSpecs) {
+  addHs(norm(f.replace(/Spec\.hs$/, '')), f);
+  const split = f.match(/^(.+?)\d+Spec\.hs$/);
+  if (split) addHs(norm(split[1]), f);
+}
 
 const [dirname, only] = process.argv.slice(2);
 if (!dirname) {
@@ -24,42 +36,46 @@ if (!dirname) {
   process.exit(2);
 }
 
-// Haskell test names for one spec file, normalized.
-function haskellNames(file) {
-  const src = fs.readFileSync(path.join(hsDir, file), 'utf8');
-  const names = [];
-  const re = /testCase\s+"((?:[^"\\]|\\.)*)"/g;
-  let m;
-  while ((m = re.exec(src))) names.push(norm(m[1]));
-  // Names built from a list, e.g. `testCase (\"should ... \" <> x)`, keep the literal
-  // part, which is still a useful prefix.
+// Haskell test names for the spec files of one upstream spec, normalized.
+function haskellNames(files) {
+  const src = files.map((file) => fs.readFileSync(path.join(hsDir, file), 'utf8')).join('\n');
+  // Plain names are matched by the whole-source check below. Only template names
+  // are prefixes: `testCase ("should ... " <> x)` keeps the literal part, which is
+  // a prefix of the full title. A plain name such as "should intercept" must not
+  // match a longer title, or that longer title is hidden.
+  const templates = [];
   const re2 = /testCase\s+\(\s*"((?:[^"\\]|\\.)*)"/g;
-  while ((m = re2.exec(src))) names.push(norm(m[1]));
-  // Haskell names are rarely more than a prefix of the upstream name, so a
-  // literal match on the whole source is a fallback.
-  return { names, whole: norm(src) };
+  let m;
+  while ((m = re2.exec(src))) templates.push(norm(m[1]));
+  return { templates, whole: norm(src) };
 }
 
 function matches(upstream, hs) {
   const u = norm(upstream.replace(/\s*@\w+/g, ''));
   if (hs.whole.includes(u)) return true;
-  return hs.names.some((h) => h.length >= 12 && (u.startsWith(h) || h.startsWith(u)));
+  return hs.templates.some((h) => h.length >= 12 && u.startsWith(h));
 }
 
 const d = path.join(ROOT, 'upstream-typescript-playwright/tests', dirname);
+const showAll = Boolean(process.env.ALL || only);
+let specs = 0, cases = 0, missingTotal = 0, hidden = 0;
 for (const f of fs.readdirSync(d).sort()) {
   if (!/\.spec\.ts$/.test(f)) continue;
   if (only && !f.includes(only)) continue;
   const base = f.replace(/\.spec\.ts$/, '');
-  const hsName = hsByNorm.get(norm(base));
+  // A numbered upstream spec (`page-click-timeout-2`) can share one Haskell file.
+  const hsFiles = hsByNorm.get(norm(base)) || hsByNorm.get(norm(base.replace(/-\d+$/, ''))) || [];
   const src = fs.readFileSync(path.join(d, f), 'utf8');
   const re = /\b(?:it|test)\(\s*['"`]([^'"`]+)['"`]/g;
   const names = [];
   let m;
   while ((m = re.exec(src))) names.push(m[1]);
   if (!names.length) continue;
-  const hs = hsName ? haskellNames(hsName) : { names: [], whole: '' };
+  const hs = hsFiles.length ? haskellNames(hsFiles) : { templates: [], whole: '' };
   const missing = names.filter((n) => !matches(n, hs));
-  console.log(`== ${f} -> ${hsName || 'NO HS FILE'}  missing ${missing.length}/${names.length}`);
+  specs++; cases += names.length; missingTotal += missing.length;
+  if (!missing.length && !showAll) { hidden++; continue; }
+  console.log(`== ${f} -> ${hsFiles.join(', ') || 'NO HS FILE'}  missing ${missing.length}/${names.length}`);
   if (process.env.SHOW) for (const n of missing) console.log(`   - ${n}`);
 }
+console.log(`total: missing ${missingTotal}/${cases} across ${specs} specs; ${hidden} fully ported spec(s) hidden (ALL=1 shows them)`);
