@@ -7,6 +7,11 @@ import Data.Maybe
   )
 import Data.Text
   ( isInfixOf
+  , replace
+  )
+import Network.Wai.Application.Static
+  ( defaultFileServerSettings
+  , staticApp
   )
 import Network.HTTP.Types
   ( hContentType
@@ -27,7 +32,9 @@ import Playwright
   , WaitForNavigationOptions (waitForNavigationOptionsUrl, waitForNavigationOptionsWaitUntil)
   , armNavigationFrame
   , childFrames
+  , evaluateOnFrame
   , evaluateOnFrameText
+  , evaluateText
   , framesEqual
   , mainFrame
   , responseFrame
@@ -275,7 +282,59 @@ tests =
                   assertFailure ("expected ProtocolRpc, got: " <> show err)
                 Right _ ->
                   assertFailure "expected the frame detach to fail the wait"
+    , testCase "should work when subframe issues window.stop()" $ do
+        assets <- testAssetsDir
+        arrived <- newEmptyMVar
+        release <- newEmptyMVar
+        withChromiumPage $ \page ->
+          withLocalApp (stallingFrameStyleApp assets arrived release) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            withAsync (goto page (urlFromText (prefix <> "/frames/one-frame.html")) defaultGotoOptions) $ \navigation -> do
+              takeMVar arrived
+              frame <- firstChild page
+              _ <- evaluateOnFrame frame "() => window.stop()"
+              _ <- wait navigation
+              pure ()
+            putMVar release ()
+    , testCase "should work for cross-process navigations" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let target = replace "127.0.0.1" "localhost" prefix <> "/empty.html"
+          takeNavigation <-
+            armNavigationOptions
+              page
+              defaultWaitForNavigationOptions
+                {waitForNavigationOptionsWaitUntil = Just LoadStateDomContentLoaded}
+          withAsync (goto page (urlFromText target) defaultGotoOptions) $ \navigation -> do
+            response <- takeNavigation
+            case response of
+              Nothing ->
+                assertFailure "expected navigation response"
+              Just value -> do
+                responseTarget <- urlToText <$> responseUrl value
+                assertEqual "response url" target responseTarget
+            pageTarget <- urlToText <$> url page
+            assertEqual "page url" target pageTarget
+            assertEqual "location href" target =<< evaluateText page "() => document.location.href"
+            _ <- wait navigation
+            pure ()
     ]
+
+-- | Serves the test assets, but holds /frames/style.css until the test releases it.
+-- The app puts to arrived when the frame's stylesheet request comes in.
+stallingFrameStyleApp :: FilePath -> MVar () -> MVar () -> Application
+stallingFrameStyleApp assets arrived release =
+  let
+    static = staticApp (defaultFileServerSettings assets)
+  in
+    \request respond ->
+      case pathInfo request of
+        ["frames", "style.css"] -> do
+          putMVar arrived ()
+          takeMVar release
+          respond (responseLBS status200 [(hContentType, "text/css")] "")
+        _ ->
+          static request respond
 
 firstChild :: Page -> Playwright Frame
 firstChild page = do
