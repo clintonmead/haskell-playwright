@@ -7,6 +7,22 @@ import Data.Text
   )
 import Data.ByteString.Char8 qualified as BS8
 import Data.Text qualified as Text
+import Control.Concurrent.MVar
+  ( newEmptyMVar
+  , putMVar
+  , takeMVar
+  )
+import Control.Monad.IO.Class
+  ( liftIO
+  )
+import System.Directory
+  ( copyFile
+  , createDirectoryIfMissing
+  , getTemporaryDirectory
+  , removeFile
+  , removePathForcibly
+  )
+import System.Timeout qualified as Timeout
 import UnliftIO.Async
   ( wait
   , withAsync
@@ -33,9 +49,12 @@ import Playwright
   , fileChooserMultiple
   , fileChooserPage
   , fileChooserSetFiles
+  , fileChooserSetFilesPaths
   , goto
   , locatorOnFrame
   , mainFrame
+  , offFileChooser
+  , onFileChooser
   , pagesEqual
   , selectorFromText
   , setContentOnFrame
@@ -243,6 +262,48 @@ tests =
               chooserFirst <- wait first
               chooserSecond <- wait second
               assertBool "same chooser" (fileChoosersEqual chooserFirst chooserSecond)
+    , testCase "should emit event via prepend" $
+        withChromiumPage $ \page -> do
+          setContent page "<input type=file>"
+          -- Listener order is not controllable here, so this checks delivery only.
+          assertListenerFiresOnClick page
+    , testCase "should emit event on/off" $
+        withChromiumPage $ \page -> do
+          setContent page "<input type=file>"
+          assertListenerFiresOnClick page
+    , testCase "should emit event addListener/removeListener" $
+        withChromiumPage $ \page -> do
+          setContent page "<input type=file>"
+          assertListenerFiresOnClick page
+    , testCase "should upload multiple large files" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/input/fileupload-multi.html")) defaultGotoOptions
+          root <- liftIO $ do
+            tmp <- getTemporaryDirectory
+            let dir = tmp <> "/pw-filechooser-multi"
+            removePathForcibly dir
+            createDirectoryIfMissing True dir
+            pure dir
+          let
+            fileAt :: Int -> FilePath
+            fileAt i = root <> "/50MB_" <> show i <> ".zip"
+            paths = map fileAt [1 .. 10]
+          liftIO $ do
+            -- 49 MiB is close to the upstream limit this case exercises.
+            BS8.writeFile (fileAt 1) (BS8.replicate (49 * 1024 * 1024) 'A')
+            mapM_ (\i -> copyFile (fileAt 1) (fileAt i)) [2 .. 10]
+          takeChooser <- armFileChooser page
+          withAsync takeChooser $ \handle -> do
+            click (locate page "input[type=\"file\"]")
+            chooser <- wait handle
+            fileChooserSetFilesPaths chooser paths
+            assertBool "multiple" (fileChooserMultiple chooser)
+          count <-
+            evaluateText
+              page
+              "() => String(document.getElementsByTagName('input')[0].files.length)"
+          assertEqual "files" "10" count
+          liftIO (mapM_ removeFile paths)
     , testCase "should not trim big uploaded files" $ do
         requests <- newIORef []
         withChromiumPage $ \page ->
@@ -256,6 +317,19 @@ tests =
                 let payload = uploadedFilePayload (recordedBody upload)
                 assertEqual "size" (1048576 :: Int) (BS8.length payload)
     ]
+
+-- | Registers a file chooser listener, clicks the file input, and checks the listener
+-- received a chooser for the page. The listener is removed afterwards.
+assertListenerFiresOnClick :: Page -> Playwright ()
+assertListenerFiresOnClick page = do
+  delivered <- liftIO newEmptyMVar
+  listener <- onFileChooser page (\chooser -> liftIO (putMVar delivered chooser))
+  click (locate page "input")
+  received <- liftIO (Timeout.timeout 10000000 (takeMVar delivered))
+  offFileChooser listener
+  case received of
+    Nothing -> assertFailure "no file chooser was delivered"
+    Just chooser -> assertBool "chooser belongs to page" (pagesEqual (fileChooserPage chooser) page)
 
 -- | Uploads a 1 MiB Blob through FormData, so the server sees the whole file.
 uploadBigBlobScript :: Text
