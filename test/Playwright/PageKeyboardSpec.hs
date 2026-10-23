@@ -214,6 +214,16 @@ tests =
             "caret"
             "Keydown: ^ Digit6 STANDARD []\nKeypress: ^ Digit6 STANDARD 94 []\nKeyup: ^ Digit6 STANDARD []"
             caret
+    , testCase "should send proper codes while typing with shift" $
+        withAssetPage "input/keyboard.html" $ \page -> do
+          keyboardDown page (Key "Shift")
+          keyboardType page "~"
+          result <- evaluateText page "() => getResult()"
+          assertEqual
+            "shift tilde"
+            "Keydown: Shift ShiftLeft LEFT [Shift]\nKeydown: ~ Backquote STANDARD [Shift]\nKeypress: ~ Backquote STANDARD 126 [Shift]\nKeyup: ~ Backquote STANDARD [Shift]"
+            result
+          keyboardUp page (Key "Shift")
     , testCase "should have correct Keydown/Keyup order when pressing Escape" $
         withAssetPage "input/keyboard.html" $ \page -> do
           keyboardPress page (Key "Escape")
@@ -427,6 +437,15 @@ tests =
             =<< evaluateOnLocatorText (first (locate page "shadow-element > .editor")) "el => el.textContent"
           assertEqual "second" "This is the second box."
             =<< evaluateOnLocatorText (locate page "section .editor") "el => el.textContent"
+    , testCase "should type repeatedly in contenteditable in shadow dom with nested elements" $
+        withChromiumPage $ \page -> do
+          setContent page shadowNestedEditorsHtml
+          typeText (first (locate page "shadow-element > .editor")) "This is the first box: "
+          typeText (locate page "section .editor") "This is the second box: "
+          assertEqual "first" "This is the first box: hello"
+            =<< evaluateOnLocatorText (first (locate page "shadow-element > .editor")) "el => el.textContent"
+          assertEqual "second" "This is the second box: world"
+            =<< evaluateOnLocatorText (locate page "section .editor") "el => el.textContent"
     , testCase "should type repeatedly in input in shadow dom" $
         withChromiumPage $ \page -> do
           setContent page shadowInputsHtml
@@ -615,6 +634,10 @@ attachFrame page prefix frameId = do
 shadowEditorsHtml :: Text
 shadowEditorsHtml =
   "<html><body><shadow-element></shadow-element><script>customElements.define('shadow-element', class extends HTMLElement { constructor() { super(); this.attachShadow({ mode: 'open' }); } connectedCallback() { this.shadowRoot.innerHTML = `<style>.editor { padding: 1rem; margin: 1rem; border: 1px solid #ccc; }</style><div class=editor contenteditable id=foo></div><hr><section><div class=editor contenteditable id=bar></div></section>`; } });</script></body></html>"
+
+shadowNestedEditorsHtml :: Text
+shadowNestedEditorsHtml =
+  "<html><body><shadow-element></shadow-element><script>customElements.define('shadow-element', class extends HTMLElement { constructor() { super(); this.attachShadow({ mode: 'open' }); } connectedCallback() { this.shadowRoot.innerHTML = `<style>.editor { padding: 1rem; margin: 1rem; border: 1px solid #ccc; }</style><div class=editor contenteditable id=foo><p>hello</p></div><hr><section><div class=editor contenteditable id=bar><p>world</p></div></section>`; } });</script></body></html>"
 
 shadowInputsHtml :: Text
 shadowInputsHtml =
