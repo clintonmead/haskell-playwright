@@ -7,6 +7,7 @@ import Playwright
   , asElement
   , elementArgument
   , evaluate
+  , evaluateHandleExpression
   , evaluateHandleWith
   , fill
   , isChecked
@@ -36,7 +37,9 @@ import Playwright
   , setContent
   , textContent
   , textContentHandle
+  , waitUntilJsHandlePreview
   )
+import qualified Data.Text as Text
 import Playwright.Harness
   ( assertProtocolContains
   , locate
@@ -57,7 +60,32 @@ tests :: TestTree
 tests =
   testGroup
     "elementhandle-convenience"
-    [ testCase "getAttribute should work" $
+    [ testCase "should have a nice preview" $
+        withAssetPage "dom.html" $ \page -> do
+          outer <- evaluateHandleExpression page "document.querySelector('#outer')"
+          inner <- evaluateHandleExpression page "document.querySelector('#inner')"
+          check <- evaluateHandleExpression page "document.querySelector('#check')"
+          text <- evaluateHandleExpression page "document.querySelector('#inner').firstChild"
+          assertEqual "outer" "JSHandle@<div id=\"outer\" name=\"value\">…</div>"
+            =<< waitUntilJsHandlePreview outer (== "JSHandle@<div id=\"outer\" name=\"value\">…</div>")
+          assertEqual "inner" "JSHandle@<div id=\"inner\">Text,↵more text</div>"
+            =<< waitUntilJsHandlePreview inner (== "JSHandle@<div id=\"inner\">Text,↵more text</div>")
+          assertEqual "text" "JSHandle@#text=Text,↵more text"
+            =<< waitUntilJsHandlePreview text (== "JSHandle@#text=Text,↵more text")
+          let checkPreview :: Text.Text
+              checkPreview = "JSHandle@<input checked id=\"check\" foo=\"bar\"\" type=\"checkbox\"/>"
+          assertEqual "check" checkPreview
+            =<< waitUntilJsHandlePreview check (== checkPreview)
+    , testCase "should have a nice preview for non-ascii attributes/children" $
+        withChromiumPage $ \page -> do
+          setContent page ("<div title=\"" <> Text.replicate 100 "😛" <> "\">" <> Text.replicate 100 "😛")
+          handle <- evaluateHandleExpression page "document.querySelector('div')"
+          let expected =
+                "JSHandle@<div title=\"" <> Text.replicate 100 "😛" <> "\">"
+                  <> Text.replicate 49 "😛" <> "…</div>"
+          assertEqual "preview" expected
+            =<< waitUntilJsHandlePreview handle (== expected)
+    , testCase "getAttribute should work" $
         withAssetPage "dom.html" $ \page -> do
           handle <- requireHandle =<< querySelector page (selectorFromText "#outer")
           assertEqual "handle name" (Just "value") =<< getAttributeHandle handle "name"
