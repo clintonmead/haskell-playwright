@@ -23,7 +23,7 @@ import Data.Text
   )
 import Playwright
   ( AriaRole (AriaRole)
-  , ClickOptions (clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsPosition, clickOptionsScroll, clickOptionsSteps, clickOptionsTimeout, clickOptionsTrial)
+  , ClickOptions (clickOptionsButton, clickOptionsClickCount, clickOptionsForce, clickOptionsModifiers, clickOptionsPosition, clickOptionsSteps, clickOptionsTimeout, clickOptionsTrial)
   , ConsoleMessage (consoleMessageText)
   , Frame
   , GetByRoleOptions (getByRoleName)
@@ -47,7 +47,6 @@ import Playwright
   , click
   , clickHandleWith
   , clickWith
-  , hoverWith
   , contentFrameHandle
   , cssPixelFromInt
   , dblclick
@@ -94,20 +93,7 @@ import Playwright.DblclickOptions
   ( DblclickOptions (dblclickOptionsTrial)
   , defaultDblclickOptions
   )
-import Playwright.HoverOptions
-  ( HoverOptions (hoverOptionsScroll, hoverOptionsTimeout)
-  , defaultHoverOptions
-  )
-import Playwright.Error
-  ( PlaywrightError
-  )
 import Playwright.Locator qualified as Locator
-import Playwright.ScrollOption
-  ( ScrollOption (ScrollNone)
-  )
-import UnliftIO.Exception
-  ( try
-  )
 import Playwright.Harness
   ( requireTimeout
   , assertStillPending
@@ -120,7 +106,6 @@ import Playwright.Harness
   , withAssets
   , withChromiumPage
   , assertEqual
-  , assertBool
   , assertFailure
   )
 import Test.Tasty
@@ -763,41 +748,6 @@ tests =
             =<< evaluateBool
               page
               "() => JSON.stringify(window.result) === JSON.stringify([[120,140],[140,180],[160,220],[180,260],[200,300]])"
-    , testCase "should not scroll the page when scroll is none" $
-        withChromiumPage $ \page -> do
-          setContent page "<div style=\"height: 2000px;\"></div><button onclick=\"window._clicked=true\">click me</button>"
-          assertProtocolContains
-            "element is outside of the viewport"
-            (clickWith (locate page "button") defaultClickOptions {clickOptionsScroll = Just ScrollNone, clickOptionsTimeout = milliseconds 2000})
-          assertEqual "not clicked" False =<< evaluateBool page "() => !!window._clicked"
-          assertEqual "not scrolled" (0 :: Double) =<< evaluateNumber page "() => window.scrollY"
-    , testCase "should click in-viewport element when scroll is none" $
-        withChromiumPage $ \page -> do
-          setContent page "<button onclick=\"window._clicked=true\">click me</button><div style=\"height: 2000px;\"></div>"
-          clickWith (locate page "button") defaultClickOptions {clickOptionsScroll = Just ScrollNone, clickOptionsTimeout = milliseconds 2000}
-          assertEqual "clicked" True =<< evaluateBool page "() => !!window._clicked"
-    , testCase "should not scroll nested container when scroll is none" $
-        withChromiumPage $ \page -> do
-          setContent
-            page
-            "<div style=\"height: 100px; width: 100px; overflow-y: scroll;\"><div style=\"height: 50px;\">A</div><div style=\"height: 50px;\">B</div><button style=\"height: 50px; width: 100px;\" onclick=\"window._clicked=true\">C</button></div>"
-          result <-
-            try (clickWith (locate page "button") defaultClickOptions {clickOptionsScroll = Just ScrollNone, clickOptionsTimeout = milliseconds 2000})
-              :: Playwright (Either PlaywrightError ())
-          assertEqual "failed without scroll" True (either (const True) (const False) result)
-          assertEqual "not clicked" False =<< evaluateBool page "() => !!window._clicked"
-          clickWith (locate page "button") defaultClickOptions {clickOptionsTimeout = milliseconds 2000}
-          assertEqual "clicked with default scroll" True =<< evaluateBool page "() => !!window._clicked"
-    , testCase "should not scroll on hover when scroll is none" $
-        withChromiumPage $ \page -> do
-          setContent
-            page
-            "<div style=\"height: 2000px;\"></div><div onmouseover=\"window._hovered=true\" style=\"width: 50px; height: 50px;\">hover me</div>"
-          assertProtocolContains
-            "element is outside of the viewport"
-            (hoverWith (locate page "div >> text=hover me") defaultHoverOptions {hoverOptionsScroll = Just ScrollNone, hoverOptionsTimeout = milliseconds 2000})
-          assertEqual "not hovered" False =<< evaluateBool page "() => !!window._hovered"
-          assertEqual "not scrolled" (0 :: Double) =<< evaluateNumber page "() => window.scrollY"
     , testCase "trial run should not double click" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/input/button.html")) defaultGotoOptions
@@ -808,14 +758,6 @@ tests =
           dblclickWith (locate page "button") defaultDblclickOptions {dblclickOptionsTrial = Just True}
           assertEqual "double" False =<< evaluateBool page "() => window['double']"
           assertEqual "result" "Was not clicked" =<< evaluateText page "() => window.result"
-    , testCase "should scroll instantly on retry when scroll-behavior is smooth" $
-        withChromiumPage $ \page -> do
-          setContent
-            page
-            "<style>html { scroll-behavior: smooth; } body { margin: 0; } .spacer { height: 2000px; } #header { position: fixed; top: 0; left: 0; right: 0; height: calc(100vh - 50px); background: rgba(0, 0, 0, 0.1); } button { height: 30px; }</style><div id=\"header\"></div><div class=\"spacer\"></div><button onclick=\"window.clicked = true\">Target</button><div class=\"spacer\"></div><script>window.scrolls = []; addEventListener('scroll', () => window.scrolls.push(window.scrollY));</script>"
-          click (locate page "button")
-          assertEqual "clicked" True =<< evaluateBool page "() => !!window.clicked"
-          assertBool "at most two scrolls" . (<= (2 :: Double)) =<< evaluateNumber page "() => window.scrolls.length"
     , testCase "should timeout waiting for button to be enabled" $
         withChromiumPage $ \page -> do
           setContent page "<button onclick=\"javascript:window.__CLICKED=true;\" disabled><span>Click target</span></button>"
