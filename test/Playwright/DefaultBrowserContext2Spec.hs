@@ -65,6 +65,7 @@ import Playwright
   , registerSelector
   , reload
   , requestHeaders
+  , routeFromHar
   , runPlaywright
   , selectorFromText
   , setContent
@@ -80,6 +81,7 @@ import Playwright.Harness
   , assertEqual
   , assertFailure
   , assertProtocolContains
+  , testAssetsDir
   , withAssetsPrefix
   , withPersistentContext
   , withPersistentContextWith
@@ -287,6 +289,14 @@ tests =
                 page
                 "async () => (await navigator.storage.getDirectory()).name"
             assertEqual "name" "" name
+    , testCase "should support har option" $
+        withPersistentContext $ \_ctx page -> do
+          dir <- testAssetsDir
+          routeFromHar page (dir <> "/har-fulfill.har")
+          _ <- goto page (urlFromText "http://no.playwright/") defaultGotoOptions
+          assertEqual "value" "foo" =<< evaluateText page "() => window.value"
+          assertEqual "background" "rgb(255, 0, 0)"
+            =<< evaluateText page "() => getComputedStyle(document.body).backgroundColor"
     ]
 
 relativeUserDataDirTest :: IO ()
