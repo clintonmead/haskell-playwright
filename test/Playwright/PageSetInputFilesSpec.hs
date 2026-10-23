@@ -87,6 +87,7 @@ import UnliftIO.Exception
   )
 import UnliftIO.Temporary
   ( withSystemTempDirectory
+  , withTempDirectory
   )
 
 tests :: TestTree
@@ -284,7 +285,52 @@ tests =
           assertBool
             ("expected: " <> show expected <> "; actual: " <> show actual)
             (length actual == length expected && and (zipWith (\a e -> abs (a - e) <= 1000) actual expected))
+    , testCase "should upload large file" $
+        withSystemTempDirectory "pw-large-upload" $ \tmp -> do
+          uploadFile <- writeLargeUploadFile tmp
+          largeFileUpload uploadFile
+    , testCase "should upload large file with relative path" $
+        -- The fixture lives under the working directory, since makeRelative
+        -- leaves a path outside it absolute.
+        withTempDirectory "." "pw-large-upload" $ \tmp -> do
+          uploadFile <- writeLargeUploadFile tmp
+          relativePath <- makeRelativeToCurrentDirectory uploadFile
+          assertBool "relative path" (take 1 relativePath /= "/")
+          largeFileUpload relativePath
     ]
+
+-- | The size of the large upload cases, 200 MB, matching the upstream fixture.
+largeUploadSize :: Int
+largeUploadSize = 200 * 1024 * 1024
+
+-- | Writes a 200 MB file named 200MB.zip into the directory and returns its path.
+writeLargeUploadFile :: FilePath -> IO FilePath
+writeLargeUploadFile dir = do
+  let path = dir <> "/200MB.zip"
+  ByteString.writeFile path (ByteString.replicate largeUploadSize 65)
+  pure path
+
+-- | Sets the given file on a file input, checks the page sees the name and the
+-- input and change events, then submits a multipart form and checks the server
+-- received the whole 200 MB under the original file name.
+largeFileUpload :: FilePath -> IO ()
+largeFileUpload uploadFile = withChromiumPage $ \page -> do
+  uploads <- liftIO newEmptyMVar
+  withLocalApp (uploadBodyApp uploads) $ \base -> do
+    _ <- goto page (urlFromText (base <> "/empty.html")) defaultGotoOptions
+    setContent
+      page
+      "<form action=\"/upload\" method=\"post\" enctype=\"multipart/form-data\"><input type=\"file\" name=\"file1\"><input type=\"submit\" value=\"Submit\"></form><script>window.events = []; const input = document.querySelector('input[name=file1]'); input.addEventListener('input', () => window.events.push('input')); input.addEventListener('change', () => window.events.push('change'));</script>"
+    setInputFilesPaths (locate page "input[name=file1]") [uploadFile]
+    assertEqual "name" "200MB.zip"
+      =<< evaluateOnLocatorText (locate page "input[name=file1]") "input => input.files[0].name"
+    assertEqual "events" ["input", "change"] =<< evaluateTexts page "() => window.events"
+    click (locate page "input[type=submit]")
+    body <- liftIO (takeMVar uploads)
+    assertBool
+      "multipart part names the file"
+      ("filename=\"200MB.zip\"" `ByteString.isInfixOf` ByteString.take 1024 body)
+    assertEqual "file size" largeUploadSize (multipartFileSize body)
 
 -- | The file's modification time in milliseconds since the epoch, the same
 -- unit as the browser's File.lastModified.
