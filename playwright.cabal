@@ -341,6 +341,7 @@ test-suite playwright-test
       Playwright.GlobalFetchCookieSpec
       Playwright.GlobalFetchSupport
       Playwright.Harness
+      Playwright.HarRecordSpec
       Playwright.HarSpec
       Playwright.HeapSpec
       Playwright.HitTargetSpec
