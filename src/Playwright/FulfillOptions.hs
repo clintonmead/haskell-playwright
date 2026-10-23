@@ -35,6 +35,7 @@ data FulfillOptions = FulfillOptions
   { fulfillBody :: Maybe FulfillBody
   , fulfillContentType :: Maybe ContentType
   , fulfillHeaders :: [HttpHeader]
+  , fulfillPath :: Maybe FilePath
   , fulfillResponse :: Maybe APIResponse
   , fulfillStatus :: Maybe HttpStatus
   }
@@ -45,6 +46,7 @@ defaultFulfillOptions =
     { fulfillBody = Nothing
     , fulfillContentType = Nothing
     , fulfillHeaders = []
+    , fulfillPath = Nothing
     , fulfillResponse = Nothing
     , fulfillStatus = Nothing
     }

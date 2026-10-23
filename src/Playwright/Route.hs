@@ -80,7 +80,7 @@ import Playwright.FetchOptions
 import Playwright.FulfillOptions
   ( ContentType (contentTypeToText)
   , FulfillBody (FulfillBytes, FulfillText)
-  , FulfillOptions (fulfillBody, fulfillContentType, fulfillHeaders, fulfillResponse, fulfillStatus)
+  , FulfillOptions (fulfillBody, fulfillContentType, fulfillHeaders, fulfillPath, fulfillResponse, fulfillStatus)
   )
 import Playwright.HttpHeader
   ( HeaderName (HeaderName, headerNameToText)
@@ -222,8 +222,9 @@ abortRouteWithCode handled code = do
   settleRoute handled True
 
 fulfillRoute :: Route -> FulfillOptions -> Playwright ()
-fulfillRoute handled opts = do
+fulfillRoute handled opts0 = do
   ensureUnhandled handled
+  opts <- fulfillOptionsWithPath opts0
   let
     (bodyText, isBase64, byteLength) = encodeFulfillBody (fulfillBody opts)
     fetchUid = fulfillFetchUid opts
@@ -289,6 +290,16 @@ encodeFulfillBody body =
       (Just text, False, ByteString.length (encodeUtf8 text))
     Just (FulfillBytes bytes) ->
       (Just (decodeLatin1 (encode bytes)), True, ByteString.length bytes)
+
+-- | Reads the body from 'fulfillPath' when one is given, replacing any body text or bytes.
+fulfillOptionsWithPath :: FulfillOptions -> Playwright FulfillOptions
+fulfillOptionsWithPath opts =
+  case fulfillPath opts of
+    Nothing ->
+      pure opts
+    Just path -> do
+      bytes <- liftIO (ByteString.readFile path)
+      pure opts {fulfillBody = Just (FulfillBytes bytes), fulfillPath = Nothing}
 
 fulfillFetchUid :: FulfillOptions -> Maybe Text
 fulfillFetchUid opts =

@@ -1261,7 +1261,7 @@ import Playwright.Frame.Wait
 import Playwright.FulfillOptions
   ( ContentType (ContentType, contentTypeToText)
   , FulfillBody (FulfillBytes, FulfillText)
-  , FulfillOptions (FulfillOptions, fulfillBody, fulfillContentType, fulfillHeaders, fulfillResponse, fulfillStatus)
+  , FulfillOptions (FulfillOptions, fulfillBody, fulfillContentType, fulfillHeaders, fulfillPath, fulfillResponse, fulfillStatus)
   , defaultFulfillOptions
   )
 import Playwright.Geolocation
