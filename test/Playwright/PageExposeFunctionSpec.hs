@@ -29,9 +29,13 @@ import System.Timeout
   )
 import Playwright
   ( BindingName (BindingName)
-  , SpecialJsValue (SpecialUndefined)
+  , BindingThrow (BindingThrow)
+  , JsHandle
+  , SpecialJsValue (SpecialNull, SpecialUndefined)
   , addInitScript
   , evaluate
+  , evaluateBool
+  , evaluateHandle
   , evaluateText
   , reload
   , specialArgument
@@ -42,6 +46,7 @@ import Playwright
   , exposeFunction
   , frames
   , goto
+  , jsHandleObjectArgument
   , numberArgument
   , setContent
   , urlFromText
@@ -58,12 +63,13 @@ import Playwright.Harness
   , assertEqual
   )
 import Playwright.SerializedArgument
-  ( SerializedArgument
+  ( SerializedArgument (serializedArgumentValue)
   , objectNumberArgument
   )
 import Playwright.SerializedValue
-  ( SerializedPayload (PayloadArray, PayloadNumber, PayloadObject, PayloadString)
+  ( SerializedPayload (PayloadArray, PayloadNumber, PayloadObject, PayloadSpecial, PayloadString)
   , SerializedValue (SerializedNode, SerializedRef)
+  , arrayValue
   )
 import Test.Tasty
   ( TestTree
@@ -202,6 +208,21 @@ tests =
           _ <- evaluate page "() => { const a = {}; a.b = a; window.log(a); }"
           args <- liftIO (timeout 10000000 (takeMVar captured))
           assertBool "cycle" (maybe False isCycle args)
+    , testCase "should work with handles and complex objects" $
+        withChromiumPage $ \page -> do
+          fooHandle <- evaluateHandle page "() => { window.fooValue = { bar: 2 }; return window.fooValue; }"
+          _ <- exposeFunction page (BindingName "handle") (\_ -> pure (arrayOfHandleObject fooHandle))
+          assertEqual "same object" True =<< evaluateBool page
+            "async () => { const [{ foo }] = await window.handle(); return foo === window.fooValue; }"
+    , testCase "should support throwing \"null\"" $
+        withChromiumPage $ \page -> do
+          _ <-
+            exposeFunction
+              page
+              (BindingName "woof")
+              (\_ -> throwIO (BindingThrow (SerializedNode (PayloadSpecial SpecialNull) Nothing)))
+          assertEqual "thrown null" True =<< evaluateBool page
+            "async () => { try { await window.woof(); return false; } catch (e) { return e === null; } }"
     , testCase "should work with complex objects" $
         withChromiumPage $ \page -> do
           _ <- exposeFunction page (BindingName "complexObject") sumX
@@ -245,6 +266,15 @@ sumX args =
       pure (objectNumberArgument [("x", left + right)])
     _ ->
       throwIO (EvaluateUnexpected (SerializedNode (PayloadNumber 0) Nothing))
+
+-- | Answers with @[{ foo: handle }]@, an array holding an object whose field
+-- is the given handle.
+arrayOfHandleObject :: JsHandle -> SerializedArgument
+arrayOfHandleObject handle =
+  let
+    inner = jsHandleObjectArgument "foo" handle
+  in
+    inner {serializedArgumentValue = arrayValue [serializedArgumentValue inner]}
 
 constant42 :: [SerializedValue] -> Playwright SerializedArgument
 constant42 _ = pure (numberArgument 42)
