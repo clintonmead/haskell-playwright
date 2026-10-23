@@ -552,6 +552,25 @@ tests =
               assertFailure "missing response"
             Just value ->
               assertEqual "http version" "HTTP/1.1" =<< responseHttpVersion value
+    , testCase "request.existingResponse should return the response after it is received" $
+        withAssets $ \prefix page -> do
+          response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          case response of
+            Nothing ->
+              assertFailure "missing response"
+            Just value -> do
+              request <- responseRequest value
+              existing <- requestResponse request
+              case existing of
+                Nothing ->
+                  assertFailure "expected an existing response"
+                Just found -> do
+                  valueUrl <- urlToText <$> responseUrl value
+                  foundUrl <- urlToText <$> responseUrl found
+                  assertEqual "same url" valueUrl foundUrl
+                  valueStatus <- responseStatus value
+                  foundStatus <- responseStatus found
+                  assertEqual "same status" valueStatus foundStatus
     ]
 
 sortedHeaders :: [HttpHeader] -> [(Text, Text)]
