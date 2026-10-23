@@ -264,6 +264,7 @@ test-suite playwright-test
       Playwright.BrowserContextFetch1Spec
       Playwright.BrowserContextFetch2Spec
       Playwright.BrowserContextFetchAlgorithmsSpec
+      Playwright.BrowserContextFetchHappyEyeballsSpec
       Playwright.BrowserContextFetchSupport
       Playwright.BrowserContextHarSpec
       Playwright.BrowserContextJavaScriptSpec

@@ -21,6 +21,7 @@ import Playwright.BrowserContextExposeFunctionSpec qualified as BrowserContextEx
 import Playwright.BrowserContextFetchAlgorithmsSpec qualified as BrowserContextFetchAlgorithmsSpec
 import Playwright.BrowserContextFetch1Spec qualified as BrowserContextFetch1Spec
 import Playwright.BrowserContextFetch2Spec qualified as BrowserContextFetch2Spec
+import Playwright.BrowserContextFetchHappyEyeballsSpec qualified as BrowserContextFetchHappyEyeballsSpec
 import Playwright.BrowserContextJavaScriptSpec qualified as BrowserContextJavaScriptSpec
 import Playwright.BrowserContextLocaleSpec qualified as BrowserContextLocaleSpec
 import Playwright.BrowserContextNetworkEventSpec qualified as BrowserContextNetworkEventSpec
@@ -233,6 +234,7 @@ main =
         , BrowserContextFetchAlgorithmsSpec.tests
         , BrowserContextFetch1Spec.tests
         , BrowserContextFetch2Spec.tests
+        , BrowserContextFetchHappyEyeballsSpec.tests
         , BrowserContextJavaScriptSpec.tests
         , BrowserContextLocaleSpec.tests
         , BrowserContextNetworkEventSpec.tests
