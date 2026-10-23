@@ -154,6 +154,7 @@ library
       Playwright.Route
       Playwright.Route.Intercept
       Playwright.RouteOptions
+      Playwright.Screencast
       Playwright.ScreenshotOptions
       Playwright.ScriptTag
       Playwright.ScrollOption
