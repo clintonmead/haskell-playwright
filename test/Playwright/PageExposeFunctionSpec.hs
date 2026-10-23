@@ -106,6 +106,21 @@ tests =
               assertEqual "product" (15 :: Double) =<< requireNumber value
             _ ->
               assertEqual "frames" True False
+    , testCase "should work on frames before navigation" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/frames/nested-frames.html")) defaultGotoOptions
+          _ <- exposeFunction page (BindingName "compute") multiply
+          children <- frames page
+          case children of
+            (_ : frame : _) -> do
+              value <- evaluateOnFrame frame "async () => window.compute(3, 5)"
+              assertEqual "product" (15 :: Double) =<< requireNumber value
+            _ ->
+              assertEqual "frames" True False
+    , testCase "should await returned promise" $
+        withChromiumPage $ \page -> do
+          _ <- exposeFunction page (BindingName "compute") multiply
+          assertEqual "product" (15 :: Double) =<< evaluateNumber page "async () => await window.compute(3, 5)"
     , testCase "should throw for duplicate registrations" $
         withChromiumPage $ \page -> do
           _ <- exposeFunction page (BindingName "foo") multiply
