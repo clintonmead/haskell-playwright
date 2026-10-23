@@ -56,6 +56,7 @@ module Playwright
   , Exactness (..)
   , FileChooser (..)
   , fileChooserSetFiles
+  , fileChoosersEqual
   , ForcedColors (..)
   , FetchOptions (..)
   , FetchPostData (..)
@@ -1226,6 +1227,7 @@ import Playwright.FetchOptions
 import Playwright.FileChooser
   ( FileChooser (FileChooser, fileChooserElement, fileChooserMultiple, fileChooserPage)
   , armFileChooser
+  , fileChoosersEqual
   , fileChooserSetFiles
   , waitForFileChooser
   , waitForFileChooserWith

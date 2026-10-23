@@ -1,6 +1,7 @@
 module Playwright.FileChooser
   ( FileChooser (..)
   , armFileChooser
+  , fileChoosersEqual
   , fileChooserSetFiles
   , waitForFileChooser
   , waitForFileChooserWith
@@ -18,7 +19,7 @@ import Playwright.Connection
   , waitForWaiter
   )
 import Playwright.ElementHandle
-  ( ElementHandle
+  ( ElementHandle (elementHandleChannel)
   , elementHandleFromRef
   , setInputFilesHandle
   )
@@ -83,6 +84,12 @@ armFileChooser page = do
         , fileChooserMultiple = pageFileChooserEventIsMultiple event
         , fileChooserPage = page
         }
+
+-- | True when both choosers wrap the same input element, as two arms of one event do.
+fileChoosersEqual :: FileChooser -> FileChooser -> Bool
+fileChoosersEqual left right =
+  channelGuid (elementHandleChannel (fileChooserElement left))
+    == channelGuid (elementHandleChannel (fileChooserElement right))
 
 -- | Sets the files the chooser picked. This is setInputFiles on the input.
 fileChooserSetFiles :: FileChooser -> [InputFile] -> Playwright ()

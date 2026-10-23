@@ -11,20 +11,26 @@ import UnliftIO.Async
   , withAsync
   )
 import Playwright
-  ( InputFile (InputFile)
+  ( Frame
+  , InputFile (InputFile)
   , InputFileName (InputFileName)
+  , Page
+  , Playwright
   , armFileChooser
+  , childFrames
   , click
   , defaultGotoOptions
   , evaluate
   , evaluateOnLocatorNumber
   , evaluateOnLocatorText
   , evaluateText
+  , fileChoosersEqual
   , fileChooserMultiple
   , fileChooserPage
   , fileChooserSetFiles
   , goto
   , locatorOnFrame
+  , mainFrame
   , pagesEqual
   , selectorFromText
   , setContentOnFrame
@@ -42,6 +48,7 @@ import Playwright.Harness
   , readTestAsset
   , withAssets
   , withChromiumPage
+  , assertBool
   , assertEqual
   , assertFailure
   )
@@ -197,7 +204,56 @@ tests =
               assertFailure "timeout"
             Just timeout ->
               assertWaitTimeout (waitForFileChooserWith page timeout)
+    , testCase "should not throw when filechooser belongs to iframe" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/frames/one-frame.html")) defaultGotoOptions
+          frame <- firstChildFrame page
+          setContentOnFrame frame clickOpensChooserContent
+          takeChooser <- armFileChooser page
+          withAsync takeChooser $ \handle -> do
+            click (locatorOnFrame page frame (selectorFromText "div"))
+            _ <- wait handle
+            pure ()
+          assertEqual "done" "true" =<< evaluateText page "() => String(window.__done === true)"
+    , testCase "should not throw when frame is detached immediately" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/frames/one-frame.html")) defaultGotoOptions
+          frame <- firstChildFrame page
+          setContentOnFrame frame clickOpensChooserAndDetachesContent
+          -- Subscribes to file choosers, as the upstream no-op listener does.
+          _ <- armFileChooser page
+          click (locatorOnFrame page frame (selectorFromText "div"))
+          assertEqual "done" "true" =<< evaluateText page "() => String(window.__done === true)"
+    , testCase "should return the same file chooser when there are many watchdogs simultaneously" $
+        withChromiumPage $ \page -> do
+          setContent page "<input type=file>"
+          takeFirst <- armFileChooser page
+          takeSecond <- armFileChooser page
+          withAsync takeFirst $ \first ->
+            withAsync takeSecond $ \second -> do
+              click (locate page "input")
+              chooserFirst <- wait first
+              chooserSecond <- wait second
+              assertBool "same chooser" (fileChoosersEqual chooserFirst chooserSecond)
     ]
+
+-- | The first child frame of the main frame, which must exist.
+firstChildFrame :: Page -> Playwright Frame
+firstChildFrame page = do
+  children <- childFrames (mainFrame page)
+  case children of
+    child : _ -> pure child
+    [] -> assertFailure "expected a child frame"
+
+-- | Frame content whose click opens a file chooser and records that the handler ran.
+clickOpensChooserContent :: Text
+clickOpensChooserContent =
+  "<div>Click me</div><script>document.querySelector('div').addEventListener('click', () => { const input = document.createElement('input'); input.type = 'file'; input.click(); window.parent.__done = true; });</script>"
+
+-- | Like clickOpensChooserContent, but removes the iframe from the parent during the click.
+clickOpensChooserAndDetachesContent :: Text
+clickOpensChooserAndDetachesContent =
+  "<div>Click me</div><script>document.querySelector('div').addEventListener('click', () => { const input = document.createElement('input'); input.type = 'file'; input.click(); window.parent.__done = true; const iframe = window.parent.document.querySelector('iframe'); iframe.remove(); });</script>"
 
 -- | Clicks the file input, waits for the selection, and returns the file text.
 readSelectedFileScript :: Text
