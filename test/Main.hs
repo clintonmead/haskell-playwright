@@ -155,6 +155,7 @@ import Playwright.PageGoto2Spec qualified as PageGoto2Spec
 import Playwright.PageHistorySpec qualified as PageHistorySpec
 import Playwright.PageKeyboardSpec qualified as PageKeyboardSpec
 import Playwright.PageLocalStorageSpec qualified as PageLocalStorageSpec
+import Playwright.PageListenersSpec qualified as PageListenersSpec
 import Playwright.PageMouseSpec qualified as PageMouseSpec
 import Playwright.PageNavigationSpec qualified as PageNavigationSpec
 import Playwright.PageNetworkIdleSpec qualified as PageNetworkIdleSpec
@@ -382,6 +383,7 @@ main =
         , PageHistorySpec.tests
         , PageKeyboardSpec.tests
         , PageLocalStorageSpec.tests
+        , PageListenersSpec.tests
         , PageMouseSpec.tests
         , PageNavigationSpec.tests
         , PageNetworkIdleSpec.tests
