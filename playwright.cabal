@@ -428,6 +428,7 @@ test-suite playwright-test
       Playwright.SharedWorkerSpec
       Playwright.SlowMoSpec
       Playwright.TapSpec
+      Playwright.TracingSpec
       Playwright.TransportSpec
       Playwright.UnrouteBehaviorSpec
       Playwright.UrlMatchSpec

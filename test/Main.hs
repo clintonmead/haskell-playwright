@@ -187,6 +187,7 @@ import Playwright.SelectorsTextSpec qualified as SelectorsTextSpec
 import Playwright.SharedWorkerSpec qualified as SharedWorkerSpec
 import Playwright.SlowMoSpec qualified as SlowMoSpec
 import Playwright.TapSpec qualified as TapSpec
+import Playwright.TracingSpec qualified as TracingSpec
 import Playwright.TransportSpec qualified as TransportSpec
 import Playwright.UnrouteBehaviorSpec qualified as UnrouteBehaviorSpec
 import Playwright.VideoSpec qualified as VideoSpec
@@ -311,6 +312,7 @@ main =
         , PageCheckSpec.tests
         , PageClockFrozenSpec.tests
         , PageClockSpec.tests
+        , TracingSpec.tests
         , PageClickSpec.tests
         , PageClickReactSpec.tests
         , PageClickScrollSpec.tests
