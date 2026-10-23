@@ -922,6 +922,7 @@ asLocatorDescriptionString lang selector = either (const selector) id describe
   where
     describe = do
       parsed <- parseSelector selector
+      when (any invalidCss (parsedParts parsed)) (Left "invalid css selector")
       custom <- customDescription parsed
       case custom of
         Just text -> pure text
@@ -931,12 +932,43 @@ asLocatorDescriptionString lang selector = either (const selector) id describe
             (row : _) -> pure row
             [] -> Left "no locator"
 
+-- | A bare CSS part with a @::@ pseudo-element or axis is rejected by the CSS
+-- parser upstream, so such selectors are returned unchanged by asLocatorDescription.
+invalidCss :: SelPart -> Bool
+invalidCss part = partName part == "css" && hasDoubleColon (partSource part)
+  where
+    hasDoubleColon :: String -> Bool
+    hasDoubleColon s = case s of
+      (':' : ':' : _) -> True
+      (_ : rest) -> hasDoubleColon rest
+      [] -> False
+
 customDescription :: ParsedSelector -> Either String (Maybe String)
 customDescription parsed = case reverse (parsedParts parsed) of
   (part : _) | partName part == "internal:describe" -> case jsonString (partSource part) of
     Right text -> Right (Just text)
-    Left err -> Left err
+    Left _ -> Right Nothing
   _ -> Right Nothing
+
+-- | True when the text starts with a generator call such as @locator(@,
+-- @Locator(@, @getByRole(@ or @page.@ rather than selector syntax. Such text is
+-- never returned unchanged as a selector.
+looksLikeCode :: String -> Bool
+looksLikeCode text = case span isIdentChar (dropWhile isSpace text) of
+  (ident@(_ : _), rest) -> (ident `elem` codeRoots || isGetBy ident) && startsCall (dropWhile isSpace rest)
+  _ -> False
+  where
+    isIdentChar :: Char -> Bool
+    isIdentChar c = isAsciiLower c || isAsciiUpper c || isDigit c || c == '_'
+    codeRoots :: [String]
+    codeRoots = ["locator", "Locator", "frameLocator", "FrameLocator", "frame_locator", "page", "AriaRole"]
+    isGetBy :: String -> Bool
+    isGetBy ident = any (`isPrefixOf` ident) ["getBy", "GetBy", "get_by_"]
+    startsCall :: String -> Bool
+    startsCall r = case r of
+      ('(' : _) -> True
+      ('.' : _) -> True
+      _ -> False
 
 innerAsLocators :: Language -> Quote -> ParsedSelector -> Bool -> Int -> Either String [String]
 innerAsLocators lang quote parsed isFrame maxOut = do
@@ -1433,8 +1465,8 @@ substParams f s = case s of
 locatorOrSelectorString :: Language -> String -> String -> String
 locatorOrSelectorString lang locator testIdAttr =
   case parseSelector locator of
-    Right _ -> locator
-    Left _ ->
+    Right _ | not (looksLikeCode locator) -> locator
+    _ ->
       let (selector, preferred) = parseLocatorText locator testIdAttr
           candidates = asLocatorsString lang False 20 (fromMaybe SingleQuote preferred) selector
           digest = digestForComparison lang locator
