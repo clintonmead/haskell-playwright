@@ -4,6 +4,7 @@ Decisions made without waiting for an answer. Each entry gives the question, the
 
 Each line below links to the full entry in [progress/QUESTIONS-ARCHIVE.md](progress/QUESTIONS-ARCHIVE.md). Status is `resolved` or `guess in place, no answer yet`.
 
+0. [Expect matchers surface only the driver error, not errorDetails](progress/QUESTIONS-ARCHIVE.md#q-26) - guess in place, no answer yet
 1. [backlog: HEAD does not build (15 missing exports), and many slices are uncommitted](progress/QUESTIONS-ARCHIVE.md#q-1) - committed as 8f8310d (option a); the user asked for the commit
 2. [page-network-request: gaps left unported, and the event-source server omits keep-alive](progress/QUESTIONS-ARCHIVE.md#q-2) - guess in place, no answer yet
 3. [page-wait-for-response: "second waiter loses events" claim did not hold](progress/QUESTIONS-ARCHIVE.md#q-3) - guess in place, no answer yet

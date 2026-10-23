@@ -42,3 +42,5 @@ Plus connection/transport unit tests and a small integration spec.
 
 Known holes inside otherwise-ported specs are listed in `FUNCTIONALITY_TODO.md`.
 `tracing` is a partial port of `tests/library/tracing.spec.ts` (13 cases). It covers `context.tracing` start with options, stop without start, stop without start without exporting, dialogs, clicks that open dialogs, concurrent export, overwrite of an existing archive (zip entry names), recovery after a failed stop (zip entry presence only), no snapshots or action screenshots by default, action screenshots, buffer placeholders in screenshot results, and a reduced frame-snapshot and screencast check. Skipped trace-content cases are listed in `FUNCTIONALITY_TODO.md`.
+
+`expect-boolean` is partly ported (`test/Playwright/ExpectBooleanSpec.hs`, 21 cases over `toBeVisible` and `toBeAttached`) on top of the new `Playwright.Expect` core. The core covers boolean locator matchers and `to.have.count` through frame `expect`, with `isNot` and timeout. The rest of the spec is still open: message-text cases need `errorDetails` (see QUESTIONS.md item 0).

@@ -1283,3 +1283,12 @@ b. Fix the library now by converting console events in the reader thread, before
 **To change:** Rename the part files, or re-run the split with a different cut rule. For the Support size, split `BrowserContextFetchSupport.hs` by topic.
 
 **Superseded:** none.
+
+<a id="q-26"></a>
+## Expect matchers surface only the driver error, not errorDetails
+
+**Question:** Should the expect core read `errorDetails` (timedOut, received) from the driver's `expect` response, so matcher results and the upstream failure messages can be built client-side?
+
+**Guess taken:** No, not yet. `Incoming.hs` drops `errorDetails` and `Connection` only carries `ProtocolFailure`. The core in `src/Playwright/Expect.hs` calls frame `expect` and lets a failed assertion throw the driver's `ProtocolRpc` error, which includes the call log. Cases that check the client-composed message ("locator resolved to ...") or `e.matcherResult` are skipped until details are surfaced.
+
+**To change:** Add an additive `errorDetails` field to `WireMessage`, carry it through `IncomingResponse` and `completeCallback`, and expose it from `expectLocatorWith` as a matcher result.
