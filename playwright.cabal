@@ -494,6 +494,7 @@ test-suite playwright-test
       Playwright.SignalsSpec
       Playwright.SlowMoSpec
       Playwright.TapSpec
+      Playwright.ToMatchAriaSnapshotSpec
       Playwright.TraceViewerScrubSpec
       Playwright.TracingSpec
       Playwright.TransportSpec

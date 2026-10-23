@@ -220,6 +220,7 @@ import Playwright.SelectorsTextSpec qualified as SelectorsTextSpec
 import Playwright.SharedWorkerSpec qualified as SharedWorkerSpec
 import Playwright.SlowMoSpec qualified as SlowMoSpec
 import Playwright.TapSpec qualified as TapSpec
+import Playwright.ToMatchAriaSnapshotSpec qualified as ToMatchAriaSnapshotSpec
 import Playwright.TracingSpec qualified as TracingSpec
 import Playwright.TraceViewerScrubSpec qualified as TraceViewerScrubSpec
 import Playwright.TransportSpec qualified as TransportSpec
@@ -459,6 +460,7 @@ main =
         , SharedWorkerSpec.tests
         , SlowMoSpec.tests
         , TapSpec.tests
+        , ToMatchAriaSnapshotSpec.tests
         , UnrouteBehaviorSpec.tests
         , VideoSpec.tests
         , WebSocketSpec.tests
