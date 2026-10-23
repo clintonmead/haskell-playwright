@@ -297,6 +297,7 @@ test-suite playwright-test
       Playwright.EmulationFocusSpec
       Playwright.EvalOnSelectorAllSpec
       Playwright.EvalOnSelectorSpec
+      Playwright.FetchProxySpec
       Playwright.FrameEvaluateSpec
       Playwright.FrameFrameElementSpec
       Playwright.FrameGotoSpec
@@ -444,6 +445,7 @@ test-suite playwright-test
     , directory
     , hedgehog
     , http-types
+    , network
     , playwright
     , stm
     , tasty

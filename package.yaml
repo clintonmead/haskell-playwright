@@ -74,6 +74,7 @@ tests:
       - directory
       - hedgehog
       - http-types
+      - network
       - playwright
       - stm
       - tasty
