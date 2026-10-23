@@ -4,6 +4,9 @@ module Playwright.NewRequestOptions
   , toPlaywrightNewRequestParams
   ) where
 
+import Data.Maybe
+  ( maybeToList
+  )
 import Playwright.HttpCredentials
   ( HttpCredentials (httpCredentialsOrigin, httpCredentialsPassword, httpCredentialsSend, httpCredentialsUsername)
   , HttpPassword (httpPasswordToText)
@@ -47,6 +50,7 @@ data NewRequestOptions = NewRequestOptions
   , newRequestExtraHTTPHeaders :: Maybe [HttpHeader]
   , newRequestFailOnStatusCode :: Maybe Bool
   , newRequestHttpCredentials :: Maybe HttpCredentials
+  , newRequestHttpCredentialsList :: [HttpCredentials]
   , newRequestIgnoreHTTPSErrors :: Maybe Bool
   , newRequestMaxRedirects :: Maybe Int
   , newRequestProxy :: Maybe ProxySettings
@@ -63,6 +67,7 @@ defaultNewRequestOptions =
     , newRequestExtraHTTPHeaders = Nothing
     , newRequestFailOnStatusCode = Nothing
     , newRequestHttpCredentials = Nothing
+    , newRequestHttpCredentialsList = []
     , newRequestIgnoreHTTPSErrors = Nothing
     , newRequestMaxRedirects = Nothing
     , newRequestProxy = Nothing
@@ -77,7 +82,7 @@ toPlaywrightNewRequestParams opts =
     { playwrightNewRequestParamsBaseURL = newRequestBaseURL opts
     , playwrightNewRequestParamsExtraHTTPHeaders = fmap (fmap toNameValue) (newRequestExtraHTTPHeaders opts)
     , playwrightNewRequestParamsFailOnStatusCode = newRequestFailOnStatusCode opts
-    , playwrightNewRequestParamsHttpCredentials = fmap toProtocolCredentials (newRequestHttpCredentials opts)
+    , playwrightNewRequestParamsHttpCredentials = toProtocolCredentialsList opts
     , playwrightNewRequestParamsIgnoreHTTPSErrors = newRequestIgnoreHTTPSErrors opts
     , playwrightNewRequestParamsMaxRedirects = newRequestMaxRedirects opts
     , playwrightNewRequestParamsProxy = fmap toProtocolProxy (newRequestProxy opts)
@@ -94,7 +99,14 @@ toProtocolProxy settings =
     , playwrightNewRequestParamsProxyPassword = fmap httpPasswordToText (proxySettingsPassword settings)
     }
 
--- | The protocol takes a list of credentials; a request has at most one.
+-- | The single 'newRequestHttpCredentials' comes first, then every entry of
+-- 'newRequestHttpCredentialsList'. Nothing is sent when neither is set.
+toProtocolCredentialsList :: NewRequestOptions -> Maybe [Protocol.HttpCredentials]
+toProtocolCredentialsList opts =
+  case concatMap toProtocolCredentials (maybeToList (newRequestHttpCredentials opts) <> newRequestHttpCredentialsList opts) of
+    [] -> Nothing
+    creds -> Just creds
+
 toProtocolCredentials :: HttpCredentials -> [Protocol.HttpCredentials]
 toProtocolCredentials creds =
   [ Protocol.HttpCredentials
