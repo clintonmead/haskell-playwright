@@ -124,3 +124,9 @@ Each line below links to the full entry in [progress/QUESTIONS-ARCHIVE.md](progr
 - **Relative `recordVideo.dir` is passed through unchanged.** Guess: the driver shares the process cwd and resolves it the same way. This is unverified until the relative-path case runs.
 - **Size and pixel checks need an ffmpeg frame reader.** Guess: parse `ffmpeg -i` stderr for size. Pixel cases stay skipped until then.
 - **Popup video cases** ("should expose video path blank popup", "should work for popups") need a popup event helper that the harness lacks.
+
+## feat-screencast-actions (overlay slice)
+
+- **Overlay pixel cases are skipped (4 cases).** The top-layer tests in `screencast-overlay.spec.ts` (dialog and popover, before and after) decode `page.screenshot()` as PNG and sample pixel (100, 100). The harness has no PNG decoder. Guess: skip them for this slice and add a minimal decoder (8-bit RGB/RGBA, filter types 0-4, zlib IDAT) in a later slice. Tests that need them are not in `ScreencastOverlaySpec.hs`.
+- **Overlay spec count.** The upstream file has 9 plain cases and 4 pixel cases (13 in total), not 11 as first noted. The 9 plain cases are ported.
+- **Action annotation gaps.** "should render annotation styles" and `cursor: "none"` are not ported. The highlight and action-point elements are gone before the poll sees them. See `progress/FUNCTIONALITY_TODO.md`.
