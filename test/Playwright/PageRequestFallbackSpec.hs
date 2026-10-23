@@ -37,6 +37,10 @@ import Data.Text
   , pack
   , toLower
   )
+import UnliftIO.Exception
+  ( SomeException
+  , try
+  )
 import Data.Text.Encoding
   ( decodeUtf8
   )
@@ -83,6 +87,7 @@ import Playwright
   , requestPostDataJSON
   , requestUrl
   , responseRequest
+  , responseOk
   , responseText
   , responseUrl
   , route
@@ -147,6 +152,25 @@ tests =
             fallbackRoute handled
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           assertEqual "order" [3, 2, 1] . reverse =<< readIORef intercepted
+    , testCase "should fall back after exception" $
+        withAssets $ \prefix page -> do
+          route page (UrlMatchGlob "**/empty.html") continueRoute
+          route page (UrlMatchGlob "**/empty.html") $ \handled -> do
+            outcome <-
+              try
+                (fulfillRoute handled defaultFulfillOptions {fulfillStatus = Just (HttpStatus 0)})
+                :: Playwright (Either SomeException ())
+            case outcome of
+              Left _ ->
+                fallbackRoute handled
+              Right () ->
+                assertFailure "fulfill with an invalid status did not throw"
+          response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          case response of
+            Nothing ->
+              assertFailure "missing response"
+            Just value ->
+              assertEqual "ok" True =<< responseOk value
     , testCase "should not chain fulfill" $
         withAssets $ \prefix page -> do
           failed <- newIORef False
