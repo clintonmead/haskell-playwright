@@ -53,10 +53,17 @@ import Playwright.Harness
   , withChromiumPage
   , assertEqual
   )
+import Control.Exception
+  ( ErrorCall (ErrorCall)
+  )
 import Data.Text
   ( Text
   )
 import Playwright.Locator qualified as Locator
+import UnliftIO.Exception
+  ( evaluate
+  , try
+  )
 import Test.Tasty
   ( TestTree
   , testGroup
@@ -306,6 +313,21 @@ tests =
           assertEqual "text" "let's hello" =<< innerText (filterHasTextRegex (locate page "button") "/let's/iu")
           assertEqual "role" "let's hello"
             =<< innerText (getByRole page (AriaRole "button") defaultGetByRoleOptions {getByRoleNameRegex = Just "/let's/iu"})
+    , testCase "should enforce same frame for has/leftOf/rightOf/above/below/near" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/frames/two-frames.html")) defaultGotoOptions
+          allFrames <- frames page
+          case drop 1 allFrames of
+            [] ->
+              assertFailure "expected a child frame"
+            child : _ -> do
+              result <-
+                try (evaluate (filterHas (locate page "div") (locatorOnFrame page child (selectorFromText "span"))))
+              case result of
+                Left (ErrorCall message) ->
+                  assertEqual "same frame" "Inner \"has\" locator must belong to the same frame." message
+                Right _ ->
+                  assertFailure "expected a same-frame error"
     ]
 
 -- | The span inside a button, reached by text regex and by role-name regex, reads "hello".
