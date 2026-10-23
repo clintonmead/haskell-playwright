@@ -133,7 +133,7 @@ tests =
           keyboardInsertText page "a"
           assertEqual "cjk+a" "嗨a"
             =<< evaluateOnLocatorText (locate page "textarea") "el => el.value"
-    , testCase "should report only input event for insertText" $
+    , testCase "insertText should only emit input event" $
         withAssetPage "input/textarea.html" $ \page -> do
           focus (locate page "textarea")
           events <-
@@ -193,7 +193,7 @@ tests =
           keyboardPress page (Key "Backspace")
           assertEqual "cleared" ""
             =<< evaluateOnLocatorText (locate page "textarea") "el => el.value"
-    , testCase "pressing Meta should not result in any text insertion" $
+    , testCase "pressing Meta should not result in any text insertion on any platform" $
         withChromiumPage $ \page -> do
           setContent page "<input type=\"text\" value=\"hello world\">"
           focus (locate page "input")
