@@ -4,20 +4,28 @@ module Playwright.ElementHandleWaitForElementStateSpec
 
 import UnliftIO.Async
   ( concurrently_
+  , wait
+  , withAsync
   )
 import Playwright
-  ( ElementState (ElementEditable, ElementEnabled, ElementHidden, ElementVisible)
+  ( ElementState (ElementEditable, ElementEnabled, ElementHidden, ElementStable, ElementVisible)
+  , defaultGotoOptions
   , evaluateOnElement
+  , goto
   , milliseconds
   , querySelector
   , selectorFromText
   , setContent
+  , urlFromText
   , waitForElementState
   , waitForElementStateWith
   )
 import Playwright.Harness
   ( assertProtocolContains
+  , assertStillPending
+  , rafraf
   , requireHandle
+  , withAssets
   , withChromiumPage
   , assertFailure
   )
@@ -95,4 +103,43 @@ tests =
                 (waitForElementState handle ElementEnabled)
             )
             (evaluateOnElement handle "button => { button.remove(); return true; }")
+    , testCase "should wait for aria enabled button" $
+        withChromiumPage $ \page -> do
+          setContent page "<button aria-disabled=true><span>Target</span></button>"
+          target <- requireHandle =<< querySelector page (selectorFromText "text=Target")
+          withAsync (waitForElementState target ElementEnabled) $ \pending -> do
+            rafraf page 5
+            assertStillPending pending
+            _ <-
+              evaluateOnElement
+                target
+                "el => { el.parentElement.setAttribute('aria-disabled', 'false'); return true; }"
+            wait pending
+    , testCase "should wait for button with an aria-disabled parent" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<div role=\"group\" aria-disabled=true><button><span>Target</span></button></div>"
+          target <- requireHandle =<< querySelector page (selectorFromText "text=Target")
+          withAsync (waitForElementState target ElementEnabled) $ \pending -> do
+            rafraf page 5
+            assertStillPending pending
+            _ <-
+              evaluateOnElement
+                target
+                "el => { el.parentElement.parentElement.setAttribute('aria-disabled', 'false'); return true; }"
+            wait pending
+    , testCase "should wait for stable position" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/input/button.html")) defaultGotoOptions
+          button <- requireHandle =<< querySelector page (selectorFromText "button")
+          _ <-
+            evaluateOnElement
+              button
+              "button => { button.style.transition = 'margin 10000ms linear 0s'; button.style.marginLeft = '20000px'; return true; }"
+          withAsync (waitForElementState button ElementStable) $ \pending -> do
+            rafraf page 5
+            assertStillPending pending
+            _ <- evaluateOnElement button "button => { button.style.transition = ''; return true; }"
+            wait pending
     ]
