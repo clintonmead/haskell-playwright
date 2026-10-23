@@ -17,6 +17,7 @@ import Playwright
   , chainLocator
   , childLocator
   , click
+  , contentFrame
   , defaultGetByRoleOptions
   , evaluateOnLocator
   , evaluateOnLocatorText
@@ -253,4 +254,19 @@ tests =
                 locatorCount
                   (childLocator (frameLocator page (selectorFromText "locatorCountHelper=iframe")) (selectorFromText "locatorCountHelper=div"))
               assertEqual "count" (0 :: Int) count
+    , testCase "should keep the capture when removing a common frame prefix" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<iframe id=f srcdoc=\"<section id=target><span>hi</span></section>\"></iframe>"
+          let
+            inner = childLocator (frameLocator page (selectorFromText "#f")) (selectorFromText "*css=section >> span")
+            framed = chainLocator (childLocator (frameLocator page (selectorFromText "#f")) (selectorFromText "body")) inner
+            captureFrame = childLocator (contentFrame (locate page "*css=#f")) (selectorFromText "span")
+          assertEqual "target" (Just "target") =<< getAttribute framed "id"
+          assertProtocolContains
+            "Can not capture the selector before diving into the frame"
+            ( locatorCount
+                (chainLocator (childLocator (frameLocator page (selectorFromText "#f")) (selectorFromText "body")) captureFrame)
+            )
     ]
