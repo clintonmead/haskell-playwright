@@ -96,6 +96,7 @@ import Playwright.LocatorDispatchEventTouchSpec qualified as LocatorDispatchEven
 import Playwright.LocatorElementHandleSpec qualified as LocatorElementHandleSpec
 import Playwright.LocatorEvaluateSpec qualified as LocatorEvaluateSpec
 import Playwright.LocatorFrameSpec qualified as LocatorFrameSpec
+import Playwright.LocatorAnyFrameSpec qualified as LocatorAnyFrameSpec
 import Playwright.LocatorHighlightSpec qualified as LocatorHighlightSpec
 import Playwright.LocatorIsVisibleSpec qualified as LocatorIsVisibleSpec
 import Playwright.ExpectBooleanSpec qualified as ExpectBooleanSpec
@@ -316,6 +317,7 @@ main =
         , LocatorElementHandleSpec.tests
         , LocatorEvaluateSpec.tests
         , LocatorFrameSpec.tests
+        , LocatorAnyFrameSpec.tests
         , LocatorHighlightSpec.tests
         , LocatorIsVisibleSpec.tests
         , ExpectBooleanSpec.tests
