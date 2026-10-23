@@ -11,12 +11,13 @@ import Playwright
   )
 import Playwright.Harness
   ( withChromiumPage
+  , assertBool
   , assertEqual
   , assertFailure
   )
 import Playwright.SerializedValue
   ( SerializedPayload (PayloadDate, PayloadObject, PayloadString)
-  , SerializedValue (SerializedNode)
+  , SerializedValue (SerializedNode, SerializedRef)
   )
 import Test.Tasty
   ( TestTree
@@ -48,7 +49,20 @@ tests =
               assertEqual "date" ("2017-09-26T00:00:00.000Z" :: Text) stamp
             _ ->
               assertFailure "expected date"
+    , testCase "should handle circular objects" $
+        withChromiumPage $ \page -> do
+          handle <- evaluateHandle page "() => { const a = {}; a.b = a; return a; }"
+          value <- jsonValue handle
+          assertBool "circular" (isSelfCycle value)
     ]
+
+isSelfCycle :: SerializedValue -> Bool
+isSelfCycle value =
+  case value of
+    SerializedNode (PayloadObject [("b", SerializedRef target)]) (Just self) ->
+      target == self
+    _ ->
+      False
 
 lookupText :: Text -> [(Text, SerializedValue)] -> Maybe Text
 lookupText key fields =

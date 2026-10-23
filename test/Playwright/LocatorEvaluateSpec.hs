@@ -48,4 +48,14 @@ tests =
               (locate page ".tweet .like")
               "nodes => nodes.map(n => n.innerText)"
           assertEqual "likes" ["100", "10"] content
+    , testCase "should not throw in case of missing selector for all" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<div class=\"a\">not-a-child-div</div><div id=\"myId\"></div>"
+          content <-
+            evaluateOnLocatorAllTexts
+              (locate page "#myId .a")
+              "nodes => nodes.map(n => n.innerText)"
+          assertEqual "none" [] content
     ]
