@@ -680,6 +680,13 @@ module Playwright
   , responseText
   , responseUrl
   , route
+  , routeFromHar
+  , routeFromHarWith
+  , contextRouteFromHar
+  , contextRouteFromHarWith
+  , HarNotFound (HarNotFoundAbort, HarNotFoundFallback)
+  , HarRouteOptions (harRouteNotFound, harRouteUrl)
+  , defaultHarRouteOptions
   , routeFetch
   , routeFetchWith
   , routeRequest
@@ -1795,6 +1802,15 @@ import Playwright.Route
   , routeFetch
   , routeFetchWith
   , routeRequest
+  )
+import Playwright.Har
+  ( HarNotFound (HarNotFoundAbort, HarNotFoundFallback)
+  , HarRouteOptions (harRouteNotFound, harRouteUrl)
+  , contextRouteFromHar
+  , contextRouteFromHarWith
+  , defaultHarRouteOptions
+  , routeFromHar
+  , routeFromHarWith
   )
 import Playwright.Route.Intercept
   ( contextRoute

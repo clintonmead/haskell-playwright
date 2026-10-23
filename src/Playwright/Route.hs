@@ -7,6 +7,7 @@ module Playwright.Route
   , fallbackRoute
   , fallbackRouteWith
   , fulfillRoute
+  , redirectRoute
   , requestFromChannel
   , routeFetch
   , routeFetchWith
@@ -16,6 +17,15 @@ module Playwright.Route
 
 import Playwright.Monad
   ( Playwright
+  )
+import Data.Aeson
+  ( Value
+  , object
+  , (.=)
+  )
+import Playwright.Url
+  ( Url
+  , urlToText
   )
 import Control.Concurrent.STM
   ( TMVar
@@ -242,6 +252,19 @@ fulfillRoute handled opts0 = do
           , routeFulfillParamsIsBase64 = Just isBase64
           , routeFulfillParamsStatus = Just status
           }
+    pure ()
+  settleRoute handled True
+
+-- | Redirects a navigation request to another URL, as the HAR router does.
+redirectRoute :: Route -> Url -> Playwright ()
+redirectRoute handled target = do
+  ensureUnhandled handled
+  ignoreTargetClosed $ do
+    _ :: Value <-
+      send
+        (routeChannel handled)
+        (MethodName "redirectNavigationRequest")
+        (object ["url" .= urlToText target])
     pure ()
   settleRoute handled True
 
