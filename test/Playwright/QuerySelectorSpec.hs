@@ -30,6 +30,10 @@ import Test.Tasty.HUnit
   ( testCase
   )
 
+-- Skipped: "should throw for non-string selector". The upstream case passes `null` to
+-- page.$ and checks for a "selector: expected string, got object" error. The Haskell
+-- API takes a Selector newtype (built with selectorFromText), so a non-string selector
+-- cannot be constructed and there is no call site to exercise.
 tests :: TestTree
 tests =
   testGroup
