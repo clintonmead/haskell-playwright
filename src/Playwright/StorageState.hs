@@ -182,9 +182,15 @@ fromOrigin origin =
   OriginStorageState
     { originStateOrigin = urlFromText (originStorageOrigin origin)
     , originStateLocalStorage = fmap fromNameValue (originStorageLocalStorage origin)
-    , originStateIndexedDB = originStorageIndexedDB origin
-    , originStateOpfs = originStorageOpfs origin
+    , originStateIndexedDB = nonEmptyOrNothing (originStorageIndexedDB origin)
+    , originStateOpfs = nonEmptyOrNothing (originStorageOpfs origin)
     }
+
+-- | The driver reports an empty list for storage kinds that were not asked
+-- for, so an empty list reads as 'Nothing'.
+nonEmptyOrNothing :: Maybe [a] -> Maybe [a]
+nonEmptyOrNothing (Just []) = Nothing
+nonEmptyOrNothing other = other
 
 toOriginStorage :: OriginStorageState -> OriginStorage
 toOriginStorage origin =
