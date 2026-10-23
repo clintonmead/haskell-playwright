@@ -84,8 +84,11 @@ import Playwright
   , locatorScreenshotMasked
   , milliseconds
   , nth
+  , querySelector
   , reload
   , screenshot
+  , screenshotHandle
+  , screenshotHandleMasked
   , screenshotMasked
   , selectorFromText
   , setContent
@@ -109,6 +112,7 @@ import Playwright.Harness
   , assertEqual
   , assertFailure
   , readTestAsset
+  , requireHandle
   )
 import Test.Tasty
   ( TestTree
@@ -401,6 +405,15 @@ tests =
           assertBool "png signature" (pngMagic `BS.isPrefixOf` plain)
           masked <- locatorScreenshotMasked bodyLocator [locator page (selectorFromText "div.box")] defaultScreenshotOptions
           assertBool "masked locator differs from plain" (masked /= plain)
+    , testCase "should work with elementhandle" $
+        withAssets $ \prefix page -> do
+          setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 500))
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          handle <- requireHandle =<< querySelector page (selectorFromText "body")
+          plain <- screenshotHandle handle
+          masked <- screenshotHandleMasked handle [nth (locator page (selectorFromText "div")) 5] defaultScreenshotOptions
+          assertBool "png signature" (pngMagic `BS.isPrefixOf` masked)
+          assertBool "masked element handle differs from plain" (masked /= plain)
     , testCase "should work for canvas" $
         withAssets $ \prefix page -> do
           setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 500))
