@@ -1,5 +1,6 @@
 module Playwright.Session
   ( Session (..)
+  , ScreencastSession (..)
   , emptySession
   , removeWaiter
   ) where
@@ -73,6 +74,15 @@ import Playwright.WaitId
   ( WaitId (WaitId)
   )
 
+-- | A page's running screencast: the generation that tags its frame handler,
+-- the recording artifact the driver returned at start, and the path to save
+-- that artifact to when the screencast stops.
+data ScreencastSession = ScreencastSession
+  { screencastSessionGeneration :: Int
+  , screencastSessionArtifact :: Maybe Guid
+  , screencastSessionPath :: Maybe FilePath
+  }
+
 data Session = Session
   { sessionObjects :: Map Guid RemoteObject
   , sessionResults :: Map RequestId (Either PlaywrightError Aeson.Value)
@@ -94,6 +104,7 @@ data Session = Session
   , sessionContextBrowsers :: Map Guid Guid
   , sessionPagesOwningContext :: Set Guid
   , sessionContextsWithOwnerPage :: Set Guid
+  , sessionScreencasts :: Map Guid ScreencastSession
   , sessionBrowserTypes :: Map Guid Guid
   , sessionSelectorEngines :: [SelectorEngine]
   , sessionTimeoutDefaults :: Map Guid TimeoutDefaults
@@ -134,6 +145,7 @@ emptySession =
     , sessionContextBrowsers = Map.empty
     , sessionPagesOwningContext = Set.empty
     , sessionContextsWithOwnerPage = Set.empty
+    , sessionScreencasts = Map.empty
     , sessionBrowserTypes = Map.empty
     , sessionSelectorEngines = []
     , sessionTimeoutDefaults = Map.empty

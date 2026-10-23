@@ -4,6 +4,9 @@ module Playwright.Connection.Store
   , clearRouteHandlers
   , closedGuids
   , contextHasOwnerPage
+  , deleteScreencast
+  , lookupScreencast
+  , putScreencast
   , deleteLocatorHandler
   , guidsOfType
   , isDetachedFrame
@@ -85,7 +88,8 @@ import Playwright.RequestOverrides
   , emptyRequestOverrides
   )
 import Playwright.Session
-  ( Session (sessionBrowserContexts, sessionBrowserTypes, sessionClosedGuids, sessionContextBaseUrls, sessionDetachedFrames, sessionContextBrowsers, sessionContextsWithOwnerPage, sessionLocatorHandlers, sessionLocatorListening, sessionMainFramePages, sessionObjects, sessionPagesOwningContext, sessionRequestEndTiming, sessionRequestFailures, sessionRequestOverrides, sessionRouteHandlers, sessionRouteListening, sessionSelectorEngines, sessionTimeoutDefaults)
+  ( ScreencastSession
+  , Session (sessionBrowserContexts, sessionBrowserTypes, sessionClosedGuids, sessionContextBaseUrls, sessionDetachedFrames, sessionContextBrowsers, sessionContextsWithOwnerPage, sessionLocatorHandlers, sessionLocatorListening, sessionMainFramePages, sessionObjects, sessionPagesOwningContext, sessionRequestEndTiming, sessionRequestFailures, sessionRequestOverrides, sessionRouteHandlers, sessionRouteListening, sessionScreencasts, sessionSelectorEngines, sessionTimeoutDefaults)
   )
 import Playwright.StoredLocatorHandler
   ( StoredLocatorHandler (storedLocatorHandlerFrame, storedLocatorHandlerSelector, storedLocatorHandlerTimes)
@@ -380,3 +384,20 @@ lookupRequestEndTiming :: Connection -> Guid -> IO (Maybe Scientific)
 lookupRequestEndTiming conn guid =
   atomically $
     Map.lookup guid . sessionRequestEndTiming <$> readSession conn
+
+lookupScreencast :: Connection -> Guid -> IO (Maybe ScreencastSession)
+lookupScreencast conn pageGuid =
+  atomically $
+    Map.lookup pageGuid . sessionScreencasts <$> readSession conn
+
+putScreencast :: Connection -> Guid -> ScreencastSession -> IO ()
+putScreencast conn pageGuid screencast =
+  atomically $
+    modifySession conn $ \session ->
+      session {sessionScreencasts = Map.insert pageGuid screencast (sessionScreencasts session)}
+
+deleteScreencast :: Connection -> Guid -> IO ()
+deleteScreencast conn pageGuid =
+  atomically $
+    modifySession conn $ \session ->
+      session {sessionScreencasts = Map.delete pageGuid (sessionScreencasts session)}

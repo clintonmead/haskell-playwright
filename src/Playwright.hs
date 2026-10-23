@@ -338,6 +338,14 @@ module Playwright
   , downloadPath
   , downloadSaveAs
   , downloadSuggestedFilename
+  , ScreencastFrame (..)
+  , ScreencastHandle
+  , ScreencastOptions (..)
+  , ScreencastSize (..)
+  , defaultScreencastOptions
+  , screencastDispose
+  , screencastStart
+  , screencastStop
   , downloadUrl
   , dragAndDrop
   , dragAndDropWith
@@ -1789,6 +1797,16 @@ import Playwright.Response
   , responseHttpVersion
   , responseText
   , responseUrl
+  )
+import Playwright.Screencast
+  ( ScreencastFrame (screencastFrameData, screencastFrameTimestamp, screencastFrameViewportHeight, screencastFrameViewportWidth)
+  , ScreencastHandle
+  , ScreencastOptions (screencastOptionsFps, screencastOptionsOnFrame, screencastOptionsPath, screencastOptionsQuality, screencastOptionsSize)
+  , ScreencastSize (screencastSizeHeight, screencastSizeWidth)
+  , defaultScreencastOptions
+  , screencastDispose
+  , screencastStart
+  , screencastStop
   )
 import Playwright.Route
   ( Route

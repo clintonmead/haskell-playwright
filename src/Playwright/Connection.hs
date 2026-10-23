@@ -26,6 +26,9 @@ module Playwright.Connection
   , pageOwnsContext
   , markContextHasOwnerPage
   , contextHasOwnerPage
+  , lookupScreencast
+  , putScreencast
+  , deleteScreencast
   , rememberBrowserType
   , lookupBrowserTypeGuid
   , waitForLifecycle
@@ -185,7 +188,8 @@ import Playwright.RequestOverrides
   ( RequestOverrides
   )
 import Playwright.Session
-  ( Session (sessionBrowserContexts, sessionChromiumGuid, sessionClosed, sessionClosedGuids, sessionFinishedRequests, sessionFirefoxGuid, sessionNextId, sessionObjects, sessionPending, sessionPlaywrightGuid, sessionRequestEndTiming, sessionRequestFailures, sessionResults, sessionWebkitGuid)
+  ( ScreencastSession
+  , Session (sessionBrowserContexts, sessionChromiumGuid, sessionClosed, sessionClosedGuids, sessionFinishedRequests, sessionFirefoxGuid, sessionNextId, sessionObjects, sessionPending, sessionPlaywrightGuid, sessionRequestEndTiming, sessionRequestFailures, sessionResults, sessionWebkitGuid)
   , emptySession
   )
 import Playwright.StoredLocatorHandler
@@ -854,3 +858,15 @@ markClosed conn err =
   atomically $
     modifySession conn $ \session ->
       session {sessionClosed = Just err}
+
+lookupScreencast :: Guid -> Playwright (Maybe ScreencastSession)
+lookupScreencast pageGuid =
+  inConnection (`Store.lookupScreencast` pageGuid)
+
+putScreencast :: Guid -> ScreencastSession -> Playwright ()
+putScreencast pageGuid screencast =
+  inConnection (\conn -> Store.putScreencast conn pageGuid screencast)
+
+deleteScreencast :: Guid -> Playwright ()
+deleteScreencast pageGuid =
+  inConnection (`Store.deleteScreencast` pageGuid)
