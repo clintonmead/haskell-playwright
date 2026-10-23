@@ -17,6 +17,7 @@ module Playwright.Channel
   , DisposableTag
   , RouteTag
   , ArtifactTag
+  , StreamTag
   , APIRequestContextTag
   , WebSocketTag
   , TracingTag
@@ -66,6 +67,7 @@ data BindingCallTag
 data DisposableTag
 data RouteTag
 data ArtifactTag
+data StreamTag
 data APIRequestContextTag
 data WebSocketTag
 data TracingTag

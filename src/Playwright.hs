@@ -356,12 +356,16 @@ module Playwright
   , dispose
   , disposeHandle
   , downloadCancel
+  , downloadCreateReadStream
   , downloadDelete
   , downloadFailure
   , downloadPage
   , downloadPath
   , downloadSaveAs
   , downloadSuggestedFilename
+  , ReadStream
+  , readStreamChunk
+  , readStreamClose
   , ScreencastFrame (..)
   , ScreencastHandle
   , ScreencastOptions (..)
@@ -1227,8 +1231,14 @@ import Playwright.Download
   , downloadPath
   , downloadSaveAs
   , downloadSuggestedFilename
+  , downloadCreateReadStream
   , downloadUrl
   , waitForDownload
+  )
+import Playwright.ReadStream
+  ( ReadStream
+  , readStreamChunk
+  , readStreamClose
   )
 import Playwright.DragAndDropOptions
   ( DragAndDropOptions (DragAndDropOptions, dragAndDropOptionsForce, dragAndDropOptionsSourcePosition, dragAndDropOptionsSteps, dragAndDropOptionsTargetPosition, dragAndDropOptionsTimeout, dragAndDropOptionsTrial)

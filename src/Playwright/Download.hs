@@ -5,6 +5,7 @@ module Playwright.Download
   , downloadFailure
   , downloadPage
   , downloadPath
+  , downloadCreateReadStream
   , downloadSaveAs
   , downloadSuggestedFilename
   , downloadUrl
@@ -49,18 +50,24 @@ import Playwright.MethodName
 import Playwright.Page
   ( Page (pageChannel)
   )
+import Playwright.ReadStream
+  ( ReadStream
+  , readStreamFromChannel
+  )
 import Playwright.Protocol
   ( ArtifactCancelResult
   , ArtifactDeleteResult
   , ArtifactFailureResult (artifactFailureResultError)
   , ArtifactPathAfterFinishedResult (artifactPathAfterFinishedResultValue)
   , ArtifactSaveAsResult
+  , ArtifactStreamResult (artifactStreamResultStream)
   , PageDownloadEvent (pageDownloadEventArtifact, pageDownloadEventSuggestedFilename, pageDownloadEventUrl)
   , mkArtifactCancelParams
   , mkArtifactDeleteParams
   , mkArtifactFailureParams
   , mkArtifactPathAfterFinishedParams
   , mkArtifactSaveAsParams
+  , mkArtifactStreamParams
   )
 import Playwright.Url
   ( Url
@@ -122,6 +129,19 @@ downloadSaveAs download dest = do
       (MethodName "saveAs")
       (mkArtifactSaveAsParams (pack absPath))
   pure ()
+
+-- | Opens a read stream over the downloaded file's contents.
+downloadCreateReadStream :: Download -> Playwright ReadStream
+downloadCreateReadStream download = do
+  result :: ArtifactStreamResult <-
+    send
+      (downloadArtifact download)
+      (MethodName "stream")
+      mkArtifactStreamParams
+  pure
+    ( readStreamFromChannel
+        (Channel (channelRefGuid (artifactStreamResultStream result)))
+    )
 
 downloadDelete :: Download -> Playwright ()
 downloadDelete download = do
