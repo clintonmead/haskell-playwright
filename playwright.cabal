@@ -27,6 +27,8 @@ library
       Playwright.APIRequestContext
       Playwright.APIResponse
       Playwright.AriaRole
+      Playwright.AriaSnapshotMode
+      Playwright.AriaSnapshotOptions
       Playwright.BindingName
       Playwright.BoundingBox
       Playwright.Browser
@@ -80,6 +82,7 @@ library
       Playwright.ForcedColors
       Playwright.Frame
       Playwright.Frame.Action
+      Playwright.Frame.AriaSnapshot
       Playwright.Frame.Inspect
       Playwright.Frame.Wait
       Playwright.FulfillOptions
@@ -240,6 +243,7 @@ test-suite playwright-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      Playwright.AriaSnapshotSupport
       Playwright.BeforeunloadSpec
       Playwright.BfcacheSpec
       Playwright.BrowserContextAddCookiesSpec
@@ -344,6 +348,8 @@ test-suite playwright-test
       Playwright.PageAddLocatorHandlerSpec
       Playwright.PageAddScriptTagSpec
       Playwright.PageAddStyleTagSpec
+      Playwright.PageAriaSnapshotJsonSpec
+      Playwright.PageAriaSnapshotSpec
       Playwright.PageAutowaitingBasicSpec
       Playwright.PageAutowaitingNoHangSpec
       Playwright.PageBasicSpec

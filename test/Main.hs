@@ -154,6 +154,8 @@ import Playwright.PageRequestFallbackSpec qualified as PageRequestFallbackSpec
 import Playwright.PageRequestFulfillSpec qualified as PageRequestFulfillSpec
 import Playwright.PageRequestInterceptSpec qualified as PageRequestInterceptSpec
 import Playwright.PageRequestGcSpec qualified as PageRequestGcSpec
+import Playwright.PageAriaSnapshotJsonSpec qualified as PageAriaSnapshotJsonSpec
+import Playwright.PageAriaSnapshotSpec qualified as PageAriaSnapshotSpec
 import Playwright.PageRoute1Spec qualified as PageRoute1Spec
 import Playwright.PageRoute2Spec qualified as PageRoute2Spec
 import Playwright.PageScreenshotSpec qualified as PageScreenshotSpec
@@ -362,6 +364,8 @@ main =
         , PageRequestGcSpec.tests
         , PageRoute1Spec.tests
         , PageRoute2Spec.tests
+        , PageAriaSnapshotSpec.tests
+        , PageAriaSnapshotJsonSpec.tests
         , PageSelectOptionSpec.tests
         , PageScreenshotSpec.tests
         , PageSetContentSpec.tests
