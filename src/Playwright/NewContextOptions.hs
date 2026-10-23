@@ -2,8 +2,13 @@ module Playwright.NewContextOptions
   ( NewContextOptions (..)
   , defaultNewContextOptions
   , toBrowserNewContextParams
+  , toProtocolCredentials
+  , toProtocolCredentialsList
   ) where
 
+import Data.Maybe
+  ( maybeToList
+  )
 import Data.Text
   ( pack
   )
@@ -117,6 +122,7 @@ data NewContextOptions = NewContextOptions
   , newContextGeolocation :: Maybe Geolocation
   , newContextHasTouch :: Maybe Bool
   , newContextHttpCredentials :: Maybe HttpCredentials
+  , newContextHttpCredentialsList :: [HttpCredentials]
   , newContextIgnoreHTTPSErrors :: Maybe Bool
   , newContextIsMobile :: Maybe Bool
   , newContextJavaScriptEnabled :: Maybe Bool
@@ -152,6 +158,7 @@ defaultNewContextOptions =
     , newContextGeolocation = Nothing
     , newContextHasTouch = Nothing
     , newContextHttpCredentials = Nothing
+    , newContextHttpCredentialsList = []
     , newContextIgnoreHTTPSErrors = Nothing
     , newContextIsMobile = Nothing
     , newContextJavaScriptEnabled = Nothing
@@ -186,7 +193,7 @@ toBrowserNewContextParams opts =
     , browserNewContextParamsForcedColors = fmap toProtocolForcedColors (newContextForcedColors opts)
     , browserNewContextParamsGeolocation = fmap toProtocolGeolocation (newContextGeolocation opts)
     , browserNewContextParamsHasTouch = newContextHasTouch opts
-    , browserNewContextParamsHttpCredentials = fmap toProtocolCredentials (newContextHttpCredentials opts)
+    , browserNewContextParamsHttpCredentials = toProtocolCredentialsList opts
     , browserNewContextParamsIgnoreHTTPSErrors = newContextIgnoreHTTPSErrors opts
     , browserNewContextParamsIsMobile = newContextIsMobile opts
     , browserNewContextParamsJavaScriptEnabled = newContextJavaScriptEnabled opts
@@ -279,7 +286,14 @@ toProtocolGeolocation location =
         fmap accuracyToScientific (geolocationAccuracy location)
     }
 
--- | The protocol takes a list of credentials; a context has at most one.
+-- | The single 'newContextHttpCredentials' comes first, then every entry of
+-- 'newContextHttpCredentialsList'. Nothing is sent when neither is set.
+toProtocolCredentialsList :: NewContextOptions -> Maybe [Protocol.HttpCredentials]
+toProtocolCredentialsList opts =
+  case concatMap toProtocolCredentials (maybeToList (newContextHttpCredentials opts) <> newContextHttpCredentialsList opts) of
+    [] -> Nothing
+    creds -> Just creds
+
 toProtocolCredentials :: HttpCredentials -> [Protocol.HttpCredentials]
 toProtocolCredentials creds =
   [ Protocol.HttpCredentials

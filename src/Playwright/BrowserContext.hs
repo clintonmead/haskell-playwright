@@ -28,6 +28,7 @@ module Playwright.BrowserContext
   , setContextDefaultNavigationTimeout
   , setGeolocation
   , setHTTPCredentials
+  , setHTTPCredentialsList
   , setOffline
   , setStorageState
   , storageState
@@ -99,9 +100,7 @@ import Playwright.Geolocation
   , Longitude (longitudeToScientific)
   )
 import Playwright.HttpCredentials
-  ( HttpCredentials (httpCredentialsOrigin, httpCredentialsPassword, httpCredentialsUsername)
-  , HttpPassword (httpPasswordToText)
-  , HttpUsername (httpUsernameToText)
+  ( HttpCredentials
   )
 import Playwright.HttpHeader
   ( HttpHeader
@@ -123,7 +122,6 @@ import Playwright.Page
 import Playwright.PermissionName
   ( PermissionName (permissionNameToText)
   )
-import Playwright.Protocol qualified as Protocol
 import Playwright.Protocol
   ( BrowserContextInitializer (browserContextInitializerTracing)
   )
@@ -186,6 +184,9 @@ import Playwright.StorageState
 import Playwright.Timeout
   ( Timeout
   , defaultTimeout
+  )
+import Playwright.NewContextOptions
+  ( toProtocolCredentials
   )
 import Playwright.Url
   ( Url
@@ -472,21 +473,20 @@ setContextExtraHTTPHeaders ctx headers = do
   pure ()
 
 setHTTPCredentials :: BrowserContext -> HttpCredentials -> Playwright ()
-setHTTPCredentials ctx creds = do
+setHTTPCredentials ctx creds = setHTTPCredentialsList ctx [creds]
+
+-- | Replaces the context's HTTP credentials with the given list. The driver
+-- picks the first entry whose origin matches the request; an entry without an
+-- origin matches every origin.
+setHTTPCredentialsList :: BrowserContext -> [HttpCredentials] -> Playwright ()
+setHTTPCredentialsList ctx creds = do
   _ :: BrowserContextSetHTTPCredentialsResult <-
     send
       (browserContextChannel ctx)
       (MethodName "setHTTPCredentials")
       mkBrowserContextSetHTTPCredentialsParams
         { browserContextSetHTTPCredentialsParamsHttpCredentials =
-            Just
-              [ Protocol.HttpCredentials
-                  { Protocol.httpCredentialsOrigin = fmap urlToText (httpCredentialsOrigin creds)
-                  , Protocol.httpCredentialsPassword = httpPasswordToText (httpCredentialsPassword creds)
-                  , Protocol.httpCredentialsSend = Nothing
-                  , Protocol.httpCredentialsUsername = httpUsernameToText (httpCredentialsUsername creds)
-                  }
-              ]
+            Just (concatMap toProtocolCredentials creds)
         }
   pure ()
 

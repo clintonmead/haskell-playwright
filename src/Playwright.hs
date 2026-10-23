@@ -775,6 +775,7 @@ module Playwright
   , setExtraHTTPHeaders
   , setGeolocation
   , setHTTPCredentials
+  , setHTTPCredentialsList
   , setInputFiles
   , setInputFilesPaths
   , setInputFilesHandle
@@ -1078,6 +1079,7 @@ import Playwright.BrowserContext
   , setContextExtraHTTPHeaders
   , setGeolocation
   , setHTTPCredentials
+  , setHTTPCredentialsList
   , setOffline
   , setStorageState
   , storageState
@@ -1658,7 +1660,7 @@ import Playwright.MimeType
   ( MimeType (MimeType, mimeTypeToText)
   )
 import Playwright.NewContextOptions
-  ( NewContextOptions (NewContextOptions, newContextAcceptDownloads, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextContrast, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextForcedColors, newContextGeolocation, newContextHasTouch, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextIsMobile, newContextJavaScriptEnabled, newContextLocale, newContextNoDefaultViewport, newContextOffline, newContextPermissions, newContextProxy, newContextRecordHar, newContextReducedMotion, newContextScreen, newContextServiceWorkers, newContextStorageState, newContextStrictSelectors, newContextTimezoneId, newContextUserAgent, newContextViewport)
+  ( NewContextOptions (NewContextOptions, newContextAcceptDownloads, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextContrast, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextForcedColors, newContextGeolocation, newContextHasTouch, newContextHttpCredentials, newContextHttpCredentialsList, newContextIgnoreHTTPSErrors, newContextIsMobile, newContextJavaScriptEnabled, newContextLocale, newContextNoDefaultViewport, newContextOffline, newContextPermissions, newContextProxy, newContextRecordHar, newContextReducedMotion, newContextScreen, newContextServiceWorkers, newContextStorageState, newContextStrictSelectors, newContextTimezoneId, newContextUserAgent, newContextViewport)
   , defaultNewContextOptions
   )
 import Playwright.NewRequestOptions

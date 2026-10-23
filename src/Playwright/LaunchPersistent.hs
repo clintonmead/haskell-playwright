@@ -30,12 +30,8 @@ import Playwright.Geolocation
   , Longitude (longitudeToScientific)
   )
 import Playwright.HttpCredentials
-  ( HttpCredentials (httpCredentialsOrigin, httpCredentialsPassword, httpCredentialsSend, httpCredentialsUsername)
-  , HttpPassword (httpPasswordToText)
+  ( HttpPassword (httpPasswordToText)
   , HttpUsername (httpUsernameToText)
-  )
-import Playwright.HttpCredentialsSend
-  ( HttpCredentialsSend (HttpCredentialsSendAlways, HttpCredentialsSendUnauthorized)
   )
 import Playwright.HttpHeader
   ( toNameValue
@@ -47,7 +43,8 @@ import Playwright.Locale
   ( Locale (localeToText)
   )
 import Playwright.NewContextOptions
-  ( NewContextOptions (newContextAcceptDownloads, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextContrast, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextForcedColors, newContextGeolocation, newContextHasTouch, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextIsMobile, newContextJavaScriptEnabled, newContextLocale, newContextNoDefaultViewport, newContextOffline, newContextPermissions, newContextRecordVideo, newContextReducedMotion, newContextScreen, newContextServiceWorkers, newContextStrictSelectors, newContextTimezoneId, newContextUserAgent, newContextViewport)
+  ( toProtocolCredentialsList
+  , NewContextOptions (newContextAcceptDownloads, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextContrast, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextForcedColors, newContextGeolocation, newContextHasTouch, newContextIgnoreHTTPSErrors, newContextIsMobile, newContextJavaScriptEnabled, newContextLocale, newContextNoDefaultViewport, newContextOffline, newContextPermissions, newContextRecordVideo, newContextReducedMotion, newContextScreen, newContextServiceWorkers, newContextStrictSelectors, newContextTimezoneId, newContextUserAgent, newContextViewport)
   )
 import Playwright.PermissionName
   ( PermissionName (permissionNameToText)
@@ -56,7 +53,6 @@ import Playwright.ProxySettings
   ( ProxyHost (proxyHostToText)
   , ProxySettings (proxySettingsBypass, proxySettingsPassword, proxySettingsServer, proxySettingsUsername)
   )
-import Playwright.Protocol qualified as Protocol
 import Playwright.Protocol
   ( BrowserTypeLaunchPersistentContextParams (browserTypeLaunchPersistentContextParamsAcceptDownloads, browserTypeLaunchPersistentContextParamsArgs, browserTypeLaunchPersistentContextParamsBaseURL, browserTypeLaunchPersistentContextParamsBypassCSP, browserTypeLaunchPersistentContextParamsChromiumSandbox, browserTypeLaunchPersistentContextParamsColorScheme, browserTypeLaunchPersistentContextParamsContrast, browserTypeLaunchPersistentContextParamsDeviceScaleFactor, browserTypeLaunchPersistentContextParamsDownloadsPath, browserTypeLaunchPersistentContextParamsExecutablePath, browserTypeLaunchPersistentContextParamsExtraHTTPHeaders, browserTypeLaunchPersistentContextParamsForcedColors, browserTypeLaunchPersistentContextParamsGeolocation, browserTypeLaunchPersistentContextParamsHasTouch, browserTypeLaunchPersistentContextParamsHeadless, browserTypeLaunchPersistentContextParamsHttpCredentials, browserTypeLaunchPersistentContextParamsIgnoreDefaultArgs, browserTypeLaunchPersistentContextParamsIgnoreHTTPSErrors, browserTypeLaunchPersistentContextParamsIsMobile, browserTypeLaunchPersistentContextParamsJavaScriptEnabled, browserTypeLaunchPersistentContextParamsLocale, browserTypeLaunchPersistentContextParamsNoDefaultViewport, browserTypeLaunchPersistentContextParamsOffline, browserTypeLaunchPersistentContextParamsPermissions, browserTypeLaunchPersistentContextParamsProxy, browserTypeLaunchPersistentContextParamsRecordVideo, browserTypeLaunchPersistentContextParamsReducedMotion, browserTypeLaunchPersistentContextParamsScreen, browserTypeLaunchPersistentContextParamsSelectorEngines, browserTypeLaunchPersistentContextParamsServiceWorkers, browserTypeLaunchPersistentContextParamsSlowMo, browserTypeLaunchPersistentContextParamsStrictSelectors, browserTypeLaunchPersistentContextParamsTimezoneId, browserTypeLaunchPersistentContextParamsUserAgent, browserTypeLaunchPersistentContextParamsViewport)
   , BrowserTypeLaunchPersistentContextParamsAcceptDownloads (BrowserTypeLaunchPersistentContextParamsAcceptDownloadsAccept, BrowserTypeLaunchPersistentContextParamsAcceptDownloadsDeny)
@@ -95,9 +91,6 @@ import Playwright.Timeout
 import Playwright.TimezoneId
   ( TimezoneId (timezoneIdToText)
   )
-import Playwright.Url
-  ( urlToText
-  )
 import Playwright.UserAgent
   ( UserAgent (userAgentToText)
   )
@@ -127,7 +120,7 @@ toLaunchPersistentParams userDataDir launch opts engines =
     , browserTypeLaunchPersistentContextParamsGeolocation = fmap toGeo (newContextGeolocation opts)
     , browserTypeLaunchPersistentContextParamsHasTouch = newContextHasTouch opts
     , browserTypeLaunchPersistentContextParamsHeadless = launchOptionsHeadless launch
-    , browserTypeLaunchPersistentContextParamsHttpCredentials = fmap toCreds (newContextHttpCredentials opts)
+    , browserTypeLaunchPersistentContextParamsHttpCredentials = toProtocolCredentialsList opts
     , browserTypeLaunchPersistentContextParamsIgnoreDefaultArgs = launchOptionsIgnoreDefaultArgs launch
     , browserTypeLaunchPersistentContextParamsIgnoreHTTPSErrors = newContextIgnoreHTTPSErrors opts
     , browserTypeLaunchPersistentContextParamsIsMobile = newContextIsMobile opts
@@ -217,25 +210,6 @@ toGeo location =
     { browserTypeLaunchPersistentContextParamsGeolocationAccuracy =
         fmap accuracyToScientific (geolocationAccuracy location)
     }
-
--- | The protocol takes a list of credentials; a launch has at most one.
-toCreds :: HttpCredentials -> [Protocol.HttpCredentials]
-toCreds creds =
-  [ Protocol.HttpCredentials
-      { Protocol.httpCredentialsOrigin = fmap urlToText (httpCredentialsOrigin creds)
-      , Protocol.httpCredentialsPassword = httpPasswordToText (httpCredentialsPassword creds)
-      , Protocol.httpCredentialsSend = fmap toSend (httpCredentialsSend creds)
-      , Protocol.httpCredentialsUsername = httpUsernameToText (httpCredentialsUsername creds)
-      }
-  ]
-
-toSend :: HttpCredentialsSend -> Protocol.HttpCredentialsSend
-toSend send =
-  case send of
-    HttpCredentialsSendAlways ->
-      Protocol.HttpCredentialsSendAlways
-    HttpCredentialsSendUnauthorized ->
-      Protocol.HttpCredentialsSendUnauthorized
 
 toRecordVideo :: RecordVideo -> BrowserTypeLaunchPersistentContextParamsRecordVideo
 toRecordVideo video =
