@@ -542,6 +542,8 @@ module Playwright
   , newBrowserPageWith
   , newContext
   , newContextWith
+  , newContextForReuseWith
+  , disconnectFromReusedContext
   , newPage
   , newRequestContext
   , newRequestContextWith
@@ -896,7 +898,9 @@ import Playwright.Browser
   , newBrowserPage
   , newBrowserPageWith
   , newContext
+  , newContextForReuseWith
   , newContextWith
+  , disconnectFromReusedContext
   , onBrowserContext
   , withPage
   , withPageWith

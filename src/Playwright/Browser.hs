@@ -9,7 +9,9 @@ module Playwright.Browser
   , newBrowserPage
   , newBrowserPageWith
   , newContext
+  , newContextForReuseWith
   , newContextWith
+  , disconnectFromReusedContext
   , onBrowserContext
   , validateNewContextOptions
   , withPage
@@ -25,6 +27,11 @@ import UnliftIO.Exception
   )
 import Control.Monad
   ( when
+  )
+import Data.Aeson
+  ( Value
+  , object
+  , (.=)
   )
 import Data.Maybe
   ( isJust
@@ -154,13 +161,36 @@ newContext browser =
   newContextWith browser defaultNewContextOptions
 
 newContextWith :: Browser -> NewContextOptions -> Playwright BrowserContext
-newContextWith browser opts = do
+newContextWith browser =
+  newContextVia browser "newContext"
+
+-- | Internal: the driver's @newContextForReuse@, which hands back the context
+-- it keeps for reuse (resetting it when the options match), as upstream's
+-- @browser._newContextForReuse@ does.
+newContextForReuseWith :: Browser -> NewContextOptions -> Playwright BrowserContext
+newContextForReuseWith browser =
+  newContextVia browser "newContextForReuse"
+
+-- | Internal: the driver's @disconnectFromReusedContext@, which disposes the
+-- context the driver is keeping for reuse, as upstream's
+-- @browser._disconnectFromReusedContext@ does.
+disconnectFromReusedContext :: Browser -> Text -> Playwright ()
+disconnectFromReusedContext browser reason = do
+  _ :: Value <-
+    send
+      (browserChannel browser)
+      (MethodName "disconnectFromReusedContext")
+      (object ["reason" .= reason])
+  pure ()
+
+newContextVia :: Browser -> Text -> NewContextOptions -> Playwright BrowserContext
+newContextVia browser method opts = do
   validateNewContextOptions opts
   engines <- lookupSelectorEngines
   result <-
     send
       (browserChannel browser)
-      (MethodName "newContext")
+      (MethodName method)
       ( (toBrowserNewContextParams opts)
           { browserNewContextParamsSelectorEngines =
               case engines of
