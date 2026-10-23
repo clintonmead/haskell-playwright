@@ -2,6 +2,9 @@ module Playwright.ElementHandleBoundingBoxSpec
   ( tests
   ) where
 
+import Data.Text
+  ( replace
+  )
 import Playwright
   ( BoundingBox (BoundingBox, boundingBoxX, boundingBoxY)
   , CssPixel (CssPixel, cssPixelToScientific)
@@ -9,22 +12,31 @@ import Playwright
   , ViewportHeight (ViewportHeight)
   , ViewportSize (ViewportSize)
   , ViewportWidth (ViewportWidth)
+  , WaitForState (WaitForAttached)
   , boundingBox
   , boundingBoxHeight
   , boundingBoxWidth
+  , childLocator
   , cssPixelFromInt
   , elementArgument
+  , elementHandle
+  , enterFrameSelector
   , evaluateNumberWith
+  , evaluateOnElementNumber
   , evaluateWith
   , defaultGotoOptions
   , evaluateBool
+  , frameLocator
+  , frames
   , goto
   , mouseClick
+  , nestedSelector
   , querySelector
   , selectorFromText
   , setContent
   , setViewportSize
   , urlFromText
+  , waitForSelectorHandleOnFrame
   )
 import Playwright.Harness
   ( requireHandle
@@ -59,6 +71,45 @@ tests =
                     (cssPixelFromInt 50)
                     (cssPixelFromInt 50)
                     (cssPixelFromInt 50)
+                )
+            )
+            box
+    , testCase "should handle nested frames" $
+        withAssets $ \prefix page -> do
+          setViewportSize page (ViewportSize (ViewportWidth 616) (ViewportHeight 500))
+          _ <- goto page (urlFromText (prefix <> "/frames/nested-frames.html")) defaultGotoOptions
+          let
+            outer = frameLocator page (selectorFromText "[name=\"2frames\"]")
+            nested = childLocator outer (nestedSelector (selectorFromText "[name=dos]") enterFrameSelector)
+          handle <- requireHandle =<< elementHandle (childLocator nested (selectorFromText "div"))
+          box <- boundingBox handle
+          assertEqual
+            "box"
+            ( Just
+                ( BoundingBox
+                    (cssPixelFromInt 24)
+                    (cssPixelFromInt 224)
+                    (cssPixelFromInt 268)
+                    (cssPixelFromInt 18)
+                )
+            )
+            box
+    , testCase "should get frame box" $
+        withChromiumPage $ \page -> do
+          setViewportSize page (ViewportSize (ViewportWidth 250) (ViewportHeight 250))
+          setContent
+            page
+            "<style>body { display: flex; height: 500px; margin: 0px; } body iframe { flex-shrink: 1; border: 0; background-color: green; }</style><iframe></iframe>"
+          element <- requireHandle =<< querySelector page (selectorFromText "iframe")
+          box <- boundingBox element
+          assertEqual
+            "box"
+            ( Just
+                ( BoundingBox
+                    (cssPixelFromInt 0)
+                    (cssPixelFromInt 0)
+                    (cssPixelFromInt 300)
+                    (cssPixelFromInt 500)
                 )
             )
             box
@@ -109,6 +160,39 @@ tests =
           setContent page "<div style=\"display:none\">hi</div>"
           element <- requireHandle =<< querySelector page (selectorFromText "div")
           assertEqual "no box" Nothing =<< boundingBox element
+    , testCase "should get bounding box of element inside a cross-origin iframe" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          let crossOrigin = replace "127.0.0.1" "localhost" prefix
+          setContent
+            page
+            ( "<div style=\"height:120px\"></div><iframe style=\"border:0;margin-left:30px;width:300px;height:200px\" src=\""
+                <> crossOrigin
+                <> "/input/button.html\"></iframe>"
+            )
+          allFrames <- frames page
+          case allFrames of
+            [_, frame] -> do
+              button <- requireHandle =<< waitForSelectorHandleOnFrame frame (selectorFromText "button") WaitForAttached
+              iframe <- requireHandle =<< querySelector page (selectorFromText "iframe")
+              iframeBox <- boundingBox iframe
+              box <- boundingBox button
+              innerX <- evaluateOnElementNumber button "e => e.getBoundingClientRect().left"
+              innerY <- evaluateOnElementNumber button "e => e.getBoundingClientRect().top"
+              case (iframeBox, box) of
+                (Just outer, Just found) -> do
+                  assertEqual
+                    "x"
+                    (wholePixels (pixelValue (boundingBoxX outer) + innerX))
+                    (wholePixels (pixelValue (boundingBoxX found)))
+                  assertEqual
+                    "y"
+                    (wholePixels (pixelValue (boundingBoxY outer) + innerY))
+                    (wholePixels (pixelValue (boundingBoxY found)))
+                _ ->
+                  assertFailure "missing bounding boxes"
+            _ ->
+              assertFailure "expected the main frame and one iframe"
     , testCase "should force a layout" $
         withChromiumPage $ \page -> do
           setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 500))
@@ -135,11 +219,40 @@ tests =
               assertEqual "y" (pixelValue (boundingBoxY found)) =<< web "y"
               assertEqual "width" (pixelValue (boundingBoxWidth found)) =<< web "width"
               assertEqual "height" (pixelValue (boundingBoxHeight found)) =<< web "height"
+    , testCase "should work when inline box child is outside of viewport" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<style>i { position: absolute; top: -1000px; } body { margin: 0; font-size: 12px; }</style><span><i>woof</i><b>doggo</b></span>"
+          element <- requireHandle =<< querySelector page (selectorFromText "span")
+          box <- boundingBox element
+          case box of
+            Nothing ->
+              assertFailure "expected a bounding box"
+            Just found -> do
+              let
+                web property = evaluateNumberWith page ("e => e.getBoundingClientRect()." <> property) (elementArgument element)
+                expected =
+                  [ pixelValue (boundingBoxX found)
+                  , pixelValue (boundingBoxY found)
+                  , pixelValue (boundingBoxWidth found)
+                  , pixelValue (boundingBoxHeight found)
+                  ]
+              actual <- mapM web ["x", "y", "width", "height"]
+              assertEqual "rect" (map hundredths expected) (map hundredths actual)
     ]
 
 -- | The pixel value as a Double, for comparing with numbers read from the page.
 pixelValue :: CssPixel -> Double
 pixelValue = realToFrac . cssPixelToScientific
+
+-- | Round to whole pixels, as the upstream cross-origin comparison does.
+wholePixels :: Double -> Int
+wholePixels = round
+
+-- | Round to hundredths of a pixel, for comparing boxes read two different ways.
+hundredths :: Double -> Int
+hundredths value = round (value * 100)
 
 shiftPixel :: CssPixel -> Int -> CssPixel
 shiftPixel pixel delta =
