@@ -98,6 +98,7 @@ import Playwright.Harness
   , testAssetsDir
   , withAssets
   , withChromiumPage
+  , assertProtocolContains
   , assertBool
   , assertEqual
   , assertFailure
@@ -326,6 +327,32 @@ tests =
             Just value ->
               assertEqual "ok" True =<< responseOk value
           assertEqual "intercepted" True =<< readIORef intercepted
+      , testCase "should throw on page.route with invalid glob" $
+        withAssets $ \_ page ->
+          assertProtocolContains "unmatched '{'" $
+            route page (UrlMatchGlob "http://*/foo{") $ \handled ->
+              continueRoute handled
+      , testCase "should throw on unbalanced glob braces" $
+        withAssets $ \_ page -> do
+          let
+            invalidGlobs :: [(Text, Text)]
+            invalidGlobs =
+              [ ("{foo", "unmatched '{'")
+              , ("}foo", "unmatched '}'")
+              , ("http://*/foo{", "unmatched '{'")
+              , ("**/*.png?{", "unmatched '{'")
+              , ("https://example.com/{a", "unmatched '{'")
+              , ("{{foo}", "nested '{' is not supported")
+              ]
+          mapM_
+            ( \(glob, message) ->
+                assertProtocolContains message $
+                  route page (UrlMatchGlob glob) continueRoute
+            )
+            invalidGlobs
+          -- Escaped braces remain literal and must not throw.
+          route page (UrlMatchGlob "\\{foo") continueRoute
+          route page (UrlMatchGlob "foo\\}") continueRoute
     ]
 
 containedIn :: Text -> Text -> Bool
