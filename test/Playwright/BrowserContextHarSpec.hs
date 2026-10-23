@@ -8,6 +8,9 @@ import Control.Monad
 import Control.Monad.IO.Class
   ( liftIO
   )
+import Data.Either
+  ( isLeft
+  )
 import Data.Text
   ( Text
   )
@@ -22,14 +25,21 @@ import Playwright
   , Playwright
   , closeContext
   , content
+  , HarNotFound (HarNotFoundAbort)
+  , HarRouteOptions (harRouteNotFound)
   , contextRouteFromHar
+  , contextRouteFromHarWith
   , defaultGotoOptions
+  , defaultHarRouteOptions
   , NewContextOptions (newContextRecordHar)
   , defaultNewContextOptions
   , evaluateText
   , goto
   , newContextWith
   , newPage
+  , routeFromHarWith
+  , unrouteAll
+  , unrouteContextAll
   , urlFromText
   )
 import Playwright.Harness
@@ -54,7 +64,9 @@ import Test.Tasty.HUnit
   ( testCase
   )
 import UnliftIO.Exception
-  ( bracket
+  ( SomeException
+  , bracket
+  , try
   )
 
 tests :: TestTree
@@ -91,7 +103,40 @@ tests =
           gotoUrl page "http://no.playwright/"
           assertEqual "page content" "<html><head></head><body>Hello, world</body></html>" =<< content page
           closeContext ctx
+    , testCase "page.unrouteAll should stop page.routeFromHAR" $
+        withAssetsPrefix $ \prefix ->
+          withChromiumBrowser $ \browser -> do
+            dir <- testAssetsDir
+            ctx <- newContextWith browser defaultNewContextOptions
+            page <- newPage ctx
+            routeFromHarWith page (dir <> "/har-sha1.har") abortingHarOptions
+            assertNavigationFails page (prefix <> "/empty.html")
+            unrouteAll page
+            gotoUrl page (prefix <> "/empty.html")
+            closeContext ctx
+    , testCase "context.unrouteAll should stop context.routeFromHAR" $
+        withAssetsPrefix $ \prefix ->
+          withChromiumBrowser $ \browser -> do
+            dir <- testAssetsDir
+            ctx <- newContextWith browser defaultNewContextOptions
+            contextRouteFromHarWith ctx (dir <> "/har-sha1.har") abortingHarOptions
+            page <- newPage ctx
+            assertNavigationFails page (prefix <> "/empty.html")
+            unrouteContextAll ctx
+            gotoUrl page (prefix <> "/empty.html")
+            closeContext ctx
     ]
+
+-- | HAR routing that aborts any request the HAR does not contain.
+abortingHarOptions :: HarRouteOptions
+abortingHarOptions =
+  defaultHarRouteOptions {harRouteNotFound = HarNotFoundAbort}
+
+-- | Asserts that navigating to the URL fails, as it does when the HAR has no entry for it.
+assertNavigationFails :: Page -> Text -> Playwright ()
+assertNavigationFails page url = do
+  outcome <- try (gotoUrl page url)
+  assertBool "navigation should fail" (isLeft (outcome :: Either SomeException ()))
 
 -- | Records one navigation with the given HAR options, closing the context so the HAR is written.
 recordOnClose :: Browser -> RecordHar -> Text -> Playwright ()
