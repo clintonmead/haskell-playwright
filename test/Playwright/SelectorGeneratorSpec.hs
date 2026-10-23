@@ -365,12 +365,14 @@ tests =
           mutate page "div" "(div1) => { const shadowRoot1 = div1.attachShadow({ mode: 'open' }); const input1 = document.createElement('input'); shadowRoot1.appendChild(input1); const divExtra3 = document.createElement('div'); shadowRoot1.append(divExtra3); const div2 = document.createElement('div'); shadowRoot1.append(div2); const shadowRoot2 = div2.attachShadow({ mode: 'open' }); const input2 = document.createElement('input'); input2.setAttribute('value', 'foo'); shadowRoot2.appendChild(input2); return ''; }"
           expectSelector page "input[value=foo]" "internal:role=textbox >> nth=2"
     , testCase "should work in dynamic iframes without navigation" $
-        withRecorderPage $ \page -> do
+        withChromiumContext $ \ctx page -> do
+          showRecorder ctx
           setContent page "<div></div>"
           _ <- evaluateText page "async () => { await new Promise(f => { const iframe = document.createElement('iframe'); iframe.onload = () => { iframe.contentDocument.body.innerHTML = '<div>Target</div>'; f(); }; document.body.appendChild(iframe); }); return 'ok'; }"
           children <- childFrames (mainFrame page)
           case children of
-            frame : _ ->
+            frame : _ -> do
+              showRecorder ctx
               assertEqual "selector" "internal:text=\"Target\"i" =<< generateInFrame frame "div"
             [] ->
               assertFailure "expected a dynamic iframe"
