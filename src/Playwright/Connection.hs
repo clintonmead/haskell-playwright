@@ -193,7 +193,7 @@ import Playwright.RequestOverrides
 import Playwright.Session
   ( HarRecorder
   , ScreencastSession
-  , Session (sessionBrowserContexts, sessionChromiumGuid, sessionClosed, sessionClosedGuids, sessionFinishedRequests, sessionFirefoxGuid, sessionNextId, sessionObjects, sessionPending, sessionPlaywrightGuid, sessionRequestEndTiming, sessionRequestFailures, sessionResults, sessionWebkitGuid)
+  , Session (sessionBrowserContexts, sessionChromiumGuid, sessionClosed, sessionClosedGuids, sessionDisposedObjects, sessionFinishedRequests, sessionFirefoxGuid, sessionNextId, sessionObjects, sessionPending, sessionPlaywrightGuid, sessionRequestEndTiming, sessionRequestFailures, sessionResults, sessionWebkitGuid)
   , emptySession
   )
 import Playwright.StoredLocatorHandler
@@ -628,7 +628,14 @@ dispatch conn incoming =
     IncomingDispose guid ->
       atomically $
         modifySession conn $ \session ->
-          session {sessionObjects = disposeTree guid (sessionObjects session)}
+          let
+            remaining = disposeTree guid (sessionObjects session)
+            removed = Map.difference (sessionObjects session) remaining
+          in
+            session
+              { sessionObjects = remaining
+              , sessionDisposedObjects = Map.union removed (sessionDisposedObjects session)
+              }
     IncomingEvent guid method params -> do
       handleEvent conn guid method params
 

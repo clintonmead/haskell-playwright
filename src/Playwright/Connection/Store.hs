@@ -93,7 +93,7 @@ import Playwright.RequestOverrides
 import Playwright.Session
   ( HarRecorder
   , ScreencastSession
-  , Session (sessionHarRecorders, sessionBrowserContexts, sessionBrowserTypes, sessionClosedGuids, sessionContextBaseUrls, sessionDetachedFrames, sessionContextBrowsers, sessionContextsWithOwnerPage, sessionLocatorHandlers, sessionLocatorListening, sessionMainFramePages, sessionObjects, sessionPagesOwningContext, sessionRequestEndTiming, sessionRequestFailures, sessionRequestOverrides, sessionRouteHandlers, sessionRouteListening, sessionScreencasts, sessionSelectorEngines, sessionTimeoutDefaults)
+  , Session (sessionHarRecorders, sessionBrowserContexts, sessionBrowserTypes, sessionClosedGuids, sessionContextBaseUrls, sessionDetachedFrames, sessionContextBrowsers, sessionContextsWithOwnerPage, sessionDisposedObjects, sessionLocatorHandlers, sessionLocatorListening, sessionMainFramePages, sessionObjects, sessionPagesOwningContext, sessionRequestEndTiming, sessionRequestFailures, sessionRequestOverrides, sessionRouteHandlers, sessionRouteListening, sessionScreencasts, sessionSelectorEngines, sessionTimeoutDefaults)
   )
 import Playwright.StoredLocatorHandler
   ( StoredLocatorHandler (storedLocatorHandlerFrame, storedLocatorHandlerSelector, storedLocatorHandlerTimes)
@@ -117,7 +117,12 @@ lookupObject conn guid = do
   session <- atomically (readSession conn)
   case Map.lookup guid (sessionObjects session) of
     Nothing ->
-      throwIO (MissingObject guid)
+      -- A dispose can race with a waiter that still needs the object, for
+      -- example a popup closed before its page event is consumed. Fall back to
+      -- the disposed record so the waiter can still resolve it.
+      case Map.lookup guid (sessionDisposedObjects session) of
+        Nothing -> throwIO (MissingObject guid)
+        Just obj -> pure obj
     Just obj ->
       pure obj
 

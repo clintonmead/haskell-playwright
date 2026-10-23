@@ -120,6 +120,7 @@ data Session = Session
   , sessionTimeoutDefaults :: Map Guid TimeoutDefaults
   , sessionMainFramePages :: Map Guid Guid
   , sessionFinishedRequests :: Set Guid
+  , sessionDisposedObjects :: Map Guid RemoteObject
   , sessionRequestEndTiming :: Map Guid Scientific
   , sessionRequestFailures :: Map Guid Text
   , sessionPendingHandlers :: Int
@@ -162,6 +163,7 @@ emptySession =
     , sessionTimeoutDefaults = Map.empty
     , sessionMainFramePages = Map.empty
     , sessionFinishedRequests = Set.empty
+    , sessionDisposedObjects = Map.empty
     , sessionRequestEndTiming = Map.empty
     , sessionRequestFailures = Map.empty
     , sessionPendingHandlers = 0
