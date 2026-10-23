@@ -57,6 +57,7 @@ import Playwright
   , goto
   , innerText
   , milliseconds
+  , setContent
   , textArgument
   , url
   , urlFromText
@@ -133,6 +134,14 @@ tests =
           withAsync (waitForPopup page) $ \handle -> do
             _ <- evaluate page "() => window.open(window.location.href) && 1"
             void (wait handle)
+    , testCase "clicking on links which do not commit navigation" $
+        withPageApp emptyOkApp $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          -- Upstream links to an https fixture; this client has no TLS
+          -- fixture. Port 1 has no listener, so the navigation fails with
+          -- a connection refusal and never commits.
+          setContent page "<a href='https://127.0.0.1:1/empty.html'>foobar</a>"
+          click (locate page "a")
     , testCase "clicking in the middle of navigation that aborts" $
         clickDuringStall DestroyConnection
     , testCase "clicking in the middle of navigation that commits" $
