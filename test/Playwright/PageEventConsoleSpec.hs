@@ -7,14 +7,22 @@ import Data.Text
   , isInfixOf
   , isPrefixOf
   , isSuffixOf
+  , pack
   )
 import Playwright
-  ( ConsoleLocation (consoleLocationLineNumber, consoleLocationUrl)
-  , ConsoleMessage (consoleMessageArgs, consoleMessageLocation, consoleMessageText, consoleMessageTimestamp, consoleMessageType)
+  ( ConsoleFilter (ConsoleFilterAll)
+  , ConsoleLocation (consoleLocationLineNumber, consoleLocationUrl)
+  , ConsoleMessage (consoleMessageArgs, consoleMessageLocation, consoleMessagePage, consoleMessageText, consoleMessageTimestamp, consoleMessageType)
   , ConsoleType (ConsoleDebug, ConsoleDir, ConsoleError, ConsoleInfo, ConsoleLog, ConsoleTimeEnd, ConsoleTrace, ConsoleWarning)
+  , PageError (pageErrorMessage)
   , Page
   , Playwright
   , armConsole
+  , clearConsoleMessages
+  , consoleMessages
+  , consoleMessagesWith
+  , pageErrors
+  , pageErrorsWith
   , evaluate
   , defaultGotoOptions
   , evaluateNumber
@@ -34,6 +42,25 @@ import Playwright.Harness
   , assertEqual
   , assertFailure
   , withAssets
+  , withLocalApp
+  )
+import Control.Monad.IO.Class
+  ( liftIO
+  )
+import Data.Maybe
+  ( isJust
+  )
+import Data.Time.Clock.POSIX
+  ( getPOSIXTime
+  )
+import Network.HTTP.Types
+  ( hContentType
+  , status200
+  )
+import Network.Wai
+  ( Application
+  , rawPathInfo
+  , responseLBS
   )
 import UnliftIO.Async
   ( wait
@@ -208,7 +235,92 @@ tests =
               page
               "() => { const fail = async () => Promise.reject(new Error('error')); console.log('begin'); void fail(); void fail(); fail().catch(() => { console.log('end'); }); }"
           assertEqual "texts" ["begin", "end"] . map consoleMessageText =<< readMessages messages
+    , testCase "should have timestamp in consoleMessages" $
+        withChromiumPage $ \page -> do
+          before <- subtract 100 <$> nowMs
+          _ <- evaluate page "() => console.log('stored message')"
+          after <- (+ 100) <$> nowMs
+          messages <- consoleMessages page
+          assertBool "at least one message" (not (null messages))
+          lastMessage <- lastMessageOf messages
+          assertEqual "text" "stored message" (consoleMessageText lastMessage)
+          let stamp = consoleMessageTimestamp lastMessage
+          assertBool ("timestamp " <> show stamp <> " in range") (stamp >= before && stamp <= after)
+    , testCase "consoleMessages should work" $
+        withChromiumPage $ \page -> do
+          _ <-
+            evaluate
+              page
+              "() => { for (let i = 0; i < 301; i++) console.log('message' + i); }"
+          messages <- consoleMessages page
+          let
+            lastOnes = drop (length messages - 100) messages
+            expectedTexts = [pack ("message" <> show i) | i <- [201 .. 300 :: Int]]
+          assertBool "at least 100 messages" (length messages >= 100)
+          assertEqual "last messages" expectedTexts (map consoleMessageText lastOnes)
+          assertBool "all log" (all ((== ConsoleLog) . consoleMessageType) lastOnes)
+          assertBool "page set" (all (isJust . consoleMessagePage) lastOnes)
+    , testCase "clearConsoleMessages should work" $
+        withChromiumPage $ \page -> do
+          _ <- evaluate page "() => { console.log('message1'); console.log('message2'); }"
+          texts <- map consoleMessageText <$> consoleMessages page
+          assertBool "contains message1" ("message1" `elem` texts)
+          assertBool "contains message2" ("message2" `elem` texts)
+          clearConsoleMessages page
+          assertEqual "cleared" [] . map consoleMessageText =<< consoleMessages page
+          _ <- evaluate page "() => console.log('message3')"
+          assertEqual "after clear" ["message3"] . map consoleMessageText =<< consoleMessages page
+    , testCase "consoleMessages since-navigation filter should work" $
+        withAssets $ \prefix page -> do
+          _ <- evaluate page "() => console.log('before navigation')"
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          _ <- evaluate page "() => console.log('after navigation')"
+          allTexts <- map consoleMessageText <$> consoleMessagesWith page ConsoleFilterAll
+          assertBool "all has before" ("before navigation" `elem` allTexts)
+          assertBool "all has after" ("after navigation" `elem` allTexts)
+          -- since-navigation is the default
+          sinceTexts <- map consoleMessageText <$> consoleMessages page
+          assertBool "default excludes before" ("before navigation" `notElem` sinceTexts)
+          assertBool "default has after" ("after navigation" `elem` sinceTexts)
+    , testCase "pageErrors since-navigation filter should work" $
+        withChromiumPage $ \page ->
+          withLocalApp pageErrorApp $ \base -> do
+            _ <- goto page (urlFromText (base <> "/page1")) defaultGotoOptions
+            _ <- goto page (urlFromText (base <> "/page2")) defaultGotoOptions
+            allMessages <- map pageErrorMessage <$> pageErrorsWith page ConsoleFilterAll
+            assertBool "all has page1" ("page1 error" `elem` allMessages)
+            assertBool "all has page2" ("page2 error" `elem` allMessages)
+            -- since-navigation is the default
+            sinceMessages <- map pageErrorMessage <$> pageErrors page
+            assertBool "default excludes page1" ("page1 error" `notElem` sinceMessages)
+            assertBool "default has page2" ("page2 error" `elem` sinceMessages)
     ]
+
+-- | Serves a page that throws on load, naming the error after the request path.
+pageErrorApp :: Application
+pageErrorApp request respond =
+  respond
+    ( responseLBS
+        status200
+        [(hContentType, "text/html")]
+        ( if rawPathInfo request == "/page1"
+            then "<script>throw new Error('page1 error');</script>"
+            else "<script>throw new Error('page2 error');</script>"
+        )
+    )
+
+nowMs :: Playwright Double
+nowMs = do
+  now <- liftIO getPOSIXTime
+  pure (realToFrac now * 1000)
+
+lastMessageOf :: [ConsoleMessage] -> Playwright ConsoleMessage
+lastMessageOf messages =
+  case reverse messages of
+    lastMessage : _ ->
+      pure lastMessage
+    [] ->
+      assertFailure "expected a console message"
 
 -- | Opens a popup, logs from an iframe inside it, then removes the iframe.
 detachedIframeScript :: Text -> Text
