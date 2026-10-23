@@ -459,6 +459,14 @@ tests =
             withPausedClock $ \page _ -> do
               clockRunFor page (ClockTicksMillis (ClockMillis (1 / 2)))
               assertEqual "now" (1001 :: Double) =<< evaluateNumber page "() => Date.now()"
+        , testCase "check Date.now is an integer (2)" $
+            withChromiumPage $ \page -> do
+              clockInstallAt page (ClockTimeMillis (clockMillisFromInt 0))
+              _ <- goto page (urlFromText "data:text/html,") defaultGotoOptions
+              clockPauseAt page (ClockTimeMillis (clockMillisFromInt 1000))
+              clockRunFor page (ClockTicksMillis (ClockMillis (1 / 2)))
+              assertEqual "integer" True =<< evaluateBool page "() => Number.isInteger(Date.now())"
+              assertEqual "now" (1001 :: Double) =<< evaluateNumber page "() => Date.now()"
         ]
     , testGroup
         "AbortSignal"
