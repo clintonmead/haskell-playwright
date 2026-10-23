@@ -29,6 +29,7 @@ import Playwright
   , locatorDescription
   , locatorOnFrame
   , locatorPage
+  , locatorToString
   , milliseconds
   , pageGetAttribute
   , pageInnerHtml
@@ -230,4 +231,11 @@ tests =
                 (getByRole page (AriaRole "button") (defaultGetByRoleOptions {getByRoleName = Just "Submit"}))
                 "Submit button"
           assertEqual "description" (Just "Submit button") (locatorDescription loc)
+    , testCase "toString() returns formatted locator" $
+        withChromiumPage $ \page -> do
+          let
+            loc =
+              getByRole page (AriaRole "button") (defaultGetByRoleOptions {getByRoleName = Just "Submit"})
+          assertEqual "formatted" "getByRole('button', { name: 'Submit' })" (locatorToString loc)
+          assertEqual "description" Nothing (locatorDescription loc)
     ]
