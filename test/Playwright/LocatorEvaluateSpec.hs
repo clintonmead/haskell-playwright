@@ -38,6 +38,16 @@ tests =
             "<div class=\"a\">not-a-child-div</div><div id=\"myId\"><div class=\"a\">a-child-div</div></div>"
           content <- evaluateOnLocatorText (locate page "#myId .a") "node => node.innerText"
           assertEqual "child" "a-child-div" content
+    , testCase "should retrieve content from subtree for all" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<div class=\"a\">not-a-child-div</div><div id=\"myId\"><div class=\"a\">a1-child-div</div><div class=\"a\">a2-child-div</div></div>"
+          content <-
+            evaluateOnLocatorAllTexts
+              (locate page "#myId .a")
+              "nodes => nodes.map(n => n.innerText)"
+          assertEqual "children" ["a1-child-div", "a2-child-div"] content
     , testCase "should work for all" $
         withChromiumPage $ \page -> do
           setContent
