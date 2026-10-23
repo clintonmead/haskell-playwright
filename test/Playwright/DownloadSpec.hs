@@ -464,6 +464,28 @@ tests =
             path <- downloadPath download
             saved <- liftIO (BS.readFile path)
             assertEqual "pdf bytes" pdf saved
+    , testCase "should be able to download a inline PDF file via response interception" $ do
+        pdf <- readTestAsset "empty.pdf"
+        withApplication (pure (pdfApp pdf)) $ \port ->
+          withAcceptedPage $ \page -> do
+            let
+              base = "http://127.0.0.1:" <> pack (show port)
+            _ <- goto page (urlFromText (base <> "/empty")) defaultGotoOptions
+            route page (UrlMatchGlob "**/empty.pdf") $ \handled -> do
+              response <- routeFetch handled
+              fulfillRoute
+                handled
+                defaultFulfillOptions
+                  { fulfillResponse = Just response
+                  , fulfillHeaders = [HttpHeader (HeaderName "Content-Disposition") (HeaderValue "attachment")]
+                  }
+            download <-
+              clickHrefWith
+                page
+                "<a href=\"/empty.pdf\">open</a>"
+            path <- downloadPath download
+            saved <- liftIO (BS.readFile path)
+            assertEqual "pdf bytes" pdf saved
     ]
 
 -- | Runs a Playwright action and returns the protocol error message when it fails with one.
