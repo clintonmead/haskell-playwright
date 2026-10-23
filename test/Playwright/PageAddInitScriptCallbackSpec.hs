@@ -5,6 +5,9 @@ module Playwright.PageAddInitScriptCallbackSpec
 import UnliftIO.Concurrent
   ( threadDelay
   )
+import UnliftIO.Exception
+  ( throwIO
+  )
 import UnliftIO.IORef
   ( IORef
   , modifyIORef'
@@ -77,6 +80,27 @@ tests =
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           pollUntil (evaluateBool page "() => window.result === 11")
           assertEqual "result" (11 :: Double) =<< evaluateNumber page "() => window.result"
+    , testCase "should pass arguments to the callback" $
+        withAssets $ \prefix page -> do
+          counts <- newIORef []
+          firsts <- newIORef []
+          _ <-
+            addPageInitScriptExposing
+              page
+              "({ cb }) => { cb(1, 'two', { three: 3 }, [4]); }"
+              [("cb", recordArguments counts firsts)]
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          pollUntil ((== [4]) <$> readIORef counts)
+          assertEqual "first" [1] =<< readIORef firsts
+    , testCase "should propagate callback errors to the page" $
+        withAssets $ \prefix page -> do
+          _ <-
+            addPageInitScriptExposing
+              page
+              "async ({ cb }) => { try { await cb(); window.result = 'no error'; } catch (e) { window.result = e.message; } }"
+              [("cb", failWithBoom)]
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          pollUntil (evaluateBool page "() => (window.result || '').includes('boom')")
     , testCase "should work in a child frame" $
         withAssets $ \prefix page -> do
           received <- newIORef []
@@ -158,6 +182,22 @@ multiply args =
       pure (numberArgument (left * right))
     _ ->
       pure undefinedArgument
+
+-- | Records how many arguments the page passed, and the first one if it is a number.
+recordArguments :: IORef [Int] -> IORef [Double] -> [SerializedValue] -> Playwright SerializedArgument
+recordArguments counts firsts args = do
+  modifyIORef' counts (<> [length args])
+  case args of
+    (SerializedNode (PayloadNumber n) _ : _) ->
+      modifyIORef' firsts (<> [n])
+    _ ->
+      pure ()
+  pure undefinedArgument
+
+-- | Fails the way a callback does when its host code throws.
+failWithBoom :: [SerializedValue] -> Playwright SerializedArgument
+failWithBoom _ =
+  throwIO (userError "boom")
 
 -- | Polls the check until it passes, with a bounded number of attempts.
 pollUntil :: Playwright Bool -> Playwright ()
