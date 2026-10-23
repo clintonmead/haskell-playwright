@@ -73,6 +73,9 @@ import Playwright.Protocol
   , mkBrowserNewContextParamsScreen
   , mkBrowserNewContextParamsViewport
   )
+import Playwright.RecordHar
+  ( RecordHar
+  )
 import Playwright.RecordVideo
   ( RecordVideo (recordVideoDir, recordVideoSize)
   )
@@ -129,6 +132,7 @@ data NewContextOptions = NewContextOptions
   , newContextStrictSelectors :: Maybe Bool
   , newContextTimezoneId :: Maybe TimezoneId
   , newContextUserAgent :: Maybe UserAgent
+  , newContextRecordHar :: Maybe RecordHar
   , newContextRecordVideo :: Maybe RecordVideo
   , newContextViewport :: Maybe ViewportSize
   }
@@ -163,6 +167,7 @@ defaultNewContextOptions =
     , newContextStrictSelectors = Nothing
     , newContextTimezoneId = Nothing
     , newContextUserAgent = Nothing
+    , newContextRecordHar = Nothing
     , newContextRecordVideo = Nothing
     , newContextViewport = Nothing
     }

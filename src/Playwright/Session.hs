@@ -1,6 +1,7 @@
 module Playwright.Session
   ( Session (..)
   , ScreencastSession (..)
+  , HarRecorder (..)
   , emptySession
   , removeWaiter
   ) where
@@ -83,6 +84,14 @@ data ScreencastSession = ScreencastSession
   , screencastSessionPath :: Maybe FilePath
   }
 
+-- | A browser context's running HAR recording: the driver's harId and the
+-- path the HAR is written to when the context closes.
+data HarRecorder = HarRecorder
+  { harRecorderId :: Text
+  , harRecorderPath :: FilePath
+  , harRecorderTracing :: Guid
+  }
+
 data Session = Session
   { sessionObjects :: Map Guid RemoteObject
   , sessionResults :: Map RequestId (Either PlaywrightError Aeson.Value)
@@ -105,6 +114,7 @@ data Session = Session
   , sessionPagesOwningContext :: Set Guid
   , sessionContextsWithOwnerPage :: Set Guid
   , sessionScreencasts :: Map Guid ScreencastSession
+  , sessionHarRecorders :: Map Guid HarRecorder
   , sessionBrowserTypes :: Map Guid Guid
   , sessionSelectorEngines :: [SelectorEngine]
   , sessionTimeoutDefaults :: Map Guid TimeoutDefaults
@@ -146,6 +156,7 @@ emptySession =
     , sessionPagesOwningContext = Set.empty
     , sessionContextsWithOwnerPage = Set.empty
     , sessionScreencasts = Map.empty
+    , sessionHarRecorders = Map.empty
     , sessionBrowserTypes = Map.empty
     , sessionSelectorEngines = []
     , sessionTimeoutDefaults = Map.empty

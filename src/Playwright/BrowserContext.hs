@@ -10,6 +10,7 @@ module Playwright.BrowserContext
   , closeContext
   , closeContextWith
   , contextFromRef
+  , startContextRecordHar
   , contextPages
   , cookies
   , cookiesFor
@@ -124,6 +125,9 @@ import Playwright.PermissionName
   )
 import Playwright.Protocol qualified as Protocol
 import Playwright.Protocol
+  ( BrowserContextInitializer (browserContextInitializerTracing)
+  )
+import Playwright.Protocol
   ( BrowserContextAddCookiesResult
   , BrowserContextAddInitScriptResult (browserContextAddInitScriptResultDisposable)
   , BrowserContextClearCookiesParams (browserContextClearCookiesParamsDomain, browserContextClearCookiesParamsName, browserContextClearCookiesParamsNameRegexFlags, browserContextClearCookiesParamsNameRegexSource, browserContextClearCookiesParamsPath)
@@ -166,8 +170,13 @@ import Playwright.Protocol
 import Playwright.RaceTimeout
   ( waitWithTimeout
   )
+import Playwright.RecordHar
+  ( RecordHar
+  , exportRecordHar
+  , startRecordHar
+  )
 import Playwright.RemoteObject
-  ( RemoteObject (remoteGuid, remoteParent, remoteType)
+  ( RemoteObject (remoteGuid, remoteInitializer, remoteParent, remoteType)
   )
 import Playwright.StorageState
   ( StorageState
@@ -226,12 +235,22 @@ closeContext ctx =
 closeContextWith :: BrowserContext -> Maybe Text -> Playwright ()
 closeContextWith ctx reason =
   ignoreTargetClosed $ do
+    exportRecordHar (channelGuid (browserContextChannel ctx))
     _ :: BrowserContextCloseResult <-
       send
         (browserContextChannel ctx)
         (MethodName "close")
         mkBrowserContextCloseParams {browserContextCloseParamsReason = reason}
     pure ()
+
+-- | Starts recording the context's traffic into a HAR file, which is written
+-- when the context closes.
+startContextRecordHar :: BrowserContext -> RecordHar -> Playwright ()
+startContextRecordHar ctx options = do
+  let guid = channelGuid (browserContextChannel ctx)
+  obj <- lookupObject guid
+  initializer <- throwDecode (remoteInitializer obj)
+  startRecordHar guid (channelRefGuid (browserContextInitializerTracing initializer)) options
 
 pageContext :: Page -> BrowserContext
 pageContext page =

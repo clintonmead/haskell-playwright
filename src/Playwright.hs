@@ -106,6 +106,9 @@ module Playwright
   , NewContextOptions (..)
   , NewRequestOptions (..)
   , RecordVideo (..)
+  , RecordHar (..)
+  , RecordHarContent (..)
+  , RecordHarMode (..)
   , Video
   , pageVideo
   , videoDelete
@@ -1362,6 +1365,11 @@ import Playwright.AddLocatorHandlerOptions
   ( AddLocatorHandlerOptions (AddLocatorHandlerOptions, addLocatorHandlerNoWaitAfter, addLocatorHandlerTimes)
   , LocatorHandlerTimes (LocatorHandlerTimes, locatorHandlerTimesToInt)
   , defaultAddLocatorHandlerOptions
+  )
+import Playwright.RecordHar
+  ( RecordHar (RecordHar, recordHarPath, recordHarContent, recordHarMode, recordHarUrlGlob)
+  , RecordHarContent (RecordHarContentEmbed, RecordHarContentAttach, RecordHarContentOmit)
+  , RecordHarMode (RecordHarModeFull, RecordHarModeMinimal)
   )
 import Playwright.RecordVideo
   ( RecordVideo (recordVideoDir, recordVideoSize)

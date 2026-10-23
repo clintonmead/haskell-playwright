@@ -5,6 +5,9 @@ module Playwright.Connection.Store
   , closedGuids
   , contextHasOwnerPage
   , deleteScreencast
+  , deleteHarRecorder
+  , lookupHarRecorder
+  , putHarRecorder
   , lookupScreencast
   , putScreencast
   , deleteLocatorHandler
@@ -88,8 +91,9 @@ import Playwright.RequestOverrides
   , emptyRequestOverrides
   )
 import Playwright.Session
-  ( ScreencastSession
-  , Session (sessionBrowserContexts, sessionBrowserTypes, sessionClosedGuids, sessionContextBaseUrls, sessionDetachedFrames, sessionContextBrowsers, sessionContextsWithOwnerPage, sessionLocatorHandlers, sessionLocatorListening, sessionMainFramePages, sessionObjects, sessionPagesOwningContext, sessionRequestEndTiming, sessionRequestFailures, sessionRequestOverrides, sessionRouteHandlers, sessionRouteListening, sessionScreencasts, sessionSelectorEngines, sessionTimeoutDefaults)
+  ( HarRecorder
+  , ScreencastSession
+  , Session (sessionHarRecorders, sessionBrowserContexts, sessionBrowserTypes, sessionClosedGuids, sessionContextBaseUrls, sessionDetachedFrames, sessionContextBrowsers, sessionContextsWithOwnerPage, sessionLocatorHandlers, sessionLocatorListening, sessionMainFramePages, sessionObjects, sessionPagesOwningContext, sessionRequestEndTiming, sessionRequestFailures, sessionRequestOverrides, sessionRouteHandlers, sessionRouteListening, sessionScreencasts, sessionSelectorEngines, sessionTimeoutDefaults)
   )
 import Playwright.StoredLocatorHandler
   ( StoredLocatorHandler (storedLocatorHandlerFrame, storedLocatorHandlerSelector, storedLocatorHandlerTimes)
@@ -395,6 +399,23 @@ putScreencast conn pageGuid screencast =
   atomically $
     modifySession conn $ \session ->
       session {sessionScreencasts = Map.insert pageGuid screencast (sessionScreencasts session)}
+
+lookupHarRecorder :: Connection -> Guid -> IO (Maybe HarRecorder)
+lookupHarRecorder conn contextGuid =
+  atomically $
+    Map.lookup contextGuid . sessionHarRecorders <$> readSession conn
+
+putHarRecorder :: Connection -> Guid -> HarRecorder -> IO ()
+putHarRecorder conn contextGuid recorder =
+  atomically $
+    modifySession conn $ \session ->
+      session {sessionHarRecorders = Map.insert contextGuid recorder (sessionHarRecorders session)}
+
+deleteHarRecorder :: Connection -> Guid -> IO ()
+deleteHarRecorder conn contextGuid =
+  atomically $
+    modifySession conn $ \session ->
+      session {sessionHarRecorders = Map.delete contextGuid (sessionHarRecorders session)}
 
 deleteScreencast :: Connection -> Guid -> IO ()
 deleteScreencast conn pageGuid =

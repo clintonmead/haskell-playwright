@@ -141,6 +141,7 @@ library
       Playwright.Protocol
       Playwright.ProxySettings
       Playwright.RaceTimeout
+      Playwright.RecordHar
       Playwright.RecordVideo
       Playwright.ReducedMotion
       Playwright.RegisterSelectorOptions

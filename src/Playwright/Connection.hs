@@ -29,6 +29,9 @@ module Playwright.Connection
   , lookupScreencast
   , putScreencast
   , deleteScreencast
+  , deleteHarRecorder
+  , lookupHarRecorder
+  , putHarRecorder
   , rememberBrowserType
   , lookupBrowserTypeGuid
   , waitForLifecycle
@@ -188,7 +191,8 @@ import Playwright.RequestOverrides
   ( RequestOverrides
   )
 import Playwright.Session
-  ( ScreencastSession
+  ( HarRecorder
+  , ScreencastSession
   , Session (sessionBrowserContexts, sessionChromiumGuid, sessionClosed, sessionClosedGuids, sessionFinishedRequests, sessionFirefoxGuid, sessionNextId, sessionObjects, sessionPending, sessionPlaywrightGuid, sessionRequestEndTiming, sessionRequestFailures, sessionResults, sessionWebkitGuid)
   , emptySession
   )
@@ -866,6 +870,18 @@ lookupScreencast pageGuid =
 putScreencast :: Guid -> ScreencastSession -> Playwright ()
 putScreencast pageGuid screencast =
   inConnection (\conn -> Store.putScreencast conn pageGuid screencast)
+
+lookupHarRecorder :: Guid -> Playwright (Maybe HarRecorder)
+lookupHarRecorder contextGuid =
+  inConnection (`Store.lookupHarRecorder` contextGuid)
+
+putHarRecorder :: Guid -> HarRecorder -> Playwright ()
+putHarRecorder contextGuid recorder =
+  inConnection (\conn -> Store.putHarRecorder conn contextGuid recorder)
+
+deleteHarRecorder :: Guid -> Playwright ()
+deleteHarRecorder contextGuid =
+  inConnection (`Store.deleteHarRecorder` contextGuid)
 
 deleteScreencast :: Guid -> Playwright ()
 deleteScreencast pageGuid =

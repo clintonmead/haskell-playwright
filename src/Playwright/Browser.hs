@@ -26,7 +26,8 @@ import UnliftIO.Exception
   , throwIO
   )
 import Control.Monad
-  ( when
+  ( forM_
+  , when
   )
 import Data.Aeson
   ( Value
@@ -44,6 +45,7 @@ import Playwright.BrowserContext
   ( BrowserContext (browserContextChannel)
   , closeContext
   , contextFromRef
+  , startContextRecordHar
   , newPage
   )
 import Playwright.Channel
@@ -77,7 +79,7 @@ import Playwright.MethodName
   ( MethodName (MethodName)
   )
 import Playwright.NewContextOptions
-  ( NewContextOptions (newContextBaseURL, newContextDeviceScaleFactor, newContextIsMobile, newContextNoDefaultViewport)
+  ( NewContextOptions (newContextBaseURL, newContextDeviceScaleFactor, newContextIsMobile, newContextNoDefaultViewport, newContextRecordHar)
   , defaultNewContextOptions
   , toBrowserNewContextParams
   )
@@ -208,7 +210,9 @@ newContextVia browser method opts = do
       pure ()
     Just base ->
       writeContextBaseUrl (channelRefGuid ref) base
-  contextFromRef ref
+  ctx <- contextFromRef ref
+  forM_ (newContextRecordHar opts) (startContextRecordHar ctx)
+  pure ctx
 
 validateNewContextOptions :: NewContextOptions -> Playwright ()
 validateNewContextOptions opts = do
