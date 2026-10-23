@@ -53,6 +53,8 @@ data ScreenshotOptions = ScreenshotOptions
   , screenshotOptionsCaret :: Maybe ScreenshotCaret
   , screenshotOptionsAnimations :: Maybe ScreenshotAnimations
   , screenshotOptionsScale :: Maybe ScreenshotScale
+  , screenshotOptionsMaskColor :: Maybe Text
+  , screenshotOptionsStyle :: Maybe Text
   }
   deriving stock (Eq, Show)
   deriving (FromJSON, ToJSON) via (Autodocodec ScreenshotOptions)
@@ -91,6 +93,8 @@ defaultScreenshotOptions =
     , screenshotOptionsCaret = Nothing
     , screenshotOptionsAnimations = Nothing
     , screenshotOptionsScale = Nothing
+    , screenshotOptionsMaskColor = Nothing
+    , screenshotOptionsStyle = Nothing
     }
 
 instance HasCodec ScreenshotOptions where
@@ -107,6 +111,8 @@ instance HasCodec ScreenshotOptions where
         <*> optionalField' "caret" .= screenshotOptionsCaret
         <*> optionalField' "animations" .= screenshotOptionsAnimations
         <*> optionalField' "scale" .= screenshotOptionsScale
+        <*> optionalField' "maskColor" .= screenshotOptionsMaskColor
+        <*> optionalField' "style" .= screenshotOptionsStyle
 
 filePathCodec :: JSONCodec FilePath
 filePathCodec =

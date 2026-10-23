@@ -11,6 +11,7 @@ module Playwright.Page
   , pdf
   , pdfWith
   , screenshot
+  , screenshotMasked
   , setContent
   , setContentWith
   , title
@@ -183,7 +184,7 @@ import Playwright.HttpHeader
   , toNameValue
   )
 import Playwright.Json.ChannelRef
-  ( ChannelRef (channelRefGuid)
+  ( ChannelRef (ChannelRef, channelRefGuid)
   )
 import Playwright.Json.Decode
   ( throwDecode
@@ -232,15 +233,19 @@ import Playwright.Protocol
       , pageScreenshotParamsCaret
       , pageScreenshotParamsClip
       , pageScreenshotParamsFullPage
+      , pageScreenshotParamsMask
+      , pageScreenshotParamsMaskColor
       , pageScreenshotParamsOmitBackground
       , pageScreenshotParamsQuality
       , pageScreenshotParamsScale
+      , pageScreenshotParamsStyle
       , pageScreenshotParamsType
       )
   , PageScreenshotParamsAnimations
       ( PageScreenshotParamsAnimationsAllow
       , PageScreenshotParamsAnimationsDisabled
       )
+  , PageScreenshotParamsMask
   , PageScreenshotParamsCaret
       ( PageScreenshotParamsCaretHide
       , PageScreenshotParamsCaretInitial
@@ -272,6 +277,7 @@ import Playwright.Protocol
   , mkPageReloadParams
   , mkPageRequestGCParams
   , mkPageScreenshotParams
+  , mkPageScreenshotParamsMask
   , mkPageSetExtraHTTPHeadersParams
   , mkPageSetViewportSizeParams
   , mkPageSetViewportSizeParamsViewportSize
@@ -313,10 +319,12 @@ import Playwright.ScreenshotOptions
       , screenshotOptionsCaret
       , screenshotOptionsClip
       , screenshotOptionsFullPage
+      , screenshotOptionsMaskColor
       , screenshotOptionsOmitBackground
       , screenshotOptionsPath
       , screenshotOptionsQuality
       , screenshotOptionsScale
+      , screenshotOptionsStyle
       , screenshotOptionsTimeout
       , screenshotOptionsType
       )
@@ -535,7 +543,19 @@ setViewportSize page size = do
   pure ()
 
 screenshot :: Page -> ScreenshotOptions -> Playwright ByteString
-screenshot page opts = do
+screenshot page = screenshotWithMasks page []
+
+-- | Screenshot with the given locators painted over; the options' 'maskColor' and 'style' apply to them.
+screenshotMasked :: Page -> [Locator] -> ScreenshotOptions -> Playwright ByteString
+screenshotMasked page locators = screenshotWithMasks page (map maskParam locators)
+  where
+    maskParam target =
+      mkPageScreenshotParamsMask
+        (ChannelRef (channelGuid (frameChannel (locatorFrame target))))
+        (locatorSelector target)
+
+screenshotWithMasks :: Page -> [PageScreenshotParamsMask] -> ScreenshotOptions -> Playwright ByteString
+screenshotWithMasks page masks opts = do
   resolvedType <- either (throwIO . DecodeFailure) pure (resolveScreenshotType opts)
   result <-
     sendWithTimeout
@@ -551,6 +571,9 @@ screenshot page opts = do
         , pageScreenshotParamsCaret = screenshotCaretParam <$> screenshotOptionsCaret opts
         , pageScreenshotParamsAnimations = screenshotAnimationsParam <$> screenshotOptionsAnimations opts
         , pageScreenshotParamsScale = screenshotScaleParam <$> screenshotOptionsScale opts
+        , pageScreenshotParamsMask = if null masks then Nothing else Just masks
+        , pageScreenshotParamsMaskColor = screenshotOptionsMaskColor opts
+        , pageScreenshotParamsStyle = screenshotOptionsStyle opts
         }
   let bytes = protocolBinaryToByteString (pageScreenshotResultBinary result)
   mapM_ (\filePath -> liftIO (writeScreenshotFile filePath bytes)) (screenshotOptionsPath opts)

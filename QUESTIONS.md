@@ -623,6 +623,18 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 
 **To change:** Rename the constructors if the group needs a different style. The mapping is one function in `Playwright.Page`, so the change is local.
 
+## page-screenshot: mask, maskColor and style
+
+**Question:** Upstream `mask` is an array of `{frame, selector}` locator pairs. `ScreenshotOptions` derives `Eq` and `Show`, and a `Locator` has neither, so `mask` cannot be a field of the record. What is the Haskell shape?
+
+**Guess taken:** `mask` is a separate function, `screenshotMasked :: Page -> [Locator] -> ScreenshotOptions -> Playwright ByteString`. `screenshot` is `screenshotMasked` with an empty list. `maskColor` and `style` are `Maybe Text` fields on `ScreenshotOptions`, and they only apply when masks are given, as upstream does.
+
+**Why not verified:** The record cannot hold the locators, so this is the only shape that keeps `Eq` and `Show` on the record.
+
+**To change:** If `ScreenshotOptions` should carry the masks, drop `Eq` and `Show` from it and add a `screenshotOptionsMask :: [Locator]` field. That is a larger change, and no caller depends on the record's `Eq` today.
+
+**Test check:** The mask case asserts that the masked bytes differ from the plain bytes, and that a later unmasked screenshot equals the plain one. Upstream compares rendered pixels, and the repo has no decoder, so this check is weaker. The `maskColor` case asserts that a red paint changes the bytes. The `style` case asserts that a `body` background rule changes the bytes. Each only checks that the option took effect.
+
 ## page-screenshot: image decoding for pixel checks
 
 **Question:** Upstream checks the webp lossless output and the transparent background by decoding the pixels. The repo has no PNG or WebP decoder. Should those cases be ported with a byte-level check, or skipped?

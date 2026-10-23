@@ -22,10 +22,12 @@ import Playwright
       , screenshotOptionsCaret
       , screenshotOptionsClip
       , screenshotOptionsFullPage
+      , screenshotOptionsMaskColor
       , screenshotOptionsOmitBackground
       , screenshotOptionsPath
       , screenshotOptionsQuality
       , screenshotOptionsScale
+      , screenshotOptionsStyle
       , screenshotOptionsType
       )
   , ScreenshotScale (ScreenshotScaleCss, ScreenshotScaleDevice)
@@ -40,7 +42,10 @@ import Playwright
   , deviceScaleFactorFromInt
   , evaluate
   , goto
+  , locator
   , screenshot
+  , screenshotMasked
+  , selectorFromText
   , setViewportSize
   , urlFromText
   )
@@ -309,6 +314,27 @@ tests =
           _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
           image <- screenshot page defaultScreenshotOptions {screenshotOptionsScale = Just ScreenshotScaleDevice}
           assertEqual "device scale size" (600, 600) (pngSize image)
+    , testCase "mask should paint over the masked locator" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          plain <- screenshot page defaultScreenshotOptions
+          masked <- screenshotMasked page [locator page (selectorFromText "div.box")] defaultScreenshotOptions
+          assertBool "masked differs from plain" (masked /= plain)
+          afterMask <- screenshot page defaultScreenshotOptions
+          assertEqual "mask is not left on the page" plain afterMask
+    , testCase "mask color should change the painted pixels" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          let boxes = [locator page (selectorFromText "div.box")]
+          defaultPaint <- screenshotMasked page boxes defaultScreenshotOptions
+          redPaint <- screenshotMasked page boxes defaultScreenshotOptions {screenshotOptionsMaskColor = Just "#FF0000"}
+          assertBool "mask color differs from default" (redPaint /= defaultPaint)
+    , testCase "style should change the screenshot" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          plain <- screenshot page defaultScreenshotOptions
+          styled <- screenshot page defaultScreenshotOptions {screenshotOptionsStyle = Just "body { background: rgb(0, 0, 255) !important; }"}
+          assertBool "style differs from plain" (styled /= plain)
     ]
 
 dsf2Options :: NewContextOptions

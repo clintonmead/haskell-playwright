@@ -634,6 +634,7 @@ module Playwright
   , routeWith
   , screenshot
   , screenshotHandle
+  , screenshotMasked
   , scrollIntoViewIfNeeded
   , scrollIntoViewIfNeededWith
   , selectOption
@@ -1472,6 +1473,7 @@ import Playwright.Page
   , reload
   , requestGC
   , screenshot
+  , screenshotMasked
   , setContent
   , setContentWith
   , setDefaultNavigationTimeout
@@ -1697,10 +1699,12 @@ import Playwright.ScreenshotOptions
       , screenshotOptionsCaret
       , screenshotOptionsClip
       , screenshotOptionsFullPage
+      , screenshotOptionsMaskColor
       , screenshotOptionsOmitBackground
       , screenshotOptionsPath
       , screenshotOptionsQuality
       , screenshotOptionsScale
+      , screenshotOptionsStyle
       , screenshotOptionsTimeout
       , screenshotOptionsType
       )
