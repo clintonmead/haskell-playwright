@@ -1497,7 +1497,7 @@ import Playwright.NewContextOptions
   , defaultNewContextOptions
   )
 import Playwright.NewRequestOptions
-  ( NewRequestOptions (NewRequestOptions, newRequestBaseURL, newRequestExtraHTTPHeaders, newRequestFailOnStatusCode, newRequestHttpCredentials, newRequestIgnoreHTTPSErrors, newRequestMaxRedirects, newRequestProxy, newRequestStorageState, newRequestTimeout, newRequestUserAgent)
+  ( NewRequestOptions (NewRequestOptions, newRequestBaseURL, newRequestExtraHTTPHeaders, newRequestFailOnStatusCode, newRequestHttpCredentials, newRequestHttpCredentialsList, newRequestIgnoreHTTPSErrors, newRequestMaxRedirects, newRequestProxy, newRequestStorageState, newRequestTimeout, newRequestUserAgent)
   , defaultNewRequestOptions
   )
 import Playwright.NetworkSizes
