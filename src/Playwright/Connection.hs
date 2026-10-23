@@ -39,6 +39,8 @@ module Playwright.Connection
   , closedGuids
   , isDetachedFrame
   , pushRouteHandler
+  , pushWebSocketRouteHandler
+  , webSocketRouteHandlersFor
   , removeRouteHandlers
   , clearRouteHandlers
   , routeHandlersFor
@@ -279,6 +281,14 @@ isDetachedFrame guid =
 pushRouteHandler :: Guid -> UrlMatch -> (ChannelRef -> IO Bool) -> Playwright Bool
 pushRouteHandler guid glob run =
   inConnection $ \conn -> Store.pushRouteHandler conn guid glob run
+
+pushWebSocketRouteHandler :: Guid -> UrlMatch -> (Guid -> IO ()) -> Playwright Bool
+pushWebSocketRouteHandler guid glob run =
+  inConnection $ \conn -> Store.pushWebSocketRouteHandler conn guid glob run
+
+webSocketRouteHandlersFor :: Guid -> Playwright [(UrlMatch, Guid -> IO ())]
+webSocketRouteHandlersFor guid =
+  inConnection $ \conn -> Store.webSocketRouteHandlersFor conn guid
 
 removeRouteHandlers :: Guid -> UrlMatch -> Playwright ()
 removeRouteHandlers guid glob =

@@ -31,6 +31,8 @@ module Playwright.Connection.Store
   , markPageOwnsContext
   , pageOwnsContext
   , pushRouteHandler
+  , pushWebSocketRouteHandler
+  , webSocketRouteHandlersFor
   , putLocatorHandler
   , registerMainFramePage
   , rememberBrowserContext
@@ -93,7 +95,7 @@ import Playwright.RequestOverrides
 import Playwright.Session
   ( HarRecorder
   , ScreencastSession
-  , Session (sessionHarRecorders, sessionBrowserContexts, sessionBrowserTypes, sessionClosedGuids, sessionContextBaseUrls, sessionDetachedFrames, sessionContextBrowsers, sessionContextsWithOwnerPage, sessionDisposedObjects, sessionLocatorHandlers, sessionLocatorListening, sessionMainFramePages, sessionObjects, sessionPagesOwningContext, sessionRequestEndTiming, sessionRequestFailures, sessionRequestOverrides, sessionRouteHandlers, sessionRouteListening, sessionScreencasts, sessionSelectorEngines, sessionTimeoutDefaults)
+  , Session (sessionHarRecorders, sessionBrowserContexts, sessionBrowserTypes, sessionClosedGuids, sessionContextBaseUrls, sessionDetachedFrames, sessionContextBrowsers, sessionContextsWithOwnerPage, sessionDisposedObjects, sessionLocatorHandlers, sessionLocatorListening, sessionMainFramePages, sessionObjects, sessionPagesOwningContext, sessionRequestEndTiming, sessionRequestFailures, sessionRequestOverrides, sessionRouteHandlers, sessionRouteListening, sessionScreencasts, sessionSelectorEngines, sessionTimeoutDefaults, sessionWebSocketRouteHandlers, sessionWebSocketRouteListening)
   )
 import Playwright.StoredLocatorHandler
   ( StoredLocatorHandler (storedLocatorHandlerFrame, storedLocatorHandlerSelector, storedLocatorHandlerTimes)
@@ -168,6 +170,32 @@ pushRouteHandler conn guid glob run =
                 Map.insertWith (++) guid [(glob, run)] (sessionRouteHandlers session)
             }
         )
+
+-- | Registers a page or context websocket route. The first registration for an
+-- owner reports True, so the caller subscribes to its webSocketRoute event once.
+pushWebSocketRouteHandler :: Connection -> Guid -> UrlMatch -> (Guid -> IO ()) -> IO Bool
+pushWebSocketRouteHandler conn guid glob run =
+  atomically $
+    stateSession conn $ \session ->
+      let
+        first = Set.notMember guid (sessionWebSocketRouteListening session)
+        listening =
+          if first
+            then Set.insert guid (sessionWebSocketRouteListening session)
+            else sessionWebSocketRouteListening session
+      in
+        ( first
+        , session
+            { sessionWebSocketRouteListening = listening
+            , sessionWebSocketRouteHandlers =
+                Map.insertWith (++) guid [(glob, run)] (sessionWebSocketRouteHandlers session)
+            }
+        )
+
+webSocketRouteHandlersFor :: Connection -> Guid -> IO [(UrlMatch, Guid -> IO ())]
+webSocketRouteHandlersFor conn guid = do
+  session <- atomically (readSession conn)
+  pure (Map.findWithDefault [] guid (sessionWebSocketRouteHandlers session))
 
 removeRouteHandlers :: Connection -> Guid -> UrlMatch -> IO ()
 removeRouteHandlers conn guid glob =

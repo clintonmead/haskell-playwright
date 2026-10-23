@@ -107,6 +107,8 @@ data Session = Session
   , sessionEventHandlers :: [EventHandler]
   , sessionRouteHandlers :: Map Guid [(UrlMatch, ChannelRef -> IO Bool)]
   , sessionRouteListening :: Set Guid
+  , sessionWebSocketRouteHandlers :: Map Guid [(UrlMatch, Guid -> IO ())]
+  , sessionWebSocketRouteListening :: Set Guid
   , sessionRequestOverrides :: Map Guid RequestOverrides
   , sessionContextBaseUrls :: Map Guid Url
   , sessionBrowserContexts :: Map Guid [Guid]
@@ -150,6 +152,8 @@ emptySession =
     , sessionEventHandlers = []
     , sessionRouteHandlers = Map.empty
     , sessionRouteListening = Set.empty
+    , sessionWebSocketRouteHandlers = Map.empty
+    , sessionWebSocketRouteListening = Set.empty
     , sessionRequestOverrides = Map.empty
     , sessionContextBaseUrls = Map.empty
     , sessionBrowserContexts = Map.empty

@@ -20,6 +20,7 @@ module Playwright.Channel
   , StreamTag
   , APIRequestContextTag
   , WebSocketTag
+  , WebSocketRouteTag
   , TracingTag
   , send
   , sendWithTimeout
@@ -70,6 +71,7 @@ data ArtifactTag
 data StreamTag
 data APIRequestContextTag
 data WebSocketTag
+data WebSocketRouteTag
 data TracingTag
 
 type Channel :: Type -> Type

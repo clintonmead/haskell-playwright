@@ -184,6 +184,21 @@ module Playwright
   , WebStorage (..)
   , WebSocket
   , WebSocketFrame (..)
+  , WebSocketRoute
+  , WebSocketRouteServer
+  , contextRouteWebSocket
+  , routeWebSocket
+  , webSocketRouteClose
+  , webSocketRouteConnectToServer
+  , webSocketRouteOnClose
+  , webSocketRouteOnMessage
+  , webSocketRouteProtocols
+  , webSocketRouteSend
+  , webSocketRouteServerClose
+  , webSocketRouteServerOnClose
+  , webSocketRouteServerOnMessage
+  , webSocketRouteServerSend
+  , webSocketRouteUrl
   , WheelDelta (..)
   , Worker (..)
   , abortRoute
@@ -2183,6 +2198,23 @@ import Playwright.WebSocket
   )
 import Playwright.WebSocketFrame
   ( WebSocketFrame (WebSocketBinary, WebSocketText)
+  )
+import Playwright.WebSocketRoute
+  ( WebSocketRoute
+  , WebSocketRouteServer
+  , contextRouteWebSocket
+  , routeWebSocket
+  , webSocketRouteClose
+  , webSocketRouteConnectToServer
+  , webSocketRouteOnClose
+  , webSocketRouteOnMessage
+  , webSocketRouteProtocols
+  , webSocketRouteSend
+  , webSocketRouteServerClose
+  , webSocketRouteServerOnClose
+  , webSocketRouteServerOnMessage
+  , webSocketRouteServerSend
+  , webSocketRouteUrl
   )
 import Playwright.WheelDelta
   ( WheelDelta (WheelDelta)
