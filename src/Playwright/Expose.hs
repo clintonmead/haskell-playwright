@@ -1,5 +1,7 @@
 module Playwright.Expose
-  ( contextExposeFunction
+  ( BindingSource (..)
+  , contextExposeBinding
+  , contextExposeFunction
   , exposeFunction
   ) where
 
@@ -21,15 +23,26 @@ import Playwright.Channel
   , send
   )
 import Playwright.Connection
-  ( lookupObject
+  ( lookupMainFramePage
+  , lookupObject
   , registerEventHandler
   )
 import Playwright.Disposable
   ( Disposable
   , disposableFromRef
   )
+import Playwright.Error
+  ( PlaywrightError (DecodeFailure)
+  )
+import Playwright.Frame
+  ( Frame (frameChannel, frameParent)
+  , frameFromRef
+  )
+import Playwright.Guid
+  ( Guid
+  )
 import Playwright.Json.ChannelRef
-  ( ChannelRef (channelRefGuid)
+  ( ChannelRef (ChannelRef, channelRefGuid)
   )
 import Playwright.Json.Decode
   ( throwDecode
@@ -42,9 +55,10 @@ import Playwright.Monad
   )
 import Playwright.Page
   ( Page (pageChannel)
+  , pageFromRef
   )
 import Playwright.Protocol
-  ( BindingCallInitializer (bindingCallInitializerArgs, bindingCallInitializerName)
+  ( BindingCallInitializer (bindingCallInitializerArgs, bindingCallInitializerFrame, bindingCallInitializerName)
   , BindingCallRejectResult
   , BindingCallResolveResult
   , BrowserContextBindingCallEvent (browserContextBindingCallEventBinding)
@@ -74,8 +88,17 @@ import Playwright.SerializedValue
 import UnliftIO.Exception
   ( SomeException
   , displayException
+  , throwIO
   , try
   )
+
+-- | The page, frame and context a binding was called from. Mirrors the
+-- @source@ argument of the JS client's @BindingSource@.
+data BindingSource = BindingSource
+  { bindingSourceContext :: BrowserContext
+  , bindingSourcePage :: Page
+  , bindingSourceFrame :: Frame
+  }
 
 exposeFunction :: Page -> BindingName -> ([SerializedValue] -> Playwright SerializedArgument) -> Playwright Disposable
 exposeFunction page name handler = do
@@ -91,11 +114,15 @@ exposeFunction page name handler = do
   pure (disposableFromRef (pageExposeBindingResultDisposable result))
 
 contextExposeFunction :: BrowserContext -> BindingName -> ([SerializedValue] -> Playwright SerializedArgument) -> Playwright Disposable
-contextExposeFunction ctx name handler = do
+contextExposeFunction ctx name handler =
+  contextExposeBinding ctx name (\_ args -> handler args)
+
+contextExposeBinding :: BrowserContext -> BindingName -> (BindingSource -> [SerializedValue] -> Playwright SerializedArgument) -> Playwright Disposable
+contextExposeBinding ctx name handler = do
   let
     guid = channelGuid (browserContextChannel ctx)
   registerEventHandler guid (MethodName "bindingCall") $ \params ->
-    handleContextBindingCall name handler params
+    handleContextBindingCall ctx name handler params
   result <-
     send
       (browserContextChannel ctx)
@@ -110,30 +137,64 @@ handlePageBindingCall ::
   Playwright ()
 handlePageBindingCall name handler params = do
   event <- throwDecode params
-  handleNamedBinding name handler (pageBindingCallEventBinding event)
+  handleNamedBinding name (\initializer -> handler (bindingCallInitializerArgs initializer)) (pageBindingCallEventBinding event)
 
 handleContextBindingCall ::
+  BrowserContext ->
   BindingName ->
-  ([SerializedValue] -> Playwright SerializedArgument) ->
+  (BindingSource -> [SerializedValue] -> Playwright SerializedArgument) ->
   Value ->
   Playwright ()
-handleContextBindingCall name handler params = do
+handleContextBindingCall ctx name handler params = do
   event <- throwDecode params
-  handleNamedBinding name handler (browserContextBindingCallEventBinding event)
+  handleNamedBinding
+    name
+    ( \initializer -> do
+        source <- bindingSourceFor ctx (bindingCallInitializerFrame initializer)
+        handler source (bindingCallInitializerArgs initializer)
+    )
+    (browserContextBindingCallEventBinding event)
+
+-- | Resolve the page, frame and context for a binding call from its frame ref.
+-- The page is found from the root (main) frame of the frame's ancestry.
+bindingSourceFor :: BrowserContext -> ChannelRef -> Playwright BindingSource
+bindingSourceFor ctx frameRef = do
+  frame <- frameFromRef frameRef
+  rootGuid <- rootFrameGuid frame
+  maybePageGuid <- lookupMainFramePage rootGuid
+  case maybePageGuid of
+    Nothing ->
+      throwIO (DecodeFailure "exposeBinding: no page found for the binding's frame")
+    Just pageGuid -> do
+      page <- pageFromRef (browserContextChannel ctx) (ChannelRef pageGuid)
+      pure
+        BindingSource
+          { bindingSourceContext = ctx
+          , bindingSourcePage = page
+          , bindingSourceFrame = frame
+          }
+
+rootFrameGuid :: Frame -> Playwright Guid
+rootFrameGuid frame =
+  case frameParent frame of
+    Nothing -> pure (channelGuid (frameChannel frame))
+    Just parentRef -> do
+      parent <- frameFromRef parentRef
+      rootFrameGuid parent
 
 handleNamedBinding ::
   BindingName ->
-  ([SerializedValue] -> Playwright SerializedArgument) ->
+  (BindingCallInitializer -> Playwright SerializedArgument) ->
   ChannelRef ->
   Playwright ()
-handleNamedBinding name handler bindingRef = do
+handleNamedBinding name run bindingRef = do
   let
     call = Channel (channelRefGuid bindingRef) :: Channel BindingCallTag
   obj <- lookupObject (channelRefGuid bindingRef)
   initializer <- throwDecode (remoteInitializer obj)
   if bindingCallInitializerName initializer == bindingNameToText name
     then do
-      outcome <- try (handler (bindingCallInitializerArgs initializer))
+      outcome <- try (run initializer)
       case outcome of
         Left (err :: SomeException) ->
           rejectBinding call err

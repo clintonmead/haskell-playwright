@@ -258,6 +258,8 @@ module Playwright
   , closePageWith
   , content
   , contentFrameHandle
+  , BindingSource (BindingSource, bindingSourceContext, bindingSourceFrame, bindingSourcePage)
+  , contextExposeBinding
   , contextExposeFunction
   , contextFromRef
   , contextBrowser
@@ -1211,7 +1213,9 @@ import Playwright.Exactness
   ( Exactness (Exact, Inexact)
   )
 import Playwright.Expose
-  ( contextExposeFunction
+  ( BindingSource (BindingSource, bindingSourceContext, bindingSourceFrame, bindingSourcePage)
+  , contextExposeBinding
+  , contextExposeFunction
   , exposeFunction
   )
 import Playwright.InitScript
