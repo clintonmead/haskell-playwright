@@ -175,16 +175,14 @@ tests =
             , testCase "link-local" $ localNetworkCase (Just "example.com") "169.254.169.254"
             ]
         ]
-    , testGroup
-        "should allow bypassing localhost requests"
-        [ testCase "localhost" $ bypassCase "localhost" "localhost"
-        , testCase "127.0.0.1" $ bypassCase "127.0.0.1" "127.0.0.1"
-        ]
-    , testGroup
-        "should bypass proxy for localhost when localhost is in bypass list"
-        [ testCase "localhost" $ bypassCase "localhost, 127.0.0.1" "localhost"
-        , testCase "127.0.0.1" $ bypassCase "localhost, 127.0.0.1" "127.0.0.1"
-        ]
+    , testCase "should allow bypassing localhost requests" $
+        bypassCase "localhost" "localhost"
+    , testCase "should allow bypassing 127.0.0.1 requests" $
+        bypassCase "127.0.0.1" "127.0.0.1"
+    , testCase "should bypass proxy for localhost when localhost is in bypass list" $
+        bypassCase "localhost" "localhost"
+    , testCase "should bypass proxy for 127.0.0.1 when 127.0.0.1 is in bypass list" $
+        bypassCase "127.0.0.1" "127.0.0.1"
     ]
 
 -- Requests to local hosts are sent through the proxy, which records them and
