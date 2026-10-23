@@ -24,6 +24,7 @@ import Playwright
   , HeaderName (HeaderName, headerNameToText)
   , HeaderValue (HeaderValue, headerValueToText)
   , HttpHeader (HttpHeader, httpHeaderName, httpHeaderValue)
+  , LaunchOptions (launchOptionsArgs)
   , Locale (Locale)
   , NewContextOptions (newContextColorScheme, newContextContrast, newContextExtraHTTPHeaders, newContextForcedColors, newContextGeolocation, newContextHasTouch, newContextIsMobile, newContextLocale, newContextPermissions, newContextReducedMotion, newContextTimezoneId, newContextViewport)
   , Page
@@ -62,6 +63,7 @@ import Playwright
   , newPage
   , pageInnerHtml
   , registerSelector
+  , reload
   , requestHeaders
   , runPlaywright
   , selectorFromText
@@ -77,6 +79,7 @@ import Playwright.Harness
   ( assertBool
   , assertEqual
   , assertFailure
+  , assertProtocolContains
   , withAssetsPrefix
   , withPersistentContext
   , withPersistentContextWith
@@ -95,6 +98,7 @@ import UnliftIO.Async
   )
 import UnliftIO.Directory
   ( listDirectory
+  , removePathForcibly
   )
 import UnliftIO.Temporary
   ( withSystemTempDirectory
@@ -256,7 +260,63 @@ tests =
           remaining <- contextPages ctx
           assertEqual "closed pages" 0 (length remaining)
           closeContext ctx
+    , testCase "should accept relative userDataDir" $
+        relativeUserDataDirTest
+    , testCase "should throw if page argument is passed" $
+        passedPageArgumentTest
+    , testCase "CacheStorage entry should survive page.reload()" $
+        withAssetsPrefix $ \prefix ->
+          withPersistentContext $ \_ctx page -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            _ <-
+              evaluate
+                page
+                "async () => { const cache = await caches.open('repro-cache'); await cache.put('/meta', new Response('payload')); }"
+            _ <- reload page
+            after <-
+              evaluateText
+                page
+                "async () => { const cache = await caches.open('repro-cache'); const resp = await cache.match('/meta'); return resp ? await resp.text() : 'missing'; }"
+            assertEqual "after reload" "payload" after
+    , testCase "should support storage.getDirectory()" $
+        withAssetsPrefix $ \prefix ->
+          withPersistentContext $ \_ctx page -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            name <-
+              evaluateText
+                page
+                "async () => (await navigator.storage.getDirectory()).name"
+            assertEqual "name" "" name
     ]
+
+relativeUserDataDirTest :: IO ()
+relativeUserDataDirTest = do
+  let
+    userDataDir :: FilePath
+    userDataDir = "pw-relative-user-data"
+  removePathForcibly userDataDir
+  runPlaywright $ do
+    browserType <- chromium
+    ctx <-
+      launchPersistentContext browserType userDataDir defaultLaunchOptions defaultNewContextOptions
+    closeContext ctx
+  entries <- listDirectory userDataDir
+  removePathForcibly userDataDir
+  assertBool "populated" (not (null entries))
+
+passedPageArgumentTest :: IO ()
+passedPageArgumentTest =
+  withSystemTempDirectory "pw-user-data" $ \userDataDir ->
+    runPlaywright $ do
+      browserType <- chromium
+      assertProtocolContains
+        "can not specify page"
+        ( launchPersistentContext
+            browserType
+            userDataDir
+            defaultLaunchOptions {launchOptionsArgs = Just ["http://127.0.0.1/empty.html"]}
+            defaultNewContextOptions
+        )
 
 acceptUserDataDirTest :: IO ()
 acceptUserDataDirTest =
