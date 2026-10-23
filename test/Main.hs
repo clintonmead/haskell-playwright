@@ -114,6 +114,7 @@ import Playwright.PageClickTimeoutSpec qualified as PageClickTimeoutSpec
 import Playwright.PageCheckSpec qualified as PageCheckSpec
 import Playwright.PageClockFrozenSpec qualified as PageClockFrozenSpec
 import Playwright.ScreencastActionsSpec qualified as ScreencastActionsSpec
+import Playwright.ScreencastOverlaySpec qualified as ScreencastOverlaySpec
 import Playwright.ScreencastSpec qualified as ScreencastSpec
 import Playwright.PageClockSpec qualified as PageClockSpec
 import Playwright.PageClickSpec qualified as PageClickSpec
@@ -328,6 +329,7 @@ main =
         , PageCheckSpec.tests
         , PageClockFrozenSpec.tests
         , ScreencastActionsSpec.tests
+        , ScreencastOverlaySpec.tests
         , ScreencastSpec.tests
         , PageClockSpec.tests
         , TracingSpec.tests
