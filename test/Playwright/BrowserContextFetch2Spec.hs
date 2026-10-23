@@ -367,6 +367,8 @@ tests =
           multipartFileTest
       , testCase "should support multipart/form-data with file bytes" $
           multipartAssetTest
+      , testCase "should support multipart/form-data with ReadStream values" $
+          multipartAssetTest
       , testCase "should support multipart/form-data and keep the order" $
           multipartOrderTest
       , testCase "should support repeating names in multipart/form-data" $
