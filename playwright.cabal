@@ -160,6 +160,8 @@ library
       Playwright.Route.Intercept
       Playwright.RouteOptions
       Playwright.Screencast
+      Playwright.ScreencastActions
+      Playwright.ScreencastOverlay
       Playwright.ScreenshotOptions
       Playwright.ScriptTag
       Playwright.ScrollOption
@@ -434,6 +436,8 @@ test-suite playwright-test
       Playwright.ResourceTimingSpec
       Playwright.RetargetSpec
       Playwright.RoleUtilsSpec
+      Playwright.ScreencastActionsSpec
+      Playwright.ScreencastOverlaySpec
       Playwright.ScreencastSpec
       Playwright.SelectorGeneratorSpec
       Playwright.SelectorsCssSpec
