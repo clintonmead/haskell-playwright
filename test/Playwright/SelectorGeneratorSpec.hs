@@ -15,8 +15,7 @@ import Data.Text
   , replace
   )
 import Playwright
-  ( BrowserContext (..)
-  , Frame
+  ( Frame
   , Locator
   , Page
   , Playwright
@@ -31,6 +30,10 @@ import Playwright
   , newPage
   , selectorFromText
   , setContent
+  )
+import Playwright.BrowserContext
+  ( BrowserContext
+  , browserContextChannel
   )
 import Playwright.Channel
   ( send
