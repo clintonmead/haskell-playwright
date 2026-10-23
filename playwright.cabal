@@ -179,6 +179,7 @@ library
       Playwright.TimeoutDefaults
       Playwright.TimezoneId
       Playwright.Touchscreen
+      Playwright.Tracing
       Playwright.Transport
       Playwright.Transport.Frame
       Playwright.Transport.Memory

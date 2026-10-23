@@ -257,6 +257,18 @@ module Playwright
   , clockRunFor
   , clockSetFixedTime
   , clockSetSystemTime
+  , Tracing
+  , TracingStartOptions (..)
+  , defaultTracingStartOptions
+  , tracingGroup
+  , tracingGroupEnd
+  , tracingStart
+  , tracingStartChunk
+  , tracingStartWith
+  , tracingStop
+  , tracingStopChunk
+  , tracingStopChunkTo
+  , tracingStopTo
   , closeBrowser
   , closeContext
   , closeContextWith
@@ -1017,6 +1029,20 @@ import Playwright.Clock
   , clockRunFor
   , clockSetFixedTime
   , clockSetSystemTime
+  )
+import Playwright.Tracing
+  ( Tracing
+  , TracingStartOptions (TracingStartOptions, tracingStartOptionsLive, tracingStartOptionsName, tracingStartOptionsScreenshots, tracingStartOptionsSnapshots)
+  , defaultTracingStartOptions
+  , tracingGroup
+  , tracingGroupEnd
+  , tracingStart
+  , tracingStartChunk
+  , tracingStartWith
+  , tracingStop
+  , tracingStopChunk
+  , tracingStopChunkTo
+  , tracingStopTo
   )
 import Playwright.ColorScheme
   ( ColorScheme (ColorSchemeDark, ColorSchemeLight, ColorSchemeNoOverride, ColorSchemeNoPreference)
