@@ -30,6 +30,9 @@ import UnliftIO.Async
   ( async
   , wait
   )
+import UnliftIO.Exception
+  ( try
+  )
 import UnliftIO.MVar
   ( newEmptyMVar
   , takeMVar
@@ -55,6 +58,7 @@ import Playwright
   , elementArgument
   , jsonValue
   , jsonValueNumber
+  , disposeHandle
   , urlFromText
   , urlToText
   , evaluateNumber
@@ -84,8 +88,13 @@ import Playwright
   , undefinedArgument
   , Playwright
   )
+import Playwright.Error
+  ( PlaywrightError (ProtocolRpc)
+  , ProtocolFailure (protocolFailureMessage)
+  )
 import Playwright.Harness
   ( assertProtocolContains
+  , attachFrame
   , requireHandle
   , withAssetPage
   , withAssets
@@ -553,6 +562,51 @@ tests =
         withChromiumPage $ \page -> do
           result <- evaluate page "() => { const a = {}; a.b = a; return a; }"
           assertBool "circular" (isSelfCycle result)
+    , testCase "should throw if underlying element was disposed" $
+        withChromiumPage $ \page -> do
+          setContent page "<section>39</section>"
+          element <- requireHandle =<< querySelector page (selectorFromText "section")
+          disposeHandle element
+          assertProtocolContains
+            "no object with guid"
+            (evaluateTextWith page "e => e.textContent" (elementArgument element))
+    , testCase "should be able to throw a tricky error" $
+        withChromiumPage $ \page -> do
+          windowHandle <- evaluateHandleExpression page "window"
+          jsonResult <- try (jsonValue windowHandle) :: Playwright (Either PlaywrightError SerializedValue)
+          errorText <-
+            case jsonResult of
+              Left (ProtocolRpc failure) ->
+                pure (protocolFailureMessage failure)
+              Left err ->
+                assertFailure ("expected ProtocolRpc, got: " <> show err)
+              -- Haskell jsonValue returns the window as a ref string rather than
+              -- failing, so the tricky text is that string.
+              Right (SerializedNode (PayloadString text) _) ->
+                pure text
+              Right value ->
+                assertFailure ("expected the window ref string, got: " <> show value)
+          assertProtocolContains
+            errorText
+            (evaluateWith page "text => { throw new Error(text); }" (textArgument errorText))
+    , testCase "should throw when frame is detached" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          frame <- attachFrame page "frame1" (prefix <> "/empty.html")
+          pending <- async (evaluateOnFrame frame "() => new Promise(() => {})")
+          _ <- evaluate page "() => document.querySelector('iframe').remove()"
+          result <- try (wait pending) :: Playwright (Either PlaywrightError SerializedValue)
+          case result of
+            Left (ProtocolRpc failure) ->
+              assertBool
+                "detached"
+                ( "frame was detached" `Text.isInfixOf` Text.toLower (protocolFailureMessage failure)
+                    || "execution context was destroyed" `Text.isInfixOf` Text.toLower (protocolFailureMessage failure)
+                )
+            Left err ->
+              assertFailure ("expected ProtocolRpc, got: " <> show err)
+            Right _ ->
+              assertFailure "expected the detached frame evaluate to reject"
     , testCase "should throw for too deep reference chain" $
         withChromiumPage $ \page ->
           assertProtocolContains
