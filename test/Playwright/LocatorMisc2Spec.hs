@@ -6,6 +6,8 @@ import UnliftIO.Async
   ( wait
   , withAsync
   )
+import Data.ByteString (ByteString)
+import Data.ByteString qualified as BS
 import Data.Text
   ( pack
   )
@@ -24,6 +26,8 @@ import Playwright
   , click
   , cssPixelFromInt
   , defaultGotoOptions
+  , defaultScreenshotOptions
+  , locatorScreenshot
   , evalOnSelector
   , evalOnSelectorText
   , evaluate
@@ -109,6 +113,14 @@ tests =
               assertEqual "y" (cssPixelFromInt 50) (boundingBoxY found)
               assertEqual "width" (cssPixelFromInt 50) (boundingBoxWidth found)
               assertEqual "height" (cssPixelFromInt 50) (boundingBoxHeight found)
+    , testCase "should take screenshot" $
+        withAssets $ \prefix page -> do
+          setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 500))
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          _ <- evaluate page "() => window.scrollBy(50, 100)"
+          image <- locatorScreenshot (locate page ".box:nth-of-type(3)") defaultScreenshotOptions
+          assertEqual "png signature" True (pngMagic `BS.isPrefixOf` image)
+          assertEqual "element size" (50, 50) (pngSize image)
     , testCase "should waitFor" $
         withChromiumPage $ \page -> do
           setContent page "<div></div>"
@@ -226,3 +238,15 @@ assertScrollsIntoView page i = do
   assertEqual "after" True (after <= 0)
   _ <- evaluate page "() => window.scrollTo(0, 0)"
   pure ()
+
+pngMagic :: ByteString
+pngMagic =
+  "\137PNG\r\n\26\n"
+
+pngSize :: ByteString -> (Int, Int)
+pngSize image =
+  (bigEndian32 (BS.take 4 (BS.drop 16 image)), bigEndian32 (BS.take 4 (BS.drop 20 image)))
+
+bigEndian32 :: ByteString -> Int
+bigEndian32 =
+  BS.foldl' (\acc byte -> acc * 256 + fromIntegral byte) 0
