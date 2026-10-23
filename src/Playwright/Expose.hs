@@ -71,7 +71,7 @@ import Playwright.Protocol
   , mkPageExposeBindingParams
   )
 import Playwright.RemoteObject
-  ( RemoteObject (remoteInitializer)
+  ( RemoteObject (remoteInitializer, remoteParent)
   )
 import Playwright.SerializedArgument
   ( SerializedArgument
@@ -161,7 +161,14 @@ bindingSourceFor :: BrowserContext -> ChannelRef -> Playwright BindingSource
 bindingSourceFor ctx frameRef = do
   frame <- frameFromRef frameRef
   rootGuid <- rootFrameGuid frame
-  maybePageGuid <- lookupMainFramePage rootGuid
+  mappedPageGuid <- lookupMainFramePage rootGuid
+  -- The page-to-frame mapping is only recorded once the page has been wrapped,
+  -- which happens after 'newPage' returns. An init script that calls a context
+  -- binding runs before that, so fall back to the root frame's parent object,
+  -- which is the page itself.
+  maybePageGuid <- case mappedPageGuid of
+    Just guid -> pure (Just guid)
+    Nothing -> Just . remoteParent <$> lookupObject rootGuid
   case maybePageGuid of
     Nothing ->
       throwIO (DecodeFailure "exposeBinding: no page found for the binding's frame")
