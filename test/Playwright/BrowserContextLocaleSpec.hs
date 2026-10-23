@@ -2,13 +2,24 @@ module Playwright.BrowserContextLocaleSpec
   ( tests
   ) where
 
+import Control.Concurrent
+  ( threadDelay
+  )
+import Control.Monad.IO.Class
+  ( liftIO
+  )
 import Data.ByteString.Char8 qualified as BS8
 import Data.ByteString.Lazy.Char8 qualified as LBS8
 import Data.Maybe
   ( fromMaybe
   )
+import UnliftIO.Async
+  ( wait
+  , withAsync
+  )
 import UnliftIO.IORef
-  ( newIORef
+  ( IORef
+  , newIORef
   , readIORef
   )
 import Data.Text
@@ -30,8 +41,12 @@ import Network.Wai.Handler.Warp
   ( withApplication
   )
 import Playwright
-  ( Locale (Locale)
+  ( ConsoleMessage (consoleMessageText)
+  , LoadState (LoadStateDomContentLoaded)
+  , Locale (Locale)
   , NewContextOptions (newContextLocale, newContextTimezoneId)
+  , Page
+  , Playwright
   , TimezoneId (TimezoneId)
   , newContext
   , newContextWith
@@ -39,12 +54,19 @@ import Playwright
   , defaultGotoOptions
   , defaultNewContextOptions
   , evaluateText
+  , evaluateWith
   , goto
+  , textArgument
   , urlFromText
+  , waitForContextConsole
+  , waitForLoadState
+  , waitForPopup
   )
 import Playwright.Harness
   ( Recorded (recordedHeaders, recordedPath)
   , assertBool
+  , assertFailure
+  , withAssetsContextWith
   , withChromiumBrowser
   , recordingPageApp
   , withChromiumContextWith
@@ -162,7 +184,95 @@ tests =
               let
                 defaultHeader = lookup "accept-language" . recordedHeaders =<< latestRecorded seenDefault
               assertBool "context locale" (maybe False ("en-GB" `BS8.isInfixOf`) defaultHeader)
+    , testCase "should format number in popups" $
+        withAssetsContextWith
+          defaultNewContextOptions {newContextLocale = Just (Locale "fr-FR")}
+          $ \prefix _ page -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            popup <- openPopup page (prefix <> "/formatted-number.html")
+            _ <- waitForLoadState popup LoadStateDomContentLoaded
+            assertEqual "result" "1 000 000,5" =<< evaluateText popup "() => window.result"
+    , testCase "should affect navigator.language in popups" $
+        withAssetsContextWith
+          defaultNewContextOptions {newContextLocale = Just (Locale "fr-FR")}
+          $ \prefix _ page -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            popup <- openPopup page (prefix <> "/formatted-number.html")
+            _ <- waitForLoadState popup LoadStateDomContentLoaded
+            assertEqual "language" "fr-FR" =<< evaluateText popup "() => window.initialNavigatorLanguage"
+    , testCase "should work for multiple pages sharing same process" $
+        withAssetsContextWith
+          defaultNewContextOptions {newContextLocale = Just (Locale "ru-RU")}
+          $ \prefix _ page -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            popup <- openPopup page (prefix <> "/empty.html")
+            _ <- openPopup popup (prefix <> "/empty.html")
+            pure ()
+    , testCase "should propagate locale to workers" $
+        withAssetsContextWith
+          defaultNewContextOptions {newContextLocale = Just (Locale "ru-RU")}
+          $ \prefix ctx page -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            withAsync (waitForContextConsole ctx) $ \pending -> do
+              _ <-
+                evaluateText
+                  page
+                  "() => { new Worker(URL.createObjectURL(new Blob(['console.log(\"locale:\" + Intl.NumberFormat().resolvedOptions().locale)'], { type: 'application/javascript' }))); return 'ok'; }"
+              message <- wait pending
+              assertEqual "worker locale" "locale:ru-RU" (consoleMessageText message)
+    , testCase "should send Accept-Language header on WebSocket handshake" $ do
+        requests <- newIORef []
+        withApplication (pure (recordingPageApp requests)) $ \port ->
+          withChromiumContextWith
+            defaultNewContextOptions {newContextLocale = Just (Locale "en-GB")}
+            $ \_ page -> do
+              let
+                base = "http://127.0.0.1:" <> pack (show port)
+              _ <- goto page (urlFromText (base <> "/empty.html")) defaultGotoOptions
+              _ <-
+                evaluateText
+                  page
+                  ("() => { new WebSocket('ws://127.0.0.1:" <> pack (show port) <> "/ws'); return 'ok'; }")
+              headers <- liftIO (awaitRequestHeaders requests "/ws")
+              assertBool "en-GB" (maybe False ("en-GB" `BS8.isInfixOf`) (lookup "accept-language" headers))
+    , testCase "should send Accept-Language header on WebSocket handshake from a worker" $ do
+        requests <- newIORef []
+        withApplication (pure (recordingPageApp requests)) $ \port ->
+          withChromiumContextWith
+            defaultNewContextOptions {newContextLocale = Just (Locale "en-GB")}
+            $ \_ page -> do
+              let
+                base = "http://127.0.0.1:" <> pack (show port)
+              _ <- goto page (urlFromText (base <> "/empty.html")) defaultGotoOptions
+              _ <-
+                evaluateText
+                  page
+                  ( "() => { const code = \"new WebSocket('ws://127.0.0.1:"
+                      <> pack (show port)
+                      <> "/ws');\"; new Worker(URL.createObjectURL(new Blob([code], { type: 'text/javascript' }))); return 'ok'; }"
+                  )
+              headers <- liftIO (awaitRequestHeaders requests "/ws")
+              assertBool "en-GB" (maybe False ("en-GB" `BS8.isInfixOf`) (lookup "accept-language" headers))
     ]
+
+-- | Open a popup from the page's window.open and return the popup page.
+openPopup :: Page -> Text -> Playwright Page
+openPopup page url =
+  withAsync (waitForPopup page) $ \handle -> do
+    _ <- evaluateWith page "url => { window.open(url); }" (textArgument url)
+    wait handle
+
+-- | Poll the recorder until a request for the given path arrives, returning its headers.
+awaitRequestHeaders :: IORef [Recorded] -> BS8.ByteString -> IO [(BS8.ByteString, BS8.ByteString)]
+awaitRequestHeaders requests path = go (100 :: Int)
+  where
+    go :: Int -> IO [(BS8.ByteString, BS8.ByteString)]
+    go 0 = assertFailure ("no request seen for " <> BS8.unpack path)
+    go n = do
+      seen <- readIORef requests
+      case filter ((== path) . recordedPath) seen of
+        request : _ -> pure (recordedHeaders request)
+        [] -> threadDelay 50000 >> go (n - 1)
 
 echoAcceptLanguage :: Application
 echoAcceptLanguage req respond =
