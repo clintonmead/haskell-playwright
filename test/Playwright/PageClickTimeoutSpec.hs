@@ -154,6 +154,15 @@ tests =
           assertBool "not clicked" =<< evaluateBool page "() => window.__clicked === undefined"
           distinct <- evaluateNumber page "() => new Set(window.scrollTops).size"
           assertBool "scroll positions" (distinct > 2)
+    -- Skipped: "should avoid side effects after timeout", "should fail when element jumps
+    -- during hit testing" and "should click for the second time after first timeout". Upstream
+    -- passes the test-only `__testHookBeforePointerAction` or `__testHookBeforeHitTarget`
+    -- option, a JavaScript function that the driver runs inside the action between
+    -- checks. A function cannot cross the JSON protocol to the separate driver process, and
+    -- the Haskell client has no equivalent hook, so the mid-action timing cannot be reproduced.
+    -- "should avoid side effects after timeout"
+    -- "should fail when element jumps during hit testing"
+    -- "should click for the second time after first timeout"
     ]
 
 -- | Runs the test against a page holding one plain button.
