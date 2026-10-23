@@ -256,6 +256,9 @@ tests =
                         assertFailure "missing redirectedTo"
                       Just next ->
                         assertEqual "to" True (requestsEqual next request)
+    -- Skipped: "should resolve responses after a navigation". Upstream marks it `fixme` on
+    -- Chromium, and this suite runs only Chromium.
+    -- "should resolve responses after a navigation"
     ]
 
 appendEvent :: IORef [(Text, Text)] -> Text -> Text -> Playwright ()
