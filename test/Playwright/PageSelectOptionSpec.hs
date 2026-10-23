@@ -191,6 +191,18 @@ tests =
         withAssetPage "input/select.html" $ \page -> do
           selected <- selectOption (locate page "select") []
           assertEqual "selected" [] selected
+    , testCase "should unselect with null" $
+        withAssetPage "input/select.html" $ \page -> do
+          _ <- evaluate page "() => window.makeMultiple()"
+          selected <-
+            selectOption
+              (locate page "select")
+              [SelectValueOrLabel "blue", SelectValueOrLabel "black", SelectValueOrLabel "magenta"]
+          assertEqual "selected in set" True (all (`elem` ["blue", "black", "magenta"]) selected)
+          -- The Haskell API has no null; an empty option list is the unselect-all form.
+          _ <- selectOption (locate page "select") []
+          assertEqual "none selected" True
+            =<< evaluateBool page "() => Array.from(document.querySelector('select').options).every(option => !option.selected)"
     , testCase "should unselect all options when passed no values" $
         withAssetPage "input/select.html" $ \page -> do
           _ <- evaluate page "() => window.makeMultiple()"
