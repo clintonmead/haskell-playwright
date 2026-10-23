@@ -480,6 +480,7 @@ test-suite playwright-test
       Playwright.SignalsSpec
       Playwright.SlowMoSpec
       Playwright.TapSpec
+      Playwright.TraceViewerScrubSpec
       Playwright.TracingSpec
       Playwright.TransportSpec
       Playwright.UnrouteBehaviorSpec

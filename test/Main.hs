@@ -216,6 +216,7 @@ import Playwright.SharedWorkerSpec qualified as SharedWorkerSpec
 import Playwright.SlowMoSpec qualified as SlowMoSpec
 import Playwright.TapSpec qualified as TapSpec
 import Playwright.TracingSpec qualified as TracingSpec
+import Playwright.TraceViewerScrubSpec qualified as TraceViewerScrubSpec
 import Playwright.TransportSpec qualified as TransportSpec
 import Playwright.UnrouteBehaviorSpec qualified as UnrouteBehaviorSpec
 import Playwright.VideoSpec qualified as VideoSpec
@@ -361,6 +362,7 @@ main =
         , ScreencastSpec.tests
         , PageClockSpec.tests
         , TracingSpec.tests
+        , TraceViewerScrubSpec.tests
         , PageClickSpec.tests
         , PageClickReactSpec.tests
         , PageClickScrollSpec.tests
