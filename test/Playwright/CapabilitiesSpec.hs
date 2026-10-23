@@ -9,6 +9,9 @@ import Control.Concurrent
   , threadDelay
   , writeChan
   )
+import Control.Exception
+  ( throwIO
+  )
 import Control.Monad.IO.Class
   ( liftIO
   )
@@ -16,9 +19,13 @@ import Data.ByteString
   ( ByteString
   )
 import Data.ByteString.Lazy.Char8 qualified as LBS8
+import Data.Maybe
+  ( fromMaybe
+  )
 import Data.Text
   ( Text
   , pack
+  , stripPrefix
   )
 import Network.HTTP.Types
   ( HeaderName
@@ -32,8 +39,20 @@ import Network.Wai
   , requestHeaders
   , responseLBS
   )
+import Network.Wai.Handler.WebSockets
+  ( websocketsOr
+  )
+import Network.WebSockets
+  ( Connection
+  , ServerApp
+  , acceptRequest
+  , defaultConnectionOptions
+  , sendTextData
+  )
 import Playwright
-  ( ContentType (ContentType)
+  ( BoundingBox (boundingBoxHeight, boundingBoxWidth)
+  , ContentType (ContentType)
+  , CssPixel (cssPixelToScientific)
   , Exactness (Inexact)
   , FulfillBody (FulfillText)
   , FulfillOptions (fulfillBody, fulfillContentType)
@@ -59,6 +78,7 @@ import Playwright
   , goto
   , innerText
   , isVisible
+  , locatorBoundingBox
   , pageTextContent
   , pagesEqual
   , reload
@@ -272,6 +292,54 @@ tests =
         withChromiumPage $ \page -> do
           setContent page "<video><source src=\"movie.mp4\"/></video>"
           liftIO (threadDelay 1000000)
+    , testCase "SharedArrayBuffer should work" $
+        withChromiumPage $ \page ->
+          withLocalApp sharedArrayBufferApp $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/sharedarraybuffer")) defaultGotoOptions
+            assertEqual "type" "function" =<< evaluateText page "() => typeof SharedArrayBuffer"
+    , testCase "WebSocket should work" $
+        withChromiumPage $ \page ->
+          withLocalApp (wsServerApp sendIncoming) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            value <-
+              evaluateText
+                page
+                ( "() => { let cb; const result = new Promise(f => cb = f); const ws = new WebSocket('ws://"
+                    <> hostOf prefix
+                    <> "/ws'); ws.addEventListener('message', data => { ws.close(); cb(data.data); }); ws.addEventListener('error', error => cb('Error')); return result; }"
+                )
+            assertEqual "message" "incoming" value
+    , testCase "should set CloseEvent.wasClean to false when the server terminates a WebSocket connection" $
+        withChromiumPage $ \page ->
+          withLocalApp (wsServerApp (\_ -> throwIO (userError "terminated by test server"))) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            wasClean <-
+              evaluateBool
+                page
+                ( "() => new Promise(resolve => { const ws = new WebSocket('ws://"
+                    <> hostOf prefix
+                    <> "/ws'); ws.addEventListener('close', error => resolve(error.wasClean)); })"
+                )
+            assertEqual "wasClean" False wasClean
+    , testCase "should not crash on showDirectoryPicker" $
+        withAssetPage "empty.html" $ \page -> do
+          click (locate page "body")
+          _ <-
+            evaluate
+              page
+              "async () => { try { const dir = await window.showDirectoryPicker(); return dir.name; } catch (e) { return e.name; } }"
+          liftIO (threadDelay 3000000)
+    , testCase "should be able to render avif images" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          setContent page ("<img src=\"" <> prefix <> "/rgb.avif\" onerror=\"window.error = true\">")
+          box <- locatorBoundingBox (locate page "img")
+          case box of
+            Just b -> do
+              assertEqual "width" (128 :: Double) (cssToDouble (boundingBoxWidth b))
+              assertEqual "height" (128 :: Double) (cssToDouble (boundingBoxHeight b))
+            Nothing -> assertFailure "expected a bounding box for the image"
+          assertEqual "error" True =<< evaluateBool page "() => window.error === undefined"
     ]
 
 serviceWorkerIframe :: IO ()
@@ -442,3 +510,43 @@ autoPlayHtml =
   \  await new Promise((resolve) => setTimeout(resolve, 1000));\
   \  log.innerHTML = 'State: ' + audioContext.state;\
   \} </script><body onload=\"onLoad()\"><div id=\"log\"></div></body>"
+
+hostOf :: Text -> Text
+hostOf prefix =
+  fromMaybe prefix (stripPrefix "http://" prefix)
+
+cssToDouble :: CssPixel -> Double
+cssToDouble =
+  realToFrac . cssPixelToScientific
+
+sharedArrayBufferApp :: Application
+sharedArrayBufferApp request respond =
+  case pathInfo request of
+    ["sharedarraybuffer"] ->
+      respond
+        ( responseLBS
+            status200
+            [ (hContentType, "text/html")
+            , ("Cross-Origin-Opener-Policy", "same-origin")
+            , ("Cross-Origin-Embedder-Policy", "require-corp")
+            ]
+            ( LBS8.pack
+                "<div>Hello there!</div><script>window.onload = () => console.log('onload')</script>"
+            )
+        )
+    _ ->
+      respond (responseLBS status200 [(hContentType, "text/html")] LBS8.empty)
+
+wsServerApp :: (Connection -> IO ()) -> Application
+wsServerApp onConnect =
+  websocketsOr defaultConnectionOptions server backup
+  where
+    server :: ServerApp
+    server pending = acceptRequest pending >>= onConnect
+    backup :: Application
+    backup _request respond =
+      respond (responseLBS status200 [(hContentType, "text/html")] LBS8.empty)
+
+sendIncoming :: Connection -> IO ()
+sendIncoming conn =
+  sendTextData conn ("incoming" :: Text)
