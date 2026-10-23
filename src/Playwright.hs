@@ -138,6 +138,11 @@ module Playwright
   , expectLocator
   , expectLocatorWith
   , expectLocatorCount
+  , CheckedOptions (..)
+  , defaultCheckedOptions
+  , expectLocatorChecked
+  , expectLocatorEditable
+  , expectLocatorEnabled
   , TextMatchOptions (..)
   , defaultTextMatchOptions
   , expectLocatorText
@@ -1694,6 +1699,13 @@ import Playwright.Expect
   , expectContainTextArray
   , expectHaveValue
   , expectHaveValues
+  )
+import Playwright.ExpectBoolean
+  ( CheckedOptions (CheckedOptions, checkedChecked, checkedIndeterminate)
+  , defaultCheckedOptions
+  , expectLocatorChecked
+  , expectLocatorEditable
+  , expectLocatorEnabled
   )
 import Playwright.ExpectedText
   ( ExpectedText (ExpectedString, ExpectedRegex)

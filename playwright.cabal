@@ -84,6 +84,7 @@ library
       Playwright.EventWaiter
       Playwright.Exactness
       Playwright.Expect
+      Playwright.ExpectBoolean
       Playwright.ExpectedText
       Playwright.ExpectText
       Playwright.Expose
