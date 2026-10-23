@@ -18,8 +18,14 @@ import Playwright.HttpHeader
   )
 import Playwright.Protocol qualified as Protocol
 import Playwright.Protocol
-  ( PlaywrightNewRequestParams (playwrightNewRequestParamsBaseURL, playwrightNewRequestParamsExtraHTTPHeaders, playwrightNewRequestParamsFailOnStatusCode, playwrightNewRequestParamsHttpCredentials, playwrightNewRequestParamsIgnoreHTTPSErrors, playwrightNewRequestParamsMaxRedirects, playwrightNewRequestParamsStorageState, playwrightNewRequestParamsUserAgent)
+  ( PlaywrightNewRequestParams (playwrightNewRequestParamsBaseURL, playwrightNewRequestParamsExtraHTTPHeaders, playwrightNewRequestParamsFailOnStatusCode, playwrightNewRequestParamsHttpCredentials, playwrightNewRequestParamsIgnoreHTTPSErrors, playwrightNewRequestParamsMaxRedirects, playwrightNewRequestParamsProxy, playwrightNewRequestParamsStorageState, playwrightNewRequestParamsUserAgent)
+  , PlaywrightNewRequestParamsProxy (playwrightNewRequestParamsProxyBypass, playwrightNewRequestParamsProxyPassword, playwrightNewRequestParamsProxyUsername)
+  , mkPlaywrightNewRequestParamsProxy
   , mkPlaywrightNewRequestParams
+  )
+import Playwright.ProxySettings
+  ( ProxyHost (proxyHostToText)
+  , ProxySettings (proxySettingsBypass, proxySettingsPassword, proxySettingsServer, proxySettingsUsername)
   )
 import Playwright.StorageState
   ( StorageState
@@ -43,6 +49,7 @@ data NewRequestOptions = NewRequestOptions
   , newRequestHttpCredentials :: Maybe HttpCredentials
   , newRequestIgnoreHTTPSErrors :: Maybe Bool
   , newRequestMaxRedirects :: Maybe Int
+  , newRequestProxy :: Maybe ProxySettings
   , newRequestStorageState :: Maybe StorageState
   , newRequestTimeout :: Maybe Timeout
   , newRequestUserAgent :: Maybe UserAgent
@@ -58,6 +65,7 @@ defaultNewRequestOptions =
     , newRequestHttpCredentials = Nothing
     , newRequestIgnoreHTTPSErrors = Nothing
     , newRequestMaxRedirects = Nothing
+    , newRequestProxy = Nothing
     , newRequestStorageState = Nothing
     , newRequestTimeout = Nothing
     , newRequestUserAgent = Nothing
@@ -72,8 +80,18 @@ toPlaywrightNewRequestParams opts =
     , playwrightNewRequestParamsHttpCredentials = fmap toProtocolCredentials (newRequestHttpCredentials opts)
     , playwrightNewRequestParamsIgnoreHTTPSErrors = newRequestIgnoreHTTPSErrors opts
     , playwrightNewRequestParamsMaxRedirects = newRequestMaxRedirects opts
+    , playwrightNewRequestParamsProxy = fmap toProtocolProxy (newRequestProxy opts)
     , playwrightNewRequestParamsStorageState = fmap toRequestStorageState (newRequestStorageState opts)
     , playwrightNewRequestParamsUserAgent = fmap userAgentToText (newRequestUserAgent opts)
+    }
+
+toProtocolProxy :: ProxySettings -> PlaywrightNewRequestParamsProxy
+toProtocolProxy settings =
+  ( mkPlaywrightNewRequestParamsProxy (proxyHostToText (proxySettingsServer settings))
+  )
+    { playwrightNewRequestParamsProxyBypass = proxySettingsBypass settings
+    , playwrightNewRequestParamsProxyUsername = fmap httpUsernameToText (proxySettingsUsername settings)
+    , playwrightNewRequestParamsProxyPassword = fmap httpPasswordToText (proxySettingsPassword settings)
     }
 
 -- | The protocol takes a list of credentials; a request has at most one.
