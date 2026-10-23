@@ -143,6 +143,8 @@ module Playwright
   , expectLocatorChecked
   , expectLocatorEditable
   , expectLocatorEnabled
+  , expectPageAriaSnapshot
+  , expectLocatorAriaSnapshot
   , TextMatchOptions (..)
   , defaultTextMatchOptions
   , expectLocatorText
@@ -1708,6 +1710,10 @@ import Playwright.ExpectBoolean
   , expectLocatorChecked
   , expectLocatorEditable
   , expectLocatorEnabled
+  )
+import Playwright.ExpectAriaSnapshot
+  ( expectLocatorAriaSnapshot
+  , expectPageAriaSnapshot
   )
 import Playwright.ExpectedText
   ( ExpectedText (ExpectedString, ExpectedRegex)
