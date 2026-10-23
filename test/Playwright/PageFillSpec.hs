@@ -281,6 +281,20 @@ tests =
             fill (locate page "div[contenteditable]") "some value"
             assertEqual "text" "some value"
               =<< evaluateOnLocatorText (locate page "div[contenteditable]") "div => div.textContent"
+      , testCase "should fill different input types" $
+          withAssetPage "input/textarea.html" $ \page ->
+            mapM_
+              ( \inputType -> do
+                  _ <-
+                    evaluateOnLocatorWith
+                      (locate page "input")
+                      "(input, type) => { input.setAttribute('type', type); }"
+                      (textArgument inputType)
+                  fill (locate page "input") ("text " <> inputType)
+                  assertEqual ("result for " <> unpack inputType) ("text " <> inputType)
+                    =<< evaluateText page "() => window.result"
+              )
+              fillableInputTypes
       ]
         <> fmap unsupportedInput unsupportedInputTypes
         <> fmap fillInputType fillableInputTypes
