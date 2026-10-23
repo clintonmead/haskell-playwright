@@ -429,6 +429,7 @@ test-suite playwright-test
       Playwright.QuerySelectorSpec
       Playwright.ResourceTimingSpec
       Playwright.RetargetSpec
+      Playwright.RoleUtilsSpec
       Playwright.ScreencastSpec
       Playwright.SelectorGeneratorSpec
       Playwright.SelectorsCssSpec

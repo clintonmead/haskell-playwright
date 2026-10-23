@@ -182,6 +182,7 @@ import Playwright.ProxySpec qualified as ProxySpec
 import Playwright.QuerySelectorSpec qualified as QuerySelectorSpec
 import Playwright.RetargetSpec qualified as RetargetSpec
 import Playwright.ResourceTimingSpec qualified as ResourceTimingSpec
+import Playwright.RoleUtilsSpec qualified as RoleUtilsSpec
 import Playwright.SelectorsCssSpec qualified as SelectorsCssSpec
 import Playwright.SelectorsFrameSpec qualified as SelectorsFrameSpec
 import Playwright.SelectorsGetBySpec qualified as SelectorsGetBySpec
@@ -392,6 +393,7 @@ main =
         , QuerySelectorSpec.tests
         , RetargetSpec.tests
         , ResourceTimingSpec.tests
+        , RoleUtilsSpec.tests
         , SelectorsCssSpec.tests
         , SelectorsFrameSpec.tests
         , SelectorsGetBySpec.tests
