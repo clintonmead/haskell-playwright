@@ -105,6 +105,7 @@ import Playwright.PageAutowaitingNoHangSpec qualified as PageAutowaitingNoHangSp
 import Playwright.PageBasicSpec qualified as PageBasicSpec
 import Playwright.PageClickTimeoutSpec qualified as PageClickTimeoutSpec
 import Playwright.PageCheckSpec qualified as PageCheckSpec
+import Playwright.PageClockFrozenSpec qualified as PageClockFrozenSpec
 import Playwright.PageClockSpec qualified as PageClockSpec
 import Playwright.PageClickSpec qualified as PageClickSpec
 import Playwright.PageClickReactSpec qualified as PageClickReactSpec
@@ -303,6 +304,7 @@ main =
         , PageBasicSpec.tests
         , PageClickTimeoutSpec.tests
         , PageCheckSpec.tests
+        , PageClockFrozenSpec.tests
         , PageClockSpec.tests
         , PageClickSpec.tests
         , PageClickReactSpec.tests
