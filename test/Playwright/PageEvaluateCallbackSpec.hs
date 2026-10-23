@@ -2,9 +2,9 @@
 -- as evaluate arguments with `exposeFunctions`. Haskell has no function
 -- serialization, so each callback is exposed with `exposeFunction` and the
 -- page calls it as `window.<name>`. Skipped upstream: the throw without the
--- option (no such option), the whole-argument function, handles returned from
--- callbacks, and the nested-handle callback, which needs handle results; and
--- the check on the internal `__pw_fn_` global name.
+-- option (no such option in Haskell), the whole-argument function (functions
+-- cannot be passed as evaluate arguments), and the check on the internal
+-- `__pw_fn_` global name, which Haskell does not have.
 module Playwright.PageEvaluateCallbackSpec
   ( tests
   ) where
@@ -34,6 +34,7 @@ import Playwright
   , evaluate
   , evaluateHandle
   , evaluateHandleOnLocator
+  , evaluateHandleWith
   , evaluateNumber
   , evaluateOnFrame
   , evaluateOnHandle
@@ -43,6 +44,8 @@ import Playwright
   , exposeFunction
   , frameLocator
   , goto
+  , jsHandleArgument
+  , jsHandleObjectArgument
   , locator
   , numberArgument
   , selectorFromText
@@ -50,6 +53,7 @@ import Playwright
   , specialArgument
   , textArgument
   , urlFromText
+  , Page
   , Playwright
   )
 import Playwright.Error
@@ -119,6 +123,15 @@ tests =
           _ <- exposeFunction page (BindingName "mul") (binaryNumber (*))
           assertEqual "result" (11 :: Double) =<< evaluateNumber page
             "async () => (await window.add(2, 3)) + (await window.mul(2, 3))"
+    , testCase "should support handle as a callback result" $
+        withChromiumPage $ \page -> do
+          _ <- exposeFunction page (BindingName "cb") (doubleHandle page)
+          assertEqual "result" (101 :: Double) =<< evaluateNumber page "async () => (await window.cb(42)) + 17"
+    , testCase "should support nested handles in the callback result" $
+        withChromiumPage $ \page -> do
+          _ <- exposeFunction page (BindingName "cb") (nestedDoubleHandle page)
+          assertEqual "result" (101 :: Double) =<< evaluateNumber page
+            "async () => { const res = await window.cb(42); return res.double + 17; }"
     , testCase "should await an async callback result" $
         withChromiumPage $ \page -> do
           _ <- exposeFunction page (BindingName "cb") addOneSlowly
@@ -264,6 +277,20 @@ doubleIt :: [SerializedValue] -> Playwright SerializedArgument
 doubleIt args = do
   number <- singleNumber args
   pure (numberArgument (number * 2))
+
+-- | Answers with a handle to twice the page's number, created in the page.
+doubleHandle :: Page -> [SerializedValue] -> Playwright SerializedArgument
+doubleHandle page args = do
+  number <- singleNumber args
+  handle <- evaluateHandleWith page "x => 2 * x" (numberArgument number)
+  pure (jsHandleArgument handle)
+
+-- | Answers with an object whose field is a handle to twice the page's number.
+nestedDoubleHandle :: Page -> [SerializedValue] -> Playwright SerializedArgument
+nestedDoubleHandle page args = do
+  number <- singleNumber args
+  handle <- evaluateHandleWith page "x => 2 * x" (numberArgument number)
+  pure (jsHandleObjectArgument "double" handle)
 
 -- | Answers with the first number plus one, after a short pause.
 addOneSlowly :: [SerializedValue] -> Playwright SerializedArgument
