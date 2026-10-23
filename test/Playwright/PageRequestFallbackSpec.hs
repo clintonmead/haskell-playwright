@@ -2,6 +2,12 @@ module Playwright.PageRequestFallbackSpec
   ( tests
   ) where
 
+import Control.Concurrent
+  ( threadDelay
+  )
+import Control.Monad.IO.Class
+  ( liftIO
+  )
 import UnliftIO.MVar
   ( MVar
   , newEmptyMVar
@@ -124,6 +130,23 @@ tests =
             fallbackRoute handled
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
           assertEqual "order" [3, 2, 1] . reverse =<< readIORef intercepted
+    , testCase "should fall back async" $
+        withAssets $ \prefix page -> do
+          intercepted <- newIORef ([] :: [Int])
+          route page (UrlMatchGlob "**/empty.html") $ \handled -> do
+            modifyIORef' intercepted (1 :)
+            liftIO (threadDelay 100000)
+            fallbackRoute handled
+          route page (UrlMatchGlob "**/empty.html") $ \handled -> do
+            modifyIORef' intercepted (2 :)
+            liftIO (threadDelay 100000)
+            fallbackRoute handled
+          route page (UrlMatchGlob "**/empty.html") $ \handled -> do
+            modifyIORef' intercepted (3 :)
+            liftIO (threadDelay 100000)
+            fallbackRoute handled
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "order" [3, 2, 1] . reverse =<< readIORef intercepted
     , testCase "should not chain fulfill" $
         withAssets $ \prefix page -> do
           failed <- newIORef False
@@ -232,6 +255,20 @@ tests =
           fromServer <- capturedBody <$> takeMVar captured
           assertEqual "route" (Just (Char8.pack "doggo")) fromRoute
           assertEqual "server" (Char8.pack "doggo") fromServer
+    , testCase "should delete header with undefined value" $
+        withCaptureServer $ \prefix captured page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          route page (UrlMatchGlob "**/sleep.zzz") $ \handled -> do
+            headers <- requestHeaders =<< routeRequest handled
+            fallbackRouteWith
+              handled
+              defaultContinueOptions
+                { continueHeaders =
+                    Just (filter (\header -> toLower (headerNameToText (httpHeaderName header)) /= "foo") headers)
+                }
+          _ <- evaluate page "() => fetch('/sleep.zzz', { headers: { foo: 'a', bar: 'b' } })"
+          fromServer <- capturedFoo <$> takeMVar captured
+          assertEqual "server" Nothing fromServer
     , testCase "should amend binary post data" $
         withCaptureServer $ \prefix captured page -> do
           _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
