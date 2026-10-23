@@ -854,8 +854,15 @@ tests =
     -- family takes exactly one argument, so the arity error cannot be sent.
     -- Skipped: "should transfer maps as empty objects". Haskell has no Map value to send,
     -- so the Map-to-object conversion has nothing to exercise here.
-    -- Skipped: the four "should throw usable message for unserializable ... function" cases.
-    -- A SerializedArgument cannot hold a JS function, so the serializer error is unreachable.
+    -- Skipped: "should throw usable message for unserializable shallow function". The upstream
+    -- client serializes the JS argument itself and rejects a bare function. A SerializedArgument
+    -- is already serialized and cannot hold a JS function, so that serializer error is unreachable.
+    -- Skipped: "should throw usable message for unserializable object one deep function". Same
+    -- reason as the shallow case: the function-valued property cannot be built as an argument.
+    -- Skipped: "should throw usable message for unserializable object nested function". Same
+    -- reason: the nested function cannot be built as an argument, so the position path is never produced.
+    -- Skipped: "should throw usable message for unserializable array nested function". Same reason,
+    -- reached through an array index in the position path.
     ]
 
 -- | True when the field is present and serialized as an object with no fields.
