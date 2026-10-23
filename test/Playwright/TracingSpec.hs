@@ -2,6 +2,7 @@ module Playwright.TracingSpec
   ( tests
   ) where
 
+import Codec.Compression.Zlib.Raw qualified as Raw
 import Control.Concurrent
   ( threadDelay
   )
@@ -35,16 +36,24 @@ import UnliftIO.Temporary
 import Playwright
   ( ClickOptions (clickOptionsTimeout)
   , Playwright
+  , Point (Point)
   , TracingStartOptions (TracingStartOptions)
   , acceptDialog
   , clickWith
+  , closePage
+  , cssPixelFromInt
   , defaultClickOptions
   , defaultGotoOptions
+  , defaultScreenshotOptions
   , dismissDialog
   , evaluateBool
   , goto
+  , keyboardInsertText
   , milliseconds
+  , mouseDblclick
+  , mouseMove
   , onDialog
+  , screenshot
   , setContent
   , tracingStart
   , tracingStartWith
@@ -149,38 +158,166 @@ tests =
             tracingStopTo ctx (dir <> "/trace2.zip")
             entries <- liftIO (zipEntryNames <$> BS.readFile (dir <> "/trace2.zip"))
             assertBool "trace archive has a .trace entry" (any (BS.isSuffixOf ".trace") entries)
+    , testCase "should not collect snapshots by default" $
+        withSystemTempDirectory "tracing" $ \dir ->
+          withChromiumContext $ \ctx page -> do
+            let
+              path = dir <> "/trace.zip"
+            tracingStart ctx
+            void (goto page (urlFromText "about:blank") defaultGotoOptions)
+            setContent page "<button>Click</button>"
+            clickWith (locate page "\"Click\"") defaultClickOptions
+            closePage page
+            tracingStopTo ctx path
+            archive <- liftIO (BS.readFile path)
+            assertBool "no frame snapshots" (not (traceContains archive (eventType "frame-snapshot")))
+            assertBool "no resource snapshots" (not (traceContains archive (eventType "resource-snapshot")))
+    , testCase "should not collect action screenshots and aria snapshots by default" $
+        withSystemTempDirectory "tracing" $ \dir ->
+          withChromiumContext $ \ctx page -> do
+            let
+              path = dir <> "/trace.zip"
+            tracingStartWith ctx (TracingStartOptions Nothing Nothing (Just True) Nothing)
+            void (goto page (urlFromText "about:blank") defaultGotoOptions)
+            setContent page "<button>Click</button>"
+            clickWith (locate page "\"Click\"") defaultClickOptions
+            tracingStopTo ctx path
+            archive <- liftIO (BS.readFile path)
+            assertBool "no screenshot events" (not (traceContains archive (eventType "screenshot")))
+            assertBool "no aria snapshot events" (not (traceContains archive (eventType "aria-snapshot")))
+    , testCase "should collect action screenshots" $
+        withSystemTempDirectory "tracing" $ \dir ->
+          withChromiumContext $ \ctx page -> do
+            let
+              path = dir <> "/trace.zip"
+            tracingStartWith ctx (TracingStartOptions Nothing (Just True) Nothing Nothing)
+            void (goto page (urlFromText "about:blank") defaultGotoOptions)
+            setContent page "<button>Click</button>"
+            clickWith (locate page "\"Click\"") defaultClickOptions
+            tracingStopTo ctx path
+            archive <- liftIO (BS.readFile path)
+            let names = zipEntryNames archive
+            assertBool "has screenshot events" (traceContains archive (eventType "screenshot"))
+            assertBool "has before screenshot" (any (BS.isSuffixOf "-before.png") names)
+            assertBool "has action screenshot" (any (BS.isSuffixOf "-action.png") names)
+            assertBool "has after screenshot" (any (BS.isSuffixOf "-after.png") names)
+    , testCase "should not include buffers in the trace" $
+        withSystemTempDirectory "tracing" $ \dir ->
+          withChromiumContext $ \ctx page -> do
+            let
+              path = dir <> "/trace.zip"
+            tracingStartWith ctx (TracingStartOptions Nothing Nothing (Just True) Nothing)
+            void (goto page (urlFromText "about:blank") defaultGotoOptions)
+            void (screenshot page defaultScreenshotOptions)
+            tracingStopTo ctx path
+            archive <- liftIO (BS.readFile path)
+            assertBool "screenshot result is a buffer placeholder" (traceContains archive "\"binary\":\"<Buffer>\"")
+    , testCase "should collect trace with resources, but no js" $
+        withSystemTempDirectory "tracing" $ \dir ->
+          withChromiumContext $ \ctx page -> do
+            let
+              path = dir <> "/trace.zip"
+            tracingStartWith ctx (TracingStartOptions Nothing (Just True) (Just True) Nothing)
+            void (goto page (urlFromText "about:blank") defaultGotoOptions)
+            setContent page "<button>Click</button>"
+            clickWith (locate page "\"Click\"") defaultClickOptions
+            mouseMove page (Point (cssPixelFromInt 20) (cssPixelFromInt 20))
+            mouseDblclick page (Point (cssPixelFromInt 30) (cssPixelFromInt 30))
+            keyboardInsertText page "abc"
+            liftIO (threadDelay 2000000)
+            closePage page
+            tracingStopTo ctx path
+            archive <- liftIO (BS.readFile path)
+            assertBool "has frame snapshots" (traceContains archive (eventType "frame-snapshot"))
+            assertBool "has screencast frames" (traceContains archive (eventType "screencast-frame"))
     ]
+
+eventType :: ByteString -> ByteString
+eventType name = "\"type\":\"" <> name <> "\""
+
+-- | Whether any trace entry (a @.trace@ file of JSON lines) of the archive contains the text.
+traceContains :: ByteString -> ByteString -> Bool
+traceContains archive needle =
+  any
+    (\(name, body) -> ".trace" `BS.isSuffixOf` name && needle `BS.isInfixOf` body)
+    (zipContents archive)
 
 anyPrefix :: ByteString -> [ByteString] -> Bool
 anyPrefix prefix = any (BS.isPrefixOf prefix)
 
 -- | Names of the entries listed in a zip archive's central directory.
--- Entry names are stored uncompressed there, so no inflation is needed.
 zipEntryNames :: ByteString -> [ByteString]
-zipEntryNames = centralEntries
+zipEntryNames archive = map zipEntryName (zipEntries archive)
+
+-- | Uncompressed contents of every entry of a zip archive.
+zipContents :: ByteString -> [(ByteString, ByteString)]
+zipContents archive = [(zipEntryName entry, entryContents archive entry) | entry <- zipEntries archive]
+
+-- | One record of a zip archive's central directory.
+data ZipEntry = ZipEntry
+  { zipEntryName :: ByteString
+  , zipEntryMethod :: Int
+  , zipEntryCompressedSize :: Int
+  , zipEntryOffset :: Int
+  , zipEntryRecordLength :: Int
+  }
+
+eocdSignature :: ByteString
+eocdSignature = BS.pack [0x50, 0x4b, 0x05, 0x06]
 
 centralSignature :: ByteString
 centralSignature = BS.pack [0x50, 0x4b, 0x01, 0x02]
 
-centralEntries :: ByteString -> [ByteString]
-centralEntries rest =
+-- | Central directory records, found through the end-of-central-directory record.
+zipEntries :: ByteString -> [ZipEntry]
+zipEntries archive =
   let
-    (_, found) = BS.breakSubstring centralSignature rest
+    (_, eocd) = BS.breakSubstring eocdSignature archive
   in
-    if BS.length found < 46
+    if BS.length eocd < 22
       then []
-      else
-        let
-          nameLen = le16 found 28
-          extraLen = le16 found 30
-          commentLen = le16 found 32
-          name = BS.take nameLen (BS.drop 46 found)
-        in
-          name : centralEntries (BS.drop (46 + nameLen + extraLen + commentLen) found)
+      else readRecords (BS.drop (le32 eocd 16) archive)
+
+readRecords :: ByteString -> [ZipEntry]
+readRecords rest
+  | BS.take 4 rest /= centralSignature = []
+  | BS.length rest < 46 = []
+  | otherwise =
+      let
+        nameLen = le16 rest 28
+        extraLen = le16 rest 30
+        commentLen = le16 rest 32
+        recordLen = 46 + nameLen + extraLen + commentLen
+        entry =
+          ZipEntry
+            { zipEntryName = BS.take nameLen (BS.drop 46 rest)
+            , zipEntryMethod = le16 rest 10
+            , zipEntryCompressedSize = le32 rest 20
+            , zipEntryOffset = le32 rest 42
+            , zipEntryRecordLength = recordLen
+            }
+      in
+        entry : readRecords (BS.drop recordLen rest)
+
+-- | Stored (method 0) or deflated (method 8) contents, located through the local file header.
+entryContents :: ByteString -> ZipEntry -> ByteString
+entryContents archive entry =
+  let
+    local = BS.drop (zipEntryOffset entry) archive
+    start = 30 + le16 local 26 + le16 local 28
+    raw = BS.take (zipEntryCompressedSize entry) (BS.drop start local)
+  in
+    case zipEntryMethod entry of
+      8 -> LBS.toStrict (Raw.decompress (LBS.fromStrict raw))
+      _ -> raw
 
 le16 :: ByteString -> Int -> Int
 le16 b i =
   fromIntegral (BS.index b i) + 256 * fromIntegral (BS.index b (i + 1))
+
+le32 :: ByteString -> Int -> Int
+le32 b i =
+  le16 b i + 65536 * le16 b (i + 2)
 
 gridApp :: Application
 gridApp _ respond =
