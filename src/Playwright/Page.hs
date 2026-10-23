@@ -119,6 +119,9 @@ import Playwright.Channel
   , send
   , sendWithTimeout
   )
+import Playwright.ApiLog
+  ( withApiLog
+  )
 import Playwright.Connection
   ( closedGuids
   , lookupContextBaseUrl
@@ -569,9 +572,10 @@ setContent page html =
   setContentWith page html defaultSetContentOptions
 
 setContentWith :: Page -> Text -> SetContentOptions -> Playwright ()
-setContentWith page html opts = do
-  timeout <- maybe (pageNavigationTimeout page) pure (setContentOptionsTimeout opts)
-  setContentFrameWith (pageMainFrame page) html timeout (setContentOptionsWaitUntil opts)
+setContentWith page html opts =
+  withApiLog (channelGuid (pageChannel page)) "page.setContent" $ do
+    timeout <- maybe (pageNavigationTimeout page) pure (setContentOptionsTimeout opts)
+    setContentFrameWith (pageMainFrame page) html timeout (setContentOptionsWaitUntil opts)
 
 setViewportSize :: Page -> ViewportSize -> Playwright ()
 setViewportSize page size = do

@@ -119,6 +119,8 @@ module Playwright
   , Latitude (..)
   , LaunchOptions (..)
   , LoadState (..)
+  , LogSeverity (..)
+  , Logger (..)
   , Locale (..)
   , Locator (..)
   , ExpectOptions (..)
@@ -653,6 +655,7 @@ module Playwright
   , lastLocator
   , latitudeFromInt
   , launch
+  , launchWithLogger
   , launchPersistentContext
   , launchWithSeleniumRemote
   , localStorage
@@ -685,6 +688,7 @@ module Playwright
   , newBrowserPageWith
   , newContext
   , newContextWith
+  , newContextWithLogger
   , newContextForReuseWith
   , disconnectFromReusedContext
   , newPage
@@ -1096,6 +1100,10 @@ import Playwright.BrowserServer
   , defaultBrowserServerOptions
   , unbindBrowser
   )
+import Playwright.Logger
+  ( LogSeverity (LogVerbose, LogInfo, LogWarning, LogError)
+  , Logger (Logger, loggerLog, loggerIsEnabled)
+  )
 import Playwright.Browser
   ( Browser (Browser, browserChannel)
   , browserContexts
@@ -1109,6 +1117,7 @@ import Playwright.Browser
   , newContext
   , newContextForReuseWith
   , newContextWith
+  , newContextWithLogger
   , disconnectFromReusedContext
   , onBrowserContext
   , withPage
@@ -1175,6 +1184,7 @@ import Playwright.BrowserType
   , browserTypeFromRef
   , browserTypesEqual
   , launch
+  , launchWithLogger
   , launchPersistentContext
   , withBrowser
   )

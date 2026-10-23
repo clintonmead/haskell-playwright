@@ -136,6 +136,9 @@ import Playwright.AriaRole
 import Playwright.BoundingBox
   ( BoundingBox
   )
+import Playwright.ApiLog
+  ( withApiLog
+  )
 import Playwright.Channel
   ( Channel (channelGuid)
   , BrowserContextTag
@@ -530,7 +533,8 @@ withActionTimeout loc action = do
 
 click :: Locator -> Playwright ()
 click loc =
-  withActionTimeout loc (clickFrame (locatorFrame loc) (locatorSelector loc))
+  withApiLog (channelGuid (frameChannel (locatorFrame loc))) "locator.click" $
+    withActionTimeout loc (clickFrame (locatorFrame loc) (locatorSelector loc))
 
 clickWith :: Locator -> ClickOptions -> Playwright ()
 clickWith loc opts = do

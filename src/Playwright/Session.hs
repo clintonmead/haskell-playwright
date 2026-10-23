@@ -57,6 +57,9 @@ import Playwright.Protocol
 import Playwright.RemoteObject
   ( RemoteObject (RemoteObject, remoteGuid, remoteInitializer, remoteParent, remoteType)
   )
+import Playwright.Logger
+  ( Logger
+  )
 import Playwright.RequestId
   ( RequestId (RequestId)
   )
@@ -138,6 +141,7 @@ data Session = Session
   , sessionChromiumGuid :: Maybe Guid
   , sessionFirefoxGuid :: Maybe Guid
   , sessionWebkitGuid :: Maybe Guid
+  , sessionLoggers :: Map Guid Logger
   }
 
 -- | Runs queued for one scope and method: how many are still pending, and the
@@ -191,6 +195,7 @@ emptySession =
     , sessionChromiumGuid = Nothing
     , sessionFirefoxGuid = Nothing
     , sessionWebkitGuid = Nothing
+    , sessionLoggers = Map.empty
     }
 
 rootObject :: RemoteObject

@@ -16,6 +16,8 @@ module Playwright.Connection.Store
   , locatorHandlerUidsMatching
   , markFrameDetached
   , lookupBrowserTypeGuid
+  , lookupLogger
+  , writeLogger
   , lookupContextBaseUrl
   , lookupContextBrowserGuid
   , lookupMainFramePage
@@ -86,7 +88,7 @@ import Playwright.Protocol
   , SelectorEngine
   )
 import Playwright.RemoteObject
-  ( RemoteObject (remoteGuid, remoteType)
+  ( RemoteObject (remoteGuid, remoteParent, remoteType)
   )
 import Playwright.RequestOverrides
   ( RequestOverrides
@@ -95,7 +97,10 @@ import Playwright.RequestOverrides
 import Playwright.Session
   ( HarRecorder
   , ScreencastSession
-  , Session (sessionHarRecorders, sessionBrowserContexts, sessionBrowserTypes, sessionClosedGuids, sessionContextBaseUrls, sessionDetachedFrames, sessionContextBrowsers, sessionContextsWithOwnerPage, sessionDisposedObjects, sessionLocatorHandlers, sessionLocatorListening, sessionMainFramePages, sessionObjects, sessionPagesOwningContext, sessionRequestEndTiming, sessionRequestFailures, sessionRequestOverrides, sessionRouteHandlers, sessionRouteListening, sessionScreencasts, sessionSelectorEngines, sessionTimeoutDefaults, sessionWebSocketRouteHandlers, sessionWebSocketRouteListening)
+  , Session (sessionHarRecorders, sessionBrowserContexts, sessionBrowserTypes, sessionClosedGuids, sessionContextBaseUrls, sessionDetachedFrames, sessionContextBrowsers, sessionContextsWithOwnerPage, sessionDisposedObjects, sessionLocatorHandlers, sessionLocatorListening, sessionLoggers, sessionMainFramePages, sessionObjects, sessionPagesOwningContext, sessionRequestEndTiming, sessionRequestFailures, sessionRequestOverrides, sessionRouteHandlers, sessionRouteListening, sessionScreencasts, sessionSelectorEngines, sessionTimeoutDefaults, sessionWebSocketRouteHandlers, sessionWebSocketRouteListening)
+  )
+import Playwright.Logger
+  ( Logger
   )
 import Playwright.StoredLocatorHandler
   ( StoredLocatorHandler (storedLocatorHandlerFrame, storedLocatorHandlerSelector, storedLocatorHandlerTimes)
@@ -221,6 +226,37 @@ lookupRequestOverrides :: Connection -> Guid -> IO RequestOverrides
 lookupRequestOverrides conn guid = do
   session <- atomically (readSession conn)
   pure (Map.findWithDefault emptyRequestOverrides guid (sessionRequestOverrides session))
+
+-- | Sets the logger for an object. Objects created under it inherit it.
+writeLogger :: Connection -> Guid -> Logger -> IO ()
+writeLogger conn guid logger =
+  atomically $
+    modifySession conn $ \session ->
+      session {sessionLoggers = Map.insert guid logger (sessionLoggers session)}
+
+-- | The logger in effect for an object: its own, or the nearest ancestor's
+-- (page, then context, then browser).
+lookupLogger :: Connection -> Guid -> IO (Maybe Logger)
+lookupLogger conn guid0 =
+  atomically $ do
+    session <- readSession conn
+    let
+      go :: Int -> Guid -> Maybe Logger
+      go depth guid
+        | depth <= 0 =
+            Nothing
+        | otherwise =
+            case Map.lookup guid (sessionLoggers session) of
+              Just logger ->
+                Just logger
+              Nothing ->
+                case Map.lookup guid (sessionObjects session) of
+                  Just obj
+                    | remoteParent obj /= guid ->
+                        go (depth - 1) (remoteParent obj)
+                  _ ->
+                    Nothing
+    pure (go 16 guid0)
 
 writeRequestOverrides :: Connection -> Guid -> RequestOverrides -> IO ()
 writeRequestOverrides conn guid overrides =

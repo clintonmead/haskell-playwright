@@ -11,6 +11,7 @@ module Playwright.Browser
   , newContext
   , newContextForReuseWith
   , newContextWith
+  , newContextWithLogger
   , disconnectFromReusedContext
   , onBrowserContext
   , validateNewContextOptions
@@ -52,6 +53,13 @@ import Playwright.BrowserContext
   , startContextRecordHar
   , newPage
   )
+import Playwright.ApiLog
+  ( withApiLog
+  , withLoggerApi
+  )
+import Playwright.Logger
+  ( Logger
+  )
 import Playwright.Channel
   ( BrowserTag
   , Channel (Channel, channelGuid)
@@ -68,6 +76,7 @@ import Playwright.Connection
   , registerEventHandler
   , rememberBrowserContext
   , writeContextBaseUrl
+  , writeLogger
   )
 import Playwright.Error
   ( PlaywrightError (DecodeFailure)
@@ -161,18 +170,30 @@ contextBrowser ctx = do
 
 closeBrowser :: Browser -> Playwright ()
 closeBrowser browser =
-  ignoreTargetClosed $ do
-    _ :: BrowserCloseResult <-
-      send (browserChannel browser) (MethodName "close") mkBrowserCloseParams
-    pure ()
+  withApiLog (channelGuid (browserChannel browser)) "browser.close" $
+    ignoreTargetClosed $ do
+      _ :: BrowserCloseResult <-
+        send (browserChannel browser) (MethodName "close") mkBrowserCloseParams
+      pure ()
 
 newContext :: Browser -> Playwright BrowserContext
 newContext browser =
   newContextWith browser defaultNewContextOptions
 
 newContextWith :: Browser -> NewContextOptions -> Playwright BrowserContext
-newContextWith browser =
-  newContextVia browser "newContext"
+newContextWith browser opts =
+  withApiLog (channelGuid (browserChannel browser)) "browser.newContext" $
+    newContextVia browser "newContext" opts
+
+-- | Creates a context that logs its own API calls to the given logger, as
+-- upstream's @browser.newContext({ logger })@ does. The line for this call
+-- itself goes to the same logger.
+newContextWithLogger :: Logger -> Browser -> NewContextOptions -> Playwright BrowserContext
+newContextWithLogger logger browser opts =
+  withLoggerApi (Just logger) "browser.newContext" $ do
+    ctx <- newContextVia browser "newContext" opts
+    writeLogger (channelGuid (browserContextChannel ctx)) logger
+    pure ctx
 
 -- | Internal: the driver's @newContextForReuse@, which hands back the context
 -- it keeps for reuse (resetting it when the options match), as upstream's

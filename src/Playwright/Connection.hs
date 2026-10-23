@@ -36,6 +36,8 @@ module Playwright.Connection
   , putHarRecorder
   , rememberBrowserType
   , lookupBrowserTypeGuid
+  , writeLogger
+  , lookupLogger
   , waitForLifecycle
   , waitUntilUrl
   , closedGuids
@@ -193,6 +195,9 @@ import Playwright.RemoteObject
   )
 import Playwright.RequestId
   ( RequestId
+  )
+import Playwright.Logger
+  ( Logger
   )
 import Playwright.RequestOverrides
   ( RequestOverrides
@@ -358,6 +363,15 @@ rememberBrowserType browserGuid browserTypeGuid =
 lookupBrowserTypeGuid :: Guid -> Playwright (Maybe Guid)
 lookupBrowserTypeGuid browserGuid =
   inConnection (`Store.lookupBrowserTypeGuid` browserGuid)
+
+writeLogger :: Guid -> Logger -> Playwright ()
+writeLogger guid logger =
+  inConnection $ \conn -> Store.writeLogger conn guid logger
+
+-- | The logger in effect for an object, inherited from its nearest ancestor.
+lookupLogger :: Guid -> Playwright (Maybe Logger)
+lookupLogger guid =
+  inConnection (`Store.lookupLogger` guid)
 
 lookupSelectorEngines :: Playwright [SelectorEngine]
 lookupSelectorEngines =

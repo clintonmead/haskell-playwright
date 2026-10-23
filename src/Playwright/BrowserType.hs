@@ -4,6 +4,7 @@ module Playwright.BrowserType
   , browserTypeFromRef
   , browserTypesEqual
   , launch
+  , launchWithLogger
   , launchPersistentContext
   , withBrowser
   ) where
@@ -36,6 +37,12 @@ import Playwright.BrowserContext
   ( BrowserContext
   , contextFromRef
   )
+import Playwright.ApiLog
+  ( withLoggerApi
+  )
+import Playwright.Logger
+  ( Logger
+  )
 import Playwright.Channel
   ( BrowserTypeTag
   , Channel (Channel, channelGuid)
@@ -49,6 +56,7 @@ import Playwright.Connection
   , rememberBrowserContext
   , rememberBrowserType
   , writeContextBaseUrl
+  , writeLogger
   )
 import Playwright.Json.ChannelRef
   ( ChannelRef (ChannelRef, channelRefGuid)
@@ -115,6 +123,16 @@ launch browserType opts = do
     (channelGuid (browserChannel browser))
     (channelGuid (browserTypeChannel browserType))
   pure browser
+
+-- | Launches a browser that logs its own API calls, and the calls on the
+-- objects it creates, to the given logger, as upstream's
+-- @browserType.launch({ logger })@ does.
+launchWithLogger :: Logger -> BrowserType -> LaunchOptions -> Playwright Browser
+launchWithLogger logger browserType opts =
+  withLoggerApi (Just logger) "browserType.launch" $ do
+    browser <- launch browserType opts
+    writeLogger (channelGuid (browserChannel browser)) logger
+    pure browser
 
 launchPersistentContext :: BrowserType -> FilePath -> LaunchOptions -> NewContextOptions -> Playwright BrowserContext
 launchPersistentContext browserType userDataDir launchOpts ctxOpts = do
