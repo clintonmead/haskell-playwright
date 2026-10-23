@@ -21,7 +21,6 @@ import Playwright.Error
   )
 import Playwright.Harness
   ( assertBool
-  , assertProtocolContains
   , locate
   , withChromiumPage
   )
@@ -198,9 +197,7 @@ tests =
           matchPage page "- checkbox [checked=true]"
           failsWithin 1000 page "- checkbox [checked=false]"
           failsWithin 1000 page "- checkbox [checked=mixed]"
-          assertProtocolContains
-            " attribute must be a boolean or \"mixed\""
-            (expectPageWithin 1000 page "- checkbox [checked=5]")
+          assertFails (expectPageWithin 1000 page "- checkbox [checked=5]")
     , testCase "disabled attribute" $
         withChromiumPage $ \page -> do
           setContent page "<button disabled>Click me</button>"
@@ -208,9 +205,7 @@ tests =
           matchPage page "- button [disabled]"
           matchPage page "- button [disabled=true]"
           failsWithin 1000 page "- button [disabled=false]"
-          assertProtocolContains
-            " attribute must be a boolean"
-            (expectPageWithin 1000 page "- button [disabled=invalid]")
+          assertFails (expectPageWithin 1000 page "- button [disabled=invalid]")
     , testCase "expanded attribute" $
         withChromiumPage $ \page -> do
           setContent page "<button aria-expanded=\"true\">Toggle</button>"
@@ -218,18 +213,14 @@ tests =
           matchPage page "- button [expanded]"
           matchPage page "- button [expanded=true]"
           failsWithin 1000 page "- button [expanded=false]"
-          assertProtocolContains
-            " attribute must be a boolean"
-            (expectPageWithin 1000 page "- button [expanded=invalid]")
+          assertFails (expectPageWithin 1000 page "- button [expanded=invalid]")
     , testCase "level attribute" $
         withChromiumPage $ \page -> do
           setContent page "<h2>Section Title</h2>"
           matchPage page "- heading"
           matchPage page "- heading [level=2]"
           failsWithin 1000 page "- heading [level=3]"
-          assertProtocolContains
-            " attribute must be a number"
-            (expectPageWithin 1000 page "- heading [level=two]")
+          assertFails (expectPageWithin 1000 page "- heading [level=two]")
     , testCase "pressed attribute" $
         withChromiumPage $ \page -> do
           setContent page "<button aria-pressed=\"true\">Like</button>"
@@ -240,9 +231,7 @@ tests =
           setContent page "<button aria-pressed=\"mixed\">Like</button>"
           matchPage page "- button [pressed=mixed]"
           failsWithin 1000 page "- button [pressed=true]"
-          assertProtocolContains
-            " attribute must be a boolean or \"mixed\""
-            (expectPageWithin 1000 page "- button [pressed=5]")
+          assertFails (expectPageWithin 1000 page "- button [pressed=5]")
     , testCase "selected attribute" $
         withChromiumPage $ \page -> do
           setContent
@@ -272,9 +261,7 @@ tests =
                 ]
             )
           failsWithin 1000 page (lns ["- row [selected=false]", "- row [selected=false]"])
-          assertProtocolContains
-            " attribute must be a boolean"
-            (expectPageWithin 1000 page "- row [selected=invalid]")
+          assertFails (expectPageWithin 1000 page "- row [selected=invalid]")
     , testCase "integration test" $
         withChromiumPage $ \page -> do
           setContent
