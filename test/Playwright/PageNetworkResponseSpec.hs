@@ -60,6 +60,7 @@ import Playwright
   , HttpStatus (HttpStatus)
   , Playwright
   , UrlMatch (UrlMatchGlob)
+  , armRequest
   , armResponse
   , armResponseWhere
   , continueRoute
@@ -74,6 +75,7 @@ import Playwright
   , onRequestFinished
   , requestFrame
   , requestRedirectedFrom
+  , requestExistingResponse
   , requestResponse
   , requestUrl
   , responseAllHeaders
@@ -571,6 +573,30 @@ tests =
                   valueStatus <- responseStatus value
                   foundStatus <- responseStatus found
                   assertEqual "same status" valueStatus foundStatus
+    , testCase "request.existingResponse should return null before response is received" $
+        withChromiumPage $ \page -> do
+          release <- newEmptyMVar
+          withLocalApp (heldGetApp release) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            takeRequest <- armRequest page (UrlMatchGlob (prefix <> "/get"))
+            takeResponse <- armResponse page (UrlMatchGlob (prefix <> "/get"))
+            withAsync (evaluate page "() => fetch('./get', { method: 'GET' })") $ \fetching -> do
+              request <- takeRequest
+              before <- requestExistingResponse request
+              case before of
+                Nothing -> pure ()
+                Just _ -> assertFailure "expected no existing response before it is received"
+              putMVar release ()
+              response <- takeResponse
+              assertEqual "status" (HttpStatus 200) =<< responseStatus response
+              after <- requestExistingResponse request
+              case after of
+                Nothing ->
+                  assertFailure "expected an existing response after it is received"
+                Just found ->
+                  assertEqual "status after" (HttpStatus 200) =<< responseStatus found
+              _ <- wait fetching
+              pure ()
     ]
 
 sortedHeaders :: [HttpHeader] -> [(Text, Text)]
@@ -644,6 +670,18 @@ streamApp hit release request respond =
                 flush
             )
         )
+    ["empty.html"] ->
+      respond (responseLBS status200 [(hContentType, "text/html")] LBS8.empty)
+    _ ->
+      respond (responseLBS status404 [] LBS8.empty)
+
+-- | Holds the /get response until the test releases it, so the request stays in flight.
+heldGetApp :: MVar () -> Application
+heldGetApp release request respond =
+  case pathInfo request of
+    ["get"] -> do
+      takeMVar release
+      respond (responseLBS status200 [(hContentType, "text/plain; charset=utf-8")] (LBS8.pack "done"))
     ["empty.html"] ->
       respond (responseLBS status200 [(hContentType, "text/html")] LBS8.empty)
     _ ->
