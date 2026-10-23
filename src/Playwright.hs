@@ -587,6 +587,7 @@ module Playwright
   , hover
   , highlight
   , highlightWithStyle
+  , highlightWithStyleProperties
   , hideHighlight
   , hoverHandle
   , pressHandle
@@ -1640,6 +1641,9 @@ import Playwright.TextExpectation
   )
 import Playwright.TextProperty
   ( TextProperty (AccessibleDescription, AccessibleErrorMessage, AccessibleName)
+  )
+import Playwright.HighlightStyle
+  ( highlightWithStyleProperties
   )
 import Playwright.Locator
   ( Locator (Locator, locatorContextChannel, locatorFrame, locatorMainFrame, locatorPageChannel, locatorSelector)
