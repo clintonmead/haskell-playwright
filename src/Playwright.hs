@@ -110,6 +110,13 @@ module Playwright
   , expectLocator
   , expectLocatorWith
   , expectLocatorCount
+  , TextMatchOptions (..)
+  , defaultTextMatchOptions
+  , expectLocatorText
+  , expectLocatorTextWith
+  , expectLocatorRole
+  , TextExpectation (..)
+  , TextProperty (..)
   , LocatorHandlerTimes (..)
   , Longitude (..)
   , MediaType (..)
@@ -1591,6 +1598,19 @@ import Playwright.Expect
   , expectLocator
   , expectLocatorCount
   , expectLocatorWith
+  )
+import Playwright.ExpectText
+  ( TextMatchOptions (TextMatchOptions, textMatchIgnoreCase)
+  , defaultTextMatchOptions
+  , expectLocatorRole
+  , expectLocatorText
+  , expectLocatorTextWith
+  )
+import Playwright.TextExpectation
+  ( TextExpectation (ExpectRegex, ExpectString)
+  )
+import Playwright.TextProperty
+  ( TextProperty (AccessibleDescription, AccessibleErrorMessage, AccessibleName)
   )
 import Playwright.Locator
   ( Locator (Locator, locatorContextChannel, locatorFrame, locatorMainFrame, locatorPageChannel, locatorSelector)

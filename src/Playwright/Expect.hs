@@ -4,6 +4,7 @@ module Playwright.Expect
   , expectLocator
   , expectLocatorWith
   , expectLocatorCount
+  , sendExpect
   ) where
 
 import Data.Aeson
@@ -76,6 +77,7 @@ expectLocatorCount options locator count =
       , frameExpectParamsExpectedNumber = Just (fromIntegral count)
       }
 
+-- | Send a raw @expect@ call to the driver, honouring the optional timeout.
 sendExpect :: ExpectOptions -> Frame -> FrameExpectParams -> Playwright ()
 sendExpect options frame params =
   case expectTimeout options of
