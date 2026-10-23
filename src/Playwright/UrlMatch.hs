@@ -1,5 +1,6 @@
 module Playwright.UrlMatch
   ( UrlMatch (..)
+  , globError
   , matchesUrlMatch
   , resolveUrlMatch
   ) where
@@ -192,6 +193,30 @@ escapeGlobChar :: Char -> String
 escapeGlobChar c
   | c `elem` ("$^+.*()|\\?{}[]" :: String) = ['\\', c]
   | otherwise = [c]
+
+-- | The message the client reports for a glob it cannot compile, or Nothing
+-- when the glob is valid. Escaped braces are literal, as in 'globSource'.
+globError :: Text -> Maybe Text
+globError glob =
+  fmap
+    (\reason -> "Invalid glob pattern \"" <> glob <> "\": " <> reason)
+    (braceProblem False (unpack glob))
+  where
+    braceProblem :: Bool -> String -> Maybe Text
+    braceProblem inGroup text =
+      case text of
+        [] ->
+          if inGroup then Just (pack "unmatched '{'") else Nothing
+        ('\\' : _ : rest) ->
+          braceProblem inGroup rest
+        ('{' : rest)
+          | inGroup -> Just (pack "nested '{' is not supported")
+          | otherwise -> braceProblem True rest
+        ('}' : rest)
+          | inGroup -> braceProblem False rest
+          | otherwise -> Just (pack "unmatched '}'")
+        (_ : rest) ->
+          braceProblem inGroup rest
 
 globMatches :: String -> String -> Bool
 globMatches glob text =

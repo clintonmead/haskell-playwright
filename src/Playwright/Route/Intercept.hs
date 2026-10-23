@@ -67,6 +67,15 @@ import Playwright.Monad
   , askConnection
   , runPlaywrightWith
   )
+import Playwright.Error
+  ( PlaywrightError (ProtocolRpc)
+  , ProtocolFailure
+      ( ProtocolFailure
+      , protocolFailureMessage
+      , protocolFailureName
+      , protocolFailureStack
+      )
+  )
 import Playwright.Page
   ( Page (pageChannel, pageContextChannel)
   )
@@ -99,8 +108,12 @@ import Playwright.RouteOptions
 import Playwright.Url
   ( Url
   )
+import UnliftIO.Exception
+  ( throwIO
+  )
 import Playwright.UrlMatch
   ( UrlMatch (UrlMatchGlob, UrlMatchPredicate, UrlMatchRegex)
+  , globError
   , matchesUrlMatch
   , resolveUrlMatch
   )
@@ -111,6 +124,7 @@ route page glob =
 
 routeWith :: Page -> UrlMatch -> RouteOptions -> (Route -> Playwright ()) -> Playwright ()
 routeWith page glob opts handler = do
+  checkGlob glob
   let
     guid = channelGuid (pageChannel page)
   first <- installRouteHandler guid glob opts handler
@@ -123,11 +137,29 @@ contextRoute ctx glob =
 
 contextRouteWith :: BrowserContext -> UrlMatch -> RouteOptions -> (Route -> Playwright ()) -> Playwright ()
 contextRouteWith ctx glob opts handler = do
+  checkGlob glob
   let
     guid = channelGuid (browserContextChannel ctx)
   first <- installRouteHandler guid glob opts handler
   when first (registerEventHandler guid (MethodName "route") (dispatchContextRoute ctx))
   updateContextInterceptionPatterns ctx
+
+-- | Rejects a malformed glob before anything is registered, as the client does.
+checkGlob :: UrlMatch -> Playwright ()
+checkGlob glob =
+  case glob of
+    UrlMatchGlob text
+      | Just message <- globError text ->
+          throwIO
+            ( ProtocolRpc
+                ProtocolFailure
+                  { protocolFailureName = "Error"
+                  , protocolFailureMessage = message
+                  , protocolFailureStack = Nothing
+                  }
+            )
+    _ ->
+      pure ()
 
 installRouteHandler :: Guid -> UrlMatch -> RouteOptions -> (Route -> Playwright ()) -> Playwright Bool
 installRouteHandler guid glob opts handler = do
