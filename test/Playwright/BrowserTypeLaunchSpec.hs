@@ -17,6 +17,7 @@ import Playwright.Harness
   ( assertProtocolContains
   , withChromiumBrowser
   , assertEqual
+  , testAssetsDir
   )
 import Test.Tasty
   ( TestTree
@@ -59,6 +60,18 @@ tests =
                 browserType
                 defaultLaunchOptions {launchOptionsExecutablePath = Just "random-invalid-path"}
             )
+    , testCase "should reject if launched browser fails immediately" $
+        withChromiumBrowser $ \_browser -> do
+          browserType <- chromium
+          dir <- testAssetsDir
+          assertProtocolContains
+            "Browser logs:"
+            ( launch
+                browserType
+                defaultLaunchOptions
+                  { launchOptionsExecutablePath = Just (dir <> "/dummy_bad_browser_executable.js")
+                  }
+            )
     , testCase "should fire close event for all contexts" $
         withChromiumBrowser $ \browser -> do
           ctx <- newContext browser
@@ -96,4 +109,3 @@ tests =
 -- userDataDir / port as untyped launch options (userDataDir belongs on launchPersistentContext)
 -- __testHookBeforeCreateBrowser timeout / Dummy exception
 -- `process` as options, `await using` (Node)
--- dummy_bad_browser_executable.js (same as invalid executablePath)
