@@ -32,7 +32,7 @@ import Playwright
   , defaultAriaSnapshotOptions
   , defaultGotoOptions
   , evaluate
-  , first
+
   , frameLocator
   , frames
   , goto
@@ -763,7 +763,7 @@ tests =
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/frames/frameset.html")) defaultGotoOptions
           checkSnapshot
-            (childLocator (first (frameLocator page (selectorFromText "frame"))) (selectorFromText "body"))
+            (childLocator (frameLocator page (selectorFromText "frame >> nth=0")) (selectorFromText "body"))
             ["- text: Hi, I'm frame"]
     , testCase "should snapshot with box from page" $
         withChromiumPage $ \page -> do
