@@ -74,6 +74,7 @@ import Playwright.GeolocationSpec qualified as GeolocationSpec
 import Playwright.GlobalFetchCookieSpec qualified as GlobalFetchCookieSpec
 import Playwright.GlobalFetch1Spec qualified as GlobalFetch1Spec
 import Playwright.GlobalFetch2Spec qualified as GlobalFetch2Spec
+import Playwright.HarSpec qualified as HarSpec
 import Playwright.HitTargetSpec qualified as HitTargetSpec
 import Playwright.IntegrationSpec qualified as IntegrationSpec
 import Playwright.InterceptionSpec qualified as InterceptionSpec
@@ -277,6 +278,7 @@ main =
         , GlobalFetchCookieSpec.tests
         , GlobalFetch1Spec.tests
         , GlobalFetch2Spec.tests
+        , HarSpec.tests
         , HitTargetSpec.tests
         , IntegrationSpec.tests
         , InterceptionSpec.tests
