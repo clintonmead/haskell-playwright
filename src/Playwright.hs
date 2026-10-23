@@ -581,6 +581,7 @@ module Playwright
   , latitudeFromInt
   , launch
   , launchPersistentContext
+  , launchWithSeleniumRemote
   , localStorage
   , locator
   , locatorBoundingBox
@@ -1482,6 +1483,9 @@ import Playwright.Keyboard
   )
 import Playwright.KeyboardModifier
   ( KeyboardModifier (KeyboardModifierAlt, KeyboardModifierControl, KeyboardModifierControlOrMeta, KeyboardModifierMeta, KeyboardModifierShift)
+  )
+import Playwright.Selenium
+  ( launchWithSeleniumRemote
   )
 import Playwright.LaunchOptions
   ( LaunchOptions (LaunchOptions, launchOptionsArgs, launchOptionsChromiumSandbox, launchOptionsDownloadsPath, launchOptionsExecutablePath, launchOptionsHeadless, launchOptionsIgnoreDefaultArgs, launchOptionsProxy, launchOptionsSlowMo, launchOptionsTimeout)
