@@ -64,6 +64,10 @@ import Playwright.Harness
   , withChromiumContextWith
   , assertEqual
   )
+import Playwright.ProxySocksSupport
+  ( socksProxyUrl
+  , withSocksMockServer
+  )
 import Test.Tasty
   ( TestTree
   , testGroup
@@ -105,6 +109,14 @@ tests =
           withContextProxy (ipProxy port) $ \page -> do
             _ <- goto page (urlFromText "http://non-existent.com/target.html") defaultGotoOptions
             assertEqual "title" "Served by the proxy" =<< title page
+    , testCase "should use socks proxy in second page" $
+        withSocksMockServer $ \port ->
+          withChromiumContextWith (proxyOpts (httpProxyHost (socksProxyUrl port))) $ \ctx page -> do
+            _ <- goto page (urlFromText "http://non-existent.com") defaultGotoOptions
+            assertEqual "first" "Served by the SOCKS proxy" =<< title page
+            page2 <- newPage ctx
+            _ <- goto page2 (urlFromText "http://non-existent.com") defaultGotoOptions
+            assertEqual "second" "Served by the SOCKS proxy" =<< title page2
     , testCase "should throw for socks5 authentication" $
         withChromiumBrowser $ \browser ->
           assertSocksAuth
@@ -161,8 +173,6 @@ tests =
 -- Upstream cases not ported here:
 --   should throw for bad server value: ProxyHost is a Text newtype, so a non-string server cannot be built.
 --   should use proxy for https urls: the harness has no TLS fixture and Warp cannot serve a CONNECT tunnel.
---   should use socks proxy, and in second page: the harness has no SOCKS5 fixture, and the test suite
---     does not depend on network, so a relay cannot be written here without a cabal change.
 --   should use ipv6 proxy: a Warp app on ::1 with an [::1]:port proxy failed with
 --     net::ERR_PROXY_CONNECTION_FAILED. The root cause was not confirmed, though the sandbox has ::1 on lo.
 
