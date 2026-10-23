@@ -4,6 +4,12 @@ module Playwright.ProxySpec
 
 import Data.ByteString.Char8 qualified as BS8
 import Data.ByteString.Lazy.Char8 qualified as LBS8
+import Data.IORef
+  ( IORef
+  , modifyIORef'
+  , newIORef
+  , readIORef
+  )
 import Data.Text
   ( Text
   , pack
@@ -126,7 +132,66 @@ tests =
           (launchWithProxy (httpProxyHost "http://localhost"))
           $ \_browser ->
             pure ()
+    , testGroup
+        "should proxy local network requests"
+        [ testGroup
+            "by default"
+            [ testCase "localhost" $ localNetworkCase Nothing "localhost"
+            , testCase "loopback address" $ localNetworkCase Nothing "127.0.0.1"
+            , testCase "link-local" $ localNetworkCase Nothing "169.254.169.254"
+            ]
+        , testGroup
+            "with other bypasses"
+            [ testCase "localhost" $ localNetworkCase (Just "example.com") "localhost"
+            , testCase "loopback address" $ localNetworkCase (Just "example.com") "127.0.0.1"
+            , testCase "link-local" $ localNetworkCase (Just "example.com") "169.254.169.254"
+            ]
+        ]
+    , testGroup
+        "should allow bypassing localhost requests"
+        [ testCase "localhost" $ bypassCase "localhost" "localhost"
+        , testCase "127.0.0.1" $ bypassCase "127.0.0.1" "127.0.0.1"
+        ]
+    , testGroup
+        "should bypass proxy for localhost when localhost is in bypass list"
+        [ testCase "localhost" $ bypassCase "localhost, 127.0.0.1" "localhost"
+        , testCase "127.0.0.1" $ bypassCase "localhost, 127.0.0.1" "127.0.0.1"
+        ]
     ]
+
+-- Requests to local hosts are sent through the proxy, which records them and
+-- answers with "Served by the proxy".
+localNetworkCase :: Maybe Text -> Text -> IO ()
+localNetworkCase bypass host = do
+  ref <- newIORef []
+  withApplication (pure (recordingProxy ref)) $ \proxyPort ->
+    withApplication (pure (titleApp "Served by the server")) $ \serverPort ->
+      withLaunchProxy (httpProxy proxyPort Nothing Nothing bypass) $ \page -> do
+        _ <- goto page (urlFromText ("http://" <> host <> ":" <> pack (show serverPort) <> "/target.html")) defaultGotoOptions
+        assertEqual "title" "Served by the proxy" =<< title page
+  seen <- readIORef ref
+  assertEqual "proxy recorded the request" True (not (null seen))
+
+-- A host listed in the bypass list is reached directly, not through the proxy.
+bypassCase :: Text -> Text -> IO ()
+bypassCase bypassList host =
+  withApplication (pure (titleApp "Served by the proxy")) $ \proxyPort ->
+    withApplication (pure (titleApp "Served by the server")) $ \serverPort ->
+      withLaunchProxy (httpProxy proxyPort Nothing Nothing (Just bypassList)) $ \page -> do
+        _ <- goto page (urlFromText ("http://" <> host <> ":" <> pack (show serverPort) <> "/proxied/target.html")) defaultGotoOptions
+        assertEqual "title" "Served by the server" =<< title page
+
+recordingProxy :: IORef [Text] -> Application
+recordingProxy ref request respond = do
+  let
+    host = maybe "" (pack . BS8.unpack) (lookup "host" (requestHeaders request))
+    path = pack (BS8.unpack (rawPathInfo request))
+  modifyIORef' ref (<> [host <> path])
+  respond (html "Served by the proxy")
+
+titleApp :: Text -> Application
+titleApp titleText _ respond =
+  respond (html titleText)
 
 withLaunchProxy :: ProxySettings -> (Page -> Playwright a) -> IO a
 withLaunchProxy settings action =
