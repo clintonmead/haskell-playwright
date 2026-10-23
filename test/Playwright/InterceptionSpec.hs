@@ -27,6 +27,7 @@ import Data.Text
   , replace
   , splitOn
   , toLower
+  , unpack
   )
 import Network.HTTP.Types
   ( hLocation
@@ -92,6 +93,10 @@ import Playwright
   )
 import Playwright.Error
   ( PlaywrightError
+  )
+import Playwright.UrlMatch
+  ( matchesUrlMatch
+  , resolveUrlMatch
   )
 import Playwright.Harness
   ( locate
@@ -353,7 +358,80 @@ tests =
           -- Escaped braces remain literal and must not throw.
           route page (UrlMatchGlob "\\{foo") continueRoute
           route page (UrlMatchGlob "foo\\}") continueRoute
+      , testCase "should work with glob" $
+          checkUrlMatches urlMatchCases
     ]
+
+-- | Glob cases from the upstream "should work with glob" test that the
+-- client can check without a URL parser. Each entry is
+-- (base URL, URL, glob, expected).
+--
+-- Not ported, because the client keeps URLs as raw text (Playwright.Url) and
+-- does not normalise them the way the TypeScript client's new URL() does:
+-- literal globs gaining a trailing slash (http://playwright.dev, h*://...,
+-- http://*.playwright.dev?x=y, http://playwright.dev?a=b, http://playwright./?ev),
+-- default ports (:80 and :443), host and scheme case (HtTpS://pLaYwRiGhT.dEv),
+-- percent-encoding (foo bar vs foo%20bar), IDN hosts (münchen.de), and an
+-- escaped query (playwright.dev\\?x=y vs playwright.dev/?x=y). Also not ported:
+-- the query-only relative globs ?bar and \\?bar resolved against
+-- http://playwright.dev/foo (joinAgainst resolves them against the directory,
+-- giving /?bar), and chrome:, edge: and file: schemes with a base URL
+-- (isAbsoluteUrl only knows about:, data:, blob: and ://), and my.{p,y}://**
+-- against the path-less my.p://foo, which the upstream client rejects.
+urlMatchCases :: [(Maybe Text, Text, Text, Bool)]
+urlMatchCases =
+  [ (Nothing, "?", "\\?", True)
+  , (Nothing, "\\", "\\\\", True)
+  , (Nothing, "[", "\\[", True)
+  , (Nothing, "[a-z]", "[a-z]", True)
+  , (Nothing, "a", "[a-z]", False)
+  , (Nothing, "$^+.*()|?{}[]", "$^+.\\*()|\\?\\{\\}\\[\\]", True)
+  , (Nothing, "http://playwright.dev/", "http://playwright.dev", False)
+  , (Nothing, "http://playwright.dev/foo/bar", "**/foo/**", True)
+  , (Just "http://playwright.dev/foo/", "http://playwright.dev/foo/bar?x=y", "./bar?x=y", True)
+  , (Nothing, "http://playwright.dev/foo$$bar", "http://playwright.dev/foo$$bar", True)
+  , (Nothing, "http://playwright.dev/a$&b", "http://playwright.dev/a$&b", True)
+  , (Just "http://playwright.dev", "http://playwright.dev/p$$q", "./p$$q", True)
+  , (Nothing, "https://playwright.dev/foobar", "https://playwright.dev/fooBAR", False)
+  , (Nothing, "https://playwright.dev/foobar?a=b", "https://playwright.dev/foobar?A=B", False)
+  , (Nothing, "http://example.com:8080/path", "http://example.com:8080/path", True)
+  , (Nothing, "https://localhost:3000/?a=b", "**/?a=b", True)
+  , (Nothing, "https://localhost:3000/?a=b", "**?a=b", True)
+  , (Nothing, "https://localhost:3000/?a=b", "**=b", True)
+  , (Nothing, "my.custom.protocol://foo", "my.custom.protocol://**", True)
+  , (Nothing, "my.p://foo/", "my.{p,y}://**", True)
+  , (Nothing, "file:///foo/", "f*e://**", True)
+  , (Nothing, "http://localhost:8080/Simple/path.js", "http://localhost:8080/?imple/path.js", False)
+  , (Nothing, "http://playwright.dev/", "http://playwright.?ev", False)
+  , (Nothing, "http://playwright.dev/foo", "http://playwright.dev/f??", False)
+  , (Nothing, "http://playwright.dev/f??", "http://playwright.dev/f??", True)
+  , (Nothing, "http://playwright.dev/?x=y", "http://playwright.dev/\\?x=y", True)
+  , (Just "http://first.host/", "http://second.host/foo", "**/foo", True)
+  , (Just "http://playwright.dev/", "http://localhost/", "*//localhost/", True)
+  , (Nothing, "https://foo/bar.js", "https://foo/**/bar.js", True)
+  , (Nothing, "https://foo/bar.js", "https://foo/**/**/bar.js", True)
+  ]
+    ++ concat
+      [ [ (Nothing, prefix <> ":blank", prefix <> ":blank", True)
+        , (Nothing, prefix <> ":blank", prefix <> ":*", True)
+        , (Nothing, "not" <> prefix <> ":blank", prefix <> ":*", False)
+        ]
+      | prefix <- ["about", "data", "chrome", "edge", "file"]
+      ]
+    ++ [ (Just "http://playwright.dev/", prefix <> ":blank", prefix <> ":blank", True)
+       | prefix <- ["about", "data"]
+       ]
+
+-- | Checks every case and reports all mismatches together.
+checkUrlMatches :: [(Maybe Text, Text, Text, Bool)] -> IO ()
+checkUrlMatches cases =
+  assertEqual "glob mismatches" [] (concatMap mismatch cases)
+  where
+    mismatch (base, url, glob, expected)
+      | actual == expected = []
+      | otherwise = [unpack glob <> " against " <> unpack url <> ": expected " <> show expected]
+      where
+        actual = matchesUrlMatch (resolveUrlMatch (urlFromText <$> base) (UrlMatchGlob glob)) (urlFromText url)
 
 containedIn :: Text -> Text -> Bool
 containedIn needle haystack =
