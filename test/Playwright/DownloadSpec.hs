@@ -24,7 +24,8 @@ import UnliftIO.Exception
   ( try
   )
 import UnliftIO.Directory
-  ( doesFileExist
+  ( doesDirectoryExist
+  , doesFileExist
   , listDirectory
   )
 import UnliftIO.Temporary
@@ -38,6 +39,9 @@ import Data.ByteString (ByteString)
 import Data.ByteString.Char8 qualified as BS8
 import Data.ByteString.Lazy qualified as LBS
 import Data.ByteString.Lazy.Char8 qualified as LBS8
+import Data.List
+  ( isPrefixOf
+  )
 import Data.Maybe
   ( isNothing
   )
@@ -64,6 +68,7 @@ import Network.Wai.Handler.Warp
   )
 import Playwright
   ( AcceptDownloads (AcceptDownloadsAccept, AcceptDownloadsDeny)
+  , Browser (browserChannel)
   , ClickOptions (clickOptionsModifiers)
   , Download
   , Exactness (Inexact)
@@ -76,6 +81,7 @@ import Playwright
   , NewContextOptions (newContextAcceptDownloads)
   , Page
   , Playwright
+  , ReadStream
   , UrlMatch (UrlMatchGlob)
   , click
   , clickWith
@@ -87,8 +93,10 @@ import Playwright
   , defaultClickOptions
   , defaultFulfillOptions
   , defaultGotoOptions
+  , defaultLaunchOptions
   , defaultNewContextOptions
   , downloadCancel
+  , downloadCreateReadStream
   , downloadDelete
   , downloadFailure
   , downloadPage
@@ -104,6 +112,8 @@ import Playwright
   , newBrowserPageWith
   , pageContext
   , pagesEqual
+  , readStreamChunk
+  , readStreamClose
   , route
   , routeFetch
   , selectorFromText
@@ -118,12 +128,26 @@ import Playwright.Error
   ( PlaywrightError (ProtocolRpc)
   , ProtocolFailure (protocolFailureMessage)
   )
+import Playwright.MethodName
+  ( MethodName (MethodName)
+  )
+import Playwright.Protocol
+  ( BrowserKillForTestsResult
+  , mkBrowserKillForTestsParams
+  )
+import Playwright.Channel
+  ( send
+  )
+import Playwright.LaunchOptions
+  ( LaunchOptions (launchOptionsArtifactsDir)
+  )
 import Playwright.Harness
   ( assertProtocolContains
   , readTestAsset
   , locate
   , withAssetPage
   , withChromiumBrowser
+  , withChromiumBrowserWith
   , withChromiumContextWith
   , assertEqual
   , assertFailure
@@ -486,7 +510,77 @@ tests =
             path <- downloadPath download
             saved <- liftIO (BS.readFile path)
             assertEqual "pdf bytes" pdf saved
+    , testCase "should expose stream" $
+        withDownloadServer $ \prefix page -> do
+          download <- clickHref page (prefix <> "/download")
+          stream <- downloadCreateReadStream download
+          content <- readAllChunks stream
+          readStreamClose stream
+          assertEqual "content" (BS8.pack "Hello world") content
+    , testCase "should save downloads to artifactsDir" $
+        withSystemTempDirectory "pw-artifacts" $ \dir -> do
+          let
+            artifactsDir = dir <> "/artifacts"
+          withApplication (pure downloadSuiteApp) $ \port -> do
+            let
+              prefix = "http://127.0.0.1:" <> pack (show port)
+            downloadPathValue <-
+              withChromiumBrowserWith defaultLaunchOptions {launchOptionsArtifactsDir = Just artifactsDir} $ \browser -> do
+                page <- newBrowserPageWith browser defaultNewContextOptions {newContextAcceptDownloads = Just AcceptDownloadsAccept}
+                download <- clickHref page (prefix <> "/download")
+                path <- downloadPath download
+                exists <- liftIO (doesFileExist path)
+                assertEqual "exists" True exists
+                pure path
+            assertEqual "under artifactsDir" True (artifactsDir `isPrefixOf` downloadPathValue)
+            keptDir <- doesDirectoryExist artifactsDir
+            assertEqual "artifactsDir kept" True keptDir
+    , testCase "should throw if browser dies" $
+        withSystemTempDirectory "pw-browser-dies" $ \dir ->
+          withApplication (pure downloadSuiteApp) $ \port ->
+            withChromiumBrowser $ \browser -> do
+              page <- newBrowserPageWith browser defaultNewContextOptions {newContextAcceptDownloads = Just AcceptDownloadsAccept}
+              download <-
+                clickHrefWith
+                  page
+                  ("<a href=\"http://127.0.0.1:" <> pack (show port) <> "/downloadWithDelay\">click me</a>")
+              pathResult <- async (protocolError (downloadPath download))
+              saveResult <- async (protocolError (downloadSaveAs download (dir <> "/download.txt")))
+              _ :: BrowserKillForTestsResult <-
+                send (browserChannel browser) (MethodName "killForTests") mkBrowserKillForTestsParams
+              pathError <- wait pathResult
+              saveError <- wait saveResult
+              assertEqual "path" True (targetClosed pathError)
+              assertEqual "saveAs" True (targetClosed saveError)
     ]
+
+-- Skipped: "should close the context without awaiting the failed download" needs an
+-- https test server (upstream httpsServer) to fail a TLS link on alt-click; this harness
+-- serves plain http only, so no download ever starts for that link.
+
+-- | Reads a download stream to its end, concatenating the chunks.
+readAllChunks :: ReadStream -> Playwright BS.ByteString
+readAllChunks stream = do
+  chunks <- collectChunks stream
+  pure (BS.concat chunks)
+
+collectChunks :: ReadStream -> Playwright [BS.ByteString]
+collectChunks stream = do
+  chunk <- readStreamChunk stream
+  case chunk of
+    Nothing ->
+      pure []
+    Just bytes ->
+      (bytes :) <$> collectChunks stream
+
+-- | True when a protocol error reports that the browser target was closed.
+targetClosed :: Maybe Text -> Bool
+targetClosed message =
+  case message of
+    Just text ->
+      "has been closed" `isInfixOf` text
+    Nothing ->
+      False
 
 -- | Runs a Playwright action and returns the protocol error message when it fails with one.
 protocolError :: Playwright a -> Playwright (Maybe Text)
