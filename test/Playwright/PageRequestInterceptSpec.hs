@@ -67,7 +67,10 @@ import Playwright
   , ContentType (ContentType)
   , FulfillBody (FulfillText)
   , FulfillOptions (fulfillBody, fulfillContentType, fulfillHeaders, fulfillResponse, fulfillStatus)
+  , ClickOptions (clickOptionsNoWaitAfter)
   , GotoOptions (gotoOptionsTimeout)
+  , InputFile (InputFile)
+  , InputFileName (InputFileName)
   , HeaderName (HeaderName, headerNameToText)
   , HeaderValue (HeaderValue, headerValueToText)
   , HttpHeader (HttpHeader, httpHeaderName, httpHeaderValue)
@@ -84,7 +87,9 @@ import Playwright
   , apiResponseText
   , apiResponseUrl
   , click
+  , clickWith
   , content
+  , defaultClickOptions
   , defaultFetchOptions
   , defaultFulfillOptions
   , defaultGotoOptions
@@ -106,13 +111,15 @@ import Playwright
   , routeFetchWith
   , routeRequest
   , setContent
+  , setInputFiles
   , textArgument
   , urlFromText
   , urlToText
   , Playwright
   )
 import Playwright.Harness
-  ( requireTimeout
+  ( locate
+  , requireTimeout
   , assertProtocolContains
   , readTestAsset
   , testAssetsDir
@@ -371,6 +378,31 @@ tests =
             postData <- fmap decodeUtf8 (takeMVar posted)
             assertBool "disposition" ("Content-Disposition: form-data; name=\"file\"; filename=\"blob\"" `isInfixOf` postData)
             assertBool "hello" ("\r\nhello\r\n" `isInfixOf` postData)
+      , testCase "should intercept multipart/form-data request body" $
+          withAssets $ \prefix page -> do
+            _ <- goto page (urlFromText (prefix <> "/input/fileupload.html")) defaultGotoOptions
+            bytes <- readTestAsset "file-to-upload.txt"
+            setInputFiles
+              (locate page "input[type=file]")
+              [InputFile (InputFileName "file-to-upload.txt") bytes]
+            captured <- newEmptyMVar
+            route page (UrlMatchGlob "**/upload") $ \handled -> do
+              request <- routeRequest handled
+              method <- requestMethod request
+              payload <- requestPostData request
+              _ <- tryPutMVar captured (httpMethodToText method, fromMaybe mempty payload)
+              fulfillRoute
+                handled
+                defaultFulfillOptions
+                  { fulfillStatus = Just (HttpStatus 200)
+                  , fulfillBody = Just (FulfillText "ok")
+                  }
+            clickWith
+              (locate page "input[type=submit]")
+              defaultClickOptions {clickOptionsNoWaitAfter = Just True}
+            (method, postData) <- takeMVar captured
+            assertEqual "method" "POST" method
+            assertBool "file contents" ("contents of the file" `isInfixOf` decodeUtf8 postData)
       , testCase "should abort favicon requests if interception is enabled" $
           withFaviconApp $ \prefix hits page -> do
             route page (UrlMatchGlob "**/*") $ \handled ->
