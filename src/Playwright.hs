@@ -9,6 +9,9 @@ module Playwright
   , AcceptDownloads (..)
   , AddLocatorHandlerOptions (..)
   , AriaRole (..)
+  , AriaSnapshotMode (..)
+  , AriaSnapshotOptions (..)
+  , defaultAriaSnapshotOptions
   , BoundingBox (..)
   , BodySize (..)
   , BindingName (..)
@@ -275,6 +278,10 @@ module Playwright
   , closePage
   , closePageReason
   , closePageWith
+  , pageAriaSnapshot
+  , pageAriaSnapshotJSON
+  , pageAriaSnapshotJSONWith
+  , pageAriaSnapshotWith
   , content
   , contentFrameHandle
   , BindingSource (BindingSource, bindingSourceContext, bindingSourceFrame, bindingSourcePage)
@@ -502,6 +509,10 @@ module Playwright
   , innerHtml
   , innerHtmlHandle
   , innerText
+  , ariaSnapshot
+  , ariaSnapshotJSON
+  , ariaSnapshotJSONWith
+  , ariaSnapshotWith
   , innerTextHandle
   , innerTextWith
   , inputValue
@@ -910,6 +921,13 @@ import Playwright.APIResponse
   , apiResponseStatusText
   , apiResponseText
   , apiResponseUrl
+  )
+import Playwright.AriaSnapshotMode
+  ( AriaSnapshotMode (AriaSnapshotModeAi, AriaSnapshotModeDefault)
+  )
+import Playwright.AriaSnapshotOptions
+  ( AriaSnapshotOptions (AriaSnapshotOptions, ariaSnapshotOptionsMode, ariaSnapshotOptionsDepth, ariaSnapshotOptionsBoxes, ariaSnapshotOptionsTimeout)
+  , defaultAriaSnapshotOptions
   )
 import Playwright.AriaRole
   ( AriaRole (AriaRole, ariaRoleToText)
@@ -1474,6 +1492,10 @@ import Playwright.Locator
   , hideHighlight
   , innerHtml
   , innerText
+  , ariaSnapshot
+  , ariaSnapshotJSON
+  , ariaSnapshotJSONWith
+  , ariaSnapshotWith
   , innerTextWith
   , inputValue
   , isChecked
@@ -1567,6 +1589,10 @@ import Playwright.Page
   , closePageReason
   , closePageWith
   , content
+  , pageAriaSnapshot
+  , pageAriaSnapshotJSON
+  , pageAriaSnapshotJSONWith
+  , pageAriaSnapshotWith
   , getByAltText
   , getByAltTextRegex
   , getByLabel

@@ -53,6 +53,10 @@ module Playwright.Locator
   , getByTitleRegex
   , hover
   , hoverWith
+  , ariaSnapshot
+  , ariaSnapshotJSON
+  , ariaSnapshotJSONWith
+  , ariaSnapshotWith
   , highlight
   , highlightWithStyle
   , hideHighlight
@@ -204,6 +208,17 @@ import Playwright.Frame.Action
   , tapFrameWith
   , typeTextFrame
   , uncheckFrame
+  )
+import Playwright.AriaSnapshotOptions
+  ( AriaSnapshotOptions (ariaSnapshotOptionsTimeout)
+  , defaultAriaSnapshotOptions
+  )
+import Playwright.Json.OpenJson
+  ( OpenJson
+  )
+import Playwright.Frame.AriaSnapshot
+  ( frameAriaSnapshot
+  , frameAriaSnapshotJSON
   )
 import Playwright.Frame.Inspect
   ( getAttributeFrame
@@ -735,6 +750,22 @@ selectOptionElementsWith loc elements opts = do
 elementHandleRef :: ElementHandle -> ChannelRef
 elementHandleRef handle =
   ChannelRef (channelGuid (elementHandleChannel handle))
+
+ariaSnapshot :: Locator -> Playwright Text
+ariaSnapshot loc = ariaSnapshotWith loc defaultAriaSnapshotOptions
+
+ariaSnapshotWith :: Locator -> AriaSnapshotOptions -> Playwright Text
+ariaSnapshotWith loc opts = do
+  timeout <- maybe (locatorActionTimeout loc) pure (ariaSnapshotOptionsTimeout opts)
+  frameAriaSnapshot (locatorFrame loc) (Just (locatorSelector loc)) timeout opts
+
+ariaSnapshotJSON :: Locator -> Playwright OpenJson
+ariaSnapshotJSON loc = ariaSnapshotJSONWith loc defaultAriaSnapshotOptions
+
+ariaSnapshotJSONWith :: Locator -> AriaSnapshotOptions -> Playwright OpenJson
+ariaSnapshotJSONWith loc opts = do
+  timeout <- maybe (locatorActionTimeout loc) pure (ariaSnapshotOptionsTimeout opts)
+  frameAriaSnapshotJSON (locatorFrame loc) (Just (locatorSelector loc)) timeout opts
 
 innerText :: Locator -> Playwright Text
 innerText loc =

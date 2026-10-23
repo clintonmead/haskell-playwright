@@ -4,6 +4,10 @@ module Playwright.Page
   , bringToFront
   , pageHideHighlight
   , closePage
+  , pageAriaSnapshot
+  , pageAriaSnapshotJSON
+  , pageAriaSnapshotJSONWith
+  , pageAriaSnapshotWith
   , content
   , goto
   , locator
@@ -144,6 +148,17 @@ import Playwright.Frame
   , gotoFrame
   , setContentFrameWith
   , titleFrame
+  )
+import Playwright.AriaSnapshotOptions
+  ( AriaSnapshotOptions (ariaSnapshotOptionsTimeout)
+  , defaultAriaSnapshotOptions
+  )
+import Playwright.Json.OpenJson
+  ( OpenJson
+  )
+import Playwright.Frame.AriaSnapshot
+  ( frameAriaSnapshot
+  , frameAriaSnapshotJSON
   )
 import Playwright.Frame.Inspect
   ( querySelectorAllFrame
@@ -532,6 +547,22 @@ url page = currentUrl (pageMainFrame page)
 
 content :: Page -> Playwright Text
 content page = frameContent (pageMainFrame page)
+
+pageAriaSnapshot :: Page -> Playwright Text
+pageAriaSnapshot page = pageAriaSnapshotWith page defaultAriaSnapshotOptions
+
+pageAriaSnapshotWith :: Page -> AriaSnapshotOptions -> Playwright Text
+pageAriaSnapshotWith page opts = do
+  timeout <- maybe (pageActionTimeout page) pure (ariaSnapshotOptionsTimeout opts)
+  frameAriaSnapshot (pageMainFrame page) Nothing timeout opts
+
+pageAriaSnapshotJSON :: Page -> Playwright OpenJson
+pageAriaSnapshotJSON page = pageAriaSnapshotJSONWith page defaultAriaSnapshotOptions
+
+pageAriaSnapshotJSONWith :: Page -> AriaSnapshotOptions -> Playwright OpenJson
+pageAriaSnapshotJSONWith page opts = do
+  timeout <- maybe (pageActionTimeout page) pure (ariaSnapshotOptionsTimeout opts)
+  frameAriaSnapshotJSON (pageMainFrame page) Nothing timeout opts
 
 setContent :: Page -> Text -> Playwright ()
 setContent page html =
