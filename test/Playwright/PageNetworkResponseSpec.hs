@@ -88,6 +88,7 @@ import Playwright
   , responseRequest
   , responseStatus
   , responseStatusText
+  , responseHttpVersion
   , responseText
   , responseUrl
   , route
@@ -543,6 +544,14 @@ tests =
               assertFailure ("expected ProtocolRpc, got: " <> show err)
             Right _ ->
               assertFailure "expected responseBody to fail after navigating away"
+    , testCase "should return http version" $
+        withAssets $ \prefix page -> do
+          response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          case response of
+            Nothing ->
+              assertFailure "missing response"
+            Just value ->
+              assertEqual "http version" "HTTP/1.1" =<< responseHttpVersion value
     ]
 
 sortedHeaders :: [HttpHeader] -> [(Text, Text)]
