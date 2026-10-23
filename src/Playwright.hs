@@ -93,6 +93,11 @@ module Playwright
   , LoadState (..)
   , Locale (..)
   , Locator (..)
+  , ExpectOptions (..)
+  , defaultExpectOptions
+  , expectLocator
+  , expectLocatorWith
+  , expectLocatorCount
   , LocatorHandlerTimes (..)
   , Longitude (..)
   , MediaType (..)
@@ -1448,6 +1453,13 @@ import Playwright.LoadState
   )
 import Playwright.Locale
   ( Locale (Locale, localeToText)
+  )
+import Playwright.Expect
+  ( ExpectOptions (ExpectOptions, expectIsNot, expectTimeout)
+  , defaultExpectOptions
+  , expectLocator
+  , expectLocatorCount
+  , expectLocatorWith
   )
 import Playwright.Locator
   ( Locator (Locator, locatorContextChannel, locatorFrame, locatorMainFrame, locatorPageChannel, locatorSelector)
