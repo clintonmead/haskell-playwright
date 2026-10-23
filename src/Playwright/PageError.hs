@@ -3,6 +3,7 @@ module Playwright.PageError
   , clearPageErrors
   , pageErrorFromSerialized
   , pageErrors
+  , pageErrorsWith
   , waitForPageError
   ) where
 
@@ -32,9 +33,14 @@ import Playwright.MethodName
 import Playwright.Page
   ( Page (pageChannel, pageContextChannel)
   )
+import Playwright.PageConsole
+  ( ConsoleFilter (ConsoleFilterSinceNavigation)
+  , consoleFilterProtocol
+  )
 import Playwright.Protocol
   ( BrowserContextPageErrorEvent (browserContextPageErrorEventError, browserContextPageErrorEventPage)
   , PageClearPageErrorsResult
+  , PagePageErrorsParams (pagePageErrorsParamsFilter)
   , PagePageErrorsResult (pagePageErrorsResultErrors)
   , mkPageClearPageErrorsParams
   , mkPagePageErrorsParams
@@ -71,12 +77,17 @@ waitForPageError page = do
     else waitForPageError page
 
 pageErrors :: Page -> Playwright [PageError]
-pageErrors page = do
+pageErrors page =
+  pageErrorsWith page ConsoleFilterSinceNavigation
+
+-- | Page errors the page has seen, narrowed by the given filter.
+pageErrorsWith :: Page -> ConsoleFilter -> Playwright [PageError]
+pageErrorsWith page filterChoice = do
   result <-
     send
       (pageChannel page)
       (MethodName "pageErrors")
-      mkPagePageErrorsParams
+      (mkPagePageErrorsParams {pagePageErrorsParamsFilter = Just (consoleFilterProtocol filterChoice)})
   pure (fmap pageErrorFromSerialized (pagePageErrorsResultErrors result))
 
 clearPageErrors :: Page -> Playwright ()

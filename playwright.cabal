@@ -139,6 +139,7 @@ library
       Playwright.Page.Network
       Playwright.Page.Query
       Playwright.Page.Wait
+      Playwright.PageConsole
       Playwright.PageError
       Playwright.PdfOptions
       Playwright.PermissionName

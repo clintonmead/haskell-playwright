@@ -237,6 +237,10 @@ module Playwright
   , apiResponseTiming
   , apiResponseUrl
   , armConsole
+  , clearConsoleMessages
+  , consoleMessages
+  , consoleMessagesWith
+  , ConsoleFilter (..)
   , armDialog
   , onDialog
   , onPageDialogClosed
@@ -691,6 +695,7 @@ module Playwright
   , ownerFrameHandle
   , pageContext
   , pageErrors
+  , pageErrorsWith
   , pageFromRef
   , pageGetAttribute
   , pageInnerHtml
@@ -1883,10 +1888,17 @@ import Playwright.BrowserContext.Wait
   , armContextDialog
   , waitForContextDialog
   )
+import Playwright.PageConsole
+  ( ConsoleFilter (ConsoleFilterAll, ConsoleFilterSinceNavigation)
+  , clearConsoleMessages
+  , consoleMessages
+  , consoleMessagesWith
+  )
 import Playwright.PageError
   ( PageError (PageError, pageErrorMessage, pageErrorName, pageErrorStack)
   , clearPageErrors
   , pageErrors
+  , pageErrorsWith
   , waitForPageError
   )
 import Playwright.PdfOptions
