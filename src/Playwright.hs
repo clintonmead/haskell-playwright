@@ -1585,7 +1585,7 @@ import Playwright.MimeType
   ( MimeType (MimeType, mimeTypeToText)
   )
 import Playwright.NewContextOptions
-  ( NewContextOptions (NewContextOptions, newContextAcceptDownloads, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextContrast, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextForcedColors, newContextGeolocation, newContextHasTouch, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextIsMobile, newContextJavaScriptEnabled, newContextLocale, newContextNoDefaultViewport, newContextOffline, newContextPermissions, newContextProxy, newContextReducedMotion, newContextScreen, newContextServiceWorkers, newContextStorageState, newContextStrictSelectors, newContextTimezoneId, newContextUserAgent, newContextViewport)
+  ( NewContextOptions (NewContextOptions, newContextAcceptDownloads, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextContrast, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextForcedColors, newContextGeolocation, newContextHasTouch, newContextHttpCredentials, newContextIgnoreHTTPSErrors, newContextIsMobile, newContextJavaScriptEnabled, newContextLocale, newContextNoDefaultViewport, newContextOffline, newContextPermissions, newContextProxy, newContextRecordHar, newContextReducedMotion, newContextScreen, newContextServiceWorkers, newContextStorageState, newContextStrictSelectors, newContextTimezoneId, newContextUserAgent, newContextViewport)
   , defaultNewContextOptions
   )
 import Playwright.NewRequestOptions
