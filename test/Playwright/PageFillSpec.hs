@@ -160,6 +160,12 @@ tests =
             assertProtocolContains
               "Element is not an <input>, <textarea> or [contenteditable] element"
               (fill (locate page "select") "")
+      , testCase "should throw nice error without injected script stack when element is not an <input>" $
+          withChromiumPage $ \page -> do
+            setContent page "<select><option>value1</option></select>"
+            assertProtocolContains
+              "Element is not an <input>, <textarea> or [contenteditable] element\nCall log:"
+              (fill (locate page "select") "")
       , testCase "should fill color input case insensitive" $
           withChromiumPage $ \page -> do
             setContent page "<input type=color value=\"#e66465\">"
