@@ -186,6 +186,7 @@ import Playwright.Protocol
   )
 import Playwright.RaceTimeout
   ( waitWithTimeout
+  , waitWithTimeoutLog
   )
 import Playwright.Request
   ( Request
@@ -213,7 +214,7 @@ import Playwright.Url
   ( Url
   )
 import Playwright.UrlMatch
-  ( UrlMatch
+  ( UrlMatch (UrlMatchGlob, UrlMatchPredicate, UrlMatchRegex)
   , matchesUrlMatch
   , resolveUrlMatch
   )
@@ -728,7 +729,21 @@ armResponseWith page glob timeout = do
   base <- lookupContextBaseUrl (channelGuid (pageContextChannel page))
   let
     resolved = resolveUrlMatch base glob
-  armResponseWhereWith page (\response -> matchesUrlMatch resolved <$> responseUrl response) timeout
+  armResponseRaced
+    page
+    (\response -> matchesUrlMatch resolved <$> responseUrl response)
+    (waitWithTimeoutLog ("waiting for response " <> describeUrlMatch glob) timeout)
+
+-- | The call log form of a URL match, as Playwright prints it in a timeout.
+describeUrlMatch :: UrlMatch -> Text
+describeUrlMatch glob =
+  case glob of
+    UrlMatchGlob pattern ->
+      "\"" <> pattern <> "\""
+    UrlMatchRegex source flags ->
+      "/" <> source <> "/" <> flags
+    UrlMatchPredicate _ ->
+      "predicate"
 
 -- | Waits for the next response that the predicate accepts.
 waitForResponseWhere :: Page -> (Response -> Playwright Bool) -> Playwright Response
@@ -744,10 +759,20 @@ armResponseWhere page predicate = do
   armResponseWhereWith page predicate timeout
 
 armResponseWhereWith :: Page -> (Response -> Playwright Bool) -> Timeout -> Playwright (Playwright Response)
-armResponseWhereWith page predicate timeout = do
+armResponseWhereWith page predicate timeout =
+  armResponseRaced page predicate (waitWithTimeout timeout)
+
+-- | Registers the response waiter, then wraps the collecting action in the
+-- given timeout race.
+armResponseRaced ::
+  Page ->
+  (Response -> Playwright Bool) ->
+  (Playwright Response -> Playwright Response) ->
+  Playwright (Playwright Response)
+armResponseRaced page predicate withTimeout = do
   firstWaiter <- registerFreshEventWaiter guid (MethodName "response")
   subscribeContext page BrowserContextUpdateSubscriptionParamsEventResponse
-  pure (waitWithTimeout timeout (collectResponse firstWaiter))
+  pure (withTimeout (collectResponse firstWaiter))
   where
     guid = channelGuid (pageContextChannel page)
     collectResponse waitId = do

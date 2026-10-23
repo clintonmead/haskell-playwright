@@ -74,6 +74,8 @@ data PlaywrightError
   | BrowserPathMissing
   | EvaluateUnexpected SerializedValue
   | WaitTimeout Timeout
+  | -- | A wait timed out. The text is the call log line naming what was waited for.
+    WaitTimeoutLog Timeout Text
   | RouteAlreadyHandled
   | SelectorsRegister Text
   | LocatorNotMainFrame
