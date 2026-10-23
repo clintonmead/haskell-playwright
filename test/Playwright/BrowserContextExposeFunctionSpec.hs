@@ -33,7 +33,9 @@ import UnliftIO.Exception
   )
 import Playwright
   ( BindingName (BindingName)
+  , BindingSource (bindingSourceContext, bindingSourceFrame, bindingSourcePage)
   , addContextInitScript
+  , contextExposeBinding
   , addInitScript
   , reload
   , newPage
@@ -49,6 +51,18 @@ import Playwright
   , numberArgument
   , urlFromText
   , Playwright
+  )
+import Playwright.BrowserContext
+  ( BrowserContext (browserContextChannel)
+  )
+import Playwright.Channel
+  ( Channel (channelGuid)
+  )
+import Playwright.Frame
+  ( Frame (frameChannel)
+  )
+import Playwright.Page
+  ( Page (pageChannel, pageMainFrame)
   )
 import Playwright.Error
   ( PlaywrightError (EvaluateUnexpected, ProtocolRpc)
@@ -88,6 +102,29 @@ tests =
           _ <- contextExposeFunction ctx (BindingName "add") add
           assertEqual "sum" (11 :: Double)
             =<< evaluateNumber page "async () => window.add(5, 6)"
+    , testCase "expose binding should work" $
+        withChromiumContext $ \ctx _ -> do
+          seen <- newIORef (Nothing :: Maybe BindingSource)
+          _ <- contextExposeBinding ctx (BindingName "add") $ \source args -> do
+            writeIORef seen (Just source)
+            add args
+          page <- newPage ctx
+          assertEqual "sum" (11 :: Double)
+            =<< evaluateNumber page "async () => window.add(5, 6)"
+          recorded <- readIORef seen
+          case recorded of
+            Nothing ->
+              assertFailure "expected the binding to be called"
+            Just source -> do
+              assertBool "context" $
+                channelGuid (browserContextChannel (bindingSourceContext source))
+                  == channelGuid (browserContextChannel ctx)
+              assertBool "page" $
+                channelGuid (pageChannel (bindingSourcePage source))
+                  == channelGuid (pageChannel page)
+              assertBool "frame" $
+                channelGuid (frameChannel (bindingSourceFrame source))
+                  == channelGuid (frameChannel (pageMainFrame page))
     , testCase "should throw for duplicate registrations" $
         withChromiumContext $ \ctx _ -> do
           _ <- contextExposeFunction ctx (BindingName "foo") add
