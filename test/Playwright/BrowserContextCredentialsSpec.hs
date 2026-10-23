@@ -34,8 +34,9 @@ import Playwright
   , HttpPassword (HttpPassword)
   , HttpStatus (httpStatusToInt)
   , HttpUsername (HttpUsername)
-  , NewContextOptions (newContextHttpCredentials)
+  , NewContextOptions (newContextHttpCredentials, newContextHttpCredentialsList)
   , Response
+  , Url
   , defaultGotoOptions
   , defaultNewContextOptions
   , evaluateText
@@ -43,6 +44,7 @@ import Playwright
   , reload
   , responseStatus
   , setHTTPCredentials
+  , setHTTPCredentialsList
   , urlFromText
   , Playwright
   )
@@ -194,7 +196,89 @@ tests =
               response <-
                 goto page (urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/empty.html")) defaultGotoOptions
               assertEqual "status" 200 =<< statusCode response
+    , testCase "should work with setHTTPCredentials and multiple credentials" $
+        withAuthServer $ \port ->
+          withChromiumContextWith defaultNewContextOptions $ \ctx page -> do
+            setHTTPCredentialsList
+              ctx
+              [ credentialsFor "user" "pass" (Just (serverOrigin port))
+              , credentialsFor "user2" "pass2" (Just (crossProcessOrigin port))
+              ]
+            response1 <- goto page (emptyPageUrl (serverOrigin port)) defaultGotoOptions
+            assertEqual "status" 200 =<< statusCode response1
+            -- Wrong credentials are picked for the other origin.
+            response2 <- goto page (emptyPageUrl (crossProcessOrigin port)) defaultGotoOptions
+            assertEqual "other origin" 401 =<< statusCode response2
+    , testCase "should work with a single credential in an array" $
+        withAuthServer $ \port ->
+          withChromiumContextWith (withCredentialsList [validCredentials]) $ \_ page -> do
+            response <- goto page (emptyPageUrl (serverOrigin port)) defaultGotoOptions
+            assertEqual "status" 200 =<< statusCode response
+    , testCase "should work with multiple credentials for different origins" $
+        withAuthServer $ \port ->
+          withChromiumContextWith
+            ( withCredentialsList
+                [ credentialsFor "user" "pass" (Just (serverOrigin port))
+                , credentialsFor "user2" "pass2" (Just (crossProcessOrigin port))
+                ]
+            )
+            $ \_ page -> do
+              response1 <- goto page (emptyPageUrl (serverOrigin port)) defaultGotoOptions
+              assertEqual "status" 200 =<< statusCode response1
+              -- Wrong credentials are picked for the other origin.
+              response2 <- goto page (emptyPageUrl (crossProcessOrigin port)) defaultGotoOptions
+              assertEqual "other origin" 401 =<< statusCode response2
+    , testCase "should fall back to credentials without origin" $
+        withAuthServer $ \port ->
+          withChromiumContextWith
+            ( withCredentialsList
+                [ credentialsFor "user2" "pass2" (Just (crossProcessOrigin port))
+                , credentialsFor "user" "pass" Nothing
+                ]
+            )
+            $ \_ page -> do
+              response1 <- goto page (emptyPageUrl (serverOrigin port)) defaultGotoOptions
+              assertEqual "status" 200 =<< statusCode response1
+              -- First matching entry has wrong credentials for this origin.
+              response2 <- goto page (emptyPageUrl (crossProcessOrigin port)) defaultGotoOptions
+              assertEqual "other origin" 401 =<< statusCode response2
+    , testCase "should use the first matching credential" $
+        withAuthServer $ \port ->
+          withChromiumContextWith
+            ( withCredentialsList
+                [ credentialsFor "wrong" "wrong" Nothing
+                , credentialsFor "user" "pass" (Just (serverOrigin port))
+                ]
+            )
+            $ \_ page -> do
+              response <- goto page (emptyPageUrl (serverOrigin port)) defaultGotoOptions
+              assertEqual "status" 401 =<< statusCode response
     ]
+
+-- | The test server, reached by address.
+serverOrigin :: Int -> Text
+serverOrigin port = "http://127.0.0.1:" <> pack (show port)
+
+-- | The same test server reached by hostname, which makes a different origin.
+crossProcessOrigin :: Int -> Text
+crossProcessOrigin port = "http://localhost:" <> pack (show port)
+
+emptyPageUrl :: Text -> Url
+emptyPageUrl origin = urlFromText (origin <> "/empty.html")
+
+credentialsFor :: Text -> Text -> Maybe Text -> HttpCredentials
+credentialsFor user password origin =
+  HttpCredentials
+    { httpCredentialsUsername = HttpUsername user
+    , httpCredentialsPassword = HttpPassword password
+    , httpCredentialsOrigin = fmap urlFromText origin
+    , httpCredentialsSend = Nothing
+    }
+
+-- | A context option set holding only the given credentials list.
+withCredentialsList :: [HttpCredentials] -> NewContextOptions
+withCredentialsList creds =
+  defaultNewContextOptions {newContextHttpCredentialsList = creds}
 
 -- | Answers /echo-auth with the Authorization header the request sent, and
 -- applies the basic check everywhere else.
