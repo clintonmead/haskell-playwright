@@ -62,6 +62,7 @@ import Playwright.BrowserContextFetchSupport
   , drainCaptured
   , lookupHeader
   , compressionTest
+  , apiTimingTest
   , corruptedCompressionTest
   , withSlowThenDoneApp
   , withSlowRedirectApp
@@ -113,7 +114,8 @@ tests =
   localOption (mkTimeout 30000000) $
     testGroup
       "browsercontext-fetch"
-      [ testCase "should return error with wrong credentials" $
+      [ testCase "should return timing" apiTimingTest
+      , testCase "should return error with wrong credentials" $
           withAuthApp $ \prefix _captured ctx -> do
             request <- contextRequest ctx
             setHTTPCredentials

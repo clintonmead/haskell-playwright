@@ -27,6 +27,7 @@ module Playwright.BrowserContextFetchSupport
   , decodePair
   , failOnStatusTest
   , withPartialBodyApp
+  , apiTimingTest
   , partialBodyApp
   , withCookieCapture
   , cookieCaptureApp
@@ -244,7 +245,17 @@ import Playwright
   , apiResponseStatus
   , apiResponseStatusText
   , apiResponseText
+  , apiResponseTiming
   , apiResponseUrl
+  , resourceTimingConnectEnd
+  , resourceTimingConnectStart
+  , resourceTimingDomainLookupEnd
+  , resourceTimingDomainLookupStart
+  , resourceTimingRequestStart
+  , resourceTimingResponseEnd
+  , resourceTimingResponseStart
+  , resourceTimingSecureConnectionStart
+  , resourceTimingStartTime
   , closeContext
   , closeContextWith
   , contextRequest
@@ -269,6 +280,9 @@ import Playwright
 import Playwright.Error
   ( PlaywrightError (DecodeFailure, ProtocolRpc)
   , ProtocolFailure (protocolFailureMessage)
+  )
+import Data.Time.Clock.POSIX
+  ( getPOSIXTime
   )
 import Playwright.Harness
   ( requireTimeout
@@ -1517,6 +1531,45 @@ headerValue name headers =
 splitSemi :: Text -> [Text]
 splitSemi text =
   filter (/= "") (fmap trim (splitOn ";" text))
+
+-- | Port of "should return timing": a fresh server guarantees a new connection,
+-- so the dns/connect phases are reported.
+apiTimingTest :: IO ()
+apiTimingTest =
+  withApplication (pure timingApp) $ \port ->
+    withChromiumContext $ \ctx _page -> do
+      request <- contextRequest ctx
+      response <-
+        fetchGet request (urlFromText ("http://localhost:" <> pack (show port) <> "/"))
+      assertBool "response is ok" (apiResponseOk response)
+      now <- liftIO getPOSIXTime
+      let
+        timing = apiResponseTiming response
+        startMs = realToFrac (resourceTimingStartTime timing) :: Double
+        nowMs = realToFrac now * 1000 :: Double
+        domainLookupStart = resourceTimingDomainLookupStart timing
+        domainLookupEnd = resourceTimingDomainLookupEnd timing
+        connectStart = resourceTimingConnectStart timing
+        secureConnectionStart = resourceTimingSecureConnectionStart timing
+        connectEnd = resourceTimingConnectEnd timing
+        requestStart = resourceTimingRequestStart timing
+        responseStart = resourceTimingResponseStart timing
+        responseEnd = resourceTimingResponseEnd timing
+      -- toBeCloseTo(Date.now(), -4) allows a difference below 5000ms.
+      assertBool "startTime is close to now" (abs (startMs - nowMs) < 5000)
+      assertEqual "domainLookupStart" 0 domainLookupStart
+      assertBool "domainLookupEnd >= domainLookupStart" (domainLookupEnd >= domainLookupStart)
+      assertEqual "connectStart" domainLookupEnd connectStart
+      assertEqual "secureConnectionStart" (-1) secureConnectionStart
+      assertBool "connectEnd >= connectStart" (connectEnd >= connectStart)
+      assertEqual "requestStart" connectEnd requestStart
+      assertBool "responseStart >= requestStart" (responseStart >= requestStart)
+      assertBool "responseEnd >= responseStart" (responseEnd >= responseStart)
+      assertBool "responseEnd < 60000" (responseEnd < 60000)
+
+timingApp :: Application
+timingApp _request respond =
+  respond (responseLBS status200 [] "Hello")
 
 trim :: Text -> Text
 trim =
