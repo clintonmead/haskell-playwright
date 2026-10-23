@@ -413,6 +413,7 @@ test-suite playwright-test
       Playwright.PageGotoSupport
       Playwright.PageHistorySpec
       Playwright.PageKeyboardSpec
+      Playwright.PageLeaksSpec
       Playwright.PageListenersSpec
       Playwright.PageLocalStorageSpec
       Playwright.PageMouseSpec

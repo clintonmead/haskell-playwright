@@ -29,8 +29,6 @@ Skipped `tests/page` specs that depend on `expect` (no Haskell spec, not started
 - page-click-during-navigation (JS `__testHookAfterStable` only)
 - page-evaluate-no-stall (JS `toImpl` / nonStallingRawEvaluate — not a public API)
 - page-evaluate-world (no HS file; the driver drops the `world` option on 1.64.1, q-95, 8 cases)
-- page-leaks (JS `toImpl` / leakedJSHandles)
-- page-listeners (JS `removeAllListeners` wait/ignoreErrors)
 
 ## Ported `tests/page` with remaining cases
 

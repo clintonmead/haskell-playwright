@@ -141,3 +141,10 @@ Each line below links to the full entry in [progress/QUESTIONS-ARCHIVE.md](progr
 - Q: Should `launchServer` be its own method? A: No. Haskell exposes `bindBrowser`, `bindBrowserWith` and `unbindBrowser` over `Browser.startServer` and `Browser.stopServer`. Best guess: launch-then-bind composition comes later.
 - Q: The launcher headed-no-xserver case. A: Skipped. The message is only produced when Chromium logs "Missing X server", and Chromium 1248 starts headed with DISPLAY unset on this host, so the assertion cannot pass here. Best guess: a port needs a host where Chromium fails without a display.
 - Q: channels and signals cases. A: All skipped, since they need `_debugScopeState()`, Node's `domain` module, or the Node-side `launchServer` child process. Best guess: revisit once the driver exposes an introspection channel and a launch-server path exists.
+
+## page-listeners / page-leaks slice (feat-page-leaks-listeners)
+
+- Q: Is console listener removal a general `removeAllListeners` or console-only? A: Console only, through `removeAllConsoleListeners :: Page -> ListenerRemoval -> Playwright ()`. Best guess: other event types can reuse `removeScopedEventHandlers` when they are ported.
+- Q: "wait should throw" needs the removal to register before the handler finishes, otherwise its error is dropped. A: The test waits 200 ms before releasing the handler. Best guess: a deterministic hook would need a removal-registered signal in the driver path, so the timing wait stays until then.
+- Q: page-leaks "expect should not leak" uses `toBeVisible`. A: The Haskell port checks `isVisible` once per element, not the retrying `expect` matcher, since Playwright `expect` is not in this client. Best guess: the element is visible as soon as it is appended, so the one-shot check is enough for the leak count.
+- Q: page-leaks counts. A: Only main-world WeakRefs are counted, with a retry loop of 20 attempts at 100 ms after `requestGC`. Best guess: the utility-world count and the leakedJSHandles assertion are not reachable from the client.
