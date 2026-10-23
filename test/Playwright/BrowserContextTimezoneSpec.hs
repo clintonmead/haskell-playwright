@@ -57,16 +57,20 @@ tests =
         assertTimezone (TimezoneId "Europe/Berlin") "Sat Nov 19 2016 19:12:34 GMT+0100"
     , testCase "should throw for invalid timezone IDs when creating pages" $
         withChromiumBrowser $ \browser ->
-          assertProtocolContains
-            "Invalid timezone ID: Foo/Bar"
-            ( do
-                ctx <-
-                  newContextWith
-                    browser
-                    defaultNewContextOptions {newContextTimezoneId = Just (TimezoneId "Foo/Bar")}
-                _ <- newPage ctx
-                pure ()
+          mapM_
+            ( \zone ->
+                assertProtocolContains
+                  ("Invalid timezone ID: " <> zone)
+                  ( do
+                      ctx <-
+                        newContextWith
+                          browser
+                          defaultNewContextOptions {newContextTimezoneId = Just (TimezoneId zone)}
+                      _ <- newPage ctx
+                      pure ()
+                  )
             )
+            ["Foo/Bar", "Baz/Qux"]
     , testCase "should work for multiple pages sharing same process" $
         withAssetsContextWith
           defaultNewContextOptions {newContextTimezoneId = Just (TimezoneId "Europe/Moscow")}
