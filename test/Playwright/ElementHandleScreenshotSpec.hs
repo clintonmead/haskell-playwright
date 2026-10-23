@@ -12,12 +12,18 @@ import Data.ByteString
   ( ByteString
   )
 import Data.ByteString qualified as BS
+import Data.ByteString.Base64
+  ( encode
+  )
 import Data.Maybe
   ( isNothing
   )
 import Data.Text
   ( Text
   , isInfixOf
+  )
+import Data.Text.Encoding
+  ( decodeUtf8
   )
 import Playwright
   ( BindingName (BindingName)
@@ -28,7 +34,7 @@ import Playwright
       , screenshotOptionsTimeout
       , screenshotOptionsType
       )
-  , ScreenshotType (ScreenshotJpeg)
+  , ScreenshotType (ScreenshotJpeg, ScreenshotWebp)
   , ViewportHeight (ViewportHeight)
   , ViewportSize (ViewportSize)
   , ViewportWidth (ViewportWidth)
@@ -37,6 +43,7 @@ import Playwright
   , evaluate
   , evaluateNumber
   , evaluateOnElement
+  , evaluateText
   , exposeFunction
   , goto
   , milliseconds
@@ -98,6 +105,28 @@ tests =
           image <- screenshotHandle handle
           assertBool "png signature" (pngMagic `BS.isPrefixOf` image)
           assertBool "non-empty" (BS.length image > 100)
+    , testCase "should work with webp" $
+        withAssets $ \prefix page -> do
+          setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 500))
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          handle <- requireHandle =<< querySelector page (selectorFromText ".box:nth-of-type(3)")
+          webpImage <-
+            screenshotHandleWith
+              handle
+              []
+              defaultScreenshotOptions
+                { screenshotOptionsType = Just ScreenshotWebp
+                }
+          -- The default webp screenshot is lossless, so it must decode to the exact same pixels as png.
+          pngImage <- screenshotHandle handle
+          result <-
+            evaluateText
+              page
+              ( webpDecodeScript
+                  (decodeUtf8 (encode webpImage))
+                  (decodeUtf8 (encode pngImage))
+              )
+          assertEqual "decoded webp matches png" "same" result
     , testCase "should work when main world busts JSON.stringify" $
         withAssets $ \prefix page -> do
           setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 500))
@@ -324,3 +353,39 @@ pngSize image =
 bigEndian32 :: ByteString -> Int
 bigEndian32 =
   BS.foldl' (\acc byte -> acc * 256 + fromIntegral byte) 0
+
+-- | Decodes the webp and png element screenshots in the browser and compares
+-- their dimensions and pixels. Returns "same" when they match.
+webpDecodeScript :: Text -> Text -> Text
+webpDecodeScript webpBase64 pngBase64 =
+  "async () => {\n"
+    <> "  const load = (src) => new Promise((resolve, reject) => {\n"
+    <> "    const img = new Image();\n"
+    <> "    img.onload = () => resolve(img);\n"
+    <> "    img.onerror = () => reject(new Error('decode failed'));\n"
+    <> "    img.src = src;\n"
+    <> "  });\n"
+    <> "  const pixels = async (src) => {\n"
+    <> "    const img = await load(src);\n"
+    <> "    const canvas = document.createElement('canvas');\n"
+    <> "    canvas.width = img.naturalWidth;\n"
+    <> "    canvas.height = img.naturalHeight;\n"
+    <> "    const ctx = canvas.getContext('2d');\n"
+    <> "    ctx.drawImage(img, 0, 0);\n"
+    <> "    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;\n"
+    <> "    return { width: img.naturalWidth, height: img.naturalHeight, data };\n"
+    <> "  };\n"
+    <> "  const webp = await pixels('data:image/webp;base64,"
+    <> webpBase64
+    <> "');\n"
+    <> "  const png = await pixels('data:image/png;base64,"
+    <> pngBase64
+    <> "');\n"
+    <> "  if (webp.width !== png.width || webp.height !== png.height) {\n"
+    <> "    return 'size ' + webp.width + 'x' + webp.height + ' vs ' + png.width + 'x' + png.height;\n"
+    <> "  }\n"
+    <> "  if (webp.data.length !== png.data.length || webp.data.some((v, i) => v !== png.data[i])) {\n"
+    <> "    return 'pixels differ';\n"
+    <> "  }\n"
+    <> "  return 'same';\n"
+    <> "}"
