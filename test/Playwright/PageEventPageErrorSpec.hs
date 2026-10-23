@@ -6,6 +6,7 @@ import UnliftIO.Async
   ( wait
   , withAsync
   )
+import Control.Monad.IO.Class (liftIO)
 import Data.ByteString.Lazy qualified as LBS
 import Data.Text.Encoding
   ( encodeUtf8
@@ -34,6 +35,7 @@ import Playwright
   , evaluateWith
   , goto
   , numberArgument
+  , onConsole
   , pageErrors
   , setContent
   , specialArgument
@@ -52,6 +54,11 @@ import Playwright.Harness
   , withChromiumPage
   , assertBool
   , assertEqual
+  )
+import UnliftIO.IORef
+  ( modifyIORef'
+  , newIORef
+  , readIORef
   )
 import Test.Tasty
   ( TestTree
@@ -79,6 +86,15 @@ tests =
               _ <- goto page (urlFromText (prefix <> "/error.html")) defaultGotoOptions
               err <- wait handle
               assertBool "illegal character" ("Invalid or unexpected token" `isInfixOf` pageErrorMessage err)
+    , testCase "should not receive console message for pageError" $
+        withAssets $ \prefix page -> do
+          messageCount <- newIORef (0 :: Int)
+          onConsole page (\_ -> liftIO (modifyIORef' messageCount (+ 1)))
+          withAsync (waitForPageError page) $ \handle -> do
+            _ <- goto page (urlFromText (prefix <> "/error.html")) defaultGotoOptions
+            _ <- wait handle
+            count <- readIORef messageCount
+            assertEqual "console messages" 1 count
     , testCase "should contain sourceURL" $
         withAssets $ \prefix page ->
           withAsync (waitForPageError page) $ \handle -> do
