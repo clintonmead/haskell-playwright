@@ -190,9 +190,11 @@ dispatchPageRoute page params = do
     chan = Channel (channelRefGuid (pageRouteEventRoute event))
   request <- requestFromChannel chan
   base <- lookupContextBaseUrl (channelGuid (pageContextChannel page))
-  pageHandlers <- routeHandlersFor (channelGuid (pageChannel page))
-  contextHandlers <- routeHandlersFor (channelGuid (pageContextChannel page))
-  chainRoutes base chan request (pageHandlers <> contextHandlers)
+  let pageGuid = channelGuid (pageChannel page)
+      contextGuid = channelGuid (pageContextChannel page)
+  pageHandlers <- routeHandlersFor pageGuid
+  contextHandlers <- routeHandlersFor contextGuid
+  chainRoutes base chan request (tagOwner pageGuid pageHandlers <> tagOwner contextGuid contextHandlers)
 
 dispatchContextRoute :: BrowserContext -> Value -> Playwright ()
 dispatchContextRoute ctx params = do
@@ -203,24 +205,38 @@ dispatchContextRoute ctx params = do
   request <- requestFromChannel chan
   base <- lookupContextBaseUrl (channelGuid (browserContextChannel ctx))
   handlers <- routeHandlersFor (channelGuid (browserContextChannel ctx))
-  chainRoutes base chan request handlers
+  chainRoutes base chan request (tagOwner (channelGuid (browserContextChannel ctx)) handlers)
+
+tagOwner :: Guid -> [(UrlMatch, ChannelRef -> IO Bool)] -> [(Guid, UrlMatch, ChannelRef -> IO Bool)]
+tagOwner guid = fmap (\(glob, run) -> (guid, glob, run))
 
 -- | The base URL resolves relative globs the way the driver does, so a route
 -- registered as @kek/index.html@ matches the same requests the driver sends.
-chainRoutes :: Maybe Url -> Channel RouteTag -> Request -> [(UrlMatch, ChannelRef -> IO Bool)] -> Playwright ()
+-- A handler removed by unroute while the chain runs is skipped, as upstream does.
+chainRoutes :: Maybe Url -> Channel RouteTag -> Request -> [(Guid, UrlMatch, ChannelRef -> IO Bool)] -> Playwright ()
 chainRoutes base chan request handlers =
   case handlers of
     [] -> do
       overrides <- lookupRequestOverrides (channelGuid (requestChannel request))
       sendContinue chan True overrides
-    (glob, run) : rest -> do
+    (owner, glob, run) : rest -> do
       current <- requestUrl request
       if matchesUrlMatch (resolveUrlMatch base glob) current
         then do
-          done <- liftIO (run (ChannelRef (channelGuid chan)))
-          unless done (chainRoutes base chan request rest)
+          live <- routeHandlersFor owner
+          -- A predicate never compares equal, and unroute cannot remove one, so it stays live.
+          if isPredicate glob || any ((== glob) . fst) live
+            then do
+              done <- liftIO (run (ChannelRef (channelGuid chan)))
+              unless done (chainRoutes base chan request rest)
+            else
+              chainRoutes base chan request rest
         else
           chainRoutes base chan request rest
+
+isPredicate :: UrlMatch -> Bool
+isPredicate (UrlMatchPredicate _) = True
+isPredicate _ = False
 
 updateInterceptionPatterns :: Page -> Playwright ()
 updateInterceptionPatterns page = do
