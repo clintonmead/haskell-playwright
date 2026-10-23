@@ -299,6 +299,7 @@ test-suite playwright-test
       Playwright.CapabilitiesSpec
       Playwright.ChannelsSpec
       Playwright.ChromiumSpec
+      Playwright.ComponentParserSpec
       Playwright.ConnectionSpec
       Playwright.DefaultBrowserContext1Spec
       Playwright.DefaultBrowserContext2Spec
