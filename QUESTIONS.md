@@ -111,3 +111,11 @@ Each line below links to the full entry in [progress/QUESTIONS-ARCHIVE.md](progr
 105. [browsercontext-events: console events for early-closed popups fail with MissingObject](progress/QUESTIONS-ARCHIVE.md#q-105) - guess in place, no answer yet: record as skips (option a)
 106. [split of BrowserContextFetch, PageRoute, PageGoto and GlobalFetch into two parts and a Support module](progress/QUESTIONS-ARCHIVE.md#q-106) - guess in place, no answer yet: keep the split as made (naming, cut point, and the 1,300-line Support module accepted for now)
 107. Discovery is dry, so the 20-slot pipeline runs a fixed list of 20 feature slices instead (script: feature-port-pipeline.js). Guess in place: each slice implements its missing src/ feature in its own commit, then ports its specs. Slices: tracing, HAR context/page/websocket, video, screencast, screencast-actions, expect core/text, aria-snapshot, to-match-aria-snapshot, locator-generator, selector-generator, role-utils, browsertype-connect, browser-server, debug-controller, multiclient, locator-any-frame, fetch-small, and two master fixes (proxy-routing failures, flaky serviceworker test). Slots use pw-wt-feat-N and pw-build/feat-N, separate from the old slot-N. Old pipeline wf_09aab4ac-e22 could not be stopped from here (no task id); it only makes no-op merges. Stop it from /workflows.
+
+## feat-video (video slice)
+
+- **recordVideo.showActions is not modelled.** `RecordVideo` has only `dir` and `size`. Upstream `showActions` is unported, so this is a gap, not a skip of a test case.
+- **recordVideo `dir` is required in Haskell.** Upstream `recordVideo: {}` cannot be expressed. Guess: keep `RecordVideo` with a required `FilePath`, and skip "should not throw without recordVideo.dir". Omitting recordVideo covers the default case.
+- **Relative `recordVideo.dir` is passed through unchanged.** Guess: the driver shares the process cwd and resolves it the same way. This is unverified until the relative-path case runs.
+- **Size and pixel checks need an ffmpeg frame reader.** Guess: parse `ffmpeg -i` stderr for size. Pixel cases stay skipped until then.
+- **Popup video cases** ("should expose video path blank popup", "should work for popups") need a popup event helper that the harness lacks.
