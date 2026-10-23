@@ -143,6 +143,14 @@ tests =
           assertEqual "nth" "visible data2" =<< innerText (nth (filterVisible (locate page ".item") True) 1)
           assertEqual "data3" "visible data3" =<< innerText (Locator.getByText (filterVisible (locate page ".item") True) "data3" Inexact)
           assertEqual "hidden" "Hidden data1" =<< innerText (Locator.getByText (filterVisible (locate page ".item") False) "data1" Inexact)
+    , testCase "should support visible()" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<div><div class=\"item\" style=\"display: none\">Hidden data0</div><div class=\"item\">visible data1</div><div class=\"item\" style=\"display: none\">Hidden data1</div><div class=\"item\">visible data2</div><div class=\"item\" style=\"display: none\">Hidden data2</div><div class=\"item\">visible data3</div></div>"
+          assertEqual "nth" "visible data2" =<< innerText (nth (filterVisible (locate page ".item") True) 1)
+          assertEqual "data3" "visible data3" =<< innerText (Locator.getByText (filterVisible (locate page ".item") True) "data3" Inexact)
+          assertEqual "count" 3 =<< locatorCount (filterVisible (locate page ".item") True)
     , testCase "locator.count should work with deleted Map in main world" $
         withChromiumPage $ \page -> do
           _ <- evaluate page "() => { Map = 1; }"
