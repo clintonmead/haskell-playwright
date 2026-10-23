@@ -106,6 +106,14 @@ import UnliftIO.Temporary
   ( withSystemTempDirectory
   )
 
+-- Upstream cases not ported here:
+--   should support ignoreHTTPSErrors option: needs an HTTPS test server; the harness has no TLS fixture.
+--   should have passed URL when launching with ignoreDefaultArgs: true: LaunchOptions only takes the
+--     list form of ignoreDefaultArgs, not the boolean that drops every default arg.
+--   should handle timeout, should handle exception, should connect to a browser with the default page:
+--     they rely on the Node-only __testHookBeforeCreateBrowser / __testHookOnConnectToBrowser options.
+--   coverage should work: page.coverage (JS coverage) is not in the library.
+--   user agent is up to date: reads the internal _channel.defaultUserAgentForTest.
 tests :: TestTree
 tests =
   testGroup
