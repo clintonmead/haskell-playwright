@@ -168,6 +168,10 @@ tests =
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/mobile.html")) defaultGotoOptions
           assertEqual "touch" False =<< evaluateBool page "() => 'ontouchstart' in window"
+    -- Skipped: "landscape viewport should have width larger than height". Upstream iterates
+    -- Playwright's built-in device registry (playwright.devices), which the Haskell client does not expose.
+    -- Skipped: "WebKit Windows headed should have a minimal viewport". Runs only for WebKit on
+    -- headed Windows, which this suite does not target.
     ]
 
 -- | The options Playwright applies for the @iPhone 14@ device descriptor.
