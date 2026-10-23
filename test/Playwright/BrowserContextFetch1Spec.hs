@@ -16,7 +16,8 @@ import Data.Text
 import Playwright
   ( CookieName (CookieName)
   , CookieValue (CookieValue)
-  , FetchOptions (fetchFailOnStatusCode, fetchHeaders, fetchTimeout)
+  , FetchOptions (fetchFailOnStatusCode, fetchHeaders, fetchQueryParams, fetchTimeout)
+  , FetchQueryParam (FetchQueryParam)
   , HeaderName (HeaderName)
   , HeaderValue (HeaderValue)
   , HttpCredentials (HttpCredentials, httpCredentialsOrigin, httpCredentialsPassword, httpCredentialsSend, httpCredentialsUsername)
@@ -67,6 +68,7 @@ import Playwright.BrowserContextFetchSupport
   , objectParamsTest
   , duplicateParamsTest
   , encodedParamsTest
+  , queryParamsTest
   , decodeQueryText
   , failOnStatusTest
   , withPartialBodyApp
@@ -382,4 +384,17 @@ tests =
                 }
             second <- fetchGet request (urlFromText (prefix <> "/empty.html"))
             assertEqual "authorized" 200 (httpStatusToInt (apiResponseStatus second))
+      , testCase "should accept bool and numeric params and filter out undefined" $
+          queryParamsTest
+            fetchGetWith
+            defaultFetchOptions
+              { fetchQueryParams =
+                  Just
+                    [ FetchQueryParam "str" "s"
+                    , FetchQueryParam "num" "10"
+                    , FetchQueryParam "bool" "true"
+                    , FetchQueryParam "bool2" "false"
+                    ]
+              }
+            [("str", "s"), ("num", "10"), ("bool", "true"), ("bool2", "false")]
       ]
