@@ -109,6 +109,11 @@ tests =
           withContextProxy (ipProxy port) $ \page -> do
             _ <- goto page (urlFromText "http://non-existent.com/target.html") defaultGotoOptions
             assertEqual "title" "Served by the proxy" =<< title page
+    , testCase "should use socks proxy" $
+        withSocksMockServer $ \port ->
+          withChromiumContextWith (proxyOpts (httpProxyHost (socksProxyUrl port))) $ \_ctx page -> do
+            _ <- goto page (urlFromText "http://non-existent.com") defaultGotoOptions
+            assertEqual "title" "Served by the SOCKS proxy" =<< title page
     , testCase "should use socks proxy in second page" $
         withSocksMockServer $ \port ->
           withChromiumContextWith (proxyOpts (httpProxyHost (socksProxyUrl port))) $ \ctx page -> do
