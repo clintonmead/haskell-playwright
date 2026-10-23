@@ -7,21 +7,36 @@ import Data.Text
   , isInfixOf
   )
 import Playwright
-  ( Locale (Locale)
+  ( ConsoleMessage (consoleMessageText)
+  , Locale (Locale)
+  , Page
+  , Playwright
   , newContext
   , NewContextOptions (newContextLocale, newContextTimezoneId)
   , TimezoneId (TimezoneId)
+  , defaultGotoOptions
   , defaultNewContextOptions
   , evaluateText
+  , evaluateWith
+  , goto
   , newContextWith
   , newPage
+  , textArgument
+  , urlFromText
+  , waitForContextConsole
+  , waitForPopup
   )
 import Playwright.Harness
   ( assertProtocolContains
+  , withAssetsContextWith
   , withChromiumBrowser
   , withChromiumContextWith
   , assertBool
   , assertEqual
+  )
+import UnliftIO.Async
+  ( wait
+  , withAsync
   )
 import Test.Tasty
   ( TestTree
@@ -52,6 +67,14 @@ tests =
                 _ <- newPage ctx
                 pure ()
             )
+    , testCase "should work for multiple pages sharing same process" $
+        withAssetsContextWith
+          defaultNewContextOptions {newContextTimezoneId = Just (TimezoneId "Europe/Moscow")}
+          $ \prefix _ page -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            popup <- openPopup page (prefix <> "/empty.html")
+            _ <- openPopup popup (prefix <> "/empty.html")
+            pure ()
     , testCase "should affect Intl.DateTimeFormat().resolvedOptions().timeZone" $
         withChromiumContextWith
           defaultNewContextOptions {newContextTimezoneId = Just (TimezoneId "America/Jamaica")}
@@ -76,6 +99,18 @@ tests =
           againPage <- newPage again
           assertEqual "default again" defaultZone
             =<< evaluateText againPage "() => Intl.DateTimeFormat().resolvedOptions().timeZone"
+    , testCase "should propagate timezone to workers" $
+        withAssetsContextWith
+          defaultNewContextOptions {newContextTimezoneId = Just (TimezoneId "America/Jamaica")}
+          $ \prefix ctx page -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            withAsync (waitForContextConsole ctx) $ \pending -> do
+              _ <-
+                evaluateText
+                  page
+                  "() => { new Worker(URL.createObjectURL(new Blob(['console.log(Intl.DateTimeFormat().resolvedOptions().timeZone)'], { type: 'application/javascript' }))); return 'ok'; }"
+              message <- wait pending
+              assertEqual "worker timezone" "America/Jamaica" (consoleMessageText message)
     ]
 
 assertTimezone :: TimezoneId -> Text -> IO ()
@@ -88,6 +123,13 @@ assertTimezone zone needle =
     $ \_ page -> do
       rendered <- evaluateText page "() => new Date(1479579154987).toString()"
       assertBool (show needle) (needle `isInfixOf` rendered)
+
+-- | Open a popup from the page by calling window.open(url), waiting for the popup event.
+openPopup :: Page -> Text -> Playwright Page
+openPopup page url =
+  withAsync (waitForPopup page) $ \handle -> do
+    _ <- evaluateWith page "url => { window.open(url); }" (textArgument url)
+    wait handle
 
 -- | A timezone other than the given default one.
 overrideZone :: Text -> Text
