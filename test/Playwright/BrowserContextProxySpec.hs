@@ -4,6 +4,9 @@ module Playwright.BrowserContextProxySpec
 
 import Data.ByteString.Char8 qualified as BS8
 import Data.ByteString.Lazy.Char8 qualified as LBS8
+import Data.List
+  ( sort
+  )
 import Data.Text
   ( Text
   , pack
@@ -29,6 +32,10 @@ import Network.Wai.Handler.Warp
   )
 import Playwright
   ( Browser
+  , Cookie (cookieDomain, cookieName, cookieValue)
+  , CookieDomain (cookieDomainToText)
+  , CookieName (cookieNameToText)
+  , CookieValue (cookieValueToText)
   , HttpPassword (HttpPassword)
   , HttpUsername (HttpUsername)
   , NewContextOptions (newContextProxy)
@@ -37,8 +44,12 @@ import Playwright
   , ProxyHost (ProxyHost)
   , ProxySettings (ProxySettings, proxySettingsBypass, proxySettingsPassword, proxySettingsServer, proxySettingsUsername)
   , closePage
+  , contextRequest
+  , cookies
+  , cookiesFor
   , defaultGotoOptions
   , defaultNewContextOptions
+  , fetchGet
   , getByTestId
   , goto
   , innerText
@@ -131,7 +142,113 @@ tests =
           pure ()
     , testCase "should isolate proxy credentials between contexts on navigation" $
         isolateOnNavigation
+    , testCase "should send secure cookies to subdomain.localhost" $
+        sendSecureCookiesToSubdomain
+    , testCase "should set cookie for top-level domain" $
+        setCookieForTopLevelDomain
+    , testGroup
+        "should proxy local network requests"
+        [ testGroup
+            label
+            [ testCase (unpack description) $
+                localNetworkProxyTest additionalBypass target
+            | (target, description) <- localTargets
+            ]
+        | (additionalBypass, label) <- [(False, "by default"), (True, "with other bypasses")]
+        ]
     ]
+
+-- Upstream cases not ported here:
+--   should throw for bad server value: ProxyHost is a Text newtype, so a non-string server cannot be built.
+--   should use proxy for https urls: the harness has no TLS fixture and Warp cannot serve a CONNECT tunnel.
+--   should use socks proxy, and in second page: the harness has no SOCKS5 fixture, and the test suite
+--     does not depend on network, so a relay cannot be written here without a cabal change.
+--   should use ipv6 proxy: a Warp app on ::1 with an [::1]:port proxy failed with
+--     net::ERR_PROXY_CONNECTION_FAILED. The root cause was not confirmed, though the sandbox has ::1 on lo.
+
+localTargets :: [(Text, Text)]
+localTargets =
+  [ ("localhost", "localhost")
+  , ("127.0.0.1", "loopback address")
+  , ("169.254.3.4", "link-local")
+  ]
+
+localNetworkProxyTest :: Bool -> Text -> IO ()
+localNetworkProxyTest additionalBypass target =
+  withProxyApp anyTargetApp $ \port ->
+    withChromiumContextWith (proxyOpts (httpProxy port Nothing Nothing bypass)) $ \_ctx page -> do
+      _ <- goto page (urlFromText ("http://" <> target <> ":55555/target.html")) defaultGotoOptions
+      assertEqual "title" "Served by the proxy" =<< title page
+      if additionalBypass
+        then assertProtocolContains "ERR_" (goto page (urlFromText otherHost) defaultGotoOptions)
+        else do
+          _ <- goto page (urlFromText otherHost) defaultGotoOptions
+          pure ()
+  where
+    bypass :: Maybe Text
+    bypass = if additionalBypass then Just "1.non.existent.domain.for.the.test" else Nothing
+    otherHost :: Text
+    otherHost = "http://1.non.existent.domain.for.the.test/foo.html"
+
+sendSecureCookiesToSubdomain :: IO ()
+sendSecureCookiesToSubdomain =
+  withProxyApp cookieApp $ \port ->
+    withChromiumContextWith (proxyOpts (httpProxy port Nothing Nothing Nothing)) $ \ctx page -> do
+      _ <- goto page (urlFromText "http://subdomain.localhost/set-cookie.html") defaultGotoOptions
+      stored <- cookiesFor ctx [urlFromText "http://subdomain.localhost"]
+      assertEqual
+        "cookies"
+        [("non-secure", "subdomain.localhost"), ("secure", "subdomain.localhost")]
+        (map cookieNameAndDomain stored)
+      _ <- goto page (urlFromText "http://subdomain.localhost/read-cookie.html") defaultGotoOptions
+      assertEqual "cookie header" "Cookie: non-secure=1; secure=1" =<< innerText (getByTestId page "cookie")
+
+setCookieForTopLevelDomain :: IO ()
+setCookieForTopLevelDomain =
+  withProxyApp cookieApp $ \port ->
+    withChromiumContextWith (proxyOpts (httpProxy port Nothing Nothing Nothing)) $ \ctx _page -> do
+      apiCtx <- contextRequest ctx
+      _ <- fetchGet apiCtx (urlFromText "http://codes/empty.html")
+      found <- cookies ctx
+      assertEqual "cookies" [("name", "val")] (map cookieNameAndValue found)
+
+cookieNameAndDomain :: Cookie -> (Text, Text)
+cookieNameAndDomain c =
+  (cookieNameToText (cookieName c), cookieDomainToText (cookieDomain c))
+
+cookieNameAndValue :: Cookie -> (Text, Text)
+cookieNameAndValue c =
+  (cookieNameToText (cookieName c), cookieValueToText (cookieValue c))
+
+cookieApp :: Application
+cookieApp request respond
+  | wantsPath request "set-cookie.html" =
+      respond
+        ( responseLBS
+            status200
+            [ ("Set-Cookie", BS8.pack "non-secure=1; HttpOnly")
+            , ("Set-Cookie", BS8.pack "secure=1; HttpOnly; Secure")
+            ]
+            ""
+        )
+  | wantsPath request "read-cookie.html" =
+      respond (htmlBody ("<div data-testid=cookie>Cookie: " <> sortedCookieHeader request <> "</div>"))
+  | wantsPath request "empty.html" =
+      respond (responseLBS status200 [("Set-Cookie", BS8.pack "name=val; Domain=codes; Path=/;")] "")
+  | otherwise =
+      respond (responseLBS status200 [] "")
+
+sortedCookieHeader :: Request -> String
+sortedCookieHeader request =
+  BS8.unpack (BS8.intercalate (BS8.pack "; ") (sort (map BS8.strip (BS8.split ';' header))))
+  where
+    header = case lookup "cookie" (requestHeaders request) of
+      Just value -> value
+      Nothing -> BS8.empty
+
+anyTargetApp :: Application
+anyTargetApp _request respond =
+  respond (htmlTitle "Served by the proxy")
 
 isolateOnNavigation :: IO ()
 isolateOnNavigation =
