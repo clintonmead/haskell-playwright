@@ -714,3 +714,15 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 **Why not verified:** Nothing has been built against a list signature, so the breakage count and the cost of each option are estimates. The single-credential case "should work with a single credential in an array" is marked covered, because the single-value case exercises the same wire shape. That covers the array shape, not the type.
 
 **To change:** Pick one of these. (a) Widen the existing functions to `HttpCredentials` or `[HttpCredentials]`, with a `Maybe` or list-typed field. This breaks callers, and this is a change to the API. (b) Add non-breaking variants, such as `setHTTPCredentialsList` and a `newContextHttpCredentialsList` field. (c) Leave the four cases skipped. Tell me which, and I will port the four cases against it.
+
+## browsercontext-events: console event for a popup that is already gone
+
+**Question:** Two upstream cases, "console event should work in popup 2" and "console event should work in immediately closed popup", fail with `MissingObject` in this port. The console event's `page` reference is decoded lazily: `consoleMessageFromEvent` (`src/Playwright/ConsoleMessage.hs`, around line 62) calls `pageFromRef` on the test thread when the waiter's result is read. By then the popup page has been disposed. `IncomingDispose` runs `disposeTree` in `Connection.hs` (around line 841), so `lookupObject` in `Connection/Store.hs` no longer finds it. The dialog equivalents ("dialog event should work in popup 2" and "dialog event should work in immediately closed popup") pass, because the dialog page is not disposed before decode. The existing "console event should work in popup" case passes because it waits for the popup page before the page closes.
+
+**Guess taken:** Skip the two console cases. Remove them from `BrowserContextEventsSpec.hs` and record them as skipped in the `browsercontext-events` entry of `progress/FUNCTIONALITY_TODO.md`, with the reason. Returning `Nothing` for the page would make them pass without checking anything, so I did not do that.
+
+**Options:**
+- (a) Resolve the console event's page reference when the event is delivered, in the connection layer (`Connection/Wait.hs` `deliverEvent` or the `IncomingEvent` path), so the page object is captured before `IncomingDispose` runs. This is a connection-layer change and touches every event that carries a ref.
+- (b) Keep the two cases skipped, the same way other TODO entries record skips.
+
+**To change:** Tell me (a) or (b). I will port the two cases once the page reference is captured at dispatch.
