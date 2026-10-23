@@ -5,6 +5,7 @@ module Playwright.PageDragSpec
 import Data.Text
   ( Text
   )
+import qualified Data.Text as Text
 import Playwright
   ( DragAndDropOptions (dragAndDropOptionsSourcePosition, dragAndDropOptionsSteps, dragAndDropOptionsTargetPosition)
   , ElementHandle
@@ -22,6 +23,7 @@ import Playwright
   , defaultGotoOptions
   , dragAndDrop
   , dragAndDropWith
+  , dragToWith
   , elementHandle
   , evaluate
   , evaluateBool
@@ -230,13 +232,33 @@ tests =
         withAssetPage "drag-n-drop.html" $ \page -> do
           dragAndDrop (locate page "#source") (locate page "#target")
           assertDropped (locate page "#target")
-    , testCase "should work with tweened mouse movement" $
+    , testCase "should dragAndDrop with tweened mouse movement" $
         withChromiumPage $ \page -> do
           setContent
             page
             "<body style=\"margin: 0; padding: 0;\">\n          <div style=\"width:100px;height:100px;background:red;\" id=\"red\"></div>\n          <div style=\"width:300px;height:100px;background:blue;\" id=\"blue\"></div>\n        </body>"
           events <- trackPageMouse page
           dragAndDropWith
+            (locate page "#red")
+            (locate page "#blue")
+            defaultDragAndDropOptions {dragAndDropOptionsSteps = Just 4}
+          assertEqual "events"
+            [ "mousemove at 50;50"
+            , "mousedown at 50;50"
+            , "mousemove at 75;75"
+            , "mousemove at 100;100"
+            , "mousemove at 125;125"
+            , "mousemove at 150;150"
+            , "mouseup at 150;150"
+            ]
+            =<< jsonValueTexts events
+    , testCase "should dragTo with tweened mouse movement" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<body style=\"margin: 0; padding: 0;\">\n          <div style=\"width:100px;height:100px;background:red;\" id=\"red\"></div>\n          <div style=\"width:300px;height:100px;background:blue;\" id=\"blue\"></div>\n        </body>"
+          events <- trackPageMouse page
+          dragToWith
             (locate page "#red")
             (locate page "#blue")
             defaultDragAndDropOptions {dragAndDropOptionsSteps = Just 4}
@@ -352,7 +374,39 @@ tests =
             , "drop at 240;350"
             ]
             =<< jsonValueTexts frameEvents
+    , testCase "should drag out of an iframe" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/drag-n-drop.html")) defaultGotoOptions
+          frame <- attachFrame page "oopif" (prefix <> "/drag-n-drop.html")
+          _ <- evaluateText page "() => { const iframe = document.querySelector('iframe'); iframe.style.width = '500px'; iframe.style.height = '600px'; iframe.style.marginLeft = '500px'; iframe.style.marginTop = '60px'; return 'set'; }"
+          pageEvents <- trackEvents =<< bodyHandle (locate page "body")
+          frameEvents <- trackEvents =<< bodyHandle (onFrame page frame "body")
+          hover (onFrame page frame "#source")
+          mouseDown page
+          hover (locate page "#target")
+          mouseUp page
+          assertDropped (locate page "#target")
+          assertEqual "frame events"
+            [ "mousemove"
+            , "mousedown"
+            , "dragstart"
+            , "dragend"
+            ]
+            . map eventType
+            =<< jsonValueTexts frameEvents
+          assertEqual "page events"
+            [ "dragenter"
+            , "dragover"
+            , "drop"
+            ]
+            . map eventType
+            =<< jsonValueTexts pageEvents
     ]
+
+-- | The event name of a tracked @type at x;y@ entry (or a bare @dragend@).
+eventType :: Text -> Text
+eventType =
+  Text.takeWhile (/= ' ')
 
 -- | Asserts the drop landed: the source ended up inside the target.
 assertDropped :: Locator -> Playwright ()
