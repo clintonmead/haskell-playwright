@@ -74,6 +74,13 @@ tests =
             popup <- wait handle
             assertEqual "opener on original" False =<< evaluateBool page "() => !!window.opener"
             assertEqual "opener on popup" True =<< evaluateBool popup "() => !!window.opener"
+    , testCase "should emit for immediately closed popups 2" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          takePopup <- armPopup page
+          _ <- evaluate page "() => { const win = window.open(window.location.href); win.close(); }"
+          _ <- takePopup
+          pure ()
     , testCase "should be able to capture alert" $
         withChromiumPage $ \page -> do
           takePopup <- armPopup page
