@@ -61,6 +61,14 @@ tests =
           emulateMedia page defaultEmulateMedia {emulateMediaColorScheme = Just ColorSchemeDark}
           assertEqual "dark on" True =<< evaluateBool page "() => matchMedia('(prefers-color-scheme: dark)').matches"
           assertEqual "light off" False =<< evaluateBool page "() => matchMedia('(prefers-color-scheme: light)').matches"
+    , testCase "should emulate colorScheme should work" $
+        withChromiumPage $ \page -> do
+          emulateMedia page defaultEmulateMedia {emulateMediaColorScheme = Just ColorSchemeLight}
+          assertEqual "light" True =<< evaluateBool page "() => matchMedia('(prefers-color-scheme: light)').matches"
+          assertEqual "dark" False =<< evaluateBool page "() => matchMedia('(prefers-color-scheme: dark)').matches"
+          emulateMedia page defaultEmulateMedia {emulateMediaColorScheme = Just ColorSchemeDark}
+          assertEqual "dark on" True =<< evaluateBool page "() => matchMedia('(prefers-color-scheme: dark)').matches"
+          assertEqual "light off" False =<< evaluateBool page "() => matchMedia('(prefers-color-scheme: light)').matches"
     , testCase "should default to light" $
         withChromiumPage $ \page -> do
           assertEqual "default light" True =<< evaluateBool page "() => matchMedia('(prefers-color-scheme: light)').matches"
