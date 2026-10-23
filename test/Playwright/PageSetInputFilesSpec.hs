@@ -20,6 +20,10 @@ import Data.Text
   ( Text
   , isInfixOf
   )
+import Data.Text qualified as Text
+import Data.Time.Clock.POSIX
+  ( utcTimeToPOSIXSeconds
+  )
 import Network.HTTP.Types
   ( hContentType
   , status200
@@ -68,6 +72,7 @@ import Playwright.Harness
   )
 import System.Directory
   ( createDirectoryIfMissing
+  , getModificationTime
   , makeRelativeToCurrentDirectory
   )
 import Test.Tasty
@@ -261,7 +266,32 @@ tests =
             assertBool
               "png part has name, filename and mime type"
               ("name=\"file2\"; filename=\"pptr.png\"\r\nContent-Type: image/png\r\n" `ByteString.isInfixOf` body)
+    , testCase "should preserve lastModified timestamp" $
+        withChromiumPage $ \page -> do
+          setContent page "<input type=file multiple=true/>"
+          assetDir <- testAssetsDir
+          let names = ["file-to-upload.txt", "file-to-upload-2.txt"] :: [Text]
+              paths = fmap (\name -> assetDir <> "/" <> Text.unpack name) names
+          setInputFilesPaths (locate page "input") paths
+          assertEqual "names" names
+            =<< evaluateTexts page "() => [...document.querySelector('input').files].map(f => f.name)"
+          actual <-
+            fmap (fmap (read . Text.unpack))
+              (evaluateTexts page "() => [...document.querySelector('input').files].map(f => String(f.lastModified))")
+          expected <- liftIO (traverse mtimeMilliseconds paths)
+          -- The browser may shift the timestamp by a millisecond, and WebKit
+          -- rounds it to whole seconds, so allow a second of slack.
+          assertBool
+            ("expected: " <> show expected <> "; actual: " <> show actual)
+            (length actual == length expected && and (zipWith (\a e -> abs (a - e) <= 1000) actual expected))
     ]
+
+-- | The file's modification time in milliseconds since the epoch, the same
+-- unit as the browser's File.lastModified.
+mtimeMilliseconds :: FilePath -> IO Double
+mtimeMilliseconds path = do
+  mtime <- getModificationTime path
+  pure (realToFrac (utcTimeToPOSIXSeconds mtime) * 1000)
 
 -- | Serves an empty page whose Content-Security-Policy forbids every resource
 -- type, the same header the upstream "should work with CSP" case sets.
