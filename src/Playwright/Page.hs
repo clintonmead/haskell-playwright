@@ -77,14 +77,7 @@ import Control.Monad
   ( filterM
   )
 import Data.Maybe
-  ( fromMaybe
-  , listToMaybe
-  )
-import System.Directory
-  ( createDirectoryIfMissing
-  )
-import System.FilePath
-  ( takeDirectory
+  ( listToMaybe
   )
 import Data.List
   ( find
@@ -326,7 +319,6 @@ import Playwright.ScreenshotOptions
       , screenshotOptionsScale
       , screenshotOptionsStyle
       , screenshotOptionsTimeout
-      , screenshotOptionsType
       )
   , ScreenshotScale
       ( ScreenshotScaleCss
@@ -337,6 +329,8 @@ import Playwright.ScreenshotOptions
       , ScreenshotPng
       , ScreenshotWebp
       )
+  , resolveScreenshotType
+  , writeScreenshotFile
   )
 import Playwright.Selector
   ( Selector
@@ -579,40 +573,6 @@ screenshotWithMasks page masks opts = do
   mapM_ (\filePath -> liftIO (writeScreenshotFile filePath bytes)) (screenshotOptionsPath opts)
   pure bytes
   where
-    resolveScreenshotType options =
-      case (screenshotOptionsType options, screenshotOptionsPath options) of
-        (Nothing, Just filePath) ->
-          typeFromPath filePath
-        (screenshotType, _) ->
-          Right screenshotType
-    typeFromPath filePath =
-      case fromMaybe "null" (mimeTypeForPath filePath) of
-        "image/png" ->
-          Right (Just ScreenshotPng)
-        "image/jpeg" ->
-          Right (Just ScreenshotJpeg)
-        "image/webp" ->
-          Right (Just ScreenshotWebp)
-        mimeType ->
-          Left ("path: unsupported mime type \"" <> mimeType <> "\"")
-    mimeTypeForPath filePath =
-      case break (== '.') (reverse filePath) of
-        (reversedExtension, '.' : _) ->
-          lookup (Text.pack (reverse reversedExtension)) mimeTypes
-        _ ->
-          Nothing
-    mimeTypes :: [(Text, Text)]
-    mimeTypes =
-      [ ("png", "image/png")
-      , ("jpg", "image/jpeg")
-      , ("jpeg", "image/jpeg")
-      , ("jpe", "image/jpeg")
-      , ("webp", "image/webp")
-      , ("txt", "text/plain")
-      ]
-    writeScreenshotFile filePath bytes = do
-      createDirectoryIfMissing True (takeDirectory filePath)
-      ByteString.writeFile filePath bytes
     screenshotClipParam clip =
       Rect
         { rectX = cssPixelToScientific (boundingBoxX clip)

@@ -5,6 +5,8 @@ module Playwright.ScreenshotOptions
   , ScreenshotAnimations (..)
   , ScreenshotScale (..)
   , defaultScreenshotOptions
+  , resolveScreenshotType
+  , writeScreenshotFile
   ) where
 
 import Autodocodec
@@ -23,6 +25,9 @@ import Data.Aeson
   ( FromJSON
   , ToJSON
   )
+import Data.ByteString (ByteString)
+import Data.ByteString qualified as ByteString
+import Data.Maybe (fromMaybe)
 import Data.Scientific
   ( Scientific
   )
@@ -30,6 +35,8 @@ import Data.Text
   ( Text
   )
 import Data.Text qualified as Text
+import System.Directory (createDirectoryIfMissing)
+import System.FilePath (takeDirectory)
 import Playwright.BoundingBox
   ( BoundingBox (BoundingBox, boundingBoxHeight, boundingBoxWidth, boundingBoxX, boundingBoxY)
   )
@@ -96,6 +103,50 @@ defaultScreenshotOptions =
     , screenshotOptionsMaskColor = Nothing
     , screenshotOptionsStyle = Nothing
     }
+
+-- | The type to capture as: the explicit 'screenshotOptionsType', or else the type implied by the path's extension.
+resolveScreenshotType :: ScreenshotOptions -> Either Text (Maybe ScreenshotType)
+resolveScreenshotType options =
+  case (screenshotOptionsType options, screenshotOptionsPath options) of
+    (Nothing, Just filePath) ->
+      typeFromPath filePath
+    (screenshotType, _) ->
+      Right screenshotType
+
+typeFromPath :: FilePath -> Either Text (Maybe ScreenshotType)
+typeFromPath filePath =
+  case fromMaybe "null" (mimeTypeForPath filePath) of
+    "image/png" ->
+      Right (Just ScreenshotPng)
+    "image/jpeg" ->
+      Right (Just ScreenshotJpeg)
+    "image/webp" ->
+      Right (Just ScreenshotWebp)
+    mimeType ->
+      Left ("path: unsupported mime type \"" <> mimeType <> "\"")
+
+mimeTypeForPath :: FilePath -> Maybe Text
+mimeTypeForPath filePath =
+  case break (== '.') (reverse filePath) of
+    (reversedExtension, '.' : _) ->
+      lookup (Text.pack (reverse reversedExtension)) mimeTypes
+    _ ->
+      Nothing
+
+mimeTypes :: [(Text, Text)]
+mimeTypes =
+  [ ("png", "image/png")
+  , ("jpg", "image/jpeg")
+  , ("jpeg", "image/jpeg")
+  , ("jpe", "image/jpeg")
+  , ("webp", "image/webp")
+  , ("txt", "text/plain")
+  ]
+
+writeScreenshotFile :: FilePath -> ByteString -> IO ()
+writeScreenshotFile filePath bytes = do
+  createDirectoryIfMissing True (takeDirectory filePath)
+  ByteString.writeFile filePath bytes
 
 instance HasCodec ScreenshotOptions where
   codec =

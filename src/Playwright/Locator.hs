@@ -65,6 +65,8 @@ module Playwright.Locator
   , locatorBoundingBox
   , locatorCount
   , locatorDescription
+  , locatorScreenshot
+  , locatorScreenshotMasked
   , locatorScrollIntoView
   , locatorSelectText
   , nth
@@ -97,6 +99,9 @@ import UnliftIO.Exception
 import Data.Aeson
   ( eitherDecodeStrict'
   , encode
+  )
+import Data.ByteString
+  ( ByteString
   )
 import Data.ByteString.Lazy
   ( toStrict
@@ -143,6 +148,7 @@ import Playwright.DropPayload
 import Playwright.ElementHandle
   ( ElementHandle (elementHandleChannel)
   , boundingBox
+  , screenshotHandleWith
   , scrollIntoViewIfNeeded
   , selectText
   )
@@ -156,7 +162,7 @@ import Playwright.Exactness
   ( Exactness (Inexact)
   )
 import Playwright.Frame
-  ( Frame
+  ( Frame (frameChannel)
   )
 import Playwright.Frame.Action
   ( blurFrame
@@ -232,6 +238,12 @@ import Playwright.Json.ChannelRef
   )
 import Playwright.Key
   ( Key
+  )
+import Playwright.Protocol
+  ( mkElementHandleScreenshotParamsMask
+  )
+import Playwright.ScreenshotOptions
+  ( ScreenshotOptions
   )
 import Playwright.SelectOption
   ( SelectOption
@@ -759,6 +771,20 @@ requireLocatorHandle loc = do
 locatorBoundingBox :: Locator -> Playwright (Maybe BoundingBox)
 locatorBoundingBox loc =
   withLocatorElement loc boundingBox
+
+locatorScreenshot :: Locator -> ScreenshotOptions -> Playwright ByteString
+locatorScreenshot loc opts =
+  locatorScreenshotMasked loc [] opts
+
+-- | Screenshot of the element with the given locators painted over; the options' 'screenshotOptionsMaskColor' and 'screenshotOptionsStyle' apply to them.
+locatorScreenshotMasked :: Locator -> [Locator] -> ScreenshotOptions -> Playwright ByteString
+locatorScreenshotMasked loc masks opts =
+  withLocatorElement loc (\handle -> screenshotHandleWith handle (map maskParam masks) opts)
+  where
+    maskParam target =
+      mkElementHandleScreenshotParamsMask
+        (ChannelRef (channelGuid (frameChannel (locatorFrame target))))
+        (locatorSelector target)
 
 locatorScrollIntoView :: Locator -> Playwright ()
 locatorScrollIntoView loc =

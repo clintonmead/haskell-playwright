@@ -503,6 +503,8 @@ module Playwright
   , locatorDescription
   , locatorOnFrame
   , locatorPage
+  , locatorScreenshot
+  , locatorScreenshotMasked
   , locatorScrollIntoView
   , locatorSelectText
   , longitudeFromInt
@@ -634,6 +636,7 @@ module Playwright
   , routeWith
   , screenshot
   , screenshotHandle
+  , screenshotHandleWith
   , screenshotMasked
   , scrollIntoViewIfNeeded
   , scrollIntoViewIfNeededWith
@@ -1062,6 +1065,7 @@ import Playwright.ElementHandle
   , scrollIntoViewIfNeeded
   , scrollIntoViewIfNeededWith
   , screenshotHandle
+  , screenshotHandleWith
   , selectText
   , selectTextWith
   , setInputFilesHandle
@@ -1387,6 +1391,8 @@ import Playwright.Locator
   , uncheckWith
   , waitFor
   , waitForWith
+  , locatorScreenshot
+  , locatorScreenshotMasked
   )
 import Playwright.LocatorHandler
   ( addLocatorHandler

@@ -609,7 +609,7 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 
 **To change:** If the record should stay minimal, add a separate `screenshotWith` builder instead of growing the record, and record that choice here.
 
-**Update (first slice):** `type`, `quality` and `omitBackground` are in, as `screenshotOptionsType :: Maybe ScreenshotType`, `screenshotOptionsQuality :: Maybe Int` and `screenshotOptionsOmitBackground :: Maybe Bool`. The fields are records, not a separate builder. `path`, `mask`, `caret`, `animations` and `scale` are still open.
+**Update (first slice):** `type`, `quality` and `omitBackground` are in, as `screenshotOptionsType :: Maybe ScreenshotType`, `screenshotOptionsQuality :: Maybe Int` and `screenshotOptionsOmitBackground :: Maybe Bool`. The fields are records, not a separate builder. Later slices closed `path`, `mask`, `caret`, `animations` and `scale`; see the sections below.
 
 **Update (clip):** `clip` is in as `screenshotOptionsClip :: Maybe BoundingBox`, not the `ScreenshotClip` record guessed above. It reuses the existing `BoundingBox`, whose fields are `CssPixel`, so the record is not duplicated. The clip test "should clip elements to the viewport" asserts the size the driver returns for a clip that runs past the viewport: 450x50 for a 1000x100 clip at (50, 450) in a 500x500 viewport. Guess: the driver's size is the expected one, since the upstream snapshot does not give a number. If upstream later pins a different size, update the test.
 
@@ -654,3 +654,53 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 **Why not verified:** Not decided with the user. The error text matches upstream, but no Haskell-side convention was checked against other client-side errors.
 
 **To change:** Give the path error its own constructor, or widen the mime table to the full upstream list.
+
+## page-screenshot: caret, animations and scale behaviour
+
+**Question:** The `caret`, `animations` and `scale` options are passed through to the protocol, but only acceptance and dimensions are tested. Is that enough, or should the port check the visual effect (caret hidden, animations finished, device pixels scaled)?
+
+**Guess taken:** Ship the three options with a test per enum value that asserts a PNG comes back, plus a device-scale-factor-2 pair that asserts `scale css` gives 300x300 and `scale device` gives 600x600 on a 300x300 viewport. The options are `Maybe` and omitted when unset, so the server defaults apply (`caret` hides the caret, `animations` disables them, `scale` is `device`).
+
+**Why not verified:** Pixel-level checks (caret visibility, a frozen animation frame) need image decoding, which the port does not have (see "page-screenshot: image decoding for pixel checks"). Those effects are not observed here.
+
+**To change:** Decode the PNG in the test and compare against a reference image, or a second screenshot taken with the animation paused.
+
+## build: InitScript overlay is not in HEAD
+
+**Question:** `src/Playwright/InitScript.hs` is staged as added (`AM`) but has working-tree changes, and HEAD does not contain it. Several committed-or-working modules import it, so a clean checkout of HEAD does not build (`Cabal-7554: can't find source for Playwright/InitScript`). Should the file go into a commit, and which version?
+
+**Guess taken:** Leave the file out of the page-screenshot commits, because it belongs to the init-script group and is not part of this slice. Every test run so far used the working tree, so it builds there.
+
+**Why not verified:** A clean build of HEAD+slice has not been run. The working-tree build is the only one checked.
+
+**To change:** Commit `InitScript.hs` with its init-script tests, or stash the importers until it is committed.
+
+## build: uncommitted specs break the build in three places
+
+**Question:** With the uncommitted specs present, the build breaks in `test/Playwright/LocatorWaitForFunctionSpec.hs`, `test/Playwright/PageAddInitScriptCallbackSpec.hs` and `test/Playwright/PageCacheStorageSpec.hs`. Are these in-progress specs to finish, or to hold back?
+
+**Guess taken:** Keep them uncommitted. Each one belongs to a group that is still open, so committing them would break HEAD.
+
+**Why not verified:** The page-screenshot runs used `PAT=` filters, which compile every spec. A clean-HEAD build was not run to confirm the break is limited to these three.
+
+**To change:** Tell me which of these groups should land first, and I will fix or commit them in that order.
+
+## page-screenshot: canvas case needs a byte-level check
+
+**Question:** Upstream `should work for canvas` screenshots a page with a drawn canvas and compares the decoded pixels. The repo has no decoder (see "page-screenshot: image decoding for pixel checks"). What should the port assert?
+
+**Guess taken:** Use a byte-level check. Draw the canvas, take a screenshot, and assert that the PNG signature comes back and that the bytes differ from a screenshot of the same page with the canvas left blank. That checks that the canvas content reaches the image, without decoding pixels. The case is not written yet, so `should work for canvas` stays open in the TODO.
+
+**Why not verified:** The byte comparison only shows that the output changed. It does not show that the canvas colour is in the right place.
+
+**To change:** Add a PNG decoder and port the upstream pixel comparison, along with the other pixel cases.
+
+## build: HEAD test/Main.hs expects PageClickTimeoutSpec.tests
+
+**Question:** HEAD's `test/Main.hs:295` runs `PageClickTimeoutSpec.tests`, but HEAD's `test/Playwright/PageClickTimeoutSpec.hs` exports only `timeout1Tests` to `timeout4Tests`. Clean HEAD does not compile its test suite. The working-tree spec exports `tests` and fixes this, but that edit is not committed. Should it land with the page-click work?
+
+**Guess taken:** Use the working-tree spec in the scratch tree, and leave it uncommitted in the repo. It belongs to the page-click group, which is not part of the page-screenshot slice.
+
+**Why not verified:** The scratch build used the working-tree spec, so the screenshot run does not show that the uncommitted spec compiles cleanly on its own.
+
+**To change:** Commit the working-tree `PageClickTimeoutSpec.hs` with its page-click group, or revert `test/Main.hs` to match HEAD's export list.

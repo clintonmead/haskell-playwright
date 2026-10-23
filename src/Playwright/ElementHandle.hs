@@ -25,6 +25,7 @@ module Playwright.ElementHandle
   , scrollIntoViewIfNeeded
   , scrollIntoViewIfNeededWith
   , screenshotHandle
+  , screenshotHandleWith
   , selectText
   , selectTextWith
   , setInputFilesHandle
@@ -36,6 +37,12 @@ module Playwright.ElementHandle
 
 import Playwright.Monad
   ( Playwright
+  )
+import Control.Monad.IO.Class
+  ( liftIO
+  )
+import UnliftIO.Exception
+  ( throwIO
   )
 import Data.Aeson
   ( FromJSON
@@ -105,6 +112,18 @@ import Playwright.Point
   , pointX
   , pointY
   )
+import Playwright.Error
+  ( PlaywrightError (DecodeFailure)
+  )
+import Playwright.ScreenshotOptions
+  ( ScreenshotAnimations (ScreenshotAnimationsAllow, ScreenshotAnimationsDisabled)
+  , ScreenshotCaret (ScreenshotCaretHide, ScreenshotCaretInitial)
+  , ScreenshotOptions (screenshotOptionsAnimations, screenshotOptionsCaret, screenshotOptionsMaskColor, screenshotOptionsOmitBackground, screenshotOptionsPath, screenshotOptionsQuality, screenshotOptionsScale, screenshotOptionsStyle, screenshotOptionsTimeout)
+  , ScreenshotScale (ScreenshotScaleCss, ScreenshotScaleDevice)
+  , ScreenshotType (ScreenshotJpeg, ScreenshotPng, ScreenshotWebp)
+  , resolveScreenshotType
+  , writeScreenshotFile
+  )
 import Playwright.Protocol
   ( ElementHandleBoundingBoxResult (elementHandleBoundingBoxResultValue)
   , ElementHandleClickParams (elementHandleClickParamsButton, elementHandleClickParamsClickCount, elementHandleClickParamsForce, elementHandleClickParamsModifiers, elementHandleClickParamsNoWaitAfter, elementHandleClickParamsPosition, elementHandleClickParamsSteps, elementHandleClickParamsTrial)
@@ -125,6 +144,12 @@ import Playwright.Protocol
   , ElementHandleIsHiddenResult (elementHandleIsHiddenResultValue)
   , ElementHandleIsVisibleResult (elementHandleIsVisibleResultValue)
   , ElementHandleOwnerFrameResult (elementHandleOwnerFrameResultFrame)
+  , ElementHandleScreenshotParams (elementHandleScreenshotParamsAnimations, elementHandleScreenshotParamsCaret, elementHandleScreenshotParamsMask, elementHandleScreenshotParamsMaskColor, elementHandleScreenshotParamsOmitBackground, elementHandleScreenshotParamsQuality, elementHandleScreenshotParamsScale, elementHandleScreenshotParamsStyle, elementHandleScreenshotParamsType)
+  , ElementHandleScreenshotParamsAnimations (ElementHandleScreenshotParamsAnimationsAllow, ElementHandleScreenshotParamsAnimationsDisabled)
+  , ElementHandleScreenshotParamsCaret (ElementHandleScreenshotParamsCaretHide, ElementHandleScreenshotParamsCaretInitial)
+  , ElementHandleScreenshotParamsMask
+  , ElementHandleScreenshotParamsScale (ElementHandleScreenshotParamsScaleCss, ElementHandleScreenshotParamsScaleDevice)
+  , ElementHandleScreenshotParamsType (ElementHandleScreenshotParamsTypeJpeg, ElementHandleScreenshotParamsTypePng, ElementHandleScreenshotParamsTypeWebp)
   , ElementHandleScreenshotResult (elementHandleScreenshotResultBinary)
   , ElementHandleScrollIntoViewIfNeededResult
   , ElementHandleSelectTextResult
@@ -353,6 +378,57 @@ screenshotHandle :: ElementHandle -> Playwright ByteString
 screenshotHandle handle = do
   result <- handleSendWithTimeout handle "screenshot" defaultTimeout mkElementHandleScreenshotParams
   pure (protocolBinaryToByteString (elementHandleScreenshotResultBinary result))
+
+-- | Screenshot with the given masks painted over; the options' 'screenshotOptionsMaskColor' and 'screenshotOptionsStyle' apply to them.
+screenshotHandleWith :: ElementHandle -> [ElementHandleScreenshotParamsMask] -> ScreenshotOptions -> Playwright ByteString
+screenshotHandleWith handle masks opts = do
+  resolvedType <- either (throwIO . DecodeFailure) pure (resolveScreenshotType opts)
+  result <-
+    handleSendWithTimeout
+      handle
+      "screenshot"
+      (screenshotOptionsTimeout opts)
+      (mkElementHandleScreenshotParams)
+        { elementHandleScreenshotParamsType = screenshotTypeParam <$> resolvedType
+        , elementHandleScreenshotParamsQuality = screenshotOptionsQuality opts
+        , elementHandleScreenshotParamsOmitBackground = screenshotOptionsOmitBackground opts
+        , elementHandleScreenshotParamsCaret = screenshotCaretParam <$> screenshotOptionsCaret opts
+        , elementHandleScreenshotParamsAnimations = screenshotAnimationsParam <$> screenshotOptionsAnimations opts
+        , elementHandleScreenshotParamsScale = screenshotScaleParam <$> screenshotOptionsScale opts
+        , elementHandleScreenshotParamsMask = if null masks then Nothing else Just masks
+        , elementHandleScreenshotParamsMaskColor = screenshotOptionsMaskColor opts
+        , elementHandleScreenshotParamsStyle = screenshotOptionsStyle opts
+        }
+  let bytes = protocolBinaryToByteString (elementHandleScreenshotResultBinary result)
+  mapM_ (\filePath -> liftIO (writeScreenshotFile filePath bytes)) (screenshotOptionsPath opts)
+  pure bytes
+  where
+    screenshotTypeParam screenshotType =
+      case screenshotType of
+        ScreenshotPng ->
+          ElementHandleScreenshotParamsTypePng
+        ScreenshotJpeg ->
+          ElementHandleScreenshotParamsTypeJpeg
+        ScreenshotWebp ->
+          ElementHandleScreenshotParamsTypeWebp
+    screenshotCaretParam screenshotCaret =
+      case screenshotCaret of
+        ScreenshotCaretHide ->
+          ElementHandleScreenshotParamsCaretHide
+        ScreenshotCaretInitial ->
+          ElementHandleScreenshotParamsCaretInitial
+    screenshotAnimationsParam screenshotAnimations =
+      case screenshotAnimations of
+        ScreenshotAnimationsDisabled ->
+          ElementHandleScreenshotParamsAnimationsDisabled
+        ScreenshotAnimationsAllow ->
+          ElementHandleScreenshotParamsAnimationsAllow
+    screenshotScaleParam screenshotScale =
+      case screenshotScale of
+        ScreenshotScaleCss ->
+          ElementHandleScreenshotParamsScaleCss
+        ScreenshotScaleDevice ->
+          ElementHandleScreenshotParamsScaleDevice
 
 boundingBox :: ElementHandle -> Playwright (Maybe BoundingBox)
 boundingBox handle = do

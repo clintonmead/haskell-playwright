@@ -43,6 +43,8 @@ import Playwright
   , evaluate
   , goto
   , locator
+  , locatorScreenshot
+  , locatorScreenshotMasked
   , screenshot
   , screenshotMasked
   , selectorFromText
@@ -335,6 +337,15 @@ tests =
           plain <- screenshot page defaultScreenshotOptions
           styled <- screenshot page defaultScreenshotOptions {screenshotOptionsStyle = Just "body { background: rgb(0, 0, 255) !important; }"}
           assertBool "style differs from plain" (styled /= plain)
+    , testCase "should work with locator" $
+        withAssets $ \prefix page -> do
+          setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 500))
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          let bodyLocator = locator page (selectorFromText "body")
+          plain <- locatorScreenshot bodyLocator defaultScreenshotOptions
+          assertBool "png signature" (pngMagic `BS.isPrefixOf` plain)
+          masked <- locatorScreenshotMasked bodyLocator [locator page (selectorFromText "div.box")] defaultScreenshotOptions
+          assertBool "masked locator differs from plain" (masked /= plain)
     ]
 
 dsf2Options :: NewContextOptions
