@@ -322,6 +322,7 @@ test-suite playwright-test
       Playwright.GlobalFetchSupport
       Playwright.Harness
       Playwright.HarSpec
+      Playwright.HeapSpec
       Playwright.HitTargetSpec
       Playwright.IntegrationSpec
       Playwright.InterceptionSpec
