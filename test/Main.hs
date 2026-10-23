@@ -45,6 +45,7 @@ import Playwright.BrowserContextUserAgentSpec qualified as BrowserContextUserAge
 import Playwright.BrowserContextViewportMobileSpec qualified as BrowserContextViewportMobileSpec
 import Playwright.BrowserContextViewportSpec qualified as BrowserContextViewportSpec
 import Playwright.BrowserTypeBasicSpec qualified as BrowserTypeBasicSpec
+import Playwright.BrowserTypeLaunchServerSpec qualified as BrowserTypeLaunchServerSpec
 import Playwright.BrowserTypeLaunchSpec qualified as BrowserTypeLaunchSpec
 import Playwright.BrowserTypeLaunchSeleniumSpec qualified as BrowserTypeLaunchSeleniumSpec
 import Playwright.CapabilitiesSpec qualified as CapabilitiesSpec
@@ -240,6 +241,7 @@ main =
         , BeforeunloadSpec.tests
         , BfcacheSpec.tests
         , BrowserServerSpec.tests
+        , BrowserTypeLaunchServerSpec.tests
         , LauncherSpec.tests
         , ChannelsSpec.tests
         , ComponentParserSpec.tests

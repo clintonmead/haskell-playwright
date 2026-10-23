@@ -126,6 +126,7 @@ library
       Playwright.LaunchEnv
       Playwright.LaunchOptions
       Playwright.LaunchPersistent
+      Playwright.LaunchServer
       Playwright.LoadState
       Playwright.Locale
       Playwright.Locator
@@ -253,6 +254,7 @@ library
     , exceptions
     , filepath
     , mtl
+    , process
     , regex-base
     , regex-tdfa
     , scientific
@@ -309,6 +311,7 @@ test-suite playwright-test
       Playwright.BrowserSpec
       Playwright.BrowserTypeBasicSpec
       Playwright.BrowserTypeLaunchSeleniumSpec
+      Playwright.BrowserTypeLaunchServerSpec
       Playwright.BrowserTypeLaunchSpec
       Playwright.CapabilitiesSpec
       Playwright.ChannelsSpec
