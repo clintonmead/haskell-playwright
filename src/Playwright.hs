@@ -1600,7 +1600,7 @@ import Playwright.Locale
   ( Locale (Locale, localeToText)
   )
 import Playwright.Expect
-  ( ExpectOptions (ExpectOptions, expectIsNot, expectTimeout)
+  ( ExpectOptions (ExpectOptions, expectIgnoreCase, expectIsNot, expectTimeout, expectUseInnerText)
   , defaultExpectOptions
   , expectLocator
   , expectLocatorCount
