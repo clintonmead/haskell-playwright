@@ -52,6 +52,7 @@ import Playwright.ChromiumSpec qualified as ChromiumSpec
 import Playwright.ConnectionSpec qualified as ConnectionSpec
 import Playwright.DefaultBrowserContext1Spec qualified as DefaultBrowserContext1Spec
 import Playwright.DefaultBrowserContext2Spec qualified as DefaultBrowserContext2Spec
+import Playwright.DebuggerSpec qualified as DebuggerSpec
 import Playwright.DisableWebSecuritySpec qualified as DisableWebSecuritySpec
 import Playwright.DownloadSpec qualified as DownloadSpec
 import Playwright.DownloadsPathSpec qualified as DownloadsPathSpec
@@ -284,6 +285,7 @@ main =
         , ConnectionSpec.tests
         , DefaultBrowserContext1Spec.tests
         , DefaultBrowserContext2Spec.tests
+        , DebuggerSpec.tests
         , DisableWebSecuritySpec.tests
         , DownloadSpec.tests
         , DownloadsPathSpec.tests

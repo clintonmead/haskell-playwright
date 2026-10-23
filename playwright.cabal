@@ -313,6 +313,7 @@ test-suite playwright-test
       Playwright.ClientCertificatesSpec
       Playwright.ComponentParserSpec
       Playwright.ConnectionSpec
+      Playwright.DebuggerSpec
       Playwright.DefaultBrowserContext1Spec
       Playwright.DefaultBrowserContext2Spec
       Playwright.DisableWebSecuritySpec
