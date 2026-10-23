@@ -42,7 +42,7 @@ import Playwright.Exactness
   ( Exactness (Exact, Inexact)
   )
 import Playwright.GetByRoleOptions
-  ( GetByRoleOptions (getByRoleChecked, getByRoleDisabled, getByRoleExact, getByRoleExpanded, getByRoleIncludeHidden, getByRoleLevel, getByRoleName, getByRoleNameRegex, getByRolePressed, getByRoleSelected)
+  ( GetByRoleOptions (getByRoleChecked, getByRoleDescription, getByRoleDescriptionRegex, getByRoleDisabled, getByRoleExact, getByRoleExpanded, getByRoleIncludeHidden, getByRoleLevel, getByRoleName, getByRoleNameRegex, getByRolePressed, getByRoleSelected)
   )
 import Playwright.Selector
   ( Selector
@@ -139,6 +139,7 @@ getByRoleSelector role opts =
         , boolAttr "include-hidden" (getByRoleIncludeHidden opts)
         , fmap (\level -> "[level=" <> pack (show level) <> "]") (getByRoleLevel opts)
         , nameAttr opts
+        , descriptionAttr opts
         , boolAttr "pressed" (getByRolePressed opts)
         ]
 
@@ -153,6 +154,14 @@ nameAttr opts =
       Just ("[name=" <> escapeRegexForSelector source <> "]")
     Nothing ->
       fmap (\name -> "[name=" <> escapeForAttributeSelector name (getByRoleExact opts) <> "]") (getByRoleName opts)
+
+descriptionAttr :: GetByRoleOptions -> Maybe Text
+descriptionAttr opts =
+  case getByRoleDescriptionRegex opts of
+    Just source ->
+      Just ("[description=" <> escapeRegexForSelector source <> "]")
+    Nothing ->
+      fmap (\description -> "[description=" <> escapeForAttributeSelector description (getByRoleExact opts) <> "]") (getByRoleDescription opts)
 
 boolText :: Bool -> Text
 boolText flag =
