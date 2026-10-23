@@ -75,7 +75,7 @@ encodingTests (encoding, zipped) =
       (unpack (decodeUtf8 encoding) <> " decompression")
       [ testCase "should support decompression" $
           fetchCompressed encoding zipped WithLength "str"
-      , testCase "should not fail if response content-length header is missing" $
+      , testCase ("should not fail if response content-length header is missing (" <> unpack (decodeUtf8 encoding) <> ")") $
           fetchCompressed encoding zipped WithoutLength "str"
       , testCase "should not fail with chunked responses (without Content-Length header)" $
           fetchCompressed encoding zipped Chunked "str"
