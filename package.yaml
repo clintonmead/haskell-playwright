@@ -82,6 +82,7 @@ tests:
       - tasty-hedgehog
       - tasty-hunit
       - text
+      - time
       - unliftio
       - wai
       - wai-app-static
