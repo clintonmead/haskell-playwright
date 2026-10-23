@@ -3,37 +3,61 @@ module Playwright.BrowserContextViewportMobileSpec
   ) where
 
 import Data.Text
-  ( replace
+  ( Text
+  , replace
   )
 import Playwright
-  ( ConsoleMessage (consoleMessageText)
+  ( AriaRole (AriaRole)
+  , BoundingBox (boundingBoxHeight, boundingBoxWidth, boundingBoxX, boundingBoxY)
+  , ClickOptions (clickOptionsForce)
+  , ConsoleMessage (consoleMessageText)
+  , ContentType (ContentType)
+  , CssPixel (cssPixelToScientific)
+  , Exactness (Inexact)
+  , FulfillBody (FulfillText)
+  , FulfillOptions (fulfillBody, fulfillContentType)
   , NewContextOptions (newContextDeviceScaleFactor, newContextHasTouch, newContextIsMobile, newContextUserAgent, newContextViewport)
   , Point (Point)
+  , UrlMatch (UrlMatchGlob)
   , UserAgent (UserAgent)
   , ViewportHeight (ViewportHeight)
   , ViewportSize (ViewportSize)
   , ViewportWidth (ViewportWidth)
   , armConsole
+  , click
+  , clickWith
   , contextBrowser
   , cssPixelFromInt
+  , defaultClickOptions
+  , defaultFulfillOptions
+  , defaultGetByRoleOptions
   , defaultGotoOptions
   , defaultNewContextOptions
   , deviceScaleFactorFromInt
   , evaluateBool
   , evaluateNumber
   , evaluateText
+  , fulfillRoute
+  , getByRole
+  , getByText
   , goto
+  , locator
+  , selectorFromText
+  , locatorBoundingBox
+  , mouseClick
   , mouseMove
   , mouseWheel
   , newContextWith
   , newPage
+  , route
   , setViewportSize
   , urlFromText
   , waitForFunction
   , wheelDeltaFromInt
   )
 import Playwright.Harness
-  ( withAssetsContextWith
+  ( assertBool
+  , withAssetsContextWith
   , withAssetsWith
   , withChromiumContextWith
   , assertEqual
@@ -187,7 +211,80 @@ tests =
             mouseWheel page (wheelDeltaFromInt 0) (wheelDeltaFromInt 100)
             _ <- waitForFunction page "() => window.scrollY === 100"
             pure ()
+    , testCase "mouse should work with mobile viewports and cross process navigations" $
+        withAssetsContextWith
+          defaultNewContextOptions
+            { newContextViewport = Just (ViewportSize (ViewportWidth 360) (ViewportHeight 640))
+            , newContextIsMobile = Just True
+            }
+          $ \prefix _ page -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            _ <- goto page (urlFromText (replace "127.0.0.1" "localhost" prefix <> "/mobile.html")) defaultGotoOptions
+            _ <-
+              evaluateBool
+                page
+                "() => { document.addEventListener('click', event => { window.result = { x: event.clientX, y: event.clientY }; }); return true; }"
+            mouseClick page (Point (cssPixelFromInt 30) (cssPixelFromInt 40))
+            assertEqual "x" (30 :: Double) =<< evaluateNumber page "() => window.result.x"
+            assertEqual "y" (40 :: Double) =<< evaluateNumber page "() => window.result.y"
+    , testCase "should scroll mobile page with background-attachment: fixed" $
+        withAssetsWith iPhone12 $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/input/background-fixed.html")) defaultGotoOptions
+          click (getByRole page (AriaRole "button") defaultGetByRoleOptions)
+          assertBool "scrolled past 1000" . (> 1000) =<< evaluateNumber page "() => window.scrollY"
+    , testCase "view scale should reset after navigation" $
+        withChromiumContextWith
+          defaultNewContextOptions
+            { newContextViewport = Just (ViewportSize (ViewportWidth 390) (ViewportHeight 664))
+            , newContextIsMobile = Just True
+            }
+          $ \_ page -> do
+            _ <-
+              goto
+                page
+                (urlFromText "data:text/html,<meta name='viewport' content='device-width, initial-scale=1'><button>Mobile Viewport</button>")
+                defaultGotoOptions
+            route page (UrlMatchGlob "**/button.html") $ \r ->
+              fulfillRoute
+                r
+                defaultFulfillOptions
+                  { fulfillBody = Just (FulfillText buttonPageHtml)
+                  , fulfillContentType = Just (ContentType "text/html")
+                  }
+            _ <- goto page (urlFromText "http://localhost/button.html") defaultGotoOptions
+            clickWith (getByText page "Click me" Inexact) defaultClickOptions {clickOptionsForce = Just True}
+            box <- locatorBoundingBox (locator page (selectorFromText "button"))
+            assertEqual "clicks" (1 :: Double) =<< evaluateNumber page "() => window.clicks.length"
+            x <- evaluateNumber page "() => window.clicks[0].x"
+            y <- evaluateNumber page "() => window.clicks[0].y"
+            case box of
+              Nothing -> assertBool "button has a box" False
+              Just b ->
+                assertBool "click inside button" $
+                  toD (boundingBoxX b) <= x
+                    && x <= toD (boundingBoxX b) + toD (boundingBoxWidth b)
+                    && toD (boundingBoxY b) <= y
+                    && y <= toD (boundingBoxY b) + toD (boundingBoxHeight b)
     ]
+
+-- | Converts a CSS pixel measurement to a plain Double for range checks.
+toD :: CssPixel -> Double
+toD = realToFrac . cssPixelToScientific
+
+buttonPageHtml :: Text
+buttonPageHtml =
+  "<body><button>Click me</button><script>window.clicks = []; document.addEventListener('click', e => { const dot = document.createElement('div'); dot.style.position = 'absolute'; dot.style.width = '10px'; dot.style.height = '10px'; dot.style.borderRadius = '5px'; dot.style.backgroundColor = 'red'; dot.style.left = e.pageX + 'px'; dot.style.top = e.pageY + 'px'; dot.textContent = 'x: ' + e.pageX + ' y: ' + e.pageY; document.body.appendChild(dot); window.clicks.push({ x: e.pageX, y: e.pageY }); });</script></body>"
+
+iPhone12 :: NewContextOptions
+iPhone12 =
+  defaultNewContextOptions
+    { newContextUserAgent =
+        Just (UserAgent "Mozilla/5.0 (iPhone; CPU iPhone OS 14_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Mobile/15E148 Safari/604.1")
+    , newContextViewport = Just (ViewportSize (ViewportWidth 390) (ViewportHeight 664))
+    , newContextDeviceScaleFactor = Just (deviceScaleFactorFromInt 3)
+    , newContextIsMobile = Just True
+    , newContextHasTouch = Just True
+    }
 
 iPhone6 :: NewContextOptions
 iPhone6 =
