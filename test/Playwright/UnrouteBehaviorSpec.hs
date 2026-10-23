@@ -1,3 +1,21 @@
+-- Skipped upstream cases (tests/library/unroute-behavior.spec.ts):
+--
+-- * context.unroute should not wait for pending handlers to complete:
+--   Haskell unroute removes by UrlMatch glob only, with no behavior option.
+-- * context.unrouteAll should wait for pending handlers to complete:
+--   unrouteAll takes no behavior option ('wait'), so the wait mode is not exposed.
+-- * context.unrouteAll should not wait for pending handlers to complete if behavior is ignoreErrors:
+--   unrouteAll takes no behavior option ('ignoreErrors'), so the mode is not exposed.
+-- * page.unroute should not wait for pending handlers to complete:
+--   same as context.unroute: glob-only removal, no behavior option.
+-- * page.unrouteAll should wait for pending handlers to complete:
+--   same as context.unrouteAll: no behavior option.
+-- * page.unrouteAll should not wait for pending handlers to complete if behavior is ignoreErrors:
+--   same as context.unrouteAll: no behavior option.
+-- * should not continue requests in flight (page):
+--   relies on unroute and in-flight route continuation semantics the port does not expose.
+-- * should not continue requests in flight (context):
+--   same as the page variant, at context scope.
 module Playwright.UnrouteBehaviorSpec
   ( tests
   ) where
