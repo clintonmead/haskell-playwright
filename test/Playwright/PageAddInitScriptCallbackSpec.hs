@@ -120,6 +120,15 @@ tests =
           _ <- goto page (urlFromText (prefix <> "/frames/one-frame.html")) defaultGotoOptions
           -- Once for the main frame document, once for the child frame document.
           pollUntil ((== [42, 42]) <$> readIORef received)
+    , testCase "should not register the callback on the global object" $
+        withAssets $ \prefix page -> do
+          _ <-
+            addPageInitScriptExposing
+              page
+              "async ({ cb }) => { await cb(); window.result = Object.getOwnPropertyNames(globalThis).filter(name => name.startsWith('__pwInitScriptFunction')).length === 0; }"
+              [("cb", ignoreArguments)]
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          pollUntil (evaluateBool page "() => window.result === true")
     , testCase "should survive a navigation and keep working" $
         withAssets $ \prefix page -> do
           received <- newIORef []
@@ -166,6 +175,11 @@ doubleAndRecord received args =
       pure (numberArgument (n * 2))
     _ ->
       pure undefinedArgument
+
+-- | Accepts any arguments and returns nothing.
+ignoreArguments :: [SerializedValue] -> Playwright SerializedArgument
+ignoreArguments _ =
+  pure undefinedArgument
 
 doubleNumber :: [SerializedValue] -> Playwright SerializedArgument
 doubleNumber args =
