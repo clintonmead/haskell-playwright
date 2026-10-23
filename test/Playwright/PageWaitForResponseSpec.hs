@@ -5,11 +5,15 @@ module Playwright.PageWaitForResponseSpec
 import Control.Monad
   ( when
   )
+import Control.Monad.IO.Class
+  ( MonadIO
+  )
 import Data.Text
-  ( isInfixOf
+  ( Text
+  , isInfixOf
   )
 import Playwright
-  ( UrlMatch (UrlMatchGlob)
+  ( UrlMatch (UrlMatchGlob, UrlMatchRegex)
   , armResponse
   , armResponseWhere
   , armResponseWith
@@ -25,6 +29,9 @@ import Playwright
   , waitForResponse
   , waitForResponseWith
   )
+import Playwright.Error
+  ( PlaywrightError (WaitTimeoutLog)
+  )
 import Playwright.Harness
   ( assertWaitTimeout
   , withAssets
@@ -37,6 +44,9 @@ import Test.Tasty
   )
 import Test.Tasty.HUnit
   ( testCase
+  )
+import UnliftIO.Exception
+  ( try
   )
 import UnliftIO.IORef
   ( modifyIORef'
@@ -143,4 +153,25 @@ tests =
               response <- takeResponse
               url <- responseUrl response
               assertEqual "url" wanted (urlToText url)
+    , testCase "should log the url" $
+        withAssets $ \_ page ->
+          case milliseconds 1000 of
+            Nothing ->
+              assertFailure "timeout"
+            Just timeout -> do
+              globResult <- try (waitForResponseWith page (UrlMatchGlob "foo.css") timeout)
+              assertLoggedWait "waiting for response \"foo.css\"" globResult
+              regexResult <- try (waitForResponseWith page (UrlMatchRegex "foo.css" "i") timeout)
+              assertLoggedWait "waiting for response /foo.css/i" regexResult
     ]
+  where
+    assertLoggedWait :: (MonadIO f) => Text -> Either PlaywrightError b -> f ()
+    assertLoggedWait needle result =
+      case result of
+        Left (WaitTimeoutLog _ logLine) ->
+          when (not (needle `isInfixOf` logLine)) $
+            assertFailure ("call log " <> show logLine <> " does not contain " <> show needle)
+        Left err ->
+          assertFailure ("expected WaitTimeoutLog, got: " <> show err)
+        Right _ ->
+          assertFailure "expected WaitTimeoutLog"

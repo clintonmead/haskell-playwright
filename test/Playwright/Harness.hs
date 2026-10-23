@@ -108,7 +108,7 @@ import Playwright
   , withPage
   )
 import Playwright.Error
-  ( PlaywrightError (ProtocolRpc, WaitTimeout)
+  ( PlaywrightError (ProtocolRpc, WaitTimeout, WaitTimeoutLog)
   , ProtocolFailure (protocolFailureMessage)
   )
 import System.Directory
@@ -392,6 +392,8 @@ assertWaitTimeout action = do
   result <- try action
   case result of
     Left (WaitTimeout _) ->
+      pure ()
+    Left (WaitTimeoutLog _ _) ->
       pure ()
     Left err ->
       assertFailure ("expected WaitTimeout, got: " <> show err)
