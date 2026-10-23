@@ -58,7 +58,7 @@ import Playwright.Protocol
   , TracingTracingGroupResult
   , TracingTracingStartChunkResult (tracingTracingStartChunkResultTraceName)
   , TracingTracingStartChunkParams (tracingTracingStartChunkParamsName, tracingTracingStartChunkParamsTitle)
-  , TracingTracingStartParams (tracingTracingStartParamsLive, tracingTracingStartParamsName, tracingTracingStartParamsScreencast, tracingTracingStartParamsSnapshotAria, tracingTracingStartParamsSnapshotDom, tracingTracingStartParamsSnapshotScreen)
+  , TracingTracingStartParams (tracingTracingStartParamsLive, tracingTracingStartParamsName, tracingTracingStartParamsScreencast, tracingTracingStartParamsSnapshotDom, tracingTracingStartParamsSnapshotScreen)
   , TracingTracingStartResult
   , TracingTracingStopChunkParamsMode (TracingTracingStopChunkParamsModeArchive, TracingTracingStopChunkParamsModeDiscard)
   , TracingTracingStopChunkResult (tracingTracingStopChunkResultArtifact)
@@ -123,7 +123,6 @@ tracingStartWith ctx options = do
           , tracingTracingStartParamsScreencast = tracingStartOptionsScreenshots options
           , tracingTracingStartParamsSnapshotDom = tracingStartOptionsSnapshots options
           , tracingTracingStartParamsSnapshotScreen = tracingStartOptionsScreenshots options
-          , tracingTracingStartParamsSnapshotAria = tracingStartOptionsSnapshots options
           , tracingTracingStartParamsLive = tracingStartOptionsLive options
           }
   _ :: TracingTracingStartResult <-
