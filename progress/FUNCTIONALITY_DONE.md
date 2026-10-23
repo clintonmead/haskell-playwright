@@ -39,3 +39,4 @@ beforeunload, bfcache (Chromium `ignoreDefaultArgs` `--disable-back-forward-cach
 Plus connection/transport unit tests and a small integration spec.
 
 Known holes inside otherwise-ported specs are listed in `FUNCTIONALITY_TODO.md`.
+`tracing` is a partial port of `tests/library/tracing.spec.ts` (8 cases). It covers `context.tracing` start with options, stop without start, stop without start without exporting, dialogs, clicks that open dialogs, concurrent export, overwrite of an existing archive (zip entry names), and recovery after a failed stop (zip entry presence only). Skipped trace-content cases are listed in `FUNCTIONALITY_TODO.md`.
