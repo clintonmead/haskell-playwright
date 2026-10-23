@@ -189,6 +189,21 @@ tests =
             assertEqual "hidden" False visible
             count <- readIORef called
             assertEqual "called" 1 count
+      , testCase "should work with toBeVisible" $
+          withHandleLocator $ \page -> do
+            called <- newIORef (0 :: Int)
+            addLocatorHandler page (getByText page "This interstitial covers the button" Inexact) $ \_ -> do
+              modifyIORef' called (+ 1)
+              click (locate page "#close")
+            _ <-
+              evaluate
+                page
+                "() => { window.clicked = 0; window.setupAnnoyingInterstitial('remove', 1); }"
+            waitFor (locate page "#target") WaitForVisible
+            visible <- isVisible (locate page "#interstitial")
+            assertEqual "hidden" False visible
+            count <- readIORef called
+            assertEqual "called" 1 count
       , testCase "should work when owner frame detaches" $
           withAssetPage "empty.html" $ \page -> do
             _ <-
