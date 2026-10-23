@@ -86,7 +86,7 @@ tests =
               prefix
               ( "() => { const request = new Request('"
                   <> prefix
-                  <> "/title.html', { method: 'POST', body: ' ' }); return fetch(request); }"
+                  <> "/title.html', { method: 'POST', body: '<not a json>' }); return fetch(request); }"
               )
           result <- try (requestPostDataJSON request)
           case result of
