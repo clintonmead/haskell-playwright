@@ -16,6 +16,7 @@ import Playwright
   , goto
   , highlight
   , highlightWithStyle
+  , highlightWithStyleProperties
   , hideHighlight
   , isVisible
   , locatorBoundingBox
@@ -66,6 +67,19 @@ tests =
           assertEqual "outline" "rgb(255, 0, 0) solid 3px" outline
           background <- highlightProp page "backgroundColor"
           assertEqual "background" "rgba(0, 255, 0, 0.25)" background
+    , testCase "highlight should accept an object style (JS only)" $
+        withChromiumPage $ \page -> do
+          setContent page "<button>Click me</button>"
+          highlightWithStyleProperties
+            (locate page "button")
+            [ ("outline", "2px dashed rgb(0, 0, 255)")
+            , ("backgroundColor", "rgba(255, 255, 0, 0.2)")
+            ]
+          waitFor (locate page "x-pw-highlight") WaitForVisible
+          outline <- highlightProp page "outline"
+          assertEqual "outline" "rgb(0, 0, 255) dashed 2px" outline
+          background <- highlightProp page "backgroundColor"
+          assertEqual "background" "rgba(255, 255, 0, 0.2)" background
     , testCase "hideHighlight removes a styled highlight" $
         withChromiumPage $ \page -> do
           setContent page "<button>Click me</button>"
