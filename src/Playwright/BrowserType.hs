@@ -20,6 +20,9 @@ import System.Directory
 import UnliftIO.Exception
   ( bracket
   )
+import Data.Maybe
+  ( fromMaybe
+  )
 import Data.Text
   ( Text
   )
@@ -53,6 +56,9 @@ import Playwright.Json.ChannelRef
 import Playwright.Json.Decode
   ( throwDecode
   )
+import Playwright.ClientCertificate
+  ( loadClientCertificates
+  )
 import Playwright.LaunchEnv
   ( applyEnvLaunchOverrides
   )
@@ -66,7 +72,7 @@ import Playwright.MethodName
   ( MethodName (MethodName)
   )
 import Playwright.NewContextOptions
-  ( NewContextOptions (newContextBaseURL)
+  ( NewContextOptions (newContextBaseURL, newContextClientCertificates)
   )
 import Playwright.Protocol
   ( BrowserTypeInitializer (browserTypeInitializerExecutablePath, browserTypeInitializerName)
@@ -116,12 +122,13 @@ launchPersistentContext browserType userDataDir launchOpts ctxOpts = do
   absUserDataDir <- liftIO (makeAbsolute userDataDir)
   resolvedLaunch <- liftIO (resolveLaunchDownloads launchOpts >>= applyEnvLaunchOverrides)
   engines <- lookupSelectorEngines
+  certs <- liftIO (loadClientCertificates (fromMaybe [] (newContextClientCertificates ctxOpts)))
   result <-
     sendWithTimeout
       (browserTypeChannel browserType)
       (MethodName "launchPersistentContext")
       (launchOptionsTimeout resolvedLaunch)
-      (toLaunchPersistentParams absUserDataDir resolvedLaunch ctxOpts engines)
+      (toLaunchPersistentParams absUserDataDir resolvedLaunch ctxOpts engines certs)
   browser <-
     browserFromRef
       (browserTypeLaunchPersistentContextResultBrowser result)

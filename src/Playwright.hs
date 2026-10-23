@@ -1666,11 +1666,11 @@ import Playwright.MimeType
   ( MimeType (MimeType, mimeTypeToText)
   )
 import Playwright.NewContextOptions
-  ( NewContextOptions (NewContextOptions, newContextAcceptDownloads, newContextBaseURL, newContextBypassCSP, newContextColorScheme, newContextContrast, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextForcedColors, newContextGeolocation, newContextHasTouch, newContextHttpCredentials, newContextHttpCredentialsList, newContextIgnoreHTTPSErrors, newContextIsMobile, newContextJavaScriptEnabled, newContextLocale, newContextNoDefaultViewport, newContextOffline, newContextPermissions, newContextProxy, newContextRecordHar, newContextReducedMotion, newContextScreen, newContextServiceWorkers, newContextStorageState, newContextStrictSelectors, newContextTimezoneId, newContextUserAgent, newContextViewport)
+  ( NewContextOptions (NewContextOptions, newContextAcceptDownloads, newContextBaseURL, newContextClientCertificates, newContextBypassCSP, newContextColorScheme, newContextContrast, newContextDeviceScaleFactor, newContextExtraHTTPHeaders, newContextForcedColors, newContextGeolocation, newContextHasTouch, newContextHttpCredentials, newContextHttpCredentialsList, newContextIgnoreHTTPSErrors, newContextIsMobile, newContextJavaScriptEnabled, newContextLocale, newContextNoDefaultViewport, newContextOffline, newContextPermissions, newContextProxy, newContextRecordHar, newContextReducedMotion, newContextScreen, newContextServiceWorkers, newContextStorageState, newContextStrictSelectors, newContextTimezoneId, newContextUserAgent, newContextViewport)
   , defaultNewContextOptions
   )
 import Playwright.NewRequestOptions
-  ( NewRequestOptions (NewRequestOptions, newRequestBaseURL, newRequestExtraHTTPHeaders, newRequestFailOnStatusCode, newRequestHttpCredentials, newRequestHttpCredentialsList, newRequestIgnoreHTTPSErrors, newRequestMaxRedirects, newRequestProxy, newRequestStorageState, newRequestTimeout, newRequestUserAgent)
+  ( NewRequestOptions (NewRequestOptions, newRequestBaseURL, newRequestClientCertificates, newRequestExtraHTTPHeaders, newRequestFailOnStatusCode, newRequestHttpCredentials, newRequestHttpCredentialsList, newRequestIgnoreHTTPSErrors, newRequestMaxRedirects, newRequestProxy, newRequestStorageState, newRequestTimeout, newRequestUserAgent)
   , defaultNewRequestOptions
   )
 import Playwright.NetworkSizes

@@ -4,6 +4,7 @@ module Playwright.ClientCertificate
   , LoadedClientCertificate (..)
   , loadClientCertificates
   , toBrowserClientCertificates
+  , toLaunchPersistentClientCertificates
   , toRequestClientCertificates
   ) where
 
@@ -128,3 +129,16 @@ binary = fmap protocolBinaryFromByteString
 nonEmpty :: [a] -> Maybe [a]
 nonEmpty [] = Nothing
 nonEmpty xs = Just xs
+
+-- | Protocol entries for a persistent browser context launch. 'Nothing' when there are none.
+toLaunchPersistentClientCertificates :: [LoadedClientCertificate] -> Maybe [Protocol.BrowserTypeLaunchPersistentContextParamsClientCertificates]
+toLaunchPersistentClientCertificates = nonEmpty . map toLaunch
+  where
+    toLaunch loaded =
+      Protocol.BrowserTypeLaunchPersistentContextParamsClientCertificates
+        { Protocol.browserTypeLaunchPersistentContextParamsClientCertificatesCert = binary (loadedClientCertificateCert loaded)
+        , Protocol.browserTypeLaunchPersistentContextParamsClientCertificatesKey = binary (loadedClientCertificateKey loaded)
+        , Protocol.browserTypeLaunchPersistentContextParamsClientCertificatesOrigin = loadedClientCertificateOrigin loaded
+        , Protocol.browserTypeLaunchPersistentContextParamsClientCertificatesPassphrase = loadedClientCertificatePassphrase loaded
+        , Protocol.browserTypeLaunchPersistentContextParamsClientCertificatesPfx = binary (loadedClientCertificatePfx loaded)
+        }

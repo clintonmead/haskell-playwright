@@ -77,6 +77,7 @@ tests:
       - http-types
       - network
       - playwright
+      - process
       - stm
       - tasty
       - tasty-hedgehog
