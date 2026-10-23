@@ -107,5 +107,9 @@ tests =
 
 -- Official cases that stay skipped:
 -- userDataDir / port as untyped launch options (userDataDir belongs on launchPersistentContext)
+-- port on launchPersistentContext (LaunchOptions has no port field)
 -- __testHookBeforeCreateBrowser timeout / Dummy exception
 -- `process` as options, `await using` (Node)
+-- launcher.spec.ts and browsers-path.spec.ts stay unported: Node `playwright.errors` / `playwright.devices`
+--   registries, __testHook* close timeout, DISPLAY mutation for the xserver error (no launch env option),
+--   and Node require-time platform spoofing of playwright-core.
