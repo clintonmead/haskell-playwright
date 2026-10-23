@@ -46,6 +46,9 @@ import Test.Tasty.HUnit
   ( testCase
   )
 
+-- Not ported: "should throw for non-string header values". NewContextOptions takes
+-- typed HttpHeader values (HeaderValue Text), so a null or non-string header cannot
+-- be expressed and the upstream error path has no equivalent.
 tests :: TestTree
 tests =
   testGroup
