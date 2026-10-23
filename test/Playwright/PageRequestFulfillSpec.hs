@@ -55,6 +55,10 @@ import Data.Text
 import UnliftIO.Async
   ( race
   )
+import UnliftIO.Exception
+  ( SomeException
+  , try
+  )
 import UnliftIO.MVar
   ( newEmptyMVar
   , putMVar
@@ -70,10 +74,11 @@ import Network.Wai
   )
 import Playwright
   ( apiResponseHeaders
+  , Playwright
   , ContentType (ContentType)
   , ContinueOptions (continueHeaders)
   , FulfillBody (FulfillBytes, FulfillText)
-  , FulfillOptions (fulfillBody, fulfillContentType, fulfillHeaders, fulfillResponse, fulfillStatus)
+  , FulfillOptions (fulfillBody, fulfillContentType, fulfillHeaders, fulfillPath, fulfillResponse, fulfillStatus)
   , HeaderName (HeaderName, headerNameToText)
   , HeaderValue (HeaderValue, headerValueToText)
   , HttpHeader (HttpHeader, httpHeaderName, httpHeaderValue)
@@ -100,6 +105,7 @@ import Playwright
   , goto
   , requestUrl
   , responseAllHeaders
+  , responseHeaderValue
   , responseHeaders
   , responseJSON
   , responseStatus
@@ -118,6 +124,7 @@ import Playwright.Harness
   ( Recorded (recordedHeaders)
   , readTestAsset
   , recordRequest
+  , testAssetsDir
   , withAssets
   , withChromiumPage
   , withLocalApp
@@ -522,6 +529,52 @@ tests =
             assertBool "loaded" loaded
             assertEqual "size" True
               =<< evaluateBool page "() => { const img = document.querySelector('img'); return img.naturalWidth === 50 && img.naturalHeight === 50; }"
+    , testCase "should work with file path" $
+        withChromiumPage $ \page ->
+          withLocalApp emptyApp $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            assets <- testAssetsDir
+            route page (UrlMatchGlob "**/*") $ \handled ->
+              fulfillRoute
+                handled
+                defaultFulfillOptions
+                  { fulfillContentType = Just (ContentType "shouldBeIgnored")
+                  , fulfillPath = Just (assets <> "/pptr.png")
+                  }
+            _ <-
+              evaluate
+                page
+                ( "() => new Promise(done => { const img = document.createElement('img'); img.src = '"
+                    <> prefix
+                    <> "/does-not-exist.png'; document.body.appendChild(img); img.onload = () => done(true); })"
+                )
+            assertEqual "loaded" True =<< evaluateBool page "() => document.querySelector('img').naturalWidth > 0"
+    , testCase "headerValue should return set-cookie from intercepted response" $
+        withAssets $ \prefix page -> do
+          -- Upstream marks this as a known failure on Chromium: Set-Cookie is missing from the
+          -- response after interception. The assertion must fail there; a pass means the
+          -- known failure is gone and this wrapper should be removed.
+          route page (UrlMatchGlob "**/empty.html") $ \handled ->
+            fulfillRoute
+              handled
+              defaultFulfillOptions
+                { fulfillStatus = Just (HttpStatus 200)
+                , fulfillHeaders = [HttpHeader (HeaderName "Set-Cookie") (HeaderValue "a=b")]
+                , fulfillBody = Just (FulfillText "")
+                }
+          navigated <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          case navigated of
+            Nothing ->
+              assertFailure "missing response"
+            Just value -> do
+              outcome <-
+                try (responseHeaderValue value (HeaderName "Set-Cookie") >>= assertEqual "set-cookie" (Just "a=b"))
+                  :: Playwright (Either SomeException ())
+              case outcome of
+                Left _ ->
+                  pure ()
+                Right () ->
+                  assertFailure "Set-Cookie survived interception; remove the known-failure wrapper"
     , testCase "should work with preload link" $
         withAssets $ \prefix page -> do
           route page (UrlMatchGlob "**/one-style.css") $ \handled ->
