@@ -40,7 +40,7 @@ import Playwright
   , FulfillBody (FulfillText)
   , FulfillOptions (fulfillBody)
   , NewContextOptions (newContextStorageState)
-  , OriginStorageState (OriginStorageState, originStateLocalStorage, originStateOrigin)
+  , OriginStorageState (OriginStorageState, originStateIndexedDB, originStateLocalStorage, originStateOpfs, originStateOrigin)
   , Page
   , Playwright
   , StorageItem (StorageItem, storageItemName, storageItemValue)
@@ -145,7 +145,7 @@ tests =
                         Just
                           ( StorageState
                               []
-                              [OriginStorageState (urlFromText "foo") [StorageItem (StorageName "name1") (StorageValue "value1")]]
+                              [OriginStorageState (urlFromText "foo") [StorageItem (StorageName "name1") (StorageValue "value1")] Nothing Nothing]
                           )
                     }
               )
@@ -168,7 +168,7 @@ tests =
                     Just
                       ( StorageState
                           []
-                          [OriginStorageState (urlFromText "https://www.example.com") [StorageItem (StorageName "name1") (StorageValue "value1")]]
+                          [OriginStorageState (urlFromText "https://www.example.com") [StorageItem (StorageName "name1") (StorageValue "value1")] Nothing Nothing]
                       )
                 }
           page <- newPage context
@@ -257,6 +257,8 @@ seeded =
             { originStateOrigin = urlFromText "https://www.example.com"
             , originStateLocalStorage =
                 [StorageItem (StorageName "name1") (StorageValue "value1")]
+            , originStateIndexedDB = Nothing
+            , originStateOpfs = Nothing
             }
         ]
     }
@@ -269,6 +271,8 @@ replaced =
             { originStateOrigin = urlFromText "https://www.example.com"
             , originStateLocalStorage =
                 [StorageItem (StorageName "name1") (StorageValue "value2")]
+            , originStateIndexedDB = Nothing
+            , originStateOpfs = Nothing
             }
         ]
     }
@@ -281,6 +285,8 @@ crossOriginState origin =
             { originStateOrigin = urlFromText origin
             , originStateLocalStorage =
                 [StorageItem (StorageName "name1") (StorageValue "value1")]
+            , originStateIndexedDB = Nothing
+            , originStateOpfs = Nothing
             }
         ]
     }

@@ -59,6 +59,9 @@ data NewRequestOptions = NewRequestOptions
   , newRequestMaxRedirects :: Maybe Int
   , newRequestProxy :: Maybe ProxySettings
   , newRequestStorageState :: Maybe StorageState
+  , -- | A storage state file read before the request context is created; it
+    -- takes the place of 'newRequestStorageState'. @{}@ reads as an empty state.
+    newRequestStorageStatePath :: Maybe FilePath
   , newRequestTimeout :: Maybe Timeout
   , newRequestUserAgent :: Maybe UserAgent
   }
@@ -77,6 +80,7 @@ defaultNewRequestOptions =
     , newRequestMaxRedirects = Nothing
     , newRequestProxy = Nothing
     , newRequestStorageState = Nothing
+    , newRequestStorageStatePath = Nothing
     , newRequestTimeout = Nothing
     , newRequestUserAgent = Nothing
     }

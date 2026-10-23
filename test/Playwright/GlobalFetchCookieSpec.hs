@@ -50,7 +50,7 @@ import Playwright
   , CookieSecure (CookieSecure)
   , CookieValue (CookieValue, cookieValueToText)
   , NewRequestOptions (newRequestStorageState)
-  , OriginStorageState (OriginStorageState, originStateLocalStorage, originStateOrigin)
+  , OriginStorageState (OriginStorageState, originStateIndexedDB, originStateLocalStorage, originStateOpfs, originStateOrigin)
   , StorageItem (StorageItem, storageItemName, storageItemValue)
   , StorageName (StorageName)
   , StorageState (StorageState, storageStateCookies, storageStateOrigins)
@@ -376,6 +376,8 @@ seededState =
                     , storageItemValue = StorageValue "value1"
                     }
                 ]
+            , originStateIndexedDB = Nothing
+            , originStateOpfs = Nothing
             }
         ]
     }

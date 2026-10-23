@@ -2,6 +2,7 @@ module Playwright.APIRequestContext
   ( APIRequestContext (..)
   , apiRequestContextFor
   , apiRequestStorageState
+  , apiRequestStorageStateWith
   , disposeAPIRequestContext
   , fetchDelete
   , fetchDeleteWith
@@ -21,6 +22,13 @@ module Playwright.APIRequestContext
   , fetchRequestWith
   ) where
 
+import Control.Monad.IO.Class
+  ( liftIO
+  )
+import Data.Foldable
+  ( for_
+  )
+import Data.ByteString.Lazy qualified as LBS
 import Playwright.Monad
   ( Playwright
   )
@@ -106,6 +114,7 @@ import Playwright.Protocol
   , NameValue
   , mkAPIRequestContextDisposeParams
   , mkAPIRequestContextFetchParams
+  , APIRequestContextStorageStateParams (aPIRequestContextStorageStateParamsIndexedDB, aPIRequestContextStorageStateParamsOpfs)
   , mkAPIRequestContextStorageStateParams
   , mkFormField
   , mkFormFieldFile
@@ -126,6 +135,9 @@ import Playwright.Timeout
   )
 import Playwright.StorageState
   ( StorageState
+  , StorageStateOptions (storageStateOptionsIndexedDB, storageStateOptionsOpfs, storageStateOptionsPath)
+  , defaultStorageStateOptions
+  , encodeStorageState
   , fromRequestStorageState
   )
 import Playwright.TimeoutDefaults
@@ -354,13 +366,26 @@ toFormField field =
         }
 
 apiRequestStorageState :: APIRequestContext -> Playwright StorageState
-apiRequestStorageState ctx = do
+apiRequestStorageState ctx =
+  apiRequestStorageStateWith defaultStorageStateOptions ctx
+
+-- | Export the request context's storage state. IndexedDB and OPFS contents
+-- are included only when the options ask for them. When a path is given the
+-- state is also written there as JSON.
+apiRequestStorageStateWith :: StorageStateOptions -> APIRequestContext -> Playwright StorageState
+apiRequestStorageStateWith opts ctx = do
   result :: APIRequestContextStorageStateResult <-
     send
       (apiRequestContextChannel ctx)
       (MethodName "storageState")
       mkAPIRequestContextStorageStateParams
-  pure (fromRequestStorageState result)
+        { aPIRequestContextStorageStateParamsIndexedDB = Just (storageStateOptionsIndexedDB opts)
+        , aPIRequestContextStorageStateParamsOpfs = Just (storageStateOptionsOpfs opts)
+        }
+  let state = fromRequestStorageState result
+  for_ (storageStateOptionsPath opts) $ \path ->
+    liftIO (LBS.writeFile path (encodeStorageState state))
+  pure state
 
 disposeAPIRequestContext :: APIRequestContext -> Playwright ()
 disposeAPIRequestContext ctx = do

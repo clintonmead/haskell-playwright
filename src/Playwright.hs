@@ -142,6 +142,14 @@ module Playwright
   , videoSaveAs
   , NetworkSizes (..)
   , OriginStorageState (..)
+  , StorageStateOptions (..)
+  , defaultStorageStateOptions
+  , IndexedDBDatabase (..)
+  , IndexedDBDatabaseStores (..)
+  , IndexedDBDatabaseStoresIndexes (..)
+  , IndexedDBDatabaseStoresRecords (..)
+  , OPFSEntry (..)
+  , OPFSEntryType (..)
   , Page (..)
   , PageError (..)
   , PdfOptions (..)
@@ -524,6 +532,7 @@ module Playwright
   , fetchRequest
   , fetchRequestWith
   , apiRequestStorageState
+  , apiRequestStorageStateWith
   , disposeAPIRequestContext
   , fill
   , fillHandle
@@ -976,6 +985,7 @@ import Playwright.APIRequest
 import Playwright.APIRequestContext
   ( APIRequestContext
   , apiRequestStorageState
+  , apiRequestStorageStateWith
   , disposeAPIRequestContext
   , fetchDelete
   , fetchDeleteWith
@@ -1748,7 +1758,7 @@ import Playwright.NewContextOptions
   , defaultNewContextOptions
   )
 import Playwright.NewRequestOptions
-  ( NewRequestOptions (NewRequestOptions, newRequestBaseURL, newRequestClientCertificates, newRequestExtraHTTPHeaders, newRequestFailOnStatusCode, newRequestHttpCredentials, newRequestHttpCredentialsList, newRequestIgnoreHTTPSErrors, newRequestMaxRedirects, newRequestProxy, newRequestStorageState, newRequestTimeout, newRequestUserAgent)
+  ( NewRequestOptions (NewRequestOptions, newRequestBaseURL, newRequestClientCertificates, newRequestExtraHTTPHeaders, newRequestFailOnStatusCode, newRequestHttpCredentials, newRequestHttpCredentialsList, newRequestIgnoreHTTPSErrors, newRequestMaxRedirects, newRequestProxy, newRequestStorageState, newRequestStorageStatePath, newRequestTimeout, newRequestUserAgent)
   , defaultNewRequestOptions
   )
 import Playwright.NetworkSizes
@@ -2192,9 +2202,19 @@ import Playwright.StorageItem
 import Playwright.StorageKind
   ( StorageKind (StorageLocal, StorageSession)
   )
+import Playwright.Protocol
+  ( IndexedDBDatabase (IndexedDBDatabase, indexedDBDatabaseName, indexedDBDatabaseStores, indexedDBDatabaseVersion)
+  , IndexedDBDatabaseStores (IndexedDBDatabaseStores, indexedDBDatabaseStoresAutoIncrement, indexedDBDatabaseStoresIndexes, indexedDBDatabaseStoresKeyPath, indexedDBDatabaseStoresKeyPathArray, indexedDBDatabaseStoresName, indexedDBDatabaseStoresRecords)
+  , IndexedDBDatabaseStoresIndexes (IndexedDBDatabaseStoresIndexes, indexedDBDatabaseStoresIndexesKeyPath, indexedDBDatabaseStoresIndexesKeyPathArray, indexedDBDatabaseStoresIndexesMultiEntry, indexedDBDatabaseStoresIndexesName, indexedDBDatabaseStoresIndexesUnique)
+  , IndexedDBDatabaseStoresRecords (IndexedDBDatabaseStoresRecords, indexedDBDatabaseStoresRecordsKey, indexedDBDatabaseStoresRecordsKeyEncoded, indexedDBDatabaseStoresRecordsValue, indexedDBDatabaseStoresRecordsValueEncoded)
+  , OPFSEntry (OPFSEntry, oPFSEntryBase64, oPFSEntryPath, oPFSEntryType)
+  , OPFSEntryType (OPFSEntryTypeFile, OPFSEntryTypeDirectory)
+  )
 import Playwright.StorageState
-  ( OriginStorageState (OriginStorageState, originStateLocalStorage, originStateOrigin)
+  ( OriginStorageState (OriginStorageState, originStateIndexedDB, originStateLocalStorage, originStateOpfs, originStateOrigin)
   , StorageState (StorageState, storageStateCookies, storageStateOrigins)
+  , StorageStateOptions (StorageStateOptions, storageStateOptionsIndexedDB, storageStateOptionsOpfs, storageStateOptionsPath)
+  , defaultStorageStateOptions
   , emptyStorageState
   )
 import Playwright.StyleTag
