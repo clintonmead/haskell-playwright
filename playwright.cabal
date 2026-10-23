@@ -76,6 +76,7 @@ library
       Playwright.EventHandler
       Playwright.EventWaiter
       Playwright.Exactness
+      Playwright.Expect
       Playwright.Expose
       Playwright.FetchOptions
       Playwright.FileChooser
@@ -308,6 +309,7 @@ test-suite playwright-test
       Playwright.EmulationFocusSpec
       Playwright.EvalOnSelectorAllSpec
       Playwright.EvalOnSelectorSpec
+      Playwright.ExpectBooleanSpec
       Playwright.FetchProxySpec
       Playwright.FrameEvaluateSpec
       Playwright.FrameFrameElementSpec
