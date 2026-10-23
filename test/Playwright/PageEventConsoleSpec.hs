@@ -200,6 +200,14 @@ tests =
             _ <- evaluate page (detachedIframeScript prefix)
             popup <- wait popupPending
             assertEqual "popup" "2" =<< evaluateText popup "() => String(1 + 1)"
+    , testCase "do not update console count on unhandled rejections" $
+        withChromiumPage $ \page -> do
+          messages <- collectConsole page
+          _ <-
+            evaluate
+              page
+              "() => { const fail = async () => Promise.reject(new Error('error')); console.log('begin'); void fail(); void fail(); fail().catch(() => { console.log('end'); }); }"
+          assertEqual "texts" ["begin", "end"] . map consoleMessageText =<< readMessages messages
     ]
 
 -- | Opens a popup, logs from an iframe inside it, then removes the iframe.
