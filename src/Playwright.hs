@@ -640,6 +640,7 @@ module Playwright
   , locatorBoundingBox
   , locatorCount
   , locatorDescription
+  , locatorToString
   , locatorScreenshot
   , locatorScreenshotMasked
   , locatorOnFrame
@@ -1697,6 +1698,7 @@ import Playwright.Locator
   , locatorBoundingBox
   , locatorCount
   , locatorDescription
+  , locatorToString
   , locatorScreenshot
   , locatorScreenshotMasked
   , screenshotHandleMasked

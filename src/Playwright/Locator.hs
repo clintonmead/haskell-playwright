@@ -74,6 +74,7 @@ module Playwright.Locator
   , locatorBoundingBox
   , locatorCount
   , locatorDescription
+  , locatorToString
   , locatorScreenshot
   , locatorScreenshotMasked
   , screenshotHandleMasked
@@ -178,6 +179,11 @@ import Playwright.Exactness
   )
 import Playwright.Frame
   ( Frame (frameChannel)
+  , framesEqual
+  )
+import Playwright.LocatorGenerator
+  ( Language (JavaScript)
+  , asLocator
   )
 import Playwright.Frame.Action
   ( blurFrame
@@ -335,8 +341,11 @@ chainLocator parent inner =
   childLocator parent (innerJsonSelector "internal:chain=" inner)
 
 filterHas :: Locator -> Locator -> Locator
-filterHas loc inner =
-  childLocator loc (innerJsonSelector "internal:has=" inner)
+filterHas loc inner
+  | not (framesEqual (locatorFrame loc) (locatorFrame inner)) =
+      error "Inner \"has\" locator must belong to the same frame."
+  | otherwise =
+      childLocator loc (innerJsonSelector "internal:has=" inner)
 
 filterHasNot :: Locator -> Locator -> Locator
 filterHasNot loc inner =
@@ -390,6 +399,16 @@ locatorDescription loc =
               Just text
             Left _ ->
               Nothing
+
+-- | Upstream @locator.toString()@: the description when one is set, otherwise
+-- the selector formatted as JavaScript locator code.
+locatorToString :: Locator -> Text
+locatorToString loc =
+  case locatorDescription loc of
+    Just description ->
+      description
+    Nothing ->
+      asLocator JavaScript (selectorToText (locatorSelector loc))
 
 jsonEncodeText :: Text -> Text
 jsonEncodeText =
