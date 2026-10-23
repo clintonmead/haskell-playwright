@@ -371,6 +371,13 @@ module Playwright
   , screencastActionsDispose
   , screencastHideActions
   , screencastShowActions
+  , ScreencastOverlayHandle
+  , ScreencastOverlayOptions (..)
+  , defaultScreencastOverlayOptions
+  , screencastHideOverlays
+  , screencastOverlayDispose
+  , screencastShowOverlay
+  , screencastShowOverlays
   , downloadUrl
   , dragAndDrop
   , dragAndDropWith
@@ -1875,6 +1882,15 @@ import Playwright.ScreencastActions
   , screencastActionsDispose
   , screencastHideActions
   , screencastShowActions
+  )
+import Playwright.ScreencastOverlay
+  ( ScreencastOverlayHandle
+  , ScreencastOverlayOptions (screencastOverlayOptionsDuration)
+  , defaultScreencastOverlayOptions
+  , screencastHideOverlays
+  , screencastOverlayDispose
+  , screencastShowOverlay
+  , screencastShowOverlays
   )
 import Playwright.Route
   ( Route
