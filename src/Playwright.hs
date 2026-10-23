@@ -706,6 +706,8 @@ module Playwright
   , objectTextArgument
   , objectValue
   , onLoad
+  , onLoadEvent
+  , onDomContentLoadedEvent
   , onBrowserContext
   , onConsole
   , removeAllConsoleListeners
@@ -1906,6 +1908,8 @@ import Playwright.Page.Wait
   , armNavigatedFrame
   , armPopup
   , onLoad
+  , onLoadEvent
+  , onDomContentLoadedEvent
   , onConsole
   , removeAllConsoleListeners
   , waitForConsole

@@ -9,6 +9,8 @@ module Playwright.Page.Wait
   , armLoadEvent
   , armPopup
   , onLoad
+  , onLoadEvent
+  , onDomContentLoadedEvent
   , onConsole
   , removeAllConsoleListeners
   , waitForConsole
@@ -254,16 +256,31 @@ waitForLoadStateWith page state timeout =
 
 onLoad :: Page -> Playwright () -> Playwright ()
 onLoad page run =
+  onLifecycleEvent page LifecycleEventLoad (const run)
+
+-- | Runs the handler with the page each time its load event fires. The page is
+-- passed back to the handler, as the upstream "load" listener receives it.
+onLoadEvent :: Page -> (Page -> Playwright ()) -> Playwright ()
+onLoadEvent page run =
+  onLifecycleEvent page LifecycleEventLoad run
+
+-- | Runs the handler with the page each time its domcontentloaded event fires.
+onDomContentLoadedEvent :: Page -> (Page -> Playwright ()) -> Playwright ()
+onDomContentLoadedEvent page run =
+  onLifecycleEvent page LifecycleEventDomcontentloaded run
+
+-- | Runs the handler with the page for each main-frame lifecycle event of the
+-- given kind.
+onLifecycleEvent :: Page -> LifecycleEvent -> (Page -> Playwright ()) -> Playwright ()
+onLifecycleEvent page lifecycle run =
   registerEventHandler
     (channelGuid (frameChannel (pageMainFrame page)))
     (MethodName "loadstate")
     $ \params -> do
       event <- throwDecode params
-      case frameLoadstateEventAdd event of
-        Just LifecycleEventLoad ->
-          run
-        _ ->
-          pure ()
+      if frameLoadstateEventAdd event == Just lifecycle
+        then run page
+        else pure ()
 
 -- | Runs the handler for each dialog the page opens. The handler must accept or
 -- dismiss the dialog, or the page stays blocked.
