@@ -207,6 +207,14 @@ tests =
                   assertFailure ("expected DecodeFailure, got: " <> show err)
                 Right _ ->
                   assertFailure "expected sizes() to fail"
+    , testCase "should return sizes without hanging" $
+        withServerPage abandonedFetchApp $ \prefix page -> do
+          awaitRequest <- armRequest page (UrlMatchGlob (prefix <> "/404"))
+          withAsync awaitRequest $ \pending -> do
+            _ <- goto page (urlFromText (prefix <> "/has-abandoned-fetch")) defaultGotoOptions
+            request <- wait pending
+            _ <- requestSizes request
+            pure ()
     , statusCodeTest 200 status200
     , statusCodeTest 401 status401
     , statusCodeTest 404 status404
@@ -255,6 +263,24 @@ emptyGetApp request respond =
           respond (plainResponse (LBS8.pack "ok"))
       | requestMethod request == methodGet ->
           respond (plainResponse (LBS8.pack "abc134"))
+    _ ->
+      respond (responseLBS status404 [] "")
+
+-- | A page that starts a fetch to a 404 and never reads its response.
+abandonedFetchApp :: Application
+abandonedFetchApp request respond =
+  case pathInfo request of
+    ["empty.html"] ->
+      respond emptyHtmlResponse
+    ["has-abandoned-fetch"] ->
+      respond
+        ( responseLBS
+            status200
+            [(hContentType, "text/html")]
+            (LBS8.pack "<!DOCTYPE html><html><head><title>t</title></head><body><script>fetch(\"./404\");</script></body></html>")
+        )
+    ["404"] ->
+      respond (responseLBS status404 [] "")
     _ ->
       respond (responseLBS status404 [] "")
 
