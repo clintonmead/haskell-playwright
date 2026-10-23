@@ -52,9 +52,12 @@ import Playwright
   , click
   , clickWith
   , dblclick
+  , ExpectOptions (expectTimeout)
   , defaultClickOptions
+  , defaultExpectOptions
   , defaultGotoOptions
   , defaultTimeout
+  , expectLocatorWith
   , fill
   , goto
   , milliseconds
@@ -120,22 +123,43 @@ tests =
             Left (ProtocolRpc failure) -> do
               let message = stripAnsi (protocolFailureMessage failure)
               assertBool "call log" ("Call log:" `Text.isInfixOf` message)
-              assertBool "waiting count" (hasCountedWaitingLine message)
+              assertBool "waiting count" (hasCountedLine "× waiting for" message)
               let logLines = Text.splitOn "\n" (snd (Text.breakOn "Call log:" message))
               assertBool "log lines" (length logLines < 30)
             Left err ->
               assertFailure ("expected a protocol failure, got: " <> show err)
             Right _ ->
               assertFailure "expected the click on the hidden input to time out"
+    , testCase "should report and collapse log in expect" $
+        withChromiumPage $ \page -> do
+          setContent page "<input id='checkbox' type='checkbox' style=\"visibility: hidden\"></input>"
+          result <-
+            try
+              ( expectLocatorWith
+                  defaultExpectOptions {expectTimeout = milliseconds 5000}
+                  (locate page "input")
+                  "to.be.visible"
+              )
+          case result of
+            Left (ProtocolRpc failure) -> do
+              let message = stripAnsi (protocolFailureMessage failure)
+              assertBool "call log" ("Call log:" `Text.isInfixOf` message)
+              assertBool "resolved count" (hasCountedLine "× locator resolved to" message)
+              let logLines = Text.splitOn "\n" (snd (Text.breakOn "Call log:" message))
+              assertBool "log lines" (length logLines < 30)
+            Left err ->
+              assertFailure ("expected a protocol failure, got: " <> show err)
+            Right _ ->
+              assertFailure "expected the visibility check on the hidden input to time out"
     ]
 
--- | Whether the message holds a line counting waiting attempts, such as
--- "2 × waiting for element to be visible".
-hasCountedWaitingLine :: Text -> Bool
-hasCountedWaitingLine message =
+-- | Whether the message holds a line counting repeated attempts, such as
+-- "2 × waiting for element to be visible" or "3 × locator resolved to".
+hasCountedLine :: Text -> Text -> Bool
+hasCountedLine phrase message =
   any
     (\(before, _) -> not (Text.null (Text.takeWhileEnd isDigit (Text.dropWhileEnd (== ' ') before))))
-    (Text.breakOnAll "× waiting for" message)
+    (Text.breakOnAll phrase message)
 
 -- | Removes ANSI colour escape sequences, which the driver can include in
 -- error messages.
