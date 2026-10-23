@@ -23,10 +23,22 @@ import Playwright
   , RecordHarMode (RecordHarModeMinimal)
   , Page
   , Playwright
+  , Response
+  , UrlMatch (UrlMatchGlob, UrlMatchRegex)
   , closeContext
+  , goBack
+  , goForward
+  , pageClickSelector
+  , reload
+  , requestUrl
+  , responseRequest
+  , selectorFromText
+  , setContent
+  , urlToText
+  , waitForURL
   , content
   , HarNotFound (HarNotFoundAbort)
-  , HarRouteOptions (harRouteNotFound)
+  , HarRouteOptions (harRouteNotFound, harRouteUrl)
   , contextRouteFromHar
   , contextRouteFromHarWith
   , defaultGotoOptions
@@ -125,12 +137,93 @@ tests =
             unrouteContextAll ctx
             gotoUrl page (prefix <> "/empty.html")
             closeContext ctx
+    , testCase "should change document URL after redirected navigation" $
+        withChromiumBrowser $ \browser -> do
+          dir <- testAssetsDir
+          ctx <- newContextWith browser defaultNewContextOptions
+          contextRouteFromHar ctx (dir <> "/har-redirect.har")
+          page <- newPage ctx
+          response <- goto page (urlFromText "https://theverge.com/") defaultGotoOptions
+          assertEqual "document url" "https://www.theverge.com/" =<< hrefOf page
+          assertEqual "response url" (Just "https://www.theverge.com/") =<< responseUrlText response
+          closeContext ctx
+    , testCase "should change document URL after redirected navigation on click" $
+        withAssetsPrefix $ \prefix ->
+          withChromiumBrowser $ \browser -> do
+            dir <- testAssetsDir
+            ctx <- newContextWith browser defaultNewContextOptions
+            contextRouteFromHarWith ctx (dir <> "/har-redirect.har") theVergeHarOptions
+            page <- newPage ctx
+            gotoUrl page (prefix <> "/empty.html")
+            setContent page "<a href=\"https://theverge.com/\">click me</a>"
+            pageClickSelector page (selectorFromText "text=click me")
+            waitForURL page (UrlMatchGlob "https://www.theverge.com/")
+            assertEqual "document url" "https://www.theverge.com/" =<< hrefOf page
+            closeContext ctx
+    , testCase "should goBack to redirected navigation" $
+        withAssetsPrefix $ \prefix ->
+          withChromiumBrowser $ \browser -> do
+            dir <- testAssetsDir
+            ctx <- newContextWith browser defaultNewContextOptions
+            contextRouteFromHarWith ctx (dir <> "/har-redirect.har") theVergeHarOptions
+            page <- newPage ctx
+            gotoUrl page "https://theverge.com/"
+            gotoUrl page (prefix <> "/empty.html")
+            assertBool "should be on empty page" . Text.isSuffixOf "/empty.html" =<< hrefOf page
+            response <- goBack page
+            assertEqual "document url" "https://www.theverge.com/" =<< hrefOf page
+            assertEqual "response url" (Just "https://www.theverge.com/") =<< responseUrlText response
+            closeContext ctx
+    , testCase "should goForward to redirected navigation" $
+        withAssetsPrefix $ \prefix ->
+          withChromiumBrowser $ \browser -> do
+            dir <- testAssetsDir
+            ctx <- newContextWith browser defaultNewContextOptions
+            contextRouteFromHarWith ctx (dir <> "/har-redirect.har") theVergeHarOptions
+            page <- newPage ctx
+            gotoUrl page (prefix <> "/empty.html")
+            gotoUrl page "https://theverge.com/"
+            assertEqual "document url" "https://www.theverge.com/" =<< hrefOf page
+            _ <- goBack page
+            assertBool "should be on empty page" . Text.isSuffixOf "/empty.html" =<< hrefOf page
+            response <- goForward page
+            assertEqual "document url" "https://www.theverge.com/" =<< hrefOf page
+            assertEqual "response url" (Just "https://www.theverge.com/") =<< responseUrlText response
+            closeContext ctx
+    , testCase "should reload redirected navigation" $
+        withChromiumBrowser $ \browser -> do
+          dir <- testAssetsDir
+          ctx <- newContextWith browser defaultNewContextOptions
+          contextRouteFromHarWith ctx (dir <> "/har-redirect.har") theVergeHarOptions
+          page <- newPage ctx
+          gotoUrl page "https://theverge.com/"
+          assertEqual "document url" "https://www.theverge.com/" =<< hrefOf page
+          response <- reload page
+          assertEqual "document url" "https://www.theverge.com/" =<< hrefOf page
+          assertEqual "response url" (Just "https://www.theverge.com/") =<< responseUrlText response
+          closeContext ctx
     ]
 
 -- | HAR routing that aborts any request the HAR does not contain.
 abortingHarOptions :: HarRouteOptions
 abortingHarOptions =
   defaultHarRouteOptions {harRouteNotFound = HarNotFoundAbort}
+
+-- | HAR routing limited to the theverge.com redirect fixture.
+theVergeHarOptions :: HarRouteOptions
+theVergeHarOptions =
+  defaultHarRouteOptions {harRouteUrl = UrlMatchRegex ".*theverge.*" ""}
+
+hrefOf :: Page -> Playwright Text
+hrefOf page =
+  evaluateText page "() => location.href"
+
+-- | The URL of the request behind a navigation response, if there was one.
+responseUrlText :: Maybe Response -> Playwright (Maybe Text)
+responseUrlText Nothing = pure Nothing
+responseUrlText (Just response) = do
+  request <- responseRequest response
+  Just . urlToText <$> requestUrl request
 
 -- | Asserts that navigating to the URL fails, as it does when the HAR has no entry for it.
 assertNavigationFails :: Page -> Text -> Playwright ()
