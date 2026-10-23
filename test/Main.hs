@@ -7,6 +7,7 @@ import Playwright.BfcacheSpec qualified as BfcacheSpec
 import Playwright.BrowserServerSpec qualified as BrowserServerSpec
 import Playwright.LauncherSpec qualified as LauncherSpec
 import Playwright.ChannelsSpec qualified as ChannelsSpec
+import Playwright.ComponentParserSpec qualified as ComponentParserSpec
 import Playwright.SignalsSpec qualified as SignalsSpec
 import Playwright.BrowserSpec qualified as BrowserSpec
 import Playwright.BrowserContextAddCookiesSpec qualified as BrowserContextAddCookiesSpec
@@ -228,6 +229,7 @@ main =
         , BrowserServerSpec.tests
         , LauncherSpec.tests
         , ChannelsSpec.tests
+        , ComponentParserSpec.tests
         , SignalsSpec.tests
         , BrowserSpec.tests
         , BrowserContextAddCookiesSpec.tests
