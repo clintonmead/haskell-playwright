@@ -45,6 +45,8 @@ import Playwright.GlobalFetchSupport
   , headerCapitalizationTest
   , retryHangupTest
   , contextFailOnStatus
+  , closeWithoutResponseTest
+  , refuseBodyTest
   )
 import Playwright.Harness
   ( assertProtocolContains
@@ -158,6 +160,10 @@ tests =
             contextFailOnStatus True
         , testCase "should not throw when failOnStatusCode is set to false inside APIRequest context options" $
             contextFailOnStatus False
+        , testCase "should append node error code to the message" $
+            closeWithoutResponseTest
+        , testCase "should not crash when server refuses body before reading it" $
+            refuseBodyTest
         ]
           <> jsonSerializationTests
       )

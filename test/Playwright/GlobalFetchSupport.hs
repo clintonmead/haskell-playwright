@@ -59,6 +59,8 @@ module Playwright.GlobalFetchSupport
   , retryHangupTest
   , retryHangupApp
   , contextFailOnStatus
+  , closeWithoutResponseTest
+  , refuseBodyTest
   , assertMessageContains
   , lookupHeader
   , headerValue
@@ -985,6 +987,63 @@ assertMessageContains needle action = do
 lookupHeader :: HTTP.HeaderName -> RequestHeaders -> Maybe ByteString
 lookupHeader =
   lookup
+
+-- Node reports a connection closed without a response as "socket hang up";
+-- the client should append the error code to the message.
+closeWithoutResponseTest :: IO ()
+closeWithoutResponseTest =
+  withApplication (pure closeWithoutResponseApp) $ \port ->
+    runPlaywright $ do
+      request <- newRequestContext
+      assertMessageContains "socket hang up (ECONNRESET)" $
+        fetchFromUrlWith
+          request
+          (urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/hangup"))
+          defaultFetchOptions {fetchMaxRetries = Just 0}
+      disposeAPIRequestContext request
+
+closeWithoutResponseApp :: Application
+closeWithoutResponseApp _request respond =
+  respond (responseRaw (\_ _ -> pure ()) (responseLBS status200 [] ""))
+
+-- The server answers 413 without reading the large request body. Depending on
+-- timing the client either receives the 413 or a socket-level error.
+refuseBodyTest :: IO ()
+refuseBodyTest =
+  withApplication (pure refuseBodyApp) $ \port ->
+    runPlaywright $ do
+      request <- newRequestContext
+      result <-
+        try
+          ( fetchPostWith
+              request
+              (urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/refuse"))
+              defaultFetchOptions
+                { fetchPostData = Just (FetchPostBytes (ByteString.replicate (20 * 1024 * 1024) 0x78))
+                , fetchHeaders = Just [HttpHeader (HeaderName "content-type") (HeaderValue "text/plain")]
+                , fetchMaxRetries = Just 0
+                }
+          ) ::
+          Playwright (Either PlaywrightError APIResponse)
+      case result of
+        Left err ->
+          assertEqual
+            "socket error"
+            True
+            (any (`isInfixOf` pack (show err)) ["ECONNRESET", "EPIPE", "ECONNABORTED", "socket"])
+        Right response -> do
+          assertEqual "status" 413 (httpStatusToInt (apiResponseStatus response))
+          assertEqual "body" "{\"error\": \"too large\"}" =<< apiResponseText response
+      disposeAPIRequestContext request
+
+refuseBodyApp :: Application
+refuseBodyApp _request respond =
+  respond
+    ( responseLBS
+        (HTTP.mkStatus 413 "Payload Too Large")
+        [(hContentType, "application/json")]
+        "{\"error\": \"too large\"}"
+    )
 
 headerValue :: Text -> [HttpHeader] -> Maybe Text
 headerValue name headers =
