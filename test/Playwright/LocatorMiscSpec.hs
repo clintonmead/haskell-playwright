@@ -19,20 +19,25 @@ import Playwright
   , evaluateBool
   , evaluateOnLocator
   , evaluateOnLocatorBool
+  , evaluateOnLocatorText
   , evaluateText
   , evaluateTexts
   , exposeFunction
   , fill
   , focus
   , hover
+  , InputFile (InputFile)
+  , InputFileName (InputFileName)
   , selectOption
   , setChecked
   , setContent
+  , setInputFiles
   , uncheck
   )
 import Playwright.Harness
   ( assertProtocolContains
   , locate
+  , readTestAsset
   , withAssetPage
   , withChromiumPage
   , assertEqual
@@ -61,6 +66,12 @@ tests =
           _ <- evaluate page "() => { delete window.Node; }"
           hover (locate page "#button-6")
           assertEqual "hovered" "button-6" =<< evaluateText page "() => document.querySelector('button:hover').id"
+    , testCase "should upload the file" $
+        withAssetPage "input/fileupload.html" $ \page -> do
+          bytes <- readTestAsset "file-to-upload.txt"
+          let input = locate page "input[type=file]"
+          setInputFiles input [InputFile (InputFileName "file-to-upload.txt") bytes]
+          assertEqual "name" "file-to-upload.txt" =<< evaluateOnLocatorText input "e => e.files[0].name"
     , testCase "should fill input" $
         withAssetPage "input/textarea.html" $ \page -> do
           fill (locate page "input") "some value"
