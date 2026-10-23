@@ -171,6 +171,7 @@ library
       Playwright.SelectOptionOptions
       Playwright.Selector
       Playwright.Selectors
+      Playwright.Selenium
       Playwright.SerializedArgument
       Playwright.SerializedError
       Playwright.SerializedErrorInfo
@@ -290,6 +291,7 @@ test-suite playwright-test
       Playwright.BrowserServerSpec
       Playwright.BrowserSpec
       Playwright.BrowserTypeBasicSpec
+      Playwright.BrowserTypeLaunchSeleniumSpec
       Playwright.BrowserTypeLaunchSpec
       Playwright.CapabilitiesSpec
       Playwright.ChannelsSpec

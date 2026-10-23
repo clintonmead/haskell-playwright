@@ -45,6 +45,7 @@ import Playwright.BrowserContextViewportMobileSpec qualified as BrowserContextVi
 import Playwright.BrowserContextViewportSpec qualified as BrowserContextViewportSpec
 import Playwright.BrowserTypeBasicSpec qualified as BrowserTypeBasicSpec
 import Playwright.BrowserTypeLaunchSpec qualified as BrowserTypeLaunchSpec
+import Playwright.BrowserTypeLaunchSeleniumSpec qualified as BrowserTypeLaunchSeleniumSpec
 import Playwright.CapabilitiesSpec qualified as CapabilitiesSpec
 import Playwright.ChromiumSpec qualified as ChromiumSpec
 import Playwright.ConnectionSpec qualified as ConnectionSpec
@@ -265,6 +266,7 @@ main =
         , BrowserContextViewportSpec.tests
         , BrowserTypeBasicSpec.tests
         , BrowserTypeLaunchSpec.tests
+        , BrowserTypeLaunchSeleniumSpec.tests
         , CapabilitiesSpec.tests
         , ChromiumSpec.tests
         , ConnectionSpec.tests
