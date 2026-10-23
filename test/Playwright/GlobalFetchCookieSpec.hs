@@ -86,6 +86,8 @@ tests =
           pathFilterTest
       , testCase "should send secure cookie over http for localhost" $
           localhostSecureCookieTest
+      , testCase "should send secure cookie over http for subdomains of localhost" $
+          subdomainSecureCookieTest
       , testCase "should send not expired cookies" $
           notExpiredCookieTest
       , testCase "should remove expired cookies" $
@@ -133,6 +135,14 @@ pathFilterApp captured request respond =
 localhostSecureCookieTest :: IO ()
 localhostSecureCookieTest =
   withCookieServerOn "localhost" secureCookieApp $ \request prefix captured -> do
+    _ <- fetchGet request (urlFromText (prefix <> "/setcookie.html"))
+    _ <- fetchGet request (urlFromText (prefix <> "/empty.html"))
+    cookie <- liftIO (readChan captured)
+    assertEqual "cookie" (Just "a=v; b=v") cookie
+
+subdomainSecureCookieTest :: IO ()
+subdomainSecureCookieTest =
+  withCookieServerOn "a.b.localhost" secureCookieApp $ \request prefix captured -> do
     _ <- fetchGet request (urlFromText (prefix <> "/setcookie.html"))
     _ <- fetchGet request (urlFromText (prefix <> "/empty.html"))
     cookie <- liftIO (readChan captured)
