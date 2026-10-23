@@ -27,6 +27,9 @@ import Playwright
   , filterHasText
   , filterHasTextRegex
   , first
+  , GetByRoleOptions (getByRoleNameRegex)
+  , Page
+  , Playwright
   , frameLocator
   , getAttribute
   , getByRole
@@ -49,6 +52,9 @@ import Playwright.Harness
   , locate
   , withChromiumPage
   , assertEqual
+  )
+import Data.Text
+  ( Text
   )
 import Playwright.Locator qualified as Locator
 import Test.Tasty
@@ -279,4 +285,44 @@ tests =
             ( locatorCount
                 (chainLocator (childLocator (frameLocator page (selectorFromText "#f")) (selectorFromText "body")) captureFrame)
             )
+    , testCase "should filter by regex with a single quote" $
+        withChromiumPage $ \page -> do
+          setContent page "<button>let's let's<span>hello</span></button>"
+          expectHelloBoth page "/let's/i"
+          expectHelloBoth page "/let\\'s/i"
+          expectHelloBoth page "/'s/i"
+          expectHelloBoth page "/\\'s/i"
+          expectHelloBoth page "/let['abc]s/i"
+          hiddenBoth page "/let\\\\'s/i"
+          expectHelloBoth page "/let's let\\'s/i"
+          expectHelloBoth page "/let\\'s let's/i"
+          setContent page "<button>let\\'s let\\'s<span>hello</span></button>"
+          hiddenBoth page "/let\\'s/i"
+          expectHelloBoth page "/let\\\\'s/i"
+          expectHelloBoth page "/let\\\\\\'s/i"
+          expectHelloBoth page "/let\\\\'s let\\\\\\'s/i"
+          expectHelloBoth page "/let\\\\\\'s let\\\\'s/i"
+          setContent page "<button>let's hello</button>"
+          assertEqual "text" "let's hello" =<< innerText (filterHasTextRegex (locate page "button") "/let's/iu")
+          assertEqual "role" "let's hello"
+            =<< innerText (getByRole page (AriaRole "button") defaultGetByRoleOptions {getByRoleNameRegex = Just "/let's/iu"})
     ]
+
+-- | The span inside a button, reached by text regex and by role-name regex, reads "hello".
+expectHelloBoth :: Page -> Text -> Playwright ()
+expectHelloBoth page re = do
+  assertEqual "text" "hello"
+    =<< innerText (childLocator (filterHasTextRegex (locate page "button") re) (selectorFromText "span"))
+  assertEqual "role" "hello"
+    =<< innerText
+      ( childLocator
+          (getByRole page (AriaRole "button") defaultGetByRoleOptions {getByRoleNameRegex = Just re})
+          (selectorFromText "span")
+      )
+
+-- | Neither the text-regex nor the role-name-regex button is visible.
+hiddenBoth :: Page -> Text -> Playwright ()
+hiddenBoth page re = do
+  assertEqual "text hidden" False =<< isVisible (filterHasTextRegex (locate page "button") re)
+  assertEqual "role hidden" False
+    =<< isVisible (getByRole page (AriaRole "button") defaultGetByRoleOptions {getByRoleNameRegex = Just re})
