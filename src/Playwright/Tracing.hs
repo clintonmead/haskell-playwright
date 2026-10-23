@@ -46,6 +46,11 @@ import Playwright.MethodName
 import Playwright.Monad
   ( Playwright
   )
+import UnliftIO.Exception
+  ( SomeException
+  , throwIO
+  , try
+  )
 import Playwright.Protocol
   ( ArtifactSaveAsResult
   , BrowserContextInitializer (browserContextInitializerTracing)
@@ -123,6 +128,11 @@ tracingStartWith ctx options = do
           }
   _ :: TracingTracingStartResult <-
     send (tracingChannel tracing) (MethodName "tracingStart") params
+  _ :: TracingTracingStartChunkResult <-
+    send
+      (tracingChannel tracing)
+      (MethodName "tracingStartChunk")
+      mkTracingTracingStartChunkParams
   pure ()
 
 -- | Starts a new trace chunk, optionally with a name and a title.
@@ -150,8 +160,15 @@ tracingStop ctx = do
 -- | Stops the trace and writes it to the given path as a zip archive.
 tracingStopTo :: BrowserContext -> FilePath -> Playwright ()
 tracingStopTo ctx dest = do
-  tracingStopChunkTo ctx dest
-  tracingStop ctx
+  -- Mirrors the upstream client: always stop the tracing session, even when
+  -- saving the chunk fails, then rethrow the save error.
+  saved <- try (tracingStopChunkTo ctx dest)
+  stopped <- try (tracingStop ctx)
+  case saved of
+    Left err -> throwIO (err :: SomeException)
+    Right () -> case stopped of
+      Left err -> throwIO (err :: SomeException)
+      Right () -> pure ()
 
 -- | Stops the current chunk, discarding its data.
 tracingStopChunk :: BrowserContext -> Playwright ()
