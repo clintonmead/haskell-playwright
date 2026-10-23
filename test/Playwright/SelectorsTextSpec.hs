@@ -352,11 +352,12 @@ tests =
               assertEqual (unpack text <> " root") True (isNothing found)
               assertEqual (unpack text <> " root count") (0 :: Double)
                 =<< evalOnSelectorAllHandleNumber root (selectorFromText ("text=" <> text)) "els => els.length"
-    , testCase "should match input[type=button|submit]" $
+    , testCase "should match input[type=button|submit|reset]" $
         withChromiumPage $ \page -> do
-          setContent page "<input type=\"submit\" value=\"hello\"><input type=\"button\" value=\"world\">"
+          setContent page "<input type=\"submit\" value=\"hello\"><input type=\"button\" value=\"world\"><input type=\"reset\" value=\"clear\">"
           assertHtml page "text=hello" "<input type=\"submit\" value=\"hello\">"
           assertHtml page "text=world" "<input type=\"button\" value=\"world\">"
+          assertHtml page "text=clear" "<input type=\"reset\" value=\"clear\">"
     , testCase "should work for open shadow roots" $
         withAssetPage "deep-shadow.html" $ \page -> do
           assertText page "text=root1" "Hello from root1"
