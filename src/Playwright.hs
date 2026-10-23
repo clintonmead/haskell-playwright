@@ -213,6 +213,7 @@ module Playwright
   , apiResponseStatus
   , apiResponseStatusText
   , apiResponseText
+  , apiResponseTiming
   , apiResponseUrl
   , armConsole
   , armDialog
@@ -952,6 +953,7 @@ import Playwright.APIResponse
   , apiResponseStatus
   , apiResponseStatusText
   , apiResponseText
+  , apiResponseTiming
   , apiResponseUrl
   )
 import Playwright.AriaSnapshotMode

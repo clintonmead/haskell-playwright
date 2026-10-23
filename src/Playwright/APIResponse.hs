@@ -12,6 +12,7 @@ module Playwright.APIResponse
   , apiResponseStatus
   , apiResponseStatusText
   , apiResponseText
+  , apiResponseTiming
   , apiResponseUrl
   ) where
 
@@ -30,6 +31,12 @@ import Data.ByteString
   )
 import Data.List
   ( partition
+  )
+import Data.Maybe
+  ( fromMaybe
+  )
+import Data.Scientific
+  ( Scientific
   )
 import Data.Text
   ( Text
@@ -66,10 +73,19 @@ import Playwright.MethodName
 import Playwright.Protocol qualified as Protocol
   ( APIRequestContextDisposeAPIResponseResult
   , APIRequestContextFetchResponseBodyResult (aPIRequestContextFetchResponseBodyResultBinary)
-  , APIResponse (aPIResponseFetchUid, aPIResponseHeaders, aPIResponseSecurityDetails, aPIResponseServerAddr, aPIResponseStatus, aPIResponseStatusText, aPIResponseUrl)
+  , APIResponse (aPIResponseFetchUid, aPIResponseHeaders, aPIResponseResponseEndTiming, aPIResponseSecurityDetails, aPIResponseServerAddr, aPIResponseStatus, aPIResponseStatusText, aPIResponseTiming, aPIResponseUrl)
   , NameValue (nameValueName, nameValueValue)
+  , ResourceTiming
   , mkAPIRequestContextDisposeAPIResponseParams
   , mkAPIRequestContextFetchResponseBodyParams
+  , resourceTimingConnectEnd
+  , resourceTimingConnectStart
+  , resourceTimingDomainLookupEnd
+  , resourceTimingDomainLookupStart
+  , resourceTimingRequestStart
+  , resourceTimingResponseStart
+  , resourceTimingSecureConnectionStart
+  , resourceTimingStartTime
   )
 import Playwright.RemoteAddr
   ( RemoteAddr
@@ -78,6 +94,9 @@ import Playwright.RemoteAddr
 import Playwright.SecurityDetails
   ( SecurityDetails
   , fromProtocolSecurityDetails
+  )
+import Playwright.ResourceTiming
+  ( ResourceTiming (ResourceTiming, resourceTimingConnectEnd, resourceTimingConnectStart, resourceTimingDomainLookupEnd, resourceTimingDomainLookupStart, resourceTimingRequestStart, resourceTimingResponseEnd, resourceTimingResponseStart, resourceTimingSecureConnectionStart, resourceTimingStartTime)
   )
 import Playwright.Url
   ( Url
@@ -115,6 +134,52 @@ apiResponseServerAddr =
 apiResponseSecurityDetails :: APIResponse -> Maybe SecurityDetails
 apiResponseSecurityDetails =
   fmap fromProtocolSecurityDetails . Protocol.aPIResponseSecurityDetails . apiResponsePayload
+
+-- | Mirrors the JS client's @timing()': unset phases are -1, and the
+-- response end comes from the separate @responseEndTiming@ field.
+apiResponseTiming :: APIResponse -> ResourceTiming
+apiResponseTiming response =
+  let
+    payload = apiResponsePayload response
+    base =
+      maybe unsetResourceTiming fromProtocolResourceTiming (Protocol.aPIResponseTiming payload)
+  in
+    base
+      { resourceTimingResponseEnd =
+          fromMaybe unsetTiming (Protocol.aPIResponseResponseEndTiming payload)
+      }
+
+unsetTiming :: Scientific
+unsetTiming =
+  -1
+
+unsetResourceTiming :: ResourceTiming
+unsetResourceTiming =
+  ResourceTiming
+    { resourceTimingStartTime = unsetTiming
+    , resourceTimingDomainLookupStart = unsetTiming
+    , resourceTimingDomainLookupEnd = unsetTiming
+    , resourceTimingConnectStart = unsetTiming
+    , resourceTimingSecureConnectionStart = unsetTiming
+    , resourceTimingConnectEnd = unsetTiming
+    , resourceTimingRequestStart = unsetTiming
+    , resourceTimingResponseStart = unsetTiming
+    , resourceTimingResponseEnd = unsetTiming
+    }
+
+fromProtocolResourceTiming :: Protocol.ResourceTiming -> ResourceTiming
+fromProtocolResourceTiming timing =
+  ResourceTiming
+    { resourceTimingStartTime = Protocol.resourceTimingStartTime timing
+    , resourceTimingDomainLookupStart = Protocol.resourceTimingDomainLookupStart timing
+    , resourceTimingDomainLookupEnd = Protocol.resourceTimingDomainLookupEnd timing
+    , resourceTimingConnectStart = Protocol.resourceTimingConnectStart timing
+    , resourceTimingSecureConnectionStart = Protocol.resourceTimingSecureConnectionStart timing
+    , resourceTimingConnectEnd = Protocol.resourceTimingConnectEnd timing
+    , resourceTimingRequestStart = Protocol.resourceTimingRequestStart timing
+    , resourceTimingResponseStart = Protocol.resourceTimingResponseStart timing
+    , resourceTimingResponseEnd = unsetTiming
+    }
 
 apiResponseHeadersArray :: APIResponse -> [HttpHeader]
 apiResponseHeadersArray response =
