@@ -28,6 +28,7 @@ import Playwright.BrowserContextOfflineSpec qualified as BrowserContextOfflineSp
 import Playwright.BrowserContextPageEventSpec qualified as BrowserContextPageEventSpec
 import Playwright.BrowserContextPagesSpec qualified as BrowserContextPagesSpec
 import Playwright.BrowserContextProxySpec qualified as BrowserContextProxySpec
+import Playwright.BrowserContextReuseSpec qualified as BrowserContextReuseSpec
 import Playwright.BrowserContextRouteSpec qualified as BrowserContextRouteSpec
 import Playwright.BrowserContextServiceWorkerPolicySpec qualified as BrowserContextServiceWorkerPolicySpec
 import Playwright.BrowserContextSetExtraHTTPHeadersSpec qualified as BrowserContextSetExtraHTTPHeadersSpec
@@ -228,6 +229,7 @@ main =
         , BrowserContextPageEventSpec.tests
         , BrowserContextPagesSpec.tests
         , BrowserContextProxySpec.tests
+        , BrowserContextReuseSpec.tests
         , BrowserContextRouteSpec.tests
         , BrowserContextServiceWorkerPolicySpec.tests
         , BrowserContextSetExtraHTTPHeadersSpec.tests
