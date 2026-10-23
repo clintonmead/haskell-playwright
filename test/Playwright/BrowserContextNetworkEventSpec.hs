@@ -102,6 +102,10 @@ import UnliftIO.IORef
   , readIORef
   )
 
+-- Not ported: "should not fire events for favicon or favicon redirects". Upstream
+-- skips it unless the browser is firefox and it runs headed, because headless
+-- chromium never requests a favicon. The case waits for a favicon request that
+-- never arrives under this harness, so it would hang.
 tests :: TestTree
 tests =
   testGroup
