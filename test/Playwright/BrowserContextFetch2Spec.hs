@@ -64,6 +64,8 @@ import Playwright.BrowserContextFetchSupport
   , compressionTest
   , apiTimingTest
   , corruptedCompressionTest
+  , brotliHello
+  , brotliRangeTest
   , withSlowThenDoneApp
   , withSlowRedirectApp
   , disposeAfterContextClose
@@ -226,6 +228,11 @@ tests =
           compressionTest "deflate" (Zlib.compress "Hello, world!")
       , testCase "should throw informative error on corrupted deflate body" $
           corruptedCompressionTest "deflate"
+      , testCase "should support brotli compression" $
+          compressionTest "br" brotliHello
+      , testCase "should throw informative error on corrupted brotli body" $
+          corruptedCompressionTest "br"
+      , testCase "should not hang on a brotli encoded Range request" brotliRangeTest
       , testCase "should support a timeout of 0" $
           withSlowThenDoneApp $ \prefix ctx -> do
             request <- contextRequest ctx

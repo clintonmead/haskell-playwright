@@ -62,6 +62,8 @@ module Playwright.BrowserContextFetchSupport
   , lookupHeader
   , compressionTest
   , corruptedCompressionTest
+  , brotliHello
+  , brotliRangeTest
   , compressedApp
   , withSlowThenDoneApp
   , slowThenDoneApp
@@ -908,6 +910,42 @@ compressedApp encoding body _request respond =
         [("Content-Encoding", encoding), (hContentType, "text/plain")]
         body
     )
+
+-- | Brotli encoding of "Hello, world!", precomputed (the Haskell test
+-- suite has no brotli compressor).
+brotliHello :: LBS.ByteString
+brotliHello =
+  LBS.pack [0x0b, 0x06, 0x80, 0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x2c, 0x20, 0x77, 0x6f, 0x72, 0x6c, 0x64, 0x21, 0x03]
+
+-- | Sends a 206 whose Content-Length is 1 but whose body is two bytes of
+-- brotli data, so the trailing byte is read as the next response.
+brotliRangeTest :: IO ()
+brotliRangeTest =
+  withApplication (pure brotliRangeApp) $ \port ->
+    withChromiumContext $ \ctx _page -> do
+      request <- contextRequest ctx
+      assertProtocolContains
+        "Parse Error: Expected HTTP/"
+        ( fetchGetWith
+            request
+            (urlFromText ("http://127.0.0.1:" <> pack (show port) <> "/brotli"))
+            defaultFetchOptions
+              { fetchHeaders = Just [HttpHeader (HeaderName "range") (HeaderValue "bytes=0-2")]
+              }
+        )
+
+brotliRangeApp :: Application
+brotliRangeApp _request respond =
+  respond
+    ( responseRaw
+        (\_ write -> write brotliRangeResponse)
+        (responseLBS status200 [] "")
+    )
+
+brotliRangeResponse :: ByteString
+brotliRangeResponse =
+  "HTTP/1.1 206 Partial Content\r\nContent-Type: text/plain\r\nContent-Length: 1\r\nContent-Encoding: br\r\nContent-Range: bytes 0-2/5\r\nAccept-Ranges: bytes\r\n\r\n"
+    <> ByteString.pack [0x0b, 0x00]
 
 withSlowThenDoneApp :: (Text -> BrowserContext -> Playwright a) -> IO a
 withSlowThenDoneApp action =
