@@ -346,6 +346,15 @@ tests =
           assertBool "png signature" (pngMagic `BS.isPrefixOf` plain)
           masked <- locatorScreenshotMasked bodyLocator [locator page (selectorFromText "div.box")] defaultScreenshotOptions
           assertBool "masked locator differs from plain" (masked /= plain)
+    , testCase "should work for canvas" $
+        withAssets $ \prefix page -> do
+          setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 500))
+          _ <- goto page (urlFromText (prefix <> "/screenshots/canvas.html")) defaultGotoOptions
+          drawn <- screenshot page defaultScreenshotOptions
+          assertBool "png signature" (pngMagic `BS.isPrefixOf` drawn)
+          _ <- evaluate page "() => { const c = document.querySelector('canvas'); c.getContext('2d').clearRect(0, 0, c.width, c.height); }"
+          blank <- screenshot page defaultScreenshotOptions
+          assertBool "drawn canvas differs from blank canvas" (drawn /= blank)
     ]
 
 dsf2Options :: NewContextOptions

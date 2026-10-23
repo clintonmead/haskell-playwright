@@ -689,7 +689,7 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 
 **Question:** Upstream `should work for canvas` screenshots a page with a drawn canvas and compares the decoded pixels. The repo has no decoder (see "page-screenshot: image decoding for pixel checks"). What should the port assert?
 
-**Guess taken:** Use a byte-level check. Draw the canvas, take a screenshot, and assert that the PNG signature comes back and that the bytes differ from a screenshot of the same page with the canvas left blank. That checks that the canvas content reaches the image, without decoding pixels. The case is not written yet, so `should work for canvas` stays open in the TODO.
+**Guess taken:** Use a byte-level check. Draw the canvas, take a screenshot, and assert that the PNG signature comes back and that the bytes differ from a screenshot of the same page with the canvas left blank. That checks that the canvas content reaches the image, without decoding pixels. The case is written in `PageScreenshotSpec.hs` (`should work for canvas`). It clears the canvas with `clearRect` in the same page, which gives the blank comparison without a second page, and passes.
 
 **Why not verified:** The byte comparison only shows that the output changed. It does not show that the canvas colour is in the right place.
 
