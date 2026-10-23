@@ -99,6 +99,7 @@ import Playwright.LocatorElementHandleSpec qualified as LocatorElementHandleSpec
 import Playwright.LocatorEvaluateSpec qualified as LocatorEvaluateSpec
 import Playwright.LocatorFrameSpec qualified as LocatorFrameSpec
 import Playwright.LocatorAnyFrameSpec qualified as LocatorAnyFrameSpec
+import Playwright.LocatorGeneratorSpec qualified as LocatorGeneratorSpec
 import Playwright.LocatorHighlightSpec qualified as LocatorHighlightSpec
 import Playwright.LocatorIsVisibleSpec qualified as LocatorIsVisibleSpec
 import Playwright.ExpectBooleanSpec qualified as ExpectBooleanSpec
@@ -324,6 +325,7 @@ main =
         , LocatorEvaluateSpec.tests
         , LocatorFrameSpec.tests
         , LocatorAnyFrameSpec.tests
+        , LocatorGeneratorSpec.tests
         , LocatorHighlightSpec.tests
         , LocatorIsVisibleSpec.tests
         , ExpectBooleanSpec.tests

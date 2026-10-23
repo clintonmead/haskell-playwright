@@ -124,6 +124,7 @@ library
       Playwright.LoadState
       Playwright.Locale
       Playwright.Locator
+      Playwright.LocatorGenerator
       Playwright.LocatorHandler
       Playwright.MediaType
       Playwright.MethodName
@@ -357,6 +358,7 @@ test-suite playwright-test
       Playwright.LocatorElementHandleSpec
       Playwright.LocatorEvaluateSpec
       Playwright.LocatorFrameSpec
+      Playwright.LocatorGeneratorSpec
       Playwright.LocatorHighlightSpec
       Playwright.LocatorIsVisibleSpec
       Playwright.LocatorListSpec
