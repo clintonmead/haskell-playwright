@@ -166,6 +166,13 @@ tests =
               _ <- evaluateText page2 "() => navigator.clipboard.writeText('second').then(() => 'ok')"
               assertEqual "second" "second" =<< evaluateText page2 "() => navigator.clipboard.readText()"
               assertEqual "first again" "first" =<< evaluateText page1 "() => navigator.clipboard.readText()"
+    , testCase "should be able to use the local-fonts API" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          assertEqual "prompt" "prompt" =<< permissionState page "local-fonts"
+          grantPermissions (pageContext page) [PermissionName "local-fonts"]
+          assertEqual "granted" "granted" =<< permissionState page "local-fonts"
+          assertEqual "fonts" "true" =<< evaluateText page "() => window.queryLocalFonts().then(fonts => String(fonts.length > 0))"
     , testCase "storage access" $
         withChromiumContext $ \ctx page ->
           withLocalApp storageAccessApp $ \prefix -> do
