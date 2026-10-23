@@ -210,6 +210,7 @@ module Playwright
   , blur
   , boundingBox
   , bringToFront
+  , pageHideHighlight
   , browserBrowserType
   , browserContexts
   , browserFromRef
@@ -467,6 +468,7 @@ module Playwright
   , grantPermissionsFor
   , hover
   , highlight
+  , highlightWithStyle
   , hideHighlight
   , hoverHandle
   , pressHandle
@@ -1413,6 +1415,7 @@ import Playwright.Locator
   , getAttribute
   , hover
   , highlight
+  , highlightWithStyle
   , hideHighlight
   , innerHtml
   , innerText
@@ -1503,6 +1506,7 @@ import Playwright.Page
   , addScriptTagOnFrame
   , addStyleTag
   , bringToFront
+  , pageHideHighlight
   , closePage
   , closePageReason
   , closePageWith

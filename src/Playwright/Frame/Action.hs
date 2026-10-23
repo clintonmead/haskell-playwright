@@ -13,6 +13,7 @@ module Playwright.Frame.Action
   , hoverFrame
   , hoverFrameWith
   , highlightFrame
+  , highlightFrameWithStyle
   , hideHighlightFrame
   , pressFrame
   , selectOptionFrame
@@ -127,6 +128,7 @@ import Playwright.Protocol
   , FrameHoverParamsModifiers (FrameHoverParamsModifiersAlt, FrameHoverParamsModifiersControl, FrameHoverParamsModifiersControlOrMeta, FrameHoverParamsModifiersMeta, FrameHoverParamsModifiersShift)
   , FrameHoverParamsScroll (FrameHoverParamsScrollAuto, FrameHoverParamsScrollNone)
   , FrameHoverResult
+  , FrameHighlightParams (frameHighlightParamsStyle)
   , FrameHighlightResult
   , FrameHideHighlightResult
   , FramePressParams (framePressParamsStrict)
@@ -431,6 +433,15 @@ highlightFrame frame selector =
     frame
     "highlight"
     (mkFrameHighlightParams selector)
+
+highlightFrameWithStyle :: Frame -> Selector -> Text -> Playwright ()
+highlightFrameWithStyle frame selector style =
+  frameSend_ @FrameHighlightResult
+    frame
+    "highlight"
+    (mkFrameHighlightParams selector)
+      { frameHighlightParamsStyle = Just style
+      }
 
 hideHighlightFrame :: Frame -> Selector -> Playwright ()
 hideHighlightFrame frame selector =

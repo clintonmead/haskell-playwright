@@ -2,6 +2,7 @@ module Playwright.Page
   ( Page (..)
   , pageFromRef
   , bringToFront
+  , pageHideHighlight
   , closePage
   , content
   , goto
@@ -217,6 +218,7 @@ import Playwright.Protocol
   , FrameAddStyleTagResult (frameAddStyleTagResultElement)
   , PageAddInitScriptResult
   , PageBringToFrontResult
+  , PageHideHighlightResult
   , PageCloseParams (pageCloseParamsReason)
   , PageCloseResult
   , PageRunBeforeUnloadResult
@@ -270,6 +272,7 @@ import Playwright.Protocol
   , mkFrameAddStyleTagParams
   , mkPageAddInitScriptParams
   , mkPageBringToFrontParams
+  , mkPageHideHighlightParams
   , mkPageCloseParams
   , mkPageRunBeforeUnloadParams
   , mkPageGoBackParams
@@ -502,6 +505,14 @@ bringToFront :: Page -> Playwright ()
 bringToFront page = do
   _ :: PageBringToFrontResult <-
     send (pageChannel page) (MethodName "bringToFront") mkPageBringToFrontParams
+  pure ()
+
+-- | Hides every element highlight on the page, including highlights made
+-- with 'Playwright.Locator.highlight'.
+pageHideHighlight :: Page -> Playwright ()
+pageHideHighlight page = do
+  _ :: PageHideHighlightResult <-
+    send (pageChannel page) (MethodName "hideHighlight") mkPageHideHighlightParams
   pure ()
 
 requestGC :: Page -> Playwright ()

@@ -54,6 +54,7 @@ module Playwright.Locator
   , hover
   , hoverWith
   , highlight
+  , highlightWithStyle
   , hideHighlight
   , innerHtml
   , innerText
@@ -191,6 +192,7 @@ import Playwright.Frame.Action
   , hoverFrame
   , hoverFrameWith
   , highlightFrame
+  , highlightFrameWithStyle
   , hideHighlightFrame
   , pressFrame
   , selectOptionFrame
@@ -607,6 +609,10 @@ hoverWith loc opts = do
 highlight :: Locator -> Playwright ()
 highlight loc =
   highlightFrame (locatorFrame loc) (locatorSelector loc)
+
+highlightWithStyle :: Locator -> Text -> Playwright ()
+highlightWithStyle loc style =
+  highlightFrameWithStyle (locatorFrame loc) (locatorSelector loc) style
 
 hideHighlight :: Locator -> Playwright ()
 hideHighlight loc =
