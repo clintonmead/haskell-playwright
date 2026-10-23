@@ -418,6 +418,7 @@ test-suite playwright-test
       Playwright.SelectorsRoleSpec
       Playwright.SelectorsTextSpec
       Playwright.SharedWorkerSpec
+      Playwright.SlowMoSpec
       Playwright.TapSpec
       Playwright.TransportSpec
       Playwright.UnrouteBehaviorSpec

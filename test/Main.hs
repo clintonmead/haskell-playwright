@@ -181,6 +181,7 @@ import Playwright.SelectorsRoleSpec qualified as SelectorsRoleSpec
 import Playwright.SelectorsRegisterSpec qualified as SelectorsRegisterSpec
 import Playwright.SelectorsTextSpec qualified as SelectorsTextSpec
 import Playwright.SharedWorkerSpec qualified as SharedWorkerSpec
+import Playwright.SlowMoSpec qualified as SlowMoSpec
 import Playwright.TapSpec qualified as TapSpec
 import Playwright.TransportSpec qualified as TransportSpec
 import Playwright.UnrouteBehaviorSpec qualified as UnrouteBehaviorSpec
@@ -377,6 +378,7 @@ main =
         , SelectorsRegisterSpec.tests
         , SelectorsTextSpec.tests
         , SharedWorkerSpec.tests
+        , SlowMoSpec.tests
         , TapSpec.tests
         , UnrouteBehaviorSpec.tests
         , WebSocketSpec.tests
