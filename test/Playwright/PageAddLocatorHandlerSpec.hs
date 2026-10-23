@@ -19,6 +19,7 @@ import UnliftIO.IORef
   , readIORef
   , writeIORef
   )
+import qualified Data.ByteString as ByteString
 import Data.Maybe
   ( isNothing
   )
@@ -37,7 +38,13 @@ import Playwright
   , LocatorHandlerTimes (LocatorHandlerTimes)
   , Page
   , SpecialJsValue (SpecialUndefined)
+  , ViewportHeight (ViewportHeight)
+  , ViewportSize (ViewportSize)
+  , ViewportWidth (ViewportWidth)
   , WaitForState (WaitForHidden, WaitForVisible)
+  , defaultScreenshotOptions
+  , screenshot
+  , setViewportSize
   , addInitScript
   , addLocatorHandler
   , addLocatorHandlerWith
@@ -204,6 +211,28 @@ tests =
             assertEqual "hidden" False visible
             count <- readIORef called
             assertEqual "called" 1 count
+      , testCase "should work with toHaveScreenshot" $
+          withAssets $ \prefix page -> do
+            setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 500))
+            _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+            _ <-
+              evaluate
+                page
+                ( "() => { const overlay = document.createElement('div'); overlay.id = 'screenshot-overlay'; document.body.append(overlay);"
+                    <> " overlay.style.position = 'absolute'; overlay.style.left = '0'; overlay.style.right = '0';"
+                    <> " overlay.style.top = '0'; overlay.style.bottom = '0'; overlay.style.backgroundColor = 'red';"
+                    <> " const closeButton = document.createElement('button'); overlay.appendChild(closeButton);"
+                    <> " closeButton.textContent = 'close';"
+                    <> " closeButton.addEventListener('click', () => overlay.remove()); }"
+                )
+            addLocatorHandler page (closeButton page) $ \_ ->
+              click (closeButton page)
+            hover (locate page "body")
+            png <- screenshot page defaultScreenshotOptions
+            assertEqual "png signature" True (ByteString.isPrefixOf pngSignature png)
+            remaining <-
+              evaluateNumber page "() => document.querySelectorAll('#screenshot-overlay').length"
+            assertEqual "overlay removed by handler" 0 remaining
       , testCase "should work when owner frame detaches" $
           withAssetPage "empty.html" $ \page -> do
             _ <-
@@ -496,3 +525,6 @@ requireNeedle haystack needle =
             <> ", got: "
             <> show haystack
         )
+
+pngSignature :: ByteString.ByteString
+pngSignature = ByteString.pack [137, 80, 78, 71, 13, 10, 26, 10]
