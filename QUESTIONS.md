@@ -570,3 +570,13 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 **Why not ported:** The cases only test the JS client's error message for an unserializable function argument. Haskell's type rules that out before anything is sent, so there is no message to check.
 
 **To change:** Only a `SerializedArgument` constructor that carries a function would make these reachable. Adding one would be a different API decision, not a port.
+
+## page-expose-function exposeBinding source argument
+
+**Question:** Upstream `tests/page/page-expose-function.spec.ts` uses `exposeBinding` with a `source` first argument (`(source, a, b) => ...`, around line 22, and the `log` cases at lines 202 and 209). Should the Haskell API expose the source frame to the handler?
+
+**Guess taken:** No. The handler type is `[SerializedValue] -> Playwright SerializedArgument`, which gets no source. `exposeFunction` is the only binding API. The source cases are skipped in `progress/FUNCTIONALITY_TODO.md`.
+
+**Why not ported:** Passing the source means a new handler type or a new `exposeBinding` function. That changes the public API, which is a design decision and not a port. The cases also check `source.frame` and `source.context`, so they need a frame handle the binding does not carry today.
+
+**To change:** Add a function such as `exposeBindingWithSource` that passes a source record (frame and context) to the handler. The `log` and `add` cases can then be ported as written.
