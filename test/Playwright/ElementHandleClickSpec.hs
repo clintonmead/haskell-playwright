@@ -55,6 +55,15 @@ tests =
           handle <- requireHandle =<< querySelector page (selectorFromText "button")
           clickHandle handle
           assertEqual "clicked" "Clicked" =<< evaluateText page "() => window.result"
+    , testCase "should work for TextNodes" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<div id='outer' onclick=\"window['result'] = 'Clicked ' + event.target.id;\"><div id='inner' style=\"max-width: 50px\">Lorem ipsum dolor sit amet consectetur adipiscing elit proin, integer curabitur imperdiet rhoncus cursus tincidunt bibendum, consequat sed magnis laoreet luctus mollis tellus. Nisl parturient mus accumsan feugiat sem laoreet magnis nisi, aptent per sollicitudin gravida orci ac blandit, viverra eros praesent auctor vivamus semper bibendum. Consequat sed habitasse luctus dictumst gravida platea semper phasellus, nascetur ridiculus purus est varius quisque et scelerisque, id vehicula eleifend montes sollicitudin dis velit. Pellentesque ridiculus per natoque et eleifend taciti nunc, laoreet auctor at condimentum imperdiet ante, conubia mi cubilia scelerisque sociosqu sem.</div>Custom Text.</div>"
+          textNode <- evaluateHandle page "() => document.querySelector('#outer').lastChild"
+          handle <- requireHandle =<< asElement textNode
+          clickHandle handle
+          assertEqual "clicked" "Clicked outer" =<< evaluateText page "() => window.result"
     , testCase "should throw for detached nodes" $
         withAssetPage "input/button.html" $ \page -> do
           button <- requireHandle =<< querySelector page (selectorFromText "button")
