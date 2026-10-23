@@ -5,10 +5,15 @@ module Playwright.PageFileChooserSpec
 import Data.Text
   ( Text
   )
+import Data.ByteString.Char8 qualified as BS8
 import Data.Text qualified as Text
 import UnliftIO.Async
   ( wait
   , withAsync
+  )
+import UnliftIO.IORef
+  ( newIORef
+  , readIORef
   )
 import Playwright
   ( Frame
@@ -42,12 +47,15 @@ import Playwright
   , waitForFileChooserWith
   )
 import Playwright.Harness
-  ( assertWaitTimeout
+  ( Recorded (recordedBody, recordedPath)
+  , assertWaitTimeout
   , attachFrame
   , locate
   , readTestAsset
+  , recordingPageApp
   , withAssets
   , withChromiumPage
+  , withLocalApp
   , assertBool
   , assertEqual
   , assertFailure
@@ -235,7 +243,30 @@ tests =
               chooserFirst <- wait first
               chooserSecond <- wait second
               assertBool "same chooser" (fileChoosersEqual chooserFirst chooserSecond)
+    , testCase "should not trim big uploaded files" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (recordingPageApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            _ <- evaluate page uploadBigBlobScript
+            seen <- readIORef requests
+            case filter ((== "/upload") . recordedPath) seen of
+              [] -> assertFailure "no upload request was recorded"
+              upload : _ -> do
+                let payload = uploadedFilePayload (recordedBody upload)
+                assertEqual "size" (1048576 :: Int) (BS8.length payload)
     ]
+
+-- | Uploads a 1 MiB Blob through FormData, so the server sees the whole file.
+uploadBigBlobScript :: Text
+uploadBigBlobScript =
+  "() => { const body = new FormData(); body.set('file', new Blob([new Uint8Array(1048576)])); return fetch('/upload', { method: 'POST', body }).then(() => true); }"
+
+-- | The bytes of the file part in a single-part multipart/form-data body.
+uploadedFilePayload :: BS8.ByteString -> BS8.ByteString
+uploadedFilePayload body =
+  let afterHeaders = BS8.drop 4 (snd (BS8.breakSubstring "\r\n\r\n" body))
+   in fst (BS8.breakSubstring "\r\n--" afterHeaders)
 
 -- | The first child frame of the main frame, which must exist.
 firstChildFrame :: Page -> Playwright Frame
