@@ -256,6 +256,11 @@ tests =
           assertProtocolContains
             "net::ERR_CONNECTION_REFUSED"
             (goto page (urlFromText "http://localhost:44123/non-existing-url") defaultGotoOptions)
+    , testCase "should fail when navigating and show the url at the error message" $
+        withChromiumPage $ \page ->
+          assertProtocolContains
+            "http://localhost:44123/non-existing-url"
+            (goto page (urlFromText "http://localhost:44123/non-existing-url") defaultGotoOptions)
     , testCase "should fail when exceeding maximum navigation timeout" $
         withChromiumPage $ \page ->
           withHangServer $ \prefix -> do
