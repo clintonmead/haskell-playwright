@@ -97,6 +97,12 @@ module Playwright
   , MouseButton (..)
   , NewContextOptions (..)
   , NewRequestOptions (..)
+  , RecordVideo (..)
+  , Video
+  , pageVideo
+  , videoDelete
+  , videoPath
+  , videoSaveAs
   , NetworkSizes (..)
   , OriginStorageState (..)
   , Page (..)
@@ -1293,6 +1299,9 @@ import Playwright.AddLocatorHandlerOptions
   , LocatorHandlerTimes (LocatorHandlerTimes, locatorHandlerTimesToInt)
   , defaultAddLocatorHandlerOptions
   )
+import Playwright.RecordVideo
+  ( RecordVideo (recordVideoDir, recordVideoSize)
+  )
 import Playwright.ReducedMotion
   ( ReducedMotion (ReducedMotionNoOverride, ReducedMotionNoPreference, ReducedMotionReduce)
   )
@@ -1930,6 +1939,13 @@ import Playwright.WebStorage
   , storageItems
   , storageRemoveItem
   , storageSetItem
+  )
+import Playwright.Video
+  ( Video
+  , pageVideo
+  , videoDelete
+  , videoPath
+  , videoSaveAs
   )
 import Playwright.WebSocket
   ( WebSocket

@@ -4,6 +4,9 @@ module Playwright.NewContextOptions
   , toBrowserNewContextParams
   ) where
 
+import Data.Text
+  ( pack
+  )
 import Playwright.AcceptDownloads
   ( AcceptDownloads (AcceptDownloadsAccept, AcceptDownloadsDeny)
   )
@@ -49,8 +52,12 @@ import Playwright.ProxySettings
   )
 import Playwright.Protocol qualified as Protocol
 import Playwright.Protocol
-  ( BrowserNewContextParams (browserNewContextParamsAcceptDownloads, browserNewContextParamsBaseURL, browserNewContextParamsBypassCSP, browserNewContextParamsColorScheme, browserNewContextParamsContrast, browserNewContextParamsDeviceScaleFactor, browserNewContextParamsExtraHTTPHeaders, browserNewContextParamsForcedColors, browserNewContextParamsGeolocation, browserNewContextParamsHasTouch, browserNewContextParamsHttpCredentials, browserNewContextParamsIgnoreHTTPSErrors, browserNewContextParamsIsMobile, browserNewContextParamsJavaScriptEnabled, browserNewContextParamsLocale, browserNewContextParamsNoDefaultViewport, browserNewContextParamsOffline, browserNewContextParamsPermissions, browserNewContextParamsProxy, browserNewContextParamsReducedMotion, browserNewContextParamsScreen, browserNewContextParamsServiceWorkers, browserNewContextParamsStorageState, browserNewContextParamsStrictSelectors, browserNewContextParamsTimezoneId, browserNewContextParamsUserAgent, browserNewContextParamsViewport)
+  ( BrowserNewContextParams (browserNewContextParamsAcceptDownloads, browserNewContextParamsBaseURL, browserNewContextParamsBypassCSP, browserNewContextParamsColorScheme, browserNewContextParamsContrast, browserNewContextParamsDeviceScaleFactor, browserNewContextParamsExtraHTTPHeaders, browserNewContextParamsForcedColors, browserNewContextParamsGeolocation, browserNewContextParamsHasTouch, browserNewContextParamsHttpCredentials, browserNewContextParamsIgnoreHTTPSErrors, browserNewContextParamsIsMobile, browserNewContextParamsJavaScriptEnabled, browserNewContextParamsLocale, browserNewContextParamsNoDefaultViewport, browserNewContextParamsOffline, browserNewContextParamsPermissions, browserNewContextParamsProxy, browserNewContextParamsRecordVideo, browserNewContextParamsReducedMotion, browserNewContextParamsScreen, browserNewContextParamsServiceWorkers, browserNewContextParamsStorageState, browserNewContextParamsStrictSelectors, browserNewContextParamsTimezoneId, browserNewContextParamsUserAgent, browserNewContextParamsViewport)
   , BrowserNewContextParamsAcceptDownloads (BrowserNewContextParamsAcceptDownloadsAccept, BrowserNewContextParamsAcceptDownloadsDeny)
+  , BrowserNewContextParamsRecordVideo (browserNewContextParamsRecordVideoDir, browserNewContextParamsRecordVideoSize)
+  , BrowserNewContextParamsRecordVideoSize
+  , mkBrowserNewContextParamsRecordVideo
+  , mkBrowserNewContextParamsRecordVideoSize
   , BrowserNewContextParamsColorScheme (BrowserNewContextParamsColorSchemeDark, BrowserNewContextParamsColorSchemeLight, BrowserNewContextParamsColorSchemeNoOverride, BrowserNewContextParamsColorSchemeNoPreference)
   , BrowserNewContextParamsContrast (BrowserNewContextParamsContrastMore, BrowserNewContextParamsContrastNoOverride, BrowserNewContextParamsContrastNoPreference)
   , BrowserNewContextParamsForcedColors (BrowserNewContextParamsForcedColorsActive, BrowserNewContextParamsForcedColorsNoOverride, BrowserNewContextParamsForcedColorsNone)
@@ -65,6 +72,9 @@ import Playwright.Protocol
   , mkBrowserNewContextParamsProxy
   , mkBrowserNewContextParamsScreen
   , mkBrowserNewContextParamsViewport
+  )
+import Playwright.RecordVideo
+  ( RecordVideo (recordVideoDir, recordVideoSize)
   )
 import Playwright.ReducedMotion
   ( ReducedMotion (ReducedMotionNoOverride, ReducedMotionNoPreference, ReducedMotionReduce)
@@ -119,6 +129,7 @@ data NewContextOptions = NewContextOptions
   , newContextStrictSelectors :: Maybe Bool
   , newContextTimezoneId :: Maybe TimezoneId
   , newContextUserAgent :: Maybe UserAgent
+  , newContextRecordVideo :: Maybe RecordVideo
   , newContextViewport :: Maybe ViewportSize
   }
   deriving stock (Eq, Show)
@@ -152,6 +163,7 @@ defaultNewContextOptions =
     , newContextStrictSelectors = Nothing
     , newContextTimezoneId = Nothing
     , newContextUserAgent = Nothing
+    , newContextRecordVideo = Nothing
     , newContextViewport = Nothing
     }
 
@@ -185,8 +197,22 @@ toBrowserNewContextParams opts =
     , browserNewContextParamsStrictSelectors = newContextStrictSelectors opts
     , browserNewContextParamsTimezoneId = fmap timezoneIdToText (newContextTimezoneId opts)
     , browserNewContextParamsUserAgent = fmap userAgentToText (newContextUserAgent opts)
+    , browserNewContextParamsRecordVideo = fmap toProtocolRecordVideo (newContextRecordVideo opts)
     , browserNewContextParamsViewport = fmap toProtocolViewport (newContextViewport opts)
     }
+
+toProtocolRecordVideo :: RecordVideo -> BrowserNewContextParamsRecordVideo
+toProtocolRecordVideo video =
+  mkBrowserNewContextParamsRecordVideo
+    { browserNewContextParamsRecordVideoDir = Just (pack (recordVideoDir video))
+    , browserNewContextParamsRecordVideoSize = fmap toProtocolVideoSize (recordVideoSize video)
+    }
+
+toProtocolVideoSize :: ViewportSize -> BrowserNewContextParamsRecordVideoSize
+toProtocolVideoSize size =
+  mkBrowserNewContextParamsRecordVideoSize
+    (viewportHeightToInt (viewportHeight size))
+    (viewportWidthToInt (viewportWidth size))
 
 toProtocolColor :: ColorScheme -> BrowserNewContextParamsColorScheme
 toProtocolColor scheme =
