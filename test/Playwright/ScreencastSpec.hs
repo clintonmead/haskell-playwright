@@ -33,14 +33,26 @@ import Data.Text
   ( isInfixOf
   )
 import Playwright
-  ( NewContextOptions (newContextViewport)
-  , Page
+  ( Page
   , ViewportSize (ViewportSize)
   , ViewportWidth (ViewportWidth)
   , ViewportHeight (ViewportHeight)
+  , closeContext
   , closePage
-  , defaultNewContextOptions
+  , defaultLaunchOptions
   , evaluate
+  , newContextWith
+  , newPage
+  )
+import Playwright.LaunchOptions
+  ( LaunchOptions (launchOptionsArtifactsDir)
+  )
+import Playwright.NewContextOptions
+  ( NewContextOptions (newContextRecordVideo, newContextViewport)
+  , defaultNewContextOptions
+  )
+import Playwright.RecordVideo
+  ( RecordVideo (RecordVideo)
   )
 import Playwright.Error
   ( PlaywrightError (ProtocolRpc)
@@ -50,6 +62,8 @@ import Playwright.Harness
   ( assertBool
   , assertEqual
   , assertFailure
+  , withChromiumBrowser
+  , withChromiumBrowserWith
   , withChromiumContextWith
   , withChromiumPage
   )
@@ -66,9 +80,16 @@ import Playwright.Screencast
   , screencastStop
   )
 import System.Directory
-  ( doesFileExist
+  ( createDirectoryIfMissing
+  , doesDirectoryExist
+  , doesFileExist
   , getTemporaryDirectory
+  , listDirectory
   , removeFile
+  , removePathForcibly
+  )
+import Data.List
+  ( isSuffixOf
   )
 import Test.Tasty
   ( TestTree
@@ -84,13 +105,10 @@ import UnliftIO.Exception
 
 -- Skipped upstream cases, not ported here:
 --
--- * "start/stop twice without path creates two files in artifactsDir": needs the
---   `artifactsDir` launch option, which this client does not expose.
--- * "start should work when recordVideo is set": needs the `recordVideo` context
---   option, which this client does not expose.
--- * "empty video" and "start dispose stops recording": both inspect the recorded
---   webm with upstream's VideoPlayer, which needs webm frame decoding that the
---   Haskell harness does not have.
+-- * "empty video" and "start dispose stops recording": both decode the recorded
+--   webm (frame size and pixel colour) with upstream's VideoPlayer. The Haskell
+--   harness has no webm decoder, and the dev shell has no ffmpeg, so they stay
+--   skipped, the same as the pixel cases in VideoSpec.
 
 tests :: TestTree
 tests =
@@ -236,6 +254,65 @@ tests =
             Left _ -> assertFailure "stop failed with an unexpected error"
             Right _ -> assertBool "stop after close should fail" False
           liftIO (removeIfExists path)
+    , testCase "start/stop twice without path creates two files in artifactsDir" $ do
+        dir <- liftIO (freshDir "artifacts-dir")
+        let artifactsDir = dir <> "/artifacts"
+            size = ScreencastSize 800 800
+        withChromiumBrowserWith defaultLaunchOptions {launchOptionsArtifactsDir = Just artifactsDir} $ \browser -> do
+          context <- newContextWith browser defaultNewContextOptions {newContextViewport = Just (ViewportSize (ViewportWidth 800) (ViewportHeight 800))}
+          page <- newPage context
+          firstFrames <- liftIO (newIORef [])
+          _ <-
+            screencastStart
+              page
+              defaultScreencastOptions
+                { screencastOptionsPath = Just (dir <> "/video1.webm")
+                , screencastOptionsSize = Just size
+                , screencastOptionsOnFrame = Just (recordFrames firstFrames)
+                }
+          startPainting page
+          waitForFrames firstFrames 1
+          screencastStop page
+          secondFrames <- liftIO (newIORef [])
+          _ <-
+            screencastStart
+              page
+              defaultScreencastOptions
+                { screencastOptionsPath = Just (dir <> "/video2.webm")
+                , screencastOptionsSize = Just size
+                , screencastOptionsOnFrame = Just (recordFrames secondFrames)
+                }
+          startPainting page
+          waitForFrames secondFrames 1
+          screencastStop page
+          videos <- liftIO (webmFiles artifactsDir)
+          assertEqual "webm files in artifactsDir" 2 (length videos)
+          closeContext context
+    , testCase "start should work when recordVideo is set" $ do
+        autoDir <- liftIO (freshDir "record-video-auto")
+        manualDir <- liftIO (freshDir "record-video-manual")
+        withChromiumBrowser $ \browser -> do
+          context <-
+            newContextWith
+              browser
+              defaultNewContextOptions {newContextRecordVideo = Just (RecordVideo autoDir Nothing)}
+          page <- newPage context
+          frames <- liftIO (newIORef [])
+          _ <-
+            screencastStart
+              page
+              defaultScreencastOptions
+                { screencastOptionsPath = Just (manualDir <> "/video.webm")
+                , screencastOptionsOnFrame = Just (recordFrames frames)
+                }
+          startPainting page
+          waitForFrames frames 1
+          screencastStop page
+          manualVideos <- liftIO (webmFiles manualDir)
+          assertEqual "manual webm files" 1 (length manualVideos)
+          closeContext context
+          autoVideos <- liftIO (webmFiles autoDir)
+          assertEqual "recordVideo webm files" 1 (length autoVideos)
     ]
 
 viewport1000x400 :: NewContextOptions
@@ -297,6 +374,21 @@ jpegDimensions bytes = scan 2
       | byte i /= 0xFF = Nothing
       | byte (i + 1) `elem` [0xC0, 0xC1, 0xC2] = Just (be16 (i + 7), be16 (i + 5))
       | otherwise = scan (i + 2 + be16 (i + 2))
+
+-- | A clean scratch directory under the system temp dir, named after the test.
+freshDir :: String -> IO FilePath
+freshDir name = do
+  tmp <- getTemporaryDirectory
+  let dir = tmp <> "/pw-screencast-" <> name
+  removePathForcibly dir
+  createDirectoryIfMissing True dir
+  pure dir
+
+webmFiles :: FilePath -> IO [FilePath]
+webmFiles dir = do
+  exists <- doesDirectoryExist dir
+  names <- if exists then listDirectory dir else pure []
+  pure (filter (".webm" `isSuffixOf`) names)
 
 recordingPath :: String -> Playwright FilePath
 recordingPath name = do
