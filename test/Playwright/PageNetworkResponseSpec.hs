@@ -67,6 +67,7 @@ import Playwright
   , defaultGotoOptions
   , evaluate
   , evaluateOnFrame
+  , evaluateText
   , frameByUrl
   , fulfillRoute
   , goto
@@ -119,7 +120,8 @@ import UnliftIO.Async
   , withAsync
   )
 import UnliftIO.Exception
-  ( try
+  ( SomeException
+  , try
   )
 import UnliftIO.IORef
   ( IORef
@@ -447,6 +449,100 @@ tests =
             Just value -> do
               assertEqual "status" (HttpStatus 200) =<< responseStatus value
               assertEqual "ok" True =<< responseOk value
+    , testCase "should return multiple header value" $
+        withChromiumPage $ \page ->
+          withLocalApp
+            ( headersPathApp
+                [ ("Name-A", "v1")
+                , ("Name-a", "v2")
+                , ("name-A", "v3")
+                ]
+            )
+            $ \prefix -> do
+              takeResponse <- armResponse page (UrlMatchGlob "**/headers")
+              _ <- goto page (urlFromText (prefix <> "/headers")) defaultGotoOptions
+              response <- takeResponse
+              assertEqual "status" (HttpStatus 200) =<< responseStatus response
+              -- Upstream reads headers(); responseAllHeaders is the merged form here.
+              headers <- responseAllHeaders response
+              assertEqual "name-a" (Just "v1, v2, v3") (headerValue "name-a" headers)
+    , testCase "should return uncompressed text for brotli encoding" $
+        withChromiumPage $ \page ->
+          withLocalApp brotliApp $ \prefix -> do
+            response <- goto page (urlFromText (prefix <> "/brotli.json")) defaultGotoOptions
+            case response of
+              Nothing ->
+                assertFailure "missing response"
+              Just value -> do
+                headers <- responseAllHeaders value
+                assertEqual "content-encoding" (Just "br") (headerValue "content-encoding" headers)
+                assertEqual "body" "{\"foo\": \"bar\"}\n" =<< responseText value
+    , testCase "should return non-utf8 body even when content-type says utf8" $
+        withChromiumPage $ \page ->
+          withLocalApp binaryApp $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            takeResponse <- armResponse page (UrlMatchGlob "**/binary-as-text")
+            bytesReceived <-
+              evaluateText page "() => fetch('/binary-as-text').then(r => r.bytes()).then(b => Array.from(b).join(','))"
+            response <- takeResponse
+            assertEqual "body" (LBS.toStrict binaryBytes) =<< responseBody response
+            assertEqual "page bytes" "128,129,130,255,254,0,1,2" bytesReceived
+    , testCase "should return set-cookie header after route.fulfill" $
+        withChromiumPage $ \page -> do
+          -- Upstream marks this it.fail on chromium and webkit (microsoft/playwright#11035), so
+          -- the case passes while the set-cookie header is still missing from allHeaders().
+          route page (UrlMatchGlob "**/*") $ \handled ->
+            fulfillRoute
+              handled
+              defaultFulfillOptions
+                { fulfillStatus = Just (HttpStatus 200)
+                , fulfillHeaders = [HttpHeader (HeaderName "set-cookie") (HeaderValue "a=b")]
+                , fulfillContentType = Just (ContentType "text/plain")
+                , fulfillBody = Just (FulfillText "")
+                }
+          outcome <-
+            try
+              ( do
+                  response <- goto page (urlFromText "http://playwright.test/empty.html") defaultGotoOptions
+                  case response of
+                    Nothing ->
+                      assertFailure "missing response"
+                    Just value -> do
+                      headers <- responseAllHeaders value
+                      assertEqual "set-cookie" (Just "a=b") (headerValue "set-cookie" headers)
+              )
+              :: Playwright (Either SomeException ())
+          case outcome of
+            Left _ ->
+              pure ()
+            Right () ->
+              assertFailure "set-cookie reached allHeaders(); the upstream it.fail (issue 11035) has been fixed, so port this as a passing case"
+    , testCase "Response.formData() should parse multipart/form-data in page context" $
+        withChromiumPage $ \page ->
+          withLocalApp headerApp $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            result <-
+              evaluateText
+                page
+                "async () => { const boundary = '----WebKitFormBoundary1234'; const body = [`--${boundary}`, 'Content-Disposition: form-data; name=\"field1\"', '', 'value1', `--${boundary}`, 'Content-Disposition: form-data; name=\"file1\"; filename=\"test.txt\"', 'Content-Type: text/plain', '', 'hello', `--${boundary}--`].join('\\r\\n'); const response = new Response(body, { headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` } }); const fd = await response.formData(); const file = fd.get('file1'); return JSON.stringify({ field1: fd.get('field1'), filename: file instanceof File ? file.name : null, fileContent: file instanceof File ? await file.text() : null }); }"
+            assertEqual "form data" "{\"field1\":\"value1\",\"filename\":\"test.txt\",\"fileContent\":\"hello\"}" result
+    , testCase "should give a readable error when response.body() races with navigation" $
+        withAssets $ \prefix page -> do
+          takeResponse <- armResponse page (UrlMatchGlob (prefix <> "/title.html"))
+          _ <- goto page (urlFromText (prefix <> "/title.html")) defaultGotoOptions
+          response <- takeResponse
+          -- Navigate away so the browser frees the first page's network resource.
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          result <- try (responseBody response)
+          case result of
+            Left (ProtocolRpc failure) ->
+              assertBool
+                "navigated away error"
+                ("navigated away" `isInfixOf` protocolFailureMessage failure)
+            Left err ->
+              assertFailure ("expected ProtocolRpc, got: " <> show err)
+            Right _ ->
+              assertFailure "expected responseBody to fail after navigating away"
     ]
 
 sortedHeaders :: [HttpHeader] -> [(Text, Text)]
@@ -604,6 +700,36 @@ gzipPngApp image request respond =
             [(hContentType, "image/png"), (hContentEncoding, "gzip")]
             (compress image)
         )
+    _ ->
+      respond (responseLBS status404 [] LBS8.empty)
+
+-- | Serves JSON as brotli. The stream is one uncompressed meta-block (RFC 7932 section 9.2),
+-- which needs no encoder: a 16-bit window, ISLAST=0, MNIBBLES=4, MLEN-1=14, ISUNCOMPRESSED=1,
+-- the 15 raw bytes, then an empty last meta-block.
+brotliApp :: Application
+brotliApp request respond =
+  case pathInfo request of
+    ["brotli.json"] ->
+      respond
+        ( responseLBS
+            status200
+            [(hContentType, "application/json"), (hContentEncoding, "br")]
+            (LBS.pack [0xE0, 0x00, 0x10] <> LBS8.pack "{\"foo\": \"bar\"}\n" <> LBS.pack [0x03])
+        )
+    _ ->
+      respond (responseLBS status404 [] LBS8.empty)
+
+-- | Bytes that are invalid UTF-8, served as text/plain with a UTF-8 charset.
+binaryBytes :: LBS.ByteString
+binaryBytes = LBS.pack [0x80, 0x81, 0x82, 0xFF, 0xFE, 0x00, 0x01, 0x02]
+
+binaryApp :: Application
+binaryApp request respond =
+  case pathInfo request of
+    ["binary-as-text"] ->
+      respond (sizedResponse status200 [(hContentType, "text/plain;charset=UTF-8")] binaryBytes)
+    ["empty.html"] ->
+      respond (responseLBS status200 [(hContentType, "text/html")] LBS8.empty)
     _ ->
       respond (responseLBS status404 [] LBS8.empty)
 
