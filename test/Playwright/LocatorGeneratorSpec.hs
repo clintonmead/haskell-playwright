@@ -9,7 +9,7 @@ import Playwright.Harness
   ( assertEqual
   )
 import Playwright.LocatorGenerator
-  ( Language (..)
+  ( Language (JavaScript, Python, Java, CSharp)
   , asLocator
   , asLocatorDescription
   , asLocators
@@ -45,7 +45,9 @@ tests =
   testGroup
     "LocatorGenerator"
     [ testCase "refuses to translate internal:role with conflicting name/description exactness" $ do
-        let conflicting = "internal:role=row[name=\"abc\"i][description=\"d\"s]"
+        let conflicting :: T.Text
+            conflicting = "internal:role=row[name=\"abc\"i][description=\"d\"s]"
+            conflictingReversed :: T.Text
             conflictingReversed = "internal:role=row[name=\"abc\"s][description=\"d\"i]"
         mapM_
           ( \lang -> do
@@ -105,7 +107,8 @@ tests =
           "Locator(\"div\").Locator(Locator(\"span\").Locator(\"article\"))"
           (asLocator CSharp "div >> internal:chain=\"span >> article\"")
     , testCase "asLocator xpath" $ do
-        let selector = "//*[contains(normalizer-text(), 'foo']"
+        let selector :: T.Text
+            selector = "//*[contains(normalizer-text(), 'foo']"
         assertEqual
           "javascript"
           "locator('//*[contains(normalizer-text(), \\'foo\\']')"
@@ -172,7 +175,8 @@ tests =
         assertEqual "java mismatched" "" (parseLocator Java "locator('text=\"bar\"')" "")
         assertEqual "csharp sq" "text='bar'" (parseLocator CSharp "Locator(\"text='bar'\")" "")
         assertEqual "csharp mismatched" "" (parseLocator CSharp "Locator('text=\"bar\"')" "")
-        let mixedQuotes =
+        let mixedQuotes :: T.Text
+            mixedQuotes =
               "\n    locator(\"[id*=freetext-field]\")\n        .locator('input:below(:text(\"Assigned Number:\"))')\n        .locator(\"visible=true\")\n  "
         assertEqual
           "js multi-line mixed"
@@ -197,7 +201,8 @@ tests =
           "internal:role=checkbox[checked=false][include-hidden=true]"
           (parseLocator JavaScript "getByRole('checkbox', { checked:false, includeHidden: true })" "")
     , testCase "parse locators strictly" $ do
-        let selector = "div >> internal:has-text=\"Goodbye world\"i >> span"
+        let selector :: T.Text
+            selector = "div >> internal:has-text=\"Goodbye world\"i >> span"
         -- Exact
         assertEqual
           "exact csharp"
@@ -259,7 +264,8 @@ tests =
           selector
           (parseLocator Python "locator(\"div\").filter(has_text==\"Goodbye world\").locator(\"span\")" "")
     , testCase "parseLocator frames" $ do
-        let frameText = "iframe >> internal:control=enter-frame >> internal:text=\"foo\"i"
+        let frameText :: T.Text
+            frameText = "iframe >> internal:control=enter-frame >> internal:text=\"foo\"i"
         assertEqual "js contentFrame" frameText (parseLocator JavaScript "locator('iframe').contentFrame().getByText('foo')" "")
         assertEqual "js frameLocator" frameText (parseLocator JavaScript "frameLocator('iframe').getByText('foo')" "")
         assertEqual
