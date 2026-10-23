@@ -84,6 +84,14 @@ import UnliftIO.MVar
   , takeMVar
   )
 
+-- Official cases that stay skipped:
+--
+-- * "should throw for bad state": the state is checked on the client before
+--   any protocol message is sent (the TypeScript client's verifyLoadState
+--   throws "state: expected one of (load|domcontentloaded|networkidle|commit)").
+--   The Haskell LoadState is a closed sum, so the invalid string cannot be
+--   built, and there is no driver command to send it to.
+
 tests :: TestTree
 tests =
   testGroup
