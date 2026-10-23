@@ -57,8 +57,13 @@ import Playwright
   , HttpHeader (HttpHeader, httpHeaderName, httpHeaderValue)
   , HttpMethod (HttpMethod)
   , RequestFailure (requestFailureText)
+  , CookieName (CookieName)
+  , CookieValue (CookieValue)
   , UrlMatch (UrlMatchGlob)
+  , addCookies
   , armRequestFailed
+  , cookieForUrl
+  , pageContext
   , continueRoute
   , continueRouteWith
   , defaultContinueOptions
@@ -215,6 +220,22 @@ tests =
             _ <- goto page (urlFromText (prefix <> "/foo")) defaultGotoOptions
             seen <- readIORef requests
             assertEqual "method" (Just "POST") (methodOf "/empty.html" seen)
+    , testCase "should amend method and post data" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (recordingApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            route page (UrlMatchGlob "**/*") $ \handled ->
+              continueRouteWith
+                handled
+                defaultContinueOptions
+                  { continueMethod = Just (HttpMethod "POST")
+                  , continuePostData = Just "doggo"
+                  }
+            _ <- evaluateText page "() => fetch('/sleep.zzz', { method: 'GET' }).then(r => r.text())"
+            seen <- readIORef requests
+            assertEqual "method" (Just "POST") (methodOf "/sleep.zzz" seen)
+            assertEqual "body" (Just "doggo") (bodyOf "/sleep.zzz" seen)
     , testCase "should amend post data" $ do
         requests <- newIORef []
         withChromiumPage $ \page ->
@@ -225,6 +246,27 @@ tests =
             _ <- evaluateText page "() => fetch('/sleep.zzz', { method: 'POST', body: 'birdy' }).then(r => r.text())"
             seen <- readIORef requests
             assertEqual "body" (Just "doggo") (bodyOf "/sleep.zzz" seen)
+    , testCase "should delete header with undefined value" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (corsApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            route page (UrlMatchGlob "**/something") $ \handled -> do
+              headers <- requestHeaders =<< routeRequest handled
+              continueRouteWith
+                handled
+                defaultContinueOptions {continueHeaders = Just (filter (not . hasName "foo") headers)}
+            text <-
+              evaluateText
+                page
+                ( "async () => { const response = await fetch('"
+                    <> prefix
+                    <> "/something', { headers: { foo: 'a', bar: 'b' } }); return response.text(); }"
+                )
+            assertEqual "text" "done" text
+            seen <- readIORef requests
+            assertEqual "foo" Nothing (headerOf "/something" "foo" seen)
+            assertEqual "bar" (Just "b") (headerOf "/something" "bar" seen)
     , testCase "should amend utf8 post data" $ do
         requests <- newIORef []
         withChromiumPage $ \page ->
@@ -582,6 +624,19 @@ tests =
             _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
             assertEqual "server cookie" (Just "foo=bar") . headerOf "/empty.html" "cookie" =<< readIORef requests
             assertEqual "server custom" (Just "value") . headerOf "/empty.html" "custom" =<< readIORef requests
+    , testCase "continue with headers should send fresh cookie from the browser cookie store" $ do
+        requests <- newIORef []
+        withChromiumPage $ \page ->
+          withLocalApp (cookieApp requests) $ \prefix -> do
+            _ <- goto page (urlFromText (prefix <> "/set-cookie-v1")) defaultGotoOptions
+            assertEqual "document cookie" "foo=v1" =<< evaluateText page "() => document.cookie"
+            route page (UrlMatchGlob "**/empty.html") $ \handled -> do
+              -- The cookie store changes between interception and continuation.
+              addCookies (pageContext page) [cookieForUrl (urlFromText prefix) (CookieName "foo") (CookieValue "v2")]
+              headers <- requestHeaders =<< routeRequest handled
+              continueRouteWith handled defaultContinueOptions {continueHeaders = Just headers}
+            _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+            assertEqual "server cookie" (Just "foo=v2") . headerOf "/empty.html" "cookie" =<< readIORef requests
     , testCase "continue with headers should send fresh cookie after a redirect" $ do
         requests <- newIORef []
         withChromiumPage $ \page ->
