@@ -14,21 +14,30 @@ import Data.Text
   )
 import Playwright
   ( BoundingBox (BoundingBox)
+  , NewContextOptions (newContextDeviceScaleFactor)
+  , ScreenshotAnimations (ScreenshotAnimationsAllow, ScreenshotAnimationsDisabled)
+  , ScreenshotCaret (ScreenshotCaretHide, ScreenshotCaretInitial)
   , ScreenshotOptions
-      ( screenshotOptionsClip
+      ( screenshotOptionsAnimations
+      , screenshotOptionsCaret
+      , screenshotOptionsClip
       , screenshotOptionsFullPage
       , screenshotOptionsOmitBackground
       , screenshotOptionsPath
       , screenshotOptionsQuality
+      , screenshotOptionsScale
       , screenshotOptionsType
       )
+  , ScreenshotScale (ScreenshotScaleCss, ScreenshotScaleDevice)
   , ScreenshotType (ScreenshotJpeg, ScreenshotPng, ScreenshotWebp)
   , ViewportHeight (ViewportHeight)
   , ViewportSize (ViewportSize)
   , ViewportWidth (ViewportWidth)
   , cssPixelFromInt
   , defaultGotoOptions
+  , defaultNewContextOptions
   , defaultScreenshotOptions
+  , deviceScaleFactorFromInt
   , evaluate
   , goto
   , screenshot
@@ -41,6 +50,7 @@ import Playwright.Error
   )
 import Playwright.Harness
   ( withAssets
+  , withAssetsWith
   , assertBool
   , assertEqual
   , assertFailure
@@ -267,7 +277,43 @@ tests =
             saved <- liftIO (BS.readFile path)
             assertBool "jpeg signature" (jpegMagic `BS.isPrefixOf` image)
             assertEqual "saved bytes match returned bytes" image saved
+    , testCase "caret hide should return png bytes" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          image <- screenshot page defaultScreenshotOptions {screenshotOptionsCaret = Just ScreenshotCaretHide}
+          assertBool "png signature" (pngMagic `BS.isPrefixOf` image)
+    , testCase "caret initial should return png bytes" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          image <- screenshot page defaultScreenshotOptions {screenshotOptionsCaret = Just ScreenshotCaretInitial}
+          assertBool "png signature" (pngMagic `BS.isPrefixOf` image)
+    , testCase "animations disabled should return png bytes" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          image <- screenshot page defaultScreenshotOptions {screenshotOptionsAnimations = Just ScreenshotAnimationsDisabled}
+          assertBool "png signature" (pngMagic `BS.isPrefixOf` image)
+    , testCase "animations allow should return png bytes" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          image <- screenshot page defaultScreenshotOptions {screenshotOptionsAnimations = Just ScreenshotAnimationsAllow}
+          assertBool "png signature" (pngMagic `BS.isPrefixOf` image)
+    , testCase "scale css should ignore device scale factor" $
+        withAssetsWith dsf2Options $ \prefix page -> do
+          setViewportSize page (ViewportSize (ViewportWidth 300) (ViewportHeight 300))
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          image <- screenshot page defaultScreenshotOptions {screenshotOptionsScale = Just ScreenshotScaleCss}
+          assertEqual "css scale size" (300, 300) (pngSize image)
+    , testCase "scale device should apply device scale factor" $
+        withAssetsWith dsf2Options $ \prefix page -> do
+          setViewportSize page (ViewportSize (ViewportWidth 300) (ViewportHeight 300))
+          _ <- goto page (urlFromText (prefix <> "/grid.html")) defaultGotoOptions
+          image <- screenshot page defaultScreenshotOptions {screenshotOptionsScale = Just ScreenshotScaleDevice}
+          assertEqual "device scale size" (600, 600) (pngSize image)
     ]
+
+dsf2Options :: NewContextOptions
+dsf2Options =
+  defaultNewContextOptions {newContextDeviceScaleFactor = Just (deviceScaleFactorFromInt 2)}
 
 withClip :: Int -> Int -> Int -> Int -> ScreenshotOptions
 withClip x y width height =

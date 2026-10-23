@@ -228,11 +228,26 @@ import Playwright.Protocol
   , PageReloadResult (pageReloadResultResponse)
   , PageRequestGCResult
   , PageScreenshotParams
-      ( pageScreenshotParamsClip
+      ( pageScreenshotParamsAnimations
+      , pageScreenshotParamsCaret
+      , pageScreenshotParamsClip
       , pageScreenshotParamsFullPage
       , pageScreenshotParamsOmitBackground
       , pageScreenshotParamsQuality
+      , pageScreenshotParamsScale
       , pageScreenshotParamsType
+      )
+  , PageScreenshotParamsAnimations
+      ( PageScreenshotParamsAnimationsAllow
+      , PageScreenshotParamsAnimationsDisabled
+      )
+  , PageScreenshotParamsCaret
+      ( PageScreenshotParamsCaretHide
+      , PageScreenshotParamsCaretInitial
+      )
+  , PageScreenshotParamsScale
+      ( PageScreenshotParamsScaleCss
+      , PageScreenshotParamsScaleDevice
       )
   , PageScreenshotParamsType
       ( PageScreenshotParamsTypeJpeg
@@ -285,14 +300,29 @@ import Playwright.CssPixel
   ( CssPixel (cssPixelToScientific)
   )
 import Playwright.ScreenshotOptions
-  ( ScreenshotOptions
-      ( screenshotOptionsClip
+  ( ScreenshotAnimations
+      ( ScreenshotAnimationsAllow
+      , ScreenshotAnimationsDisabled
+      )
+  , ScreenshotCaret
+      ( ScreenshotCaretHide
+      , ScreenshotCaretInitial
+      )
+  , ScreenshotOptions
+      ( screenshotOptionsAnimations
+      , screenshotOptionsCaret
+      , screenshotOptionsClip
       , screenshotOptionsFullPage
       , screenshotOptionsOmitBackground
       , screenshotOptionsPath
       , screenshotOptionsQuality
+      , screenshotOptionsScale
       , screenshotOptionsTimeout
       , screenshotOptionsType
+      )
+  , ScreenshotScale
+      ( ScreenshotScaleCss
+      , ScreenshotScaleDevice
       )
   , ScreenshotType
       ( ScreenshotJpeg
@@ -518,6 +548,9 @@ screenshot page opts = do
         , pageScreenshotParamsQuality = screenshotOptionsQuality opts
         , pageScreenshotParamsOmitBackground = screenshotOptionsOmitBackground opts
         , pageScreenshotParamsClip = screenshotClipParam <$> screenshotOptionsClip opts
+        , pageScreenshotParamsCaret = screenshotCaretParam <$> screenshotOptionsCaret opts
+        , pageScreenshotParamsAnimations = screenshotAnimationsParam <$> screenshotOptionsAnimations opts
+        , pageScreenshotParamsScale = screenshotScaleParam <$> screenshotOptionsScale opts
         }
   let bytes = protocolBinaryToByteString (pageScreenshotResultBinary result)
   mapM_ (\filePath -> liftIO (writeScreenshotFile filePath bytes)) (screenshotOptionsPath opts)
@@ -572,6 +605,24 @@ screenshot page opts = do
           PageScreenshotParamsTypeJpeg
         ScreenshotWebp ->
           PageScreenshotParamsTypeWebp
+    screenshotCaretParam screenshotCaret =
+      case screenshotCaret of
+        ScreenshotCaretHide ->
+          PageScreenshotParamsCaretHide
+        ScreenshotCaretInitial ->
+          PageScreenshotParamsCaretInitial
+    screenshotAnimationsParam screenshotAnimations =
+      case screenshotAnimations of
+        ScreenshotAnimationsDisabled ->
+          PageScreenshotParamsAnimationsDisabled
+        ScreenshotAnimationsAllow ->
+          PageScreenshotParamsAnimationsAllow
+    screenshotScaleParam screenshotScale =
+      case screenshotScale of
+        ScreenshotScaleCss ->
+          PageScreenshotParamsScaleCss
+        ScreenshotScaleDevice ->
+          PageScreenshotParamsScaleDevice
 
 pdf :: Page -> Playwright ByteString
 pdf page =

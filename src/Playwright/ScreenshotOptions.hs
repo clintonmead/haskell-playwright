@@ -1,6 +1,9 @@
 module Playwright.ScreenshotOptions
   ( ScreenshotOptions (..)
   , ScreenshotType (..)
+  , ScreenshotCaret (..)
+  , ScreenshotAnimations (..)
+  , ScreenshotScale (..)
   , defaultScreenshotOptions
   ) where
 
@@ -47,6 +50,9 @@ data ScreenshotOptions = ScreenshotOptions
   , screenshotOptionsOmitBackground :: Maybe Bool
   , screenshotOptionsClip :: Maybe BoundingBox
   , screenshotOptionsPath :: Maybe FilePath
+  , screenshotOptionsCaret :: Maybe ScreenshotCaret
+  , screenshotOptionsAnimations :: Maybe ScreenshotAnimations
+  , screenshotOptionsScale :: Maybe ScreenshotScale
   }
   deriving stock (Eq, Show)
   deriving (FromJSON, ToJSON) via (Autodocodec ScreenshotOptions)
@@ -55,6 +61,21 @@ data ScreenshotType
   = ScreenshotPng
   | ScreenshotJpeg
   | ScreenshotWebp
+  deriving stock (Eq, Show)
+
+data ScreenshotCaret
+  = ScreenshotCaretHide
+  | ScreenshotCaretInitial
+  deriving stock (Eq, Show)
+
+data ScreenshotAnimations
+  = ScreenshotAnimationsDisabled
+  | ScreenshotAnimationsAllow
+  deriving stock (Eq, Show)
+
+data ScreenshotScale
+  = ScreenshotScaleCss
+  | ScreenshotScaleDevice
   deriving stock (Eq, Show)
 
 defaultScreenshotOptions :: ScreenshotOptions
@@ -67,6 +88,9 @@ defaultScreenshotOptions =
     , screenshotOptionsOmitBackground = Nothing
     , screenshotOptionsClip = Nothing
     , screenshotOptionsPath = Nothing
+    , screenshotOptionsCaret = Nothing
+    , screenshotOptionsAnimations = Nothing
+    , screenshotOptionsScale = Nothing
     }
 
 instance HasCodec ScreenshotOptions where
@@ -80,6 +104,9 @@ instance HasCodec ScreenshotOptions where
         <*> optionalField' "omitBackground" .= screenshotOptionsOmitBackground
         <*> optionalFieldWith' "clip" boundingBoxCodec .= screenshotOptionsClip
         <*> optionalFieldWith' "path" filePathCodec .= screenshotOptionsPath
+        <*> optionalField' "caret" .= screenshotOptionsCaret
+        <*> optionalField' "animations" .= screenshotOptionsAnimations
+        <*> optionalField' "scale" .= screenshotOptionsScale
 
 filePathCodec :: JSONCodec FilePath
 filePathCodec =
@@ -123,3 +150,69 @@ screenshotTypeToText screenshotType =
       "jpeg"
     ScreenshotWebp ->
       "webp"
+
+instance HasCodec ScreenshotCaret where
+  codec =
+    bimapCodec screenshotCaretFromText screenshotCaretToText (codec :: JSONCodec Text)
+
+screenshotCaretFromText :: Text -> Either String ScreenshotCaret
+screenshotCaretFromText name =
+  case name of
+    "hide" ->
+      Right ScreenshotCaretHide
+    "initial" ->
+      Right ScreenshotCaretInitial
+    _ ->
+      Left ("unknown screenshot caret: " <> show name)
+
+screenshotCaretToText :: ScreenshotCaret -> Text
+screenshotCaretToText screenshotCaret =
+  case screenshotCaret of
+    ScreenshotCaretHide ->
+      "hide"
+    ScreenshotCaretInitial ->
+      "initial"
+
+instance HasCodec ScreenshotAnimations where
+  codec =
+    bimapCodec screenshotAnimationsFromText screenshotAnimationsToText (codec :: JSONCodec Text)
+
+screenshotAnimationsFromText :: Text -> Either String ScreenshotAnimations
+screenshotAnimationsFromText name =
+  case name of
+    "disabled" ->
+      Right ScreenshotAnimationsDisabled
+    "allow" ->
+      Right ScreenshotAnimationsAllow
+    _ ->
+      Left ("unknown screenshot animations: " <> show name)
+
+screenshotAnimationsToText :: ScreenshotAnimations -> Text
+screenshotAnimationsToText screenshotAnimations =
+  case screenshotAnimations of
+    ScreenshotAnimationsDisabled ->
+      "disabled"
+    ScreenshotAnimationsAllow ->
+      "allow"
+
+instance HasCodec ScreenshotScale where
+  codec =
+    bimapCodec screenshotScaleFromText screenshotScaleToText (codec :: JSONCodec Text)
+
+screenshotScaleFromText :: Text -> Either String ScreenshotScale
+screenshotScaleFromText name =
+  case name of
+    "css" ->
+      Right ScreenshotScaleCss
+    "device" ->
+      Right ScreenshotScaleDevice
+    _ ->
+      Left ("unknown screenshot scale: " <> show name)
+
+screenshotScaleToText :: ScreenshotScale -> Text
+screenshotScaleToText screenshotScale =
+  case screenshotScale of
+    ScreenshotScaleCss ->
+      "css"
+    ScreenshotScaleDevice ->
+      "device"
