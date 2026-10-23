@@ -189,6 +189,7 @@ import Playwright.SlowMoSpec qualified as SlowMoSpec
 import Playwright.TapSpec qualified as TapSpec
 import Playwright.TransportSpec qualified as TransportSpec
 import Playwright.UnrouteBehaviorSpec qualified as UnrouteBehaviorSpec
+import Playwright.VideoSpec qualified as VideoSpec
 import Playwright.WebSocketSpec qualified as WebSocketSpec
 import Playwright.WheelSpec qualified as WheelSpec
 import Playwright.WorkersSpec qualified as WorkersSpec
@@ -389,6 +390,7 @@ main =
         , SlowMoSpec.tests
         , TapSpec.tests
         , UnrouteBehaviorSpec.tests
+        , VideoSpec.tests
         , WebSocketSpec.tests
         , WheelSpec.tests
         , WorkersSpec.tests

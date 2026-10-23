@@ -136,6 +136,7 @@ library
       Playwright.Protocol
       Playwright.ProxySettings
       Playwright.RaceTimeout
+      Playwright.RecordVideo
       Playwright.ReducedMotion
       Playwright.RegisterSelectorOptions
       Playwright.RemoteAddr
@@ -186,6 +187,7 @@ library
       Playwright.Url
       Playwright.UrlMatch
       Playwright.UserAgent
+      Playwright.Video
       Playwright.ViewportSize
       Playwright.WaitForNavigationOptions
       Playwright.WaitForState
@@ -428,6 +430,7 @@ test-suite playwright-test
       Playwright.TransportSpec
       Playwright.UnrouteBehaviorSpec
       Playwright.UrlMatchSpec
+      Playwright.VideoSpec
       Playwright.WebSocketSpec
       Playwright.WheelSpec
       Playwright.WorkersSpec
