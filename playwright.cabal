@@ -338,6 +338,7 @@ test-suite playwright-test
       Playwright.JsHandleJsonValueSpec
       Playwright.JsHandlePropertiesSpec
       Playwright.JsHandleToStringSpec
+      Playwright.LauncherSpec
       Playwright.LocatorClickSpec
       Playwright.LocatorConvenienceSpec
       Playwright.LocatorDispatchEventTouchSpec

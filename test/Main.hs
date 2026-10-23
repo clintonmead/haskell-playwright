@@ -5,6 +5,7 @@ module Main
 import Playwright.BeforeunloadSpec qualified as BeforeunloadSpec
 import Playwright.BfcacheSpec qualified as BfcacheSpec
 import Playwright.BrowserServerSpec qualified as BrowserServerSpec
+import Playwright.LauncherSpec qualified as LauncherSpec
 import Playwright.BrowserSpec qualified as BrowserSpec
 import Playwright.BrowserContextAddCookiesSpec qualified as BrowserContextAddCookiesSpec
 import Playwright.BrowserContextAddInitScriptSpec qualified as BrowserContextAddInitScriptSpec
@@ -221,6 +222,7 @@ main =
         , BeforeunloadSpec.tests
         , BfcacheSpec.tests
         , BrowserServerSpec.tests
+        , LauncherSpec.tests
         , BrowserSpec.tests
         , BrowserContextAddCookiesSpec.tests
         , BrowserContextAddInitScriptSpec.tests
