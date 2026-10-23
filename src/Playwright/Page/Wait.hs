@@ -19,6 +19,7 @@ module Playwright.Page.Wait
   , waitForFrameDetached
   , waitForFrameNavigated
   , waitForNavigatedFrame
+  , waitForExpression
   , waitForFunction
   , waitForFunctionOnFrame
   , waitForFunctionPolling
@@ -133,7 +134,8 @@ import Playwright.Frame
   , mainFrameGuid
   )
 import Playwright.Frame.Wait
-  ( waitForFunctionFrame
+  ( waitForExpressionFrame
+  , waitForFunctionFrame
   , waitForLoadStateFrame
   , waitForSelectorFrame
   , waitForSelectorHandleFrame
@@ -407,6 +409,12 @@ waitForFunctionPolling page expression timeout interval =
 waitForFunctionOnFrame :: Frame -> Text -> Playwright JsHandle
 waitForFunctionOnFrame frame expression = do
   waitForFunctionFrame frame expression undefinedArgument defaultTimeout Nothing
+
+-- The string form of upstream waitForFunction: the text is evaluated as an expression.
+waitForExpression :: Page -> Text -> Playwright JsHandle
+waitForExpression page expression = do
+  timeout <- pageActionTimeout page
+  waitForExpressionFrame (pageMainFrame page) expression timeout
 
 waitForURL :: Page -> UrlMatch -> Playwright ()
 waitForURL page glob = do

@@ -1,5 +1,6 @@
 module Playwright.Frame.Wait
-  ( waitForFunctionFrame
+  ( waitForExpressionFrame
+  , waitForFunctionFrame
   , waitForFunctionSelectorFrame
   , waitForLoadStateFrame
   , waitForSelectorFrame
@@ -76,6 +77,7 @@ import Playwright.Selector
   )
 import Playwright.SerializedArgument
   ( SerializedArgument
+  , undefinedArgument
   )
 import Playwright.Timeout
   ( Timeout
@@ -129,14 +131,23 @@ waitForTimeoutFrame frame timeout =
     (mkFrameWaitForTimeoutParams timeout)
 
 waitForFunctionFrame :: Frame -> Text -> SerializedArgument -> Timeout -> Maybe Scientific -> Playwright JsHandle
-waitForFunctionFrame frame expression arg timeout polling = do
+waitForFunctionFrame frame expression arg timeout polling =
+  waitForPredicateFrame frame expression arg timeout polling (Just True)
+
+-- A string predicate is an expression, not a function: the driver evaluates it as written.
+waitForExpressionFrame :: Frame -> Text -> Timeout -> Playwright JsHandle
+waitForExpressionFrame frame expression timeout =
+  waitForPredicateFrame frame expression undefinedArgument timeout Nothing Nothing
+
+waitForPredicateFrame :: Frame -> Text -> SerializedArgument -> Timeout -> Maybe Scientific -> Maybe Bool -> Playwright JsHandle
+waitForPredicateFrame frame expression arg timeout polling isFunction = do
   result <-
     frameSendWithTimeout
       frame
       "waitForFunction"
       timeout
       (mkFrameWaitForFunctionParams arg expression)
-        { frameWaitForFunctionParamsIsFunction = Just True
+        { frameWaitForFunctionParamsIsFunction = isFunction
         , frameWaitForFunctionParamsPollingInterval = polling
         }
   case frameWaitForFunctionResultHandle result of

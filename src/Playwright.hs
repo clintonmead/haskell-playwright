@@ -934,6 +934,7 @@ module Playwright
   , waitForElementStateWith
   , waitForFileChooser
   , waitForFileChooserWith
+  , waitForExpression
   , waitForFunction
   , waitForFunctionOnFrame
   , waitForFunctionPolling
@@ -1949,6 +1950,7 @@ import Playwright.Page.Wait
   , waitForConsole
   , waitForConsoleWhere
   , waitForDialog
+  , waitForExpression
   , waitForFunction
   , waitForFunctionOnFrame
   , waitForFunctionPolling
