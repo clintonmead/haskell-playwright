@@ -41,12 +41,14 @@ import Playwright
   , evalOnSelectorText
   , evaluate
   , evaluateOnLocator
+  , frames
   , fulfillRoute
   , goto
   , innerHtml
   , innerText
   , innerTextHandle
   , locator
+  , locatorCount
   , querySelector
   , querySelectorAll
   , querySelectorAllHandle
@@ -54,10 +56,12 @@ import Playwright
   , route
   , selectorFromText
   , setContent
+  , textContent
   , textContentHandle
   , urlFromText
   , waitFor
   , waitForSelector
+  , waitForSelectorHandleOnFrame
   , waitForSelectorOnHandle
   , waitForTimeout
   , Playwright
@@ -73,6 +77,7 @@ import Playwright.Harness
   , requireHandle
   , withAssets
   , withChromiumPage
+  , assertBool
   , assertEqual
   , assertFailure
   )
@@ -325,7 +330,113 @@ tests =
             button :: Locator
             button = locator page (selectorFromText "div >> internal:control=enter-frame >> button")
           assertProtocolContainsAll ["<div></div>", "<iframe> was expected"] (waitFor button WaitForVisible)
+    , testCase "should match in a descendant frame" $
+        withAssets $ \prefix page -> do
+          routeIframe page
+          _ <- gotoEmpty prefix page
+          let
+            divLocator :: Locator
+            divLocator = locator page (selectorFromText "internal:control=any-frame >> div")
+          waitFor divLocator WaitForVisible
+          assertEqual "count" 1 =<< locatorCount divLocator
+          html <- innerHtml divLocator
+          assertBool "innerHTML" ("<button>Hello iframe</button>" `isInfixOf` html)
+    , testCase "should match in a deeply nested frame" $
+        withAssets $ \prefix page -> do
+          routeIframe page
+          _ <- gotoEmpty prefix page
+          let
+            button :: Locator
+            button = locator page (selectorFromText "internal:control=any-frame >> button[tag=\"iframe2\"]")
+          waitFor button WaitForVisible
+          assertEqual "count" 1 =<< locatorCount button
+          assertEqual "text" (Just "Hello nested iframe") =<< textContent button
+    , testCase "should not match a chain across frames" $
+        withAssets $ \prefix page -> do
+          routeIframe page
+          _ <- gotoEmpty prefix page
+          assertEqual "nested count" 0
+            =<< locatorCount (locator page (selectorFromText "internal:control=any-frame >> div >> button[tag=\"iframe2\"]"))
+          let
+            button :: Locator
+            button = locator page (selectorFromText "internal:control=any-frame >> div >> button")
+          waitFor button WaitForVisible
+          assertEqual "text" "Hello iframe" =<< innerText button
+    , testCase "should match multiple elements" $
+        withAssets $ \prefix page -> do
+          routeBody page "**/empty.html" "<iframe src=\"a.html\"></iframe><iframe src=\"b.html\"></iframe>"
+          routeBody page "**/a.html" "<div>one</div>"
+          routeBody page "**/b.html" "<span>two</span><span>three</span>"
+          _ <- gotoEmpty prefix page
+          assertEqual "texts" ["two", "three"]
+            =<< evalOnSelectorAllTexts
+              page
+              (selectorFromText "internal:control=any-frame >> span")
+              "els => els.map(e => e.textContent)"
+    , testCase "should throw when matching elements in multiple frames" $
+        withAssets $ \prefix page -> do
+          routeBody page "**/empty.html" "<iframe src=\"a.html\"></iframe><iframe src=\"b.html\"></iframe>"
+          routeBody page "**/a.html" "<div>one</div>"
+          routeBody page "**/b.html" "<div>two</div>"
+          _ <- gotoEmpty prefix page
+          allFrames <- frames page
+          assertEqual "frames" 3 (length allFrames)
+          forM_ (drop 1 allFrames) $ \frame ->
+            waitForSelectorHandleOnFrame frame (selectorFromText "div") WaitForVisible
+          assertProtocolContains
+            "frameLocator() matched elements in multiple frames"
+            ( innerHtml
+                (locator page (selectorFromText "internal:control=any-frame >> div"))
+            )
+    , testCase "should not allow any-frame in the middle of a selector" $
+        withAssets $ \prefix page -> do
+          routeIframe page
+          _ <- gotoEmpty prefix page
+          assertProtocolContains
+            "\"any-frame\" is only allowed as the first selector token"
+            ( waitFor
+                (locator page (selectorFromText "iframe >> internal:control=any-frame >> div"))
+                WaitForVisible
+            )
+    , testCase "should allow entering frames from any frame" $
+        withAssets $ \prefix page -> do
+          routeIframe page
+          _ <- gotoEmpty prefix page
+          let
+            button :: Locator
+            button =
+              locator
+                page
+                ( selectorFromText
+                    "internal:control=any-frame >> iframe[src=\"iframe-2.html\"] >> internal:control=enter-frame >> button"
+                )
+          waitFor button WaitForVisible
+          assertEqual "text" "Hello nested iframe" =<< innerText button
+    , testCase "should not allow any-frame after entering a frame" $
+        withChromiumPage $ \page ->
+          assertProtocolContains
+            "\"any-frame\" is only allowed as the first selector token"
+            ( locatorCount
+                (locator page (selectorFromText "iframe >> internal:control=enter-frame >> internal:control=any-frame >> button"))
+            )
+    , testCase "should not allow dangling enter-frame after any-frame" $
+        withChromiumPage $ \page ->
+          assertProtocolContains
+            "Selector cannot end with entering frame"
+            ( locatorCount
+                (locator page (selectorFromText "internal:control=any-frame >> iframe >> internal:control=enter-frame"))
+            )
     ]
+
+routeBody :: Page -> Text -> Text -> Playwright ()
+routeBody page glob body =
+  route page (UrlMatchGlob glob) $ \handled ->
+    fulfillRoute
+      handled
+      defaultFulfillOptions
+        { fulfillContentType = Just (ContentType "text/html")
+        , fulfillBody = Just (FulfillText body)
+        }
 
 iframeButton :: Text
 iframeButton =
@@ -377,7 +488,7 @@ routeIframe page = do
       handled
       defaultFulfillOptions
         { fulfillContentType = Just (ContentType "text/html")
-        , fulfillBody = Just (FulfillText "<html><button>Hello nested iframe</button></html>")
+        , fulfillBody = Just (FulfillText "<html><button tag=\"iframe2\">Hello nested iframe</button></html>")
         }
 
 reattachNested :: Page -> Playwright ()
