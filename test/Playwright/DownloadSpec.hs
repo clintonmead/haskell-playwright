@@ -16,8 +16,12 @@ import Control.Monad.IO.Class
   ( liftIO
   )
 import UnliftIO.Async
-  ( wait
+  ( async
+  , wait
   , withAsync
+  )
+import UnliftIO.Exception
+  ( try
   )
 import UnliftIO.Directory
   ( doesFileExist
@@ -63,7 +67,11 @@ import Playwright
   , ClickOptions (clickOptionsModifiers)
   , Download
   , Exactness (Inexact)
+  , FulfillOptions (fulfillHeaders, fulfillResponse)
   , Frame
+  , HeaderName (HeaderName)
+  , HeaderValue (HeaderValue)
+  , HttpHeader (HttpHeader)
   , KeyboardModifier (KeyboardModifierAlt)
   , NewContextOptions (newContextAcceptDownloads)
   , Page
@@ -77,6 +85,7 @@ import Playwright
   , contextRoute
   , currentUrl
   , defaultClickOptions
+  , defaultFulfillOptions
   , defaultGotoOptions
   , defaultNewContextOptions
   , downloadCancel
@@ -88,6 +97,7 @@ import Playwright
   , downloadSuggestedFilename
   , downloadUrl
   , frames
+  , fulfillRoute
   , getByText
   , goto
   , locatorOnFrame
@@ -95,6 +105,7 @@ import Playwright
   , pageContext
   , pagesEqual
   , route
+  , routeFetch
   , selectorFromText
   , setContent
   , suggestedFilenameToText
@@ -102,6 +113,10 @@ import Playwright
   , urlFromText
   , urlToText
   , waitForDownload
+  )
+import Playwright.Error
+  ( PlaywrightError (ProtocolRpc)
+  , ProtocolFailure (protocolFailureMessage)
   )
 import Playwright.Harness
   ( assertProtocolContains
@@ -398,7 +413,98 @@ tests =
             path <- downloadPath download
             saved <- liftIO (BS.readFile path)
             assertEqual "pdf bytes" pdf saved
+    , testCase "should close the context without awaiting the download" $
+        withDownloadServer $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty")) defaultGotoOptions
+          setContent page ("<a href=\"" <> prefix <> "/downloadWithDelay\">download</a>")
+          withSystemTempDirectory "pw-save-as" $ \dir ->
+            withAsync (waitForDownload page) $ \handle -> do
+              click (locate page "a")
+              download <- wait handle
+              pathResult <- async (protocolError (downloadPath download))
+              saveResult <- async (protocolError (downloadSaveAs download (dir <> "/download.txt")))
+              closeContext (pageContext page)
+              pathError <- wait pathResult
+              saveError <- wait saveResult
+              assertEqual "path" True (cancelledOrClosed pathError)
+              assertEqual "saveAs" True (cancelledOrClosed saveError)
+    , testCase "should download large binary.zip" $ do
+        withApplication (pure (binaryApp largeBinary)) $ \port ->
+          withAcceptedPage $ \page -> do
+            let
+              prefix = "http://127.0.0.1:" <> pack (show port)
+            _ <- goto page (urlFromText (prefix <> "/empty")) defaultGotoOptions
+            download <-
+              clickHrefWith
+                page
+                ("<a href=\"" <> prefix <> "/binary.zip\" download=\"binary.zip\">download</a>")
+            path <- downloadPath download
+            saved <- liftIO (BS.readFile path)
+            assertEqual "size" (BS.length largeBinary) (BS.length saved)
+            assertEqual "bytes" True (saved == largeBinary)
+    , testCase "should be able to download a PDF file via response interception" $ do
+        pdf <- readTestAsset "empty.pdf"
+        withApplication (pure (pdfApp pdf)) $ \port ->
+          withAcceptedPage $ \page -> do
+            let
+              base = "http://127.0.0.1:" <> pack (show port)
+            _ <- goto page (urlFromText (base <> "/empty")) defaultGotoOptions
+            route page (UrlMatchGlob "**/empty.pdf") $ \handled -> do
+              response <- routeFetch handled
+              fulfillRoute
+                handled
+                defaultFulfillOptions
+                  { fulfillResponse = Just response
+                  , fulfillHeaders = [HttpHeader (HeaderName "Content-Disposition") (HeaderValue "attachment")]
+                  }
+            download <-
+              clickHrefWith
+                page
+                ("<a href=\"" <> base <> "/empty.pdf\">open</a>")
+            path <- downloadPath download
+            saved <- liftIO (BS.readFile path)
+            assertEqual "pdf bytes" pdf saved
     ]
+
+-- | Runs a Playwright action and returns the protocol error message when it fails with one.
+protocolError :: Playwright a -> Playwright (Maybe Text)
+protocolError action = do
+  result <- try action
+  pure $ case result of
+    Left (ProtocolRpc failure) ->
+      Just (protocolFailureMessage failure)
+    Left _ ->
+      Nothing
+    Right _ ->
+      Nothing
+
+cancelledOrClosed :: Maybe Text -> Bool
+cancelledOrClosed message =
+  case message of
+    Just text ->
+      "canceled" `isInfixOf` text || "closed" `isInfixOf` text
+    Nothing ->
+      False
+
+-- | A deterministic 1 MiB payload for the large download case.
+largeBinary :: ByteString
+largeBinary =
+  BS.pack [fromIntegral (index `mod` 251) | index <- [0 .. 1048575 :: Int]]
+
+-- | Serves the given bytes at /binary.zip as an attachment, and an empty page elsewhere.
+binaryApp :: ByteString -> Application
+binaryApp content request respond =
+  case pathInfo request of
+    ["binary.zip"] ->
+      respond $
+        responseLBS
+          status200
+          [ (hContentType, "application/zip")
+          , ("Content-Disposition", "attachment")
+          ]
+          (LBS.fromStrict content)
+    _ ->
+      respond (responseLBS status200 [(hContentType, "text/html")] LBS8.empty)
 
 withAcceptedPage :: (Page -> Playwright a) -> IO a
 withAcceptedPage action =
