@@ -362,6 +362,21 @@ tests =
           assertProtocolContains
             "navigation"
             (evaluate page "() => { location.reload(); return new Promise(() => {}); }")
+    , testCase "should throw a nice error after a navigation" $
+        withChromiumPage $ \page -> do
+          pending <- async (evaluate page "() => new Promise(f => window.__resolve = f)")
+          -- The page sets __resolve when the pending evaluate runs, so this is the barrier
+          -- that keeps the reload from overtaking it.
+          let waitForResolver :: Int -> Playwright ()
+              waitForResolver 0 = assertFailure "the pending evaluate never reached the page"
+              waitForResolver remaining = do
+                ready <- evaluateBool page "() => typeof window.__resolve === 'function'"
+                if ready
+                  then pure ()
+                  else waitForResolver (remaining - 1)
+          waitForResolver 100
+          _ <- evaluate page "() => { window.location.reload(); setTimeout(() => window.__resolve(42), 1000); }"
+          assertProtocolContains "navigation" (wait pending)
     , testCase "should not throw an error when evaluation does a navigation" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/one-style.html")) defaultGotoOptions

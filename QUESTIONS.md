@@ -547,11 +547,9 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 
 **Question:** Upstream "should throw a nice error after a navigation" (`tests/page/page-evaluate.spec.ts`, around line 542) starts an evaluate, navigates the page, and expects the first evaluate to fail with a nice error. Does the case need the first evaluate to reach the page before the navigation?
 
-**Guess taken:** Yes. The error only shows up when the first evaluate is already running in the page when the reload starts. Haskell has no ordering barrier between an in-flight evaluate and a later `goto` or `reload` on the same page, so the case is left open in `progress/FUNCTIONALITY_TODO.md`.
+**Guess taken:** Yes. The error only shows up when the first evaluate is already running in the page when the reload starts.
 
-**Why not ported:** Sending the navigation right after forking the evaluate would race. The case could pass or fail depending on timing, and that would not test the error.
-
-**To change:** Add a page-side barrier, for example a script that sets a flag once the first evaluate has started, then wait on that flag before the navigation. The case can then be ported as written.
+**Resolution:** Ported in `test/Playwright/PageEvaluateSpec.hs`. The pending evaluate is forked with `async`. The test then polls a page-side check, `typeof window.__resolve === 'function'`, which the pending evaluate sets as it runs. The poll is bounded at 100 tries and fails if the flag never appears. Only after that does the reload evaluate run, and `wait` on the pending evaluate is checked for `navigation`. The case passes (80 of 80 in the page-evaluate group).
 
 ## Handle preview cases (elementhandle-convenience)
 
