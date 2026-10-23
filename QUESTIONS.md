@@ -4,6 +4,7 @@ Decisions made without waiting for an answer. Each entry gives the question, the
 
 Each line below links to the full entry in [progress/QUESTIONS-ARCHIVE.md](progress/QUESTIONS-ARCHIVE.md). Status is `resolved` or `guess in place, no answer yet`.
 
+-. Logger: "should log context-level" asserts `locator.click`, not `page.click` - Haskell has no `page.click`, so the logger spec wraps `Locator.click` (named `locator.click`) and the case asserts that name. Guess in place, no answer yet. To change it, add a `page.click` wrapper and assert on that instead.
 0. [Expect matchers surface only the driver error, not errorDetails](progress/QUESTIONS-ARCHIVE.md#q-26) - guess in place, no answer yet
 1. [backlog: HEAD does not build (15 missing exports), and many slices are uncommitted](progress/QUESTIONS-ARCHIVE.md#q-1) - committed as 8f8310d (option a); the user asked for the commit
 2. [page-network-request: gaps left unported, and the event-source server omits keep-alive](progress/QUESTIONS-ARCHIVE.md#q-2) - guess in place, no answer yet

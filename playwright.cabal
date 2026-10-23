@@ -23,6 +23,7 @@ library
       Playwright
       Playwright.AcceptDownloads
       Playwright.AddLocatorHandlerOptions
+      Playwright.ApiLog
       Playwright.APIRequest
       Playwright.APIRequestContext
       Playwright.APIResponse
@@ -130,6 +131,7 @@ library
       Playwright.Locator
       Playwright.LocatorGenerator
       Playwright.LocatorHandler
+      Playwright.Logger
       Playwright.MediaType
       Playwright.MethodName
       Playwright.MimeType
@@ -380,6 +382,7 @@ test-suite playwright-test
       Playwright.LocatorQuerySpec
       Playwright.LocatorSpec
       Playwright.LocatorWaitForFunctionSpec
+      Playwright.LoggerSpec
       Playwright.OopifSpec
       Playwright.PageAddInitScriptCallbackSpec
       Playwright.PageAddInitScriptSpec
