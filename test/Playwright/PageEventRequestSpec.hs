@@ -392,6 +392,9 @@ tests =
             interceptRaceTest (prefix <> "/empty.html") page
     , localOption (mkTimeout 120000000) $
         testCase "should return last requests" lastRequestsTest
+    -- Skipped: "should finish 204 request". Upstream marks it `fixme` on Chromium, and this
+    -- suite runs only Chromium.
+    -- "should finish 204 request"
     ]
 
 lastRequestsTest :: IO ()
