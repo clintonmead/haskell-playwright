@@ -6,6 +6,16 @@ module Playwright
   , bindBrowserWith
   , defaultBrowserServerOptions
   , unbindBrowser
+  , LaunchedServer
+  , LaunchServerError (LaunchServerError)
+  , LaunchServerOptions (LaunchServerOptions, launchServerHost, launchServerPort, launchServerWsPath, launchServerExtra)
+  , closeLaunchedServer
+  , defaultLaunchServerOptions
+  , killLaunchedServer
+  , launchServer
+  , launchedServerEndpoint
+  , launchedServerPid
+  , waitLaunchedServer
   , BrowserContext (..)
   , BrowserName (..)
   , BrowserType (..)
@@ -1093,6 +1103,18 @@ import Playwright.BindingName
   )
 import Playwright.BoundingBox
   ( BoundingBox (BoundingBox, boundingBoxHeight, boundingBoxWidth, boundingBoxX, boundingBoxY)
+  )
+import Playwright.LaunchServer
+  ( LaunchedServer
+  , LaunchServerError (LaunchServerError)
+  , LaunchServerOptions (LaunchServerOptions, launchServerHost, launchServerPort, launchServerWsPath, launchServerExtra)
+  , closeLaunchedServer
+  , defaultLaunchServerOptions
+  , killLaunchedServer
+  , launchServer
+  , launchedServerEndpoint
+  , launchedServerPid
+  , waitLaunchedServer
   )
 import Playwright.BrowserServer
   ( BrowserServer (BrowserServer, browserServerEndpoint)
