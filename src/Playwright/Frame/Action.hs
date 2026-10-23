@@ -27,8 +27,12 @@ module Playwright.Frame.Action
   , dragAndDropFrameWith
   , dropFrame
   , setInputFilesFrame
+  , setInputFilesFramePaths
   ) where
 
+import Control.Monad.IO.Class
+  ( liftIO
+  )
 import Playwright.Monad
   ( Playwright
   )
@@ -71,6 +75,7 @@ import Playwright.Frame
   )
 import Playwright.InputFile
   ( InputFile (inputFileBytes, inputFileName)
+  , resolveInputFilePaths
   )
 import Playwright.InputFileName
   ( inputFileNameToText
@@ -136,7 +141,7 @@ import Playwright.Protocol
   , FrameSelectOptionParams (frameSelectOptionParamsElements, frameSelectOptionParamsForce, frameSelectOptionParamsOptions, frameSelectOptionParamsStrict)
   , FrameSelectOptionParamsOptions (frameSelectOptionParamsOptionsIndex, frameSelectOptionParamsOptionsLabel, frameSelectOptionParamsOptionsValue, frameSelectOptionParamsOptionsValueOrLabel)
   , FrameSelectOptionResult (frameSelectOptionResultValues)
-  , FrameSetInputFilesParams (frameSetInputFilesParamsPayloads, frameSetInputFilesParamsStrict)
+  , FrameSetInputFilesParams (frameSetInputFilesParamsLocalDirectory, frameSetInputFilesParamsLocalPaths, frameSetInputFilesParamsPayloads, frameSetInputFilesParamsStrict)
   , FrameSetInputFilesParamsPayloads
   , FrameSetInputFilesResult
   , FrameTapParams (frameTapParamsForce, frameTapParamsModifiers, frameTapParamsPosition, frameTapParamsStrict, frameTapParamsTrial)
@@ -565,6 +570,21 @@ setInputFilesFrame frame selector files timeout =
     (mkFrameSetInputFilesParams selector)
       { frameSetInputFilesParamsStrict = Just True
       , frameSetInputFilesParamsPayloads = Just (fmap toPayload files)
+      }
+
+-- | Sets files from host paths. A single directory uploads its whole tree,
+-- as the upstream client does for a webkitdirectory input.
+setInputFilesFramePaths :: Frame -> Selector -> [FilePath] -> Timeout -> Playwright ()
+setInputFilesFramePaths frame selector paths timeout = do
+  (localPaths, localDirectory) <- liftIO (resolveInputFilePaths paths)
+  frameSendTimed_ @FrameSetInputFilesResult
+    frame
+    "setInputFiles"
+    timeout
+    (mkFrameSetInputFilesParams selector)
+      { frameSetInputFilesParamsStrict = Just True
+      , frameSetInputFilesParamsLocalPaths = if null localPaths then Nothing else Just localPaths
+      , frameSetInputFilesParamsLocalDirectory = localDirectory
       }
 
 toPayload :: InputFile -> FrameSetInputFilesParamsPayloads

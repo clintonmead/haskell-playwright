@@ -697,6 +697,7 @@ module Playwright
   , setGeolocation
   , setHTTPCredentials
   , setInputFiles
+  , setInputFilesPaths
   , setInputFilesHandle
   , setOffline
   , setStorageState
@@ -1446,6 +1447,7 @@ import Playwright.Locator
   , selectOptionWith
   , setChecked
   , setInputFiles
+  , setInputFilesPaths
   , tap
   , tapWith
   , hoverWith

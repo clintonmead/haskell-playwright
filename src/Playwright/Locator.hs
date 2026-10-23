@@ -85,6 +85,7 @@ module Playwright.Locator
   , selectOptionElementsWith
   , setChecked
   , setInputFiles
+  , setInputFilesPaths
   , tap
   , tapWith
   , textContent
@@ -188,6 +189,7 @@ import Playwright.Frame.Action
   , dropFrame
   , fillFrame
   , setInputFilesFrame
+  , setInputFilesFramePaths
   , focusFrame
   , hoverFrame
   , hoverFrameWith
@@ -647,6 +649,11 @@ pressSequentially =
 setInputFiles :: Locator -> [InputFile] -> Playwright ()
 setInputFiles loc files =
   withActionTimeout loc (setInputFilesFrame (locatorFrame loc) (locatorSelector loc) files)
+
+-- | Sets files from host paths. A single directory uploads its whole tree.
+setInputFilesPaths :: Locator -> [FilePath] -> Playwright ()
+setInputFilesPaths loc paths =
+  withActionTimeout loc (setInputFilesFramePaths (locatorFrame loc) (locatorSelector loc) paths)
 
 dragAndDrop :: Locator -> Locator -> Playwright ()
 dragAndDrop source target =
