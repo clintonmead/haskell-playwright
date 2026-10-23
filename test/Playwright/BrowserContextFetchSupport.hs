@@ -94,6 +94,7 @@ module Playwright.BrowserContextFetchSupport
   , hostRedirectApp
   , httpCredentialsSendTest
   , headerOnlyAuthApp
+  , httpCredentialsSendPageTest
   , multipartFileTest
   , multipartAssetTest
   , multipartOrderTest
@@ -257,6 +258,8 @@ import Playwright
   , fetchRequestWith
   , goto
   , newContextWith
+  , newPage
+  , pageRequest
   , sessionExpires
   , urlFromText
   , urlToText
@@ -1315,6 +1318,38 @@ httpCredentialsSendTest = do
         assertEqual "local auth" (Just "Basic dXNlcjpwYXNz") authLocal
         assertEqual "cross status" 200 (httpStatusToInt (apiResponseStatus responseCross))
         assertEqual "cross auth" Nothing authCross
+
+httpCredentialsSendPageTest :: IO ()
+httpCredentialsSendPageTest = do
+  captured <- newChan
+  withApplication (pure (headerOnlyAuthApp captured)) $ \port -> do
+    let
+      localPrefix = "http://localhost:" <> pack (show port)
+      crossPrefix = "http://127.0.0.1:" <> pack (show port)
+    withChromiumBrowser $ \browser -> do
+      ctx <-
+        newContextWith
+          browser
+          defaultNewContextOptions
+            { newContextHttpCredentials =
+                Just
+                  HttpCredentials
+                    { httpCredentialsUsername = HttpUsername "user"
+                    , httpCredentialsPassword = HttpPassword "pass"
+                    , httpCredentialsOrigin = Just (urlFromText (toUpper localPrefix))
+                    , httpCredentialsSend = Just HttpCredentialsSendAlways
+                    }
+            }
+      page <- newPage ctx
+      request <- pageRequest page
+      responseLocal <- fetchGet request (urlFromText (localPrefix <> "/empty.html"))
+      authLocal <- liftIO (readChan captured)
+      responseCross <- fetchGet request (urlFromText (crossPrefix <> "/empty.html"))
+      authCross <- liftIO (readChan captured)
+      assertEqual "local status" 200 (httpStatusToInt (apiResponseStatus responseLocal))
+      assertEqual "local auth" (Just "Basic dXNlcjpwYXNz") authLocal
+      assertEqual "cross status" 200 (httpStatusToInt (apiResponseStatus responseCross))
+      assertEqual "cross auth" Nothing authCross
 
 headerOnlyAuthApp :: Chan (Maybe ByteString) -> Application
 headerOnlyAuthApp captured request respond = do

@@ -81,6 +81,7 @@ import Playwright.BrowserContextFetchSupport
   , retryMidstreamGzipTest
   , hostHeaderRedirectTest
   , httpCredentialsSendTest
+  , httpCredentialsSendPageTest
   , multipartFileTest
   , multipartAssetTest
   , multipartOrderTest
@@ -351,6 +352,8 @@ tests =
           hostHeaderRedirectTest
       , testCase "should support HTTPCredentials.send for newContext" $
           httpCredentialsSendTest
+      , testCase "should support HTTPCredentials.send for browser.newPage" $
+          httpCredentialsSendPageTest
       , testCase "should support multipart/form-data" $
           multipartFileTest
       , testCase "should support multipart/form-data with file bytes" $
