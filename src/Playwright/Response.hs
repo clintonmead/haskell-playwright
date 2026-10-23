@@ -12,6 +12,7 @@ module Playwright.Response
   , responseRequest
   , responseStatus
   , responseStatusText
+  , responseHttpVersion
   , responseText
   , responseUrl
   , responseFromServiceWorker
@@ -75,8 +76,10 @@ import Playwright.Protocol
   ( NameValue (nameValueName, nameValueValue)
   , ResponseBodyResult (responseBodyResultBinary)
   , ResponseInitializer (responseInitializerFromServiceWorker, responseInitializerHeaders, responseInitializerRequest, responseInitializerStatus, responseInitializerStatusText, responseInitializerUrl)
+  , ResponseHttpVersionResult (responseHttpVersionResultValue)
   , ResponseRawResponseHeadersResult (responseRawResponseHeadersResultHeaders)
   , mkResponseBodyParams
+  , mkResponseHttpVersionParams
   , mkResponseRawResponseHeadersParams
   )
 import Playwright.RemoteObject
@@ -128,6 +131,16 @@ responseStatus response =
 responseStatusText :: Response -> Playwright Text
 responseStatusText response =
   responseInitializerStatusText <$> responseInitializer response
+
+-- | The protocol version the response was received over, such as "HTTP/1.1".
+responseHttpVersion :: Response -> Playwright Text
+responseHttpVersion response = do
+  result :: ResponseHttpVersionResult <-
+    send
+      (responseChannel response)
+      (MethodName "httpVersion")
+      mkResponseHttpVersionParams
+  pure (responseHttpVersionResultValue result)
 
 responseHeaders :: Response -> Playwright [HttpHeader]
 responseHeaders response =

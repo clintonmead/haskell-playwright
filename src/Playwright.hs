@@ -654,6 +654,7 @@ module Playwright
   , responseRequest
   , responseStatus
   , responseStatusText
+  , responseHttpVersion
   , responseText
   , responseUrl
   , route
@@ -1733,6 +1734,7 @@ import Playwright.Response
   , responseFromServiceWorker
   , responseStatus
   , responseStatusText
+  , responseHttpVersion
   , responseText
   , responseUrl
   )
