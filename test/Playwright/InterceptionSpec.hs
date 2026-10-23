@@ -18,6 +18,7 @@ import UnliftIO.IORef
   )
 import Data.Maybe
   ( fromMaybe
+  , isNothing
   )
 import Data.Text
   ( Text
@@ -25,6 +26,7 @@ import Data.Text
   , pack
   , replace
   , splitOn
+  , toLower
   )
 import Network.HTTP.Types
   ( hLocation
@@ -59,11 +61,24 @@ import Playwright
   , evaluateText
   , evaluateTextWith
   , evaluateWith
+  , framesEqual
   , fulfillRoute
   , goBack
   , goto
+  , HeaderName (headerNameToText)
+  , HttpHeader (httpHeaderName)
+  , HttpMethod (httpMethodToText)
+  , ResourceType (resourceTypeToText)
+  , currentUrl
+  , mainFrame
+  , requestFrame
+  , requestHeaders
   , requestIsNavigation
+  , requestMethod
+  , requestPostData
+  , requestResourceType
   , requestUrl
+  , responseOk
   , route
   , routeRequest
   , textArgument
@@ -83,6 +98,7 @@ import Playwright.Harness
   , testAssetsDir
   , withAssets
   , withChromiumPage
+  , assertBool
   , assertEqual
   , assertFailure
   )
@@ -276,6 +292,40 @@ tests =
             fulfillRoute handled defaultFulfillOptions {fulfillBody = Just (FulfillText "intercepted")}
           mapM_ (\_ -> assertEqual "body" "intercepted" =<< evaluateText page "() => fetch('/intercept-me', { cache: 'no-store' }).then(r => r.text())") [1 :: Int, 2, 3]
           assertEqual "count" 3 =<< readIORef intercepted
+    , testCase "should work with regular expression passed from a different context" $
+        withAssets $ \prefix page -> do
+          intercepted <- newIORef False
+          route page (UrlMatchRegex "empty\\.html" "") $ \handled -> do
+            request <- routeRequest handled
+            url <- requestUrl request
+            assertBool "url" ("empty.html" `isInfixOf` urlToText url)
+            headers <- requestHeaders request
+            assertBool "user-agent" (any ((== "user-agent") . toLower . headerNameToText . httpHeaderName) headers)
+            method <- requestMethod request
+            assertEqual "method" "GET" (httpMethodToText method)
+            postData <- requestPostData request
+            assertBool "postData" (isNothing postData)
+            navigation <- requestIsNavigation request
+            assertEqual "navigation" True navigation
+            resourceType <- requestResourceType request
+            assertEqual "resource" "document" (resourceTypeToText resourceType)
+            frame <- requestFrame request
+            case frame of
+              Nothing ->
+                assertFailure "expected frame"
+              Just actual -> do
+                assertEqual "main frame" True (framesEqual actual (mainFrame page))
+                blank <- currentUrl actual
+                assertEqual "blank" "about:blank" (urlToText blank)
+            writeIORef intercepted True
+            continueRoute handled
+          response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          case response of
+            Nothing ->
+              assertFailure "missing response"
+            Just value ->
+              assertEqual "ok" True =<< responseOk value
+          assertEqual "intercepted" True =<< readIORef intercepted
     ]
 
 containedIn :: Text -> Text -> Bool
