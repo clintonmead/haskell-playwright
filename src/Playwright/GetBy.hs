@@ -181,8 +181,18 @@ escapeForAttributeSelector value exactness =
     <> exactnessSuffix exactness
 
 escapeRegexForSelector :: Text -> Text
-escapeRegexForSelector source =
-  replace ">>" "\\>\\>" (escapeRegexQuotes source)
+escapeRegexForSelector source
+  | isUnicodeRegexSource source = source
+  | otherwise = replace ">>" "\\>\\>" (escapeRegexQuotes source)
+
+-- Mirrors upstream escapeRegexForSelector: in unicode (u/v) mode identity
+-- escapes such as \' are invalid, so the source is passed through unchanged.
+isUnicodeRegexSource :: Text -> Bool
+isUnicodeRegexSource source =
+  case Text.stripPrefix "/" source of
+    Just rest | Text.any (== '/') rest ->
+      Text.any (`elem` ("uv" :: String)) (Text.takeWhileEnd (/= '/') rest)
+    _ -> False
 
 -- Mirrors upstream stringUtils.ts: a quote preceded by an even number of
 -- backslashes gets a backslash inserted before it.
