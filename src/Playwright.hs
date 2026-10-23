@@ -67,6 +67,10 @@ module Playwright
   , Exactness (..)
   , FileChooser (..)
   , fileChooserSetFiles
+  , fileChooserSetFilesPaths
+  , offFileChooser
+  , onFileChooser
+  , FileChooserListener
   , fileChoosersEqual
   , ForcedColors (..)
   , FetchOptions (..)
@@ -1420,6 +1424,10 @@ import Playwright.FileChooser
   , armFileChooser
   , fileChoosersEqual
   , fileChooserSetFiles
+  , fileChooserSetFilesPaths
+  , offFileChooser
+  , onFileChooser
+  , FileChooserListener
   , waitForFileChooser
   , waitForFileChooserWith
   )

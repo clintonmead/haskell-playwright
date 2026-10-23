@@ -30,6 +30,7 @@ module Playwright.ElementHandle
   , selectText
   , selectTextWith
   , setInputFilesHandle
+  , setInputFilesHandlePaths
   , textContentHandle
   , typeHandle
   , waitForElementState
@@ -88,6 +89,7 @@ import Playwright.Frame
   )
 import Playwright.InputFile
   ( InputFile (inputFileBytes, inputFileName)
+  , resolveInputFilePaths
   )
 import Playwright.InputFileName
   ( inputFileNameToText
@@ -155,7 +157,7 @@ import Playwright.Protocol
   , ElementHandleScreenshotResult (elementHandleScreenshotResultBinary)
   , ElementHandleScrollIntoViewIfNeededResult
   , ElementHandleSelectTextResult
-  , ElementHandleSetInputFilesParams (elementHandleSetInputFilesParamsPayloads)
+  , ElementHandleSetInputFilesParams (elementHandleSetInputFilesParamsLocalDirectory, elementHandleSetInputFilesParamsLocalPaths, elementHandleSetInputFilesParamsPayloads)
   , ElementHandleSetInputFilesParamsPayloads
   , ElementHandleSetInputFilesResult
   , ElementHandleTapParams (elementHandleTapParamsForce, elementHandleTapParamsModifiers, elementHandleTapParamsPosition, elementHandleTapParamsTrial)
@@ -557,6 +559,22 @@ setInputFilesHandle handle files = do
       defaultTimeout
       (mkElementHandleSetInputFilesParams)
         { elementHandleSetInputFilesParamsPayloads = Just (fmap toPayload files)
+        }
+  pure ()
+
+-- | Sets files from host paths, as 'setInputFilesHandle' does with bytes. A single
+-- directory uploads its whole tree.
+setInputFilesHandlePaths :: ElementHandle -> [FilePath] -> Playwright ()
+setInputFilesHandlePaths handle paths = do
+  (localPaths, localDirectory) <- liftIO (resolveInputFilePaths paths)
+  _ :: ElementHandleSetInputFilesResult <-
+    handleSendWithTimeout
+      handle
+      "setInputFiles"
+      defaultTimeout
+      (mkElementHandleSetInputFilesParams)
+        { elementHandleSetInputFilesParamsLocalPaths = if null localPaths then Nothing else Just localPaths
+        , elementHandleSetInputFilesParamsLocalDirectory = localDirectory
         }
   pure ()
 
