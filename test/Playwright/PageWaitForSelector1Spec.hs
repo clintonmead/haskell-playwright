@@ -5,12 +5,22 @@ module Playwright.PageWaitForSelector1Spec
 import Control.Monad
   ( replicateM_
   )
+import Data.Aeson
+  ( Value
+  , object
+  , (.=)
+  )
+import Data.Text
+  ( Text
+  )
 import UnliftIO.Async
   ( wait
   , withAsync
   )
 import Playwright
-  ( WaitForState (WaitForAttached, WaitForHidden, WaitForVisible)
+  ( Frame (frameChannel)
+  , Page
+  , WaitForState (WaitForAttached, WaitForHidden, WaitForVisible)
   , defaultGotoOptions
   , evaluate
   , evaluateOnElementText
@@ -18,6 +28,7 @@ import Playwright
   , framesEqual
   , goto
   , mainFrame
+  , Playwright
   , milliseconds
   , ownerFrameHandle
   , pageClickSelector
@@ -33,6 +44,12 @@ import Playwright
   , waitForSelectorOnHandle
   , waitForSelectorOnHandleWith
   , waitForTimeout
+  )
+import Playwright.Channel
+  ( send
+  )
+import Playwright.MethodName
+  ( MethodName (MethodName)
   )
 import Playwright.Harness
   ( assertBool
@@ -235,4 +252,18 @@ tests =
                 _ <- evaluate page "() => document.getElementById('frame1').remove()"
                 wait pending
             )
+    , testCase "should tolerate waitFor=visible" $
+        withAssets $ \prefix page -> do
+          _ <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+          _ <-
+            rawWaitForSelector
+              page
+              (object ["selector" .= ("*" :: Text), "waitFor" .= ("visible" :: Text)])
+          pure ()
     ]
+
+-- | Sends waitForSelector straight to the main frame channel, so tests can
+-- pass the undocumented waitFor option that the typed API does not model.
+rawWaitForSelector :: Page -> Value -> Playwright Value
+rawWaitForSelector page params =
+  send (frameChannel (mainFrame page)) (MethodName "waitForSelector") params
