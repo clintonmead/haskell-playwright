@@ -558,4 +558,13 @@ tests =
           _ <- evaluate page "() => window['activationPromise']"
           _ <- goto page (urlFromText target) defaultGotoOptions
           assertEqual "interceptions" 2 =<< readMVar interceptions
+    -- Upstream cases not ported here:
+    --   should not fulfill with redirect status: upstream runs it only on WebKit
+    --     (`it.skip` for every other browser). The "Cannot fulfill with redirect status"
+    --     error is raised by the WebKit interceptable-request code in the driver
+    --     (server/webkit/wkInterceptableRequest.ts); this harness runs Chromium only,
+    --     where fulfilling with a 3xx status is accepted.
+    --   route abort with times: 1 should not affect second sequential fetch: upstream
+    --     marks it `it.fixme` on Chromium (the Fetch domain drops a request intercepted
+    --     while Fetch.disable is in progress), and this harness runs Chromium only.
     ]
