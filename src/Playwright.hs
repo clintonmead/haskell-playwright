@@ -119,6 +119,7 @@ module Playwright
   , RouteOptions (..)
   , RouteTimes (..)
   , ScreenshotOptions (..)
+  , ScreenshotType (..)
   , ScriptTag (..)
   , SecurityDetails (..)
   , SelectAttributes (..)
@@ -1679,7 +1680,19 @@ import Playwright.RouteOptions
   , defaultRouteOptions
   )
 import Playwright.ScreenshotOptions
-  ( ScreenshotOptions (ScreenshotOptions, screenshotOptionsFullPage, screenshotOptionsTimeout)
+  ( ScreenshotOptions
+      ( ScreenshotOptions
+      , screenshotOptionsFullPage
+      , screenshotOptionsOmitBackground
+      , screenshotOptionsQuality
+      , screenshotOptionsTimeout
+      , screenshotOptionsType
+      )
+  , ScreenshotType
+      ( ScreenshotJpeg
+      , ScreenshotPng
+      , ScreenshotWebp
+      )
   , defaultScreenshotOptions
   )
 import Playwright.ScriptTag

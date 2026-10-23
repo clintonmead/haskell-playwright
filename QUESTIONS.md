@@ -608,3 +608,25 @@ The real difference is `registerEventWaiter`'s buffer path. It pops a console ev
 **Why not verified:** Nothing is implemented yet. The field names follow the upstream names, but the Haskell types are a guess.
 
 **To change:** If the record should stay minimal, add a separate `screenshotWith` builder instead of growing the record, and record that choice here.
+
+**Update (first slice):** `type`, `quality` and `omitBackground` are in, as `screenshotOptionsType :: Maybe ScreenshotType`, `screenshotOptionsQuality :: Maybe Int` and `screenshotOptionsOmitBackground :: Maybe Bool`. The fields are records, not a separate builder. `clip`, `path`, `mask`, `caret`, `animations` and `scale` are still open.
+
+## page-screenshot: enum constructor names and quality type
+
+**Question:** `ScreenshotType` has constructors `ScreenshotPng`, `ScreenshotJpeg` and `ScreenshotWebp`, mapped onto the generated `PageScreenshotParamsType` constructors. Are these the right names, and is `Int` the right type for `quality`?
+
+**Guess taken:** Yes to both. The Haskell names follow the `ScreenshotType` pattern (`Screenshot` plus the format). `quality` is `Maybe Int`, because the protocol's `number` field is generated as `Scientific`, and `Int` makes out-of-range values reach the driver unchanged. The out-of-range webp case checks the driver's own message, not a Haskell-side check.
+
+**Verified:** The build passes and all eight `page-screenshot` cases pass against the live driver, including the out-of-range webp message from the driver. The build had first failed on the import-list style, an identity `fromIntegral`, and a `Playwright.hs` import that dropped the new record fields. All three are fixed.
+
+**To change:** Rename the constructors if the group needs a different style. The mapping is one function in `Playwright.Page`, so the change is local.
+
+## page-screenshot: image decoding for pixel checks
+
+**Question:** Upstream checks the webp lossless output and the transparent background by decoding the pixels. The repo has no PNG or WebP decoder. Should those cases be ported with a byte-level check, or skipped?
+
+**Guess taken:** Skip the pixel checks (the transparency and lossless cases) and port the signature and size checks. The signature and size checks cover the wiring. The pixel checks need a decoder dependency that the project does not have.
+
+**Why not verified:** Not decided with the user. The skip is recorded in the TODO.
+
+**To change:** Add a decoder dependency (for example `JuicyPixels`) and port the pixel cases, if the user wants that coverage.

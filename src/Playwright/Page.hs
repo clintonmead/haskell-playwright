@@ -220,7 +220,17 @@ import Playwright.Protocol
   , PagePdfResult (pagePdfResultPdf)
   , PageReloadResult (pageReloadResultResponse)
   , PageRequestGCResult
-  , PageScreenshotParams (pageScreenshotParamsFullPage)
+  , PageScreenshotParams
+      ( pageScreenshotParamsFullPage
+      , pageScreenshotParamsOmitBackground
+      , pageScreenshotParamsQuality
+      , pageScreenshotParamsType
+      )
+  , PageScreenshotParamsType
+      ( PageScreenshotParamsTypeJpeg
+      , PageScreenshotParamsTypePng
+      , PageScreenshotParamsTypeWebp
+      )
   , PageScreenshotResult (pageScreenshotResultBinary)
   , PageSetExtraHTTPHeadersResult
   , PageSetViewportSizeResult
@@ -260,7 +270,18 @@ import Playwright.PdfOptions
   , defaultPdfOptions
   )
 import Playwright.ScreenshotOptions
-  ( ScreenshotOptions (screenshotOptionsFullPage, screenshotOptionsTimeout)
+  ( ScreenshotOptions
+      ( screenshotOptionsFullPage
+      , screenshotOptionsOmitBackground
+      , screenshotOptionsQuality
+      , screenshotOptionsTimeout
+      , screenshotOptionsType
+      )
+  , ScreenshotType
+      ( ScreenshotJpeg
+      , ScreenshotPng
+      , ScreenshotWebp
+      )
   )
 import Playwright.Selector
   ( Selector
@@ -475,8 +496,20 @@ screenshot page opts = do
       (screenshotOptionsTimeout opts)
       (mkPageScreenshotParams)
         { pageScreenshotParamsFullPage = screenshotOptionsFullPage opts
+        , pageScreenshotParamsType = screenshotTypeParam <$> screenshotOptionsType opts
+        , pageScreenshotParamsQuality = screenshotOptionsQuality opts
+        , pageScreenshotParamsOmitBackground = screenshotOptionsOmitBackground opts
         }
   pure (protocolBinaryToByteString (pageScreenshotResultBinary result))
+  where
+    screenshotTypeParam screenshotType =
+      case screenshotType of
+        ScreenshotPng ->
+          PageScreenshotParamsTypePng
+        ScreenshotJpeg ->
+          PageScreenshotParamsTypeJpeg
+        ScreenshotWebp ->
+          PageScreenshotParamsTypeWebp
 
 pdf :: Page -> Playwright ByteString
 pdf page =

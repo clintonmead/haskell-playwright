@@ -1,11 +1,14 @@
 module Playwright.ScreenshotOptions
   ( ScreenshotOptions (..)
+  , ScreenshotType (..)
   , defaultScreenshotOptions
   ) where
 
 import Autodocodec
   ( Autodocodec (Autodocodec)
   , HasCodec (codec)
+  , JSONCodec
+  , bimapCodec
   , object
   , optionalField'
   , requiredField'
@@ -15,6 +18,9 @@ import Data.Aeson
   ( FromJSON
   , ToJSON
   )
+import Data.Text
+  ( Text
+  )
 import Playwright.Timeout
   ( Timeout
   , defaultTimeout
@@ -23,15 +29,27 @@ import Playwright.Timeout
 data ScreenshotOptions = ScreenshotOptions
   { screenshotOptionsTimeout :: Timeout
   , screenshotOptionsFullPage :: Maybe Bool
+  , screenshotOptionsType :: Maybe ScreenshotType
+  , screenshotOptionsQuality :: Maybe Int
+  , screenshotOptionsOmitBackground :: Maybe Bool
   }
   deriving stock (Eq, Show)
   deriving (FromJSON, ToJSON) via (Autodocodec ScreenshotOptions)
+
+data ScreenshotType
+  = ScreenshotPng
+  | ScreenshotJpeg
+  | ScreenshotWebp
+  deriving stock (Eq, Show)
 
 defaultScreenshotOptions :: ScreenshotOptions
 defaultScreenshotOptions =
   ScreenshotOptions
     { screenshotOptionsTimeout = defaultTimeout
     , screenshotOptionsFullPage = Nothing
+    , screenshotOptionsType = Nothing
+    , screenshotOptionsQuality = Nothing
+    , screenshotOptionsOmitBackground = Nothing
     }
 
 instance HasCodec ScreenshotOptions where
@@ -40,3 +58,32 @@ instance HasCodec ScreenshotOptions where
       ScreenshotOptions
         <$> requiredField' "timeout" .= screenshotOptionsTimeout
         <*> optionalField' "fullPage" .= screenshotOptionsFullPage
+        <*> optionalField' "type" .= screenshotOptionsType
+        <*> optionalField' "quality" .= screenshotOptionsQuality
+        <*> optionalField' "omitBackground" .= screenshotOptionsOmitBackground
+
+instance HasCodec ScreenshotType where
+  codec =
+    bimapCodec screenshotTypeFromText screenshotTypeToText (codec :: JSONCodec Text)
+
+screenshotTypeFromText :: Text -> Either String ScreenshotType
+screenshotTypeFromText name =
+  case name of
+    "png" ->
+      Right ScreenshotPng
+    "jpeg" ->
+      Right ScreenshotJpeg
+    "webp" ->
+      Right ScreenshotWebp
+    _ ->
+      Left ("unknown screenshot type: " <> show name)
+
+screenshotTypeToText :: ScreenshotType -> Text
+screenshotTypeToText screenshotType =
+  case screenshotType of
+    ScreenshotPng ->
+      "png"
+    ScreenshotJpeg ->
+      "jpeg"
+    ScreenshotWebp ->
+      "webp"
