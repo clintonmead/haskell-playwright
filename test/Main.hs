@@ -185,6 +185,7 @@ import Playwright.SelectorsCssSpec qualified as SelectorsCssSpec
 import Playwright.SelectorsFrameSpec qualified as SelectorsFrameSpec
 import Playwright.SelectorsGetBySpec qualified as SelectorsGetBySpec
 import Playwright.SelectorsMiscSpec qualified as SelectorsMiscSpec
+import Playwright.SelectorGeneratorSpec qualified as SelectorGeneratorSpec
 import Playwright.SelectorsRoleSpec qualified as SelectorsRoleSpec
 import Playwright.SelectorsRegisterSpec qualified as SelectorsRegisterSpec
 import Playwright.SelectorsTextSpec qualified as SelectorsTextSpec
@@ -394,6 +395,7 @@ main =
         , SelectorsGetBySpec.tests
         , SelectorsMiscSpec.tests
         , SelectorsRoleSpec.tests
+        , SelectorGeneratorSpec.tests
         , SelectorsRegisterSpec.tests
         , SelectorsTextSpec.tests
         , SharedWorkerSpec.tests
