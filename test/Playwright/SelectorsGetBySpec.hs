@@ -116,7 +116,7 @@ tests =
             , getByLabel page "what?" Inexact
             , getByLabelRegex page "/last name/"
             ]
-    , testCase "getByLabel should work with multiply-labelled elements" $
+    , testCase "getByLabel should work with multiply-labelled input" $
         withChromiumPage $ \page -> do
           setContent page "<label for=target>Name</label><input id=target type=text><label for=target>First or Last</label>"
           assertEqual "name" "target" =<< idOf (getByLabel page "Name" Inexact)
@@ -134,7 +134,7 @@ tests =
           setContent page "<label id=name-label>Name</label><button aria-labelledby=name-label>Click me</button>"
           assertEqual "text" "Click me"
             =<< evaluateOnLocatorText (getByLabel page "Name" Inexact) "e => e.textContent"
-    , testCase "getByLabel should prefer aria-labelledby over a native label" $
+    , testCase "getByLabel should prioritize aria-labelledby over native label" $
         withChromiumPage $ \page -> do
           setContent page "<label id=name-label>Name</label><label>Wrong<button aria-labelledby=name-label>Click me</button></label>"
           assertEqual "text" "Click me"
@@ -197,7 +197,7 @@ tests =
             =<< outerHtmlsOf (getByRole page (AriaRole "button") (defaultGetByRoleOptions { getByRoleName = Just "Click \\me", getByRoleExact = Exact }))
           assertEqual "two backslashes" []
             =<< outerHtmlsOf (getByRole page (AriaRole "button") (defaultGetByRoleOptions { getByRoleName = Just "Click \\\\me", getByRoleExact = Exact }))
-    , testCase "getByRole should work with v-flag name regex" $
+    , testCase "getByRole should accept regexp with v flag" $
         withChromiumPage $ \page -> do
           setContent page "<button>Click me</button><button>Submit</button>"
           assertEqual "v" 1
