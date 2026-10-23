@@ -69,6 +69,7 @@ tests:
     dependencies:
       - aeson
       - base
+      - base64-bytestring
       - bytestring
       - case-insensitive
       - directory

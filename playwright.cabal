@@ -441,6 +441,7 @@ test-suite playwright-test
   build-depends:
       aeson
     , base
+    , base64-bytestring
     , bytestring
     , case-insensitive
     , directory
