@@ -146,6 +146,7 @@ library
       Playwright.Protocol
       Playwright.ProxySettings
       Playwright.RaceTimeout
+      Playwright.ReadStream
       Playwright.RecordHar
       Playwright.RecordVideo
       Playwright.ReducedMotion
