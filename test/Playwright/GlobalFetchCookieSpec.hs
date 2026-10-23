@@ -14,9 +14,13 @@ import Control.Concurrent
 import Data.ByteString
   ( ByteString
   )
+import Data.Char
+  ( isDigit
+  )
 import Data.Text
   ( Text
   , pack
+  , takeWhileEnd
   )
 import Network.HTTP.Types
   ( RequestHeaders
@@ -104,6 +108,20 @@ tests =
           storageStateRoundTripTest
       , testCase "should work with empty storage state" $
           emptyStorageStateTest
+      , testCase "should store cookie from Set-Cookie header" $
+          storeCookieTest
+      , testCase "should filter outgoing cookies by domain" $
+          filterByDomainTest
+      , testCase "should do case-insensitive match of cookie domain" $
+          caseInsensitiveCookieDomainTest
+      , testCase "should do case-insensitive match of request domain" $
+          caseInsensitiveRequestDomainTest
+      , testCase "should store cookie from Set-Cookie header even if it contains equal signs" $
+          equalSignsCookieTest
+      , testCase "should export cookies to storage state" $
+          exportCookiesTest
+      , testCase "should send cookies from storage state" $
+          sendFromStorageStateTest
       ]
 
 pathFilterTest :: IO ()
@@ -397,6 +415,162 @@ withCookieServerOn host app action = do
       request <- newRequestContext
       action request ("http://" <> host <> ":" <> pack (show port)) captured
       disposeAPIRequestContext request
+
+storeCookieTest :: IO ()
+storeCookieTest =
+  withCookieServerOn "a.b.localhost" storeCookieApp $ \request prefix captured -> do
+    _ <- fetchGet request (urlFromText (prefix <> "/setcookie.html"))
+    _ <- fetchGet request (urlFromText (atHost "b.localhost" prefix <> "/input/button.html"))
+    cookie <- liftIO (readChan captured)
+    assertEqual "cookie" (Just "c=d") cookie
+
+storeCookieApp :: Chan (Maybe ByteString) -> Application
+storeCookieApp captured request respond =
+  case pathInfo request of
+    ["setcookie.html"] ->
+      respond
+        ( responseLBS
+            status200
+            [ ("Set-Cookie", "a=b")
+            , ("Set-Cookie", "c=d; max-age=3600; domain=b.localhost; path=/input")
+            , ("Set-Cookie", "e=f; domain=b.localhost; path=/input/subfolder")
+            ]
+            ""
+        )
+    ["input", "button.html"] ->
+      captureCookie captured request respond
+    _ ->
+      respond (responseLBS status404 [] "")
+
+filterByDomainTest :: IO ()
+filterByDomainTest =
+  withCookieServerOn "a.b.one.localhost" (setThenEmpty [("Set-Cookie", "a=v; domain=one.localhost"), ("Set-Cookie", "b=v; domain=.b.one.localhost"), ("Set-Cookie", "c=v; domain=other.com")]) $
+    \request prefix captured -> do
+      _ <- fetchGet request (urlFromText (prefix <> "/setcookie.html"))
+      _ <- fetchGet request (urlFromText (atHost "www.b.one.localhost" prefix <> "/empty.html"))
+      cookie <- liftIO (readChan captured)
+      assertEqual "cookie" (Just "a=v; b=v") cookie
+      _ <- fetchGet request (urlFromText (atHost "127.0.0.1" prefix <> "/empty.html"))
+      unrelated <- liftIO (readChan captured)
+      assertEqual "unrelated host cookie" Nothing unrelated
+
+caseInsensitiveCookieDomainTest :: IO ()
+caseInsensitiveCookieDomainTest =
+  withCookieServerOn "a.b.one.localhost" (setThenEmpty [("Set-Cookie", "a=v; domain=ONE.LOCALHOST"), ("Set-Cookie", "b=v; domain=.B.one.localhost")]) $
+    \request prefix captured -> do
+      _ <- fetchGet request (urlFromText (prefix <> "/setcookie.html"))
+      _ <- fetchGet request (urlFromText (atHost "www.b.one.localhost" prefix <> "/empty.html"))
+      cookie <- liftIO (readChan captured)
+      assertEqual "cookie" (Just "a=v; b=v") cookie
+
+caseInsensitiveRequestDomainTest :: IO ()
+caseInsensitiveRequestDomainTest =
+  withCookieServerOn "a.b.one.localhost" (setThenEmpty [("Set-Cookie", "a=v; domain=one.localhost"), ("Set-Cookie", "b=v; domain=.b.one.localhost")]) $
+    \request prefix captured -> do
+      _ <- fetchGet request (urlFromText (prefix <> "/setcookie.html"))
+      _ <- fetchGet request (urlFromText (atHost "WWW.B.ONE.LOCALHOST" prefix <> "/empty.html"))
+      cookie <- liftIO (readChan captured)
+      assertEqual "cookie" (Just "a=v; b=v") cookie
+
+equalSignsCookieTest :: IO ()
+equalSignsCookieTest =
+  withCookieServerOn "a.b.localhost" (setThenEmpty [("Set-Cookie", "f=value == value=; secure; httpOnly; path=/some=value")]) $
+    \request prefix _captured -> do
+      _ <- fetchGet request (urlFromText (prefix <> "/setcookie.html"))
+      state <- apiRequestStorageState request
+      assertEqual
+        "state"
+        StorageState
+          { storageStateCookies =
+              [ Cookie
+                  { cookieName = CookieName "f"
+                  , cookieValue = CookieValue "value == value="
+                  , cookieDomain = CookieDomain "a.b.localhost"
+                  , cookiePath = CookiePath "/some=value"
+                  , cookieExpires = sessionExpires
+                  , cookieHttpOnly = CookieHttpOnly True
+                  , cookieSecure = CookieSecure True
+                  , cookieSameSite = CookieSameSiteLax
+                  }
+              ]
+          , storageStateOrigins = []
+          }
+        state
+
+exportCookiesTest :: IO ()
+exportCookiesTest =
+  withCookieServerOn "a.b.localhost" exportApp $ \request prefix _captured -> do
+    _ <- fetchGet request (urlFromText (prefix <> "/setcookie.html"))
+    state <- apiRequestStorageState request
+    assertEqual
+      "state"
+      StorageState
+        { storageStateCookies =
+            [ mkCookie "a" "b" "a.b.localhost" "/" sessionExpires
+            , mkCookie "c" "d" ".b.localhost" "/input" (CookieExpires (fromInteger 4102444800))
+            , mkCookie "e" "f" ".b.localhost" "/input/subfolder" sessionExpires
+            ]
+        , storageStateOrigins = []
+        }
+      state
+
+exportApp :: Chan (Maybe ByteString) -> Application
+exportApp _captured request respond =
+  case pathInfo request of
+    ["setcookie.html"] ->
+      respond
+        ( responseLBS
+            status200
+            [ ("Set-Cookie", "a=b")
+            , ("Set-Cookie", "c=d; expires=" <> laterHttpDate <> "; domain=b.localhost; path=/input")
+            , ("Set-Cookie", "e=f; domain=b.localhost; path=/input/subfolder")
+            ]
+            ""
+        )
+    _ ->
+      respond (responseLBS status404 [] "")
+
+sendFromStorageStateTest :: IO ()
+sendFromStorageStateTest = do
+  captured <- newChan
+  withApplication (pure (captureCookie captured)) $ \port ->
+    runPlaywright $ do
+      request <-
+        newRequestContextWith
+          defaultNewRequestOptions
+            { newRequestStorageState =
+                Just
+                  StorageState
+                    { storageStateCookies =
+                        [ mkCookie "a" "b" "a.b.localhost" "/" sessionExpires
+                        , mkCookie "c" "d" ".b.localhost" "/first/" (CookieExpires (fromInteger 4070908800))
+                        , mkCookie "e" "f" ".b.localhost" "/first/second" sessionExpires
+                        ]
+                    , storageStateOrigins = []
+                    }
+            }
+      _ <- fetchGet request (urlFromText ("http://www.a.b.localhost:" <> pack (show port) <> "/first/second/third/not_found.html"))
+      cookie <- liftIO (readChan captured)
+      assertEqual "cookie" (Just "c=d; e=f") cookie
+      disposeAPIRequestContext request
+
+mkCookie :: Text -> Text -> Text -> Text -> CookieExpires -> Cookie
+mkCookie name value domain path expires =
+  Cookie
+    { cookieName = CookieName name
+    , cookieValue = CookieValue value
+    , cookieDomain = CookieDomain domain
+    , cookiePath = CookiePath path
+    , cookieExpires = expires
+    , cookieHttpOnly = CookieHttpOnly False
+    , cookieSecure = CookieSecure False
+    , cookieSameSite = CookieSameSiteLax
+    }
+
+-- Replaces the host of a "http://host:port" prefix, keeping the port.
+atHost :: Text -> Text -> Text
+atHost host prefix =
+  "http://" <> host <> ":" <> takeWhileEnd isDigit prefix
 
 lookupHeader :: HTTP.HeaderName -> RequestHeaders -> Maybe ByteString
 lookupHeader =
