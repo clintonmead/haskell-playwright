@@ -57,6 +57,10 @@ import Playwright.Harness
   , withChromiumBrowserWith
   , assertEqual
   )
+import Playwright.ProxySocksSupport
+  ( socksProxyUrl
+  , withSocksMockServer
+  )
 import Test.Tasty
   ( TestTree
   , testGroup
@@ -64,6 +68,16 @@ import Test.Tasty
 import Test.Tasty.HUnit
   ( testCase
   )
+
+-- Upstream cases not ported here:
+--   should throw for bad server value: ProxyHost is a Text newtype, so a non-string server cannot be built.
+--   should use proxy with emulated user agent: upstream marks it fixme(true); the non-emulated
+--     user agent is still sent in the CONNECT request.
+--   should reconnect with credentials after CONNECT 407 closes the socket: needs an HTTPS fixture,
+--     a CONNECT tunnel and a proxy auth handler, and Warp cannot serve CONNECT.
+--   should use SOCKS proxy for websocket requests, should use http proxy for websocket requests:
+--     they resolve fake hosts through public DNS (nip.io) and inspect CONNECT and websocket
+--     traffic at the proxy, which the Warp-based test proxy cannot record.
 
 tests :: TestTree
 tests =
@@ -127,6 +141,20 @@ tests =
               page4 <- newBrowserPage browser
               _ <- goto page4 (urlFromText "http://3.non.existent.domain.for.the.test/target.html") defaultGotoOptions
               assertEqual "still proxied" "Served by the proxy" =<< title page4
+    , testCase "should use socks proxy" $
+        withSocksMockServer $ \port ->
+          withLaunchProxy (httpProxyHost (socksProxyUrl port)) $ \page -> do
+            _ <- goto page (urlFromText "http://non-existent.com") defaultGotoOptions
+            assertEqual "title" "Served by the SOCKS proxy" =<< title page
+    , testCase "should use socks proxy in second page" $
+        withSocksMockServer $ \port ->
+          withChromiumBrowserWith (launchWithProxy (httpProxyHost (socksProxyUrl port))) $ \browser -> do
+            page <- newBrowserPage browser
+            _ <- goto page (urlFromText "http://non-existent.com") defaultGotoOptions
+            assertEqual "first" "Served by the SOCKS proxy" =<< title page
+            page2 <- newBrowserPage browser
+            _ <- goto page2 (urlFromText "http://non-existent.com") defaultGotoOptions
+            assertEqual "second" "Served by the SOCKS proxy" =<< title page2
     , testCase "does launch without a port" $
         withChromiumBrowserWith
           (launchWithProxy (httpProxyHost "http://localhost"))
