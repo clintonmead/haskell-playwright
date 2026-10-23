@@ -5,7 +5,16 @@ module Playwright.PageGoto2Spec
 import Data.Text
   ( Text
   )
+import Data.ByteString qualified as BS
+import Data.ByteString.Lazy qualified as LBS
 import Data.Text qualified as Text
+import Data.Text.Encoding (encodeUtf8)
+import Network.HTTP.Types (status200, status404)
+import Network.Wai
+  ( Application
+  , pathInfo
+  , responseLBS
+  )
 import Playwright
   ( GotoOptions (gotoOptionsReferer, gotoOptionsTimeout, gotoOptionsWaitUntil)
   , HeaderName (HeaderName)
@@ -13,6 +22,7 @@ import Playwright
   , HttpHeader (HttpHeader)
   , HttpStatus (httpStatusToInt)
   , LoadState (LoadStateLoad, LoadStateNetworkIdle)
+  , Playwright
   , defaultGotoOptions
   , evaluate
   , frames
@@ -21,6 +31,7 @@ import Playwright
   , onRequest
   , pageContext
   , requestUrl
+  , responseBody
   , responseOk
   , responseStatus
   , responseUrl
@@ -64,6 +75,10 @@ import Test.Tasty
   )
 import Test.Tasty.HUnit
   ( testCase
+  )
+import UnliftIO.Exception
+  ( SomeException
+  , try
   )
 import UnliftIO.IORef
   ( newIORef
@@ -250,6 +265,26 @@ tests =
               (urlFromText (prefix <> "/empty.html"))
               defaultGotoOptions {gotoOptionsWaitUntil = Just LoadStateNetworkIdle}
           pure ()
+    , testCase "should report raw buffer for main resource" $
+        withGotoServer rawBufferApp $ \prefix page -> do
+          -- Upstream marks this it.fail on chromium (Chromium sends the main resource as text),
+          -- so the case passes while the body still differs from the raw bytes.
+          outcome <-
+            try
+              ( do
+                  response <- goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions
+                  case response of
+                    Nothing ->
+                      assertFailure "missing response"
+                    Just value ->
+                      assertEqual "body" rawBufferBytes =<< responseBody value
+              )
+              :: Playwright (Either SomeException ())
+          case outcome of
+            Left _ ->
+              pure ()
+            Right () ->
+              assertFailure "main resource body matched the raw buffer; the upstream it.fail has been fixed, so port this as a passing case"
     , localOption (mkTimeout 30000000) $
         testCase "should not resolve goto upon window.stop()" $
           windowStopGoto
@@ -269,3 +304,15 @@ tests =
         testCase "should succeed on url bar navigation when there is pending navigation" $
           urlBarDuringPending
     ]
+
+rawBufferBytes :: BS.ByteString
+rawBufferBytes =
+  encodeUtf8 "Ü (lowercase ü)"
+
+rawBufferApp :: Application
+rawBufferApp request respond =
+  case pathInfo request of
+    ["empty.html"] ->
+      respond (responseLBS status200 [] (LBS.fromStrict rawBufferBytes))
+    _ ->
+      respond (responseLBS status404 [] "")
