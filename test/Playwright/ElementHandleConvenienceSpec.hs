@@ -4,7 +4,10 @@ module Playwright.ElementHandleConvenienceSpec
 
 import Playwright
   ( SelectOption (SelectValue)
+  , asElement
+  , elementArgument
   , evaluate
+  , evaluateHandleWith
   , fill
   , isChecked
   , isCheckedHandle
@@ -27,6 +30,7 @@ import Playwright
   , inputValue
   , inputValueHandle
   , querySelector
+  , querySelectorAllHandle
   , selectOption
   , selectorFromText
   , setContent
@@ -116,6 +120,17 @@ tests =
           assertEqual "handle unchecked" False =<< isCheckedHandle input
           divHandle <- requireHandle =<< querySelector page (selectorFromText "div")
           assertProtocolContains "Not a checkbox or radio button" (isCheckedHandle divHandle)
+    , testCase "textContent should work on ShadowRoot" $
+        withChromiumPage $ \page -> do
+          setContent
+            page
+            "<div></div><script>document.querySelector('div').attachShadow({ mode: 'open' }).innerHTML = '<div>hello</div>';</script>"
+          host <- requireHandle =<< querySelector page (selectorFromText "div")
+          root <- requireHandle =<< asElement =<< evaluateHandleWith page "div => div.shadowRoot" (elementArgument host)
+          assertEqual "shadow root text" (Just "hello") =<< textContentHandle root
+          -- We do not match ShadowRoot as ":scope".
+          matches <- querySelectorAllHandle root (selectorFromText ":scope div")
+          assertEqual "scope matches" 0 (length matches)
     , testCase "isVisible and isHidden should work" $
         withChromiumPage $ \page -> do
           setContent page "<div>Hi</div><span></span>"
