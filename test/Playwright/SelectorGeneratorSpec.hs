@@ -29,6 +29,7 @@ import Playwright
   , mainFrame
   , newContext
   , newPage
+  , selectorFromText
   , setContent
   )
 import Playwright.Channel
@@ -73,7 +74,7 @@ noTextFn =
 -- | Upstream `$eval` takes the first match, so every target is narrowed to its first match.
 firstOf :: Page -> Text -> Locator
 firstOf page target =
-  locator page (target <> " >> nth=0")
+  locator page (selectorFromText (target <> " >> nth=0"))
 
 generateFor :: Page -> Text -> Maybe Text -> Playwright Text
 generateFor page target expected =
@@ -148,7 +149,7 @@ checkStrictErrors page = do
     , "aka getByTestId('One')"
     , "aka getByTestId('Two')"
     ]
-    (hover (locator page ".foo"))
+    (hover (locator page (selectorFromText ".foo")))
 
 tests :: TestTree
 tests =
