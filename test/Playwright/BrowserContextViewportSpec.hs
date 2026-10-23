@@ -6,7 +6,7 @@ import Data.Text
   ( Text
   )
 import Playwright
-  ( NewContextOptions (newContextDeviceScaleFactor, newContextHasTouch, newContextIsMobile, newContextNoDefaultViewport, newContextUserAgent, newContextViewport)
+  ( NewContextOptions (newContextDeviceScaleFactor, newContextHasTouch, newContextIsMobile, newContextNoDefaultViewport, newContextScreen, newContextUserAgent, newContextViewport)
   , Point (Point)
   , UserAgent (UserAgent)
   , Page
@@ -26,11 +26,16 @@ import Playwright
   , mouseDown
   , mouseMove
   , mouseUp
+  , setContent
   , setViewportSize
+  , tap
   )
 import Playwright.Harness
   ( assertBool
+  , assertProtocolContains
+  , locate
   , withAssets
+  , withAssetsContextWith
   , withChromiumContext
   , withChromiumContextWith
   , assertEqual
@@ -139,11 +144,45 @@ tests =
           setViewportSize page (ViewportSize (ViewportWidth 500) (ViewportHeight 600))
           assertEqual "availWidth" (500 :: Double) =<< evaluateNumber page "() => window.screen.availWidth"
           assertEqual "availHeight" (600 :: Double) =<< evaluateNumber page "() => window.screen.availHeight"
+    , testCase "should set both screen and viewport options" $
+        withChromiumContextWith
+          defaultNewContextOptions
+            { newContextScreen = Just (ViewportSize (ViewportWidth 1280) (ViewportHeight 720))
+            , newContextViewport = Just (ViewportSize (ViewportWidth 1000) (ViewportHeight 600))
+            }
+          $ \_ page -> do
+            assertEqual "screen width" (1280 :: Double) =<< evaluateNumber page "() => screen.width"
+            assertEqual "screen height" (720 :: Double) =<< evaluateNumber page "() => screen.height"
+            assertEqual "inner width" (1000 :: Double) =<< evaluateNumber page "() => window.innerWidth"
+            assertEqual "inner height" (600 :: Double) =<< evaluateNumber page "() => window.innerHeight"
+    , testCase "should throw on tap if hasTouch is not enabled" $
+        withChromiumContext $ \_ page -> do
+          -- Partial: the upstream page.tap(selector) form has no Haskell API, so only the locator form is ported.
+          setContent page "<div>a</div>"
+          assertProtocolContains "The page does not support tap" (tap (locate page "div"))
+    , testCase "should set window.screen.orientation.type for mobile devices" $
+        withAssetsContextWith iPhone14 $ \prefix _ page -> do
+          _ <- goto page (urlFromText (prefix <> "/index.html")) defaultGotoOptions
+          assertEqual "orientation" "portrait-primary" =<< evaluateText page "() => window.screen.orientation.type"
     , testCase "should not have touch by default" $
         withAssets $ \prefix page -> do
           _ <- goto page (urlFromText (prefix <> "/mobile.html")) defaultGotoOptions
           assertEqual "touch" False =<< evaluateBool page "() => 'ontouchstart' in window"
     ]
+
+-- | The options Playwright applies for the @iPhone 14@ device descriptor.
+-- The Haskell API has no device registry, so the values are copied here.
+iPhone14 :: NewContextOptions
+iPhone14 =
+  defaultNewContextOptions
+    { newContextUserAgent =
+        Just (UserAgent "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Mobile/15E148 Safari/604.1")
+    , newContextViewport = Just (ViewportSize (ViewportWidth 390) (ViewportHeight 664))
+    , newContextScreen = Just (ViewportSize (ViewportWidth 390) (ViewportHeight 844))
+    , newContextDeviceScaleFactor = Just (deviceScaleFactorFromInt 3)
+    , newContextIsMobile = Just True
+    , newContextHasTouch = Just True
+    }
 
 -- | Whether a media query matches the page.
 mediaMatches :: Page -> Text -> Playwright Bool
