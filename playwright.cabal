@@ -29,6 +29,9 @@ library
       Playwright.AriaRole
       Playwright.AriaSnapshotMode
       Playwright.AriaSnapshotOptions
+      Playwright.AttributeSelector
+      Playwright.AttributeSelectorOperator
+      Playwright.AttributeValue
       Playwright.BindingName
       Playwright.BoundingBox
       Playwright.Browser

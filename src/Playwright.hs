@@ -910,6 +910,11 @@ module Playwright
   , workerUrl
   , workers
   , workersEqual
+  , AttributeSelector (..)
+  , AttributeSelectorPart (..)
+  , AttributeSelectorOperator (..)
+  , AttributeValue (..)
+  , parseAttributeSelector
   ) where
 
 import Playwright.AcceptDownloads
@@ -965,6 +970,37 @@ import Playwright.AriaSnapshotOptions
   )
 import Playwright.AriaRole
   ( AriaRole (AriaRole, ariaRoleToText)
+  )
+import Playwright.AttributeSelector
+  ( AttributeSelector (AttributeSelector, attributeSelectorName, attributeSelectorAttributes)
+  , AttributeSelectorPart
+      ( AttributeSelectorPart
+      , attributePartName
+      , attributePartJsonPath
+      , attributePartOperator
+      , attributePartValue
+      , attributePartCaseSensitive
+      )
+  , parseAttributeSelector
+  )
+import Playwright.AttributeSelectorOperator
+  ( AttributeSelectorOperator
+      ( OpTruthy
+      , OpEqual
+      , OpContains
+      , OpDashMatch
+      , OpPrefix
+      , OpSuffix
+      , OpWord
+      )
+  )
+import Playwright.AttributeValue
+  ( AttributeValue
+      ( AttributeString
+      , AttributeNumber
+      , AttributeBool
+      , AttributeRegex
+      )
   )
 import Playwright.BindingName
   ( BindingName (BindingName, bindingNameToText)
