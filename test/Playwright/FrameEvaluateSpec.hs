@@ -215,6 +215,13 @@ tests =
               assertFailure ("expected ProtocolRpc, got: " <> show err)
             Right _ ->
               assertFailure "expected the cross-frame element handle to be rejected"
+    -- Skipped: "should dispose context on navigation" and "should dispose context on
+    -- cross-origin navigation". Upstream counts the frame execution contexts through
+    -- `page.delegate._mainFrameSession._contextIdToContext`, an internal map of the JS
+    -- client. The Haskell client has no public execution-context count, so the
+    -- dispose-on-navigation check cannot be expressed.
+    -- "should dispose context on navigation"
+    -- "should dispose context on cross-origin navigation"
     ]
 
 -- | The first child frame of the main frame, which must exist.
