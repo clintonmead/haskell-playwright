@@ -6,6 +6,10 @@ module Playwright.APIRequest
 import Playwright.APIRequestContext
   ( APIRequestContext (APIRequestContext, apiRequestContextChannel, apiRequestContextTimeoutOwner)
   )
+import Playwright.ClientCertificate
+  ( loadClientCertificates
+  , toRequestClientCertificates
+  )
 import Playwright.Channel
   ( Channel (Channel)
   )
@@ -20,16 +24,23 @@ import Playwright.Json.ChannelRef
 import Playwright.MethodName
   ( MethodName (MethodName)
   )
+import Control.Monad.IO.Class
+  ( liftIO
+  )
+import Data.Maybe
+  ( fromMaybe
+  )
 import Playwright.Monad
   ( Playwright
   )
 import Playwright.NewRequestOptions
-  ( NewRequestOptions (newRequestTimeout)
+  ( NewRequestOptions (newRequestClientCertificates, newRequestTimeout)
   , defaultNewRequestOptions
   , toPlaywrightNewRequestParams
   )
 import Playwright.Protocol
-  ( PlaywrightNewRequestResult (playwrightNewRequestResultRequest)
+  ( PlaywrightNewRequestParams (playwrightNewRequestParamsClientCertificates)
+  , PlaywrightNewRequestResult (playwrightNewRequestResultRequest)
   )
 
 newRequestContext :: Playwright APIRequestContext
@@ -39,11 +50,12 @@ newRequestContext =
 newRequestContextWith :: NewRequestOptions -> Playwright APIRequestContext
 newRequestContextWith opts = do
   guid <- lookupPlaywrightGuid
+  certs <- liftIO (loadClientCertificates (fromMaybe [] (newRequestClientCertificates opts)))
   result <-
     sendCommand
       guid
       (MethodName "newRequest")
-      (toPlaywrightNewRequestParams opts)
+      ((toPlaywrightNewRequestParams opts) { playwrightNewRequestParamsClientCertificates = toRequestClientCertificates certs })
   let
     requestGuid = channelRefGuid (playwrightNewRequestResultRequest result)
   setTimeoutDefault requestGuid (newRequestTimeout opts)

@@ -25,6 +25,9 @@ import UnliftIO.Exception
   ( bracket
   , throwIO
   )
+import Control.Monad.IO.Class
+  ( liftIO
+  )
 import Control.Monad
   ( forM_
   , when
@@ -35,7 +38,8 @@ import Data.Aeson
   , (.=)
   )
 import Data.Maybe
-  ( isJust
+  ( fromMaybe
+  , isJust
   )
 import Data.Set qualified as Set
 import Data.Text
@@ -78,8 +82,12 @@ import Playwright.Json.Decode
 import Playwright.MethodName
   ( MethodName (MethodName)
   )
+import Playwright.ClientCertificate
+  ( loadClientCertificates
+  , toBrowserClientCertificates
+  )
 import Playwright.NewContextOptions
-  ( NewContextOptions (newContextBaseURL, newContextDeviceScaleFactor, newContextIsMobile, newContextNoDefaultViewport, newContextRecordHar)
+  ( NewContextOptions (newContextBaseURL, newContextClientCertificates, newContextDeviceScaleFactor, newContextIsMobile, newContextNoDefaultViewport, newContextRecordHar)
   , defaultNewContextOptions
   , toBrowserNewContextParams
   )
@@ -90,7 +98,7 @@ import Playwright.Protocol
   ( BrowserCloseResult
   , BrowserContextEvent (browserContextEventContext)
   , BrowserInitializer (browserInitializerVersion)
-  , BrowserNewContextParams (browserNewContextParamsSelectorEngines)
+  , BrowserNewContextParams (browserNewContextParamsClientCertificates, browserNewContextParamsSelectorEngines)
   , BrowserNewContextResult (browserNewContextResultContext)
   , mkBrowserCloseParams
   )
@@ -189,6 +197,7 @@ newContextVia :: Browser -> Text -> NewContextOptions -> Playwright BrowserConte
 newContextVia browser method opts = do
   validateNewContextOptions opts
   engines <- lookupSelectorEngines
+  certs <- liftIO (loadClientCertificates (fromMaybe [] (newContextClientCertificates opts)))
   result <-
     send
       (browserChannel browser)
@@ -200,6 +209,7 @@ newContextVia browser method opts = do
                   Nothing
                 _ ->
                   Just engines
+          , browserNewContextParamsClientCertificates = toBrowserClientCertificates certs
           }
       )
   let

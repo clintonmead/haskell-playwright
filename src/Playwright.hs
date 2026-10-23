@@ -24,6 +24,8 @@ module Playwright
   , CheckOptions (..)
   , ClearCookiesOptions (..)
   , ClickOptions (..)
+  , ClientCertificate (..)
+  , ClientCertificateSource (..)
   , ScrollOption (..)
   , TapOptions (..)
   , HoverOptions (..)
@@ -1156,6 +1158,10 @@ import Playwright.Tracing
   , tracingStopChunk
   , tracingStopChunkTo
   , tracingStopTo
+  )
+import Playwright.ClientCertificate
+  ( ClientCertificate (ClientCertificate, clientCertificateOrigin, clientCertificatePassphrase, clientCertificateSource)
+  , ClientCertificateSource (ClientCertificatePem, ClientCertificatePfx)
   )
 import Playwright.ColorScheme
   ( ColorScheme (ColorSchemeDark, ColorSchemeLight, ColorSchemeNoOverride, ColorSchemeNoPreference)

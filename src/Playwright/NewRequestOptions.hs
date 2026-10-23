@@ -7,6 +7,9 @@ module Playwright.NewRequestOptions
 import Data.Maybe
   ( maybeToList
   )
+import Playwright.ClientCertificate
+  ( ClientCertificate
+  )
 import Playwright.HttpCredentials
   ( HttpCredentials (httpCredentialsOrigin, httpCredentialsPassword, httpCredentialsSend, httpCredentialsUsername)
   , HttpPassword (httpPasswordToText)
@@ -47,6 +50,7 @@ import Playwright.UserAgent
 
 data NewRequestOptions = NewRequestOptions
   { newRequestBaseURL :: Maybe Url
+  , newRequestClientCertificates :: Maybe [ClientCertificate]
   , newRequestExtraHTTPHeaders :: Maybe [HttpHeader]
   , newRequestFailOnStatusCode :: Maybe Bool
   , newRequestHttpCredentials :: Maybe HttpCredentials
@@ -64,6 +68,7 @@ defaultNewRequestOptions :: NewRequestOptions
 defaultNewRequestOptions =
   NewRequestOptions
     { newRequestBaseURL = Nothing
+    , newRequestClientCertificates = Nothing
     , newRequestExtraHTTPHeaders = Nothing
     , newRequestFailOnStatusCode = Nothing
     , newRequestHttpCredentials = Nothing

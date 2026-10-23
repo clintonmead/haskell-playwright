@@ -15,6 +15,9 @@ import Data.Text
 import Playwright.AcceptDownloads
   ( AcceptDownloads (AcceptDownloadsAccept, AcceptDownloadsDeny)
   )
+import Playwright.ClientCertificate
+  ( ClientCertificate
+  )
 import Playwright.ColorScheme
   ( ColorScheme (ColorSchemeDark, ColorSchemeLight, ColorSchemeNoOverride, ColorSchemeNoPreference)
   )
@@ -114,6 +117,7 @@ data NewContextOptions = NewContextOptions
   { newContextAcceptDownloads :: Maybe AcceptDownloads
   , newContextBaseURL :: Maybe Url
   , newContextBypassCSP :: Maybe Bool
+  , newContextClientCertificates :: Maybe [ClientCertificate]
   , newContextColorScheme :: Maybe ColorScheme
   , newContextContrast :: Maybe Contrast
   , newContextDeviceScaleFactor :: Maybe DeviceScaleFactor
@@ -150,6 +154,7 @@ defaultNewContextOptions =
     { newContextAcceptDownloads = Nothing
     , newContextBaseURL = Nothing
     , newContextBypassCSP = Nothing
+    , newContextClientCertificates = Nothing
     , newContextColorScheme = Nothing
     , newContextContrast = Nothing
     , newContextDeviceScaleFactor = Nothing

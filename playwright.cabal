@@ -45,6 +45,7 @@ library
       Playwright.CheckOptions
       Playwright.ClearCookiesOptions
       Playwright.ClickOptions
+      Playwright.ClientCertificate
       Playwright.Clock
       Playwright.ColorScheme
       Playwright.Connection
