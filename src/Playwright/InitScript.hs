@@ -97,12 +97,14 @@ bindFunction expose (key, handler) = do
   _ <- expose (BindingName name) handler
   pure (key, name)
 
+-- | Each binding is read off @window@ and then deleted, so the exposed function
+-- is reachable only through the argument the source receives, not as a global.
 initScript :: Text -> [(Text, Text)] -> Text
 initScript source bound =
   "(" <> source <> ")({" <> intercalate ", " (map entry bound) <> "})"
   where
     entry (key, name) =
-      quoteJs key <> ": window[" <> quoteJs name <> "]"
+      quoteJs key <> ": (() => { const f = window[" <> quoteJs name <> "]; delete window[" <> quoteJs name <> "]; return f; })()"
 
 quoteJs :: Text -> Text
 quoteJs = toStrict . encodeToLazyText
