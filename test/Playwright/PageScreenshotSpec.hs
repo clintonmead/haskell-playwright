@@ -910,6 +910,10 @@ tests =
           _ <- goto page (urlFromText (prefix <> "/grid-iframe-in-shadow.html")) defaultGotoOptions
           image <- screenshot page defaultScreenshotOptions
           assertEqual "iframe in shadow screenshot size" (500, 500) (pngSize image)
+    -- Skipped: "should stop animations that happen right before screenshot". Upstream passes the
+    -- test-only `__testHookBeforeScreenshot` option, which runs inside the Node client between
+    -- animation disabling and capture. The Haskell client has no equivalent hook.
+    -- "should stop animations that happen right before screenshot"
     ]
 
 -- Polls the element screenshot ten times, 150 ms apart, and reports whether any
