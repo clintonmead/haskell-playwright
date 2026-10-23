@@ -212,6 +212,7 @@ library
       Playwright.WaitId
       Playwright.WebSocket
       Playwright.WebSocketFrame
+      Playwright.WebSocketRoute
       Playwright.WebStorage
       Playwright.WheelDelta
       Playwright.Worker
@@ -450,6 +451,7 @@ test-suite playwright-test
       Playwright.ResourceTimingSpec
       Playwright.RetargetSpec
       Playwright.RoleUtilsSpec
+      Playwright.RouteWebSocketSpec
       Playwright.ScreencastActionsSpec
       Playwright.ScreencastOverlaySpec
       Playwright.ScreencastSpec

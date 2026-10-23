@@ -172,6 +172,7 @@ import Playwright.PageAriaSnapshotJsonSpec qualified as PageAriaSnapshotJsonSpec
 import Playwright.PageAriaSnapshotSpec qualified as PageAriaSnapshotSpec
 import Playwright.PageRoute1Spec qualified as PageRoute1Spec
 import Playwright.PageRoute2Spec qualified as PageRoute2Spec
+import Playwright.RouteWebSocketSpec qualified as RouteWebSocketSpec
 import Playwright.PageScreenshotSpec qualified as PageScreenshotSpec
 import Playwright.PageSetContentSpec qualified as PageSetContentSpec
 import Playwright.PageTransitionSpec qualified as PageTransitionSpec
@@ -394,6 +395,7 @@ main =
         , PageRequestGcSpec.tests
         , PageRoute1Spec.tests
         , PageRoute2Spec.tests
+        , RouteWebSocketSpec.tests
         , PageAriaSnapshotSpec.tests
         , PageAriaSnapshotJsonSpec.tests
         , PageSelectOptionSpec.tests
