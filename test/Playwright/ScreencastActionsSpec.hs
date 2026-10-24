@@ -25,7 +25,7 @@ import Playwright
   , Page
   , Playwright
   , ScreencastActionsHandle
-  , ScreencastActionsOptions (screencastActionsOptionsDuration, screencastActionsOptionsPosition)
+  , ScreencastActionsOptions (screencastActionsOptionsDuration, screencastActionsOptionsFontSize, screencastActionsOptionsPosition)
   , click
   , defaultGotoOptions
   , defaultScreencastActionsOptions
@@ -75,6 +75,18 @@ eventually check = go (50 :: Int)
         liftIO (threadDelay 100000)
         go (n - 1)
 
+-- | Like 'eventually', but names the condition that was not met.
+eventuallyNamed :: String -> Playwright Bool -> Playwright ()
+eventuallyNamed label check = go (50 :: Int)
+  where
+    go :: Int -> Playwright ()
+    go 0 = assertFailure ("condition was not met in time: " <> label)
+    go n = do
+      ok <- check
+      unless ok $ do
+        liftIO (threadDelay 100000)
+        go (n - 1)
+
 -- | Shows actions with a 5 second duration, as most upstream cases do.
 showFiveSeconds :: Page -> Playwright ScreencastActionsHandle
 showFiveSeconds page =
@@ -115,6 +127,19 @@ tests =
     , positionCase PositionBottomLeft "bottom-left" [("bottom", "6px"), ("left", "6px")]
     , positionCase PositionBottom "bottom" [("bottom", "6px"), ("left", "50%")]
     , positionCase PositionBottomRight "bottom-right" [("bottom", "6px"), ("right", "6px")]
+    , testCase "should render annotation styles" $
+        withAssets $ \prefix page -> do
+          gotoButton prefix page
+          void (screencastShowActions page defaultScreencastActionsOptions {screencastActionsOptionsDuration = Just 5000, screencastActionsOptionsFontSize = Just 32})
+          clickBg (locate page "button")
+          let title = locate page "x-pw-title"
+          eventuallyNamed "title visible" (isVisible title)
+          styleOf title "getComputedStyle(el).color" >>= assertEqual "title color" "rgb(255, 255, 255)"
+          styleOf title "getComputedStyle(el).borderRadius" >>= assertEqual "title radius" "6px"
+          styleOf title "getComputedStyle(el).padding" >>= assertEqual "title padding" "6px"
+          styleOf title "el.style.top" >>= assertEqual "title top" "6px"
+          styleOf title "el.style.right" >>= assertEqual "title right" "6px"
+          styleOf title "el.style.fontSize" >>= assertEqual "title font size" "32px"
     , testCase "should clear annotation after duration" $
         withAssets $ \prefix page -> do
           gotoButton prefix page
