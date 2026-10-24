@@ -116,6 +116,10 @@ import Test.Tasty.HUnit
 -- WebM frame decoder yet. Only the container header is read (see
 -- webmDimensions).
 --
+-- "should capture full viewport on hidpi" is a partial port: it checks the
+-- recorded 600x400 size at deviceScaleFactor 3 from the WebM header, but skips
+-- the upstream red-border pixel check, which needs the WebM frame decoder.
+--
 -- Skipped: "should expose video path blank popup", "should work for popups" and
 -- "should not create video for internal pages". The first two need a popup
 -- event helper, which the harness does not have yet. The last needs a
@@ -355,6 +359,15 @@ tests =
           (800, 600)
     , testCase "should emulate an iphone" $
         expectRecordedSize iPhone6Options (374, 666)
+    , testCase "should capture full viewport on hidpi" $
+        expectRecordedSize
+          (\dir ->
+            defaultNewContextOptions
+              { newContextRecordVideo = Just (RecordVideo dir (Just (videoSize 600 400)))
+              , newContextViewport = Just (videoSize 600 400)
+              , newContextDeviceScaleFactor = Just (deviceScaleFactorFromInt 3)
+              })
+          (600, 400)
     , testCase "should throw on browser close" $
         withSystemTempDirectory "pw-video" $ \dir ->
           withChromiumBrowser $ \browser -> do
