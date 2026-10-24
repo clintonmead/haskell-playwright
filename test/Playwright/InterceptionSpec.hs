@@ -378,6 +378,10 @@ tests =
 -- giving /?bar), and chrome:, edge: and file: schemes with a base URL
 -- (isAbsoluteUrl only knows about:, data:, blob: and ://), and my.{p,y}://**
 -- against the path-less my.p://foo, which the upstream client rejects.
+--
+-- Not ported as a separate case: upstream "should intercept blob url requests"
+-- is skipped unless the browser is WebKit (it.skip(browserName !== 'webkit')),
+-- and this harness runs Chromium only.
 urlMatchCases :: [(Maybe Text, Text, Text, Bool)]
 urlMatchCases =
   [ (Nothing, "?", "\\?", True)
@@ -410,6 +414,34 @@ urlMatchCases =
   , (Just "http://playwright.dev/", "http://localhost/", "*//localhost/", True)
   , (Nothing, "https://foo/bar.js", "https://foo/**/bar.js", True)
   , (Nothing, "https://foo/bar.js", "https://foo/**/**/bar.js", True)
+  , (Nothing, "https://localhost:8080/foo.js", "**/*.js", True)
+  , (Nothing, "https://localhost:8080/foo.js", "**/*.css", False)
+  , (Nothing, "https://localhost:8080/foo.js", "*.js", False)
+  , (Nothing, "https://localhost:8080/foo.js", "https://**/*.js", True)
+  , (Nothing, "http://localhost:8080/simple/path.js", "http://localhost:8080/simple/path.js", True)
+  , (Nothing, "https://localhost:8080/a.js", "**/{a,b}.js", True)
+  , (Nothing, "https://localhost:8080/b.js", "**/{a,b}.js", True)
+  , (Nothing, "https://localhost:8080/c.js", "**/{a,b}.js", False)
+  , (Nothing, "https://localhost:8080/c.jpg", "**/*.{png,jpg,jpeg}", True)
+  , (Nothing, "https://localhost:8080/c.jpeg", "**/*.{png,jpg,jpeg}", True)
+  , (Nothing, "https://localhost:8080/c.png", "**/*.{png,jpg,jpeg}", True)
+  , (Nothing, "https://localhost:8080/c.css", "**/*.{png,jpg,jpeg}", False)
+  , (Nothing, "foo.js", "foo*", True)
+  , (Nothing, "foo/bar.js", "foo*", False)
+  , (Nothing, "http://localhost:3000/signin-oidc/foo", "http://localhost:3000/signin-oidc*", False)
+  , (Nothing, "http://localhost:3000/signin-oidcnice", "http://localhost:3000/signin-oidc*", True)
+  , (Nothing, "/foo.js", "**/*.js", True)
+  , (Nothing, "/foo.js", "asd/**.js", False)
+  , (Nothing, "bar_foo.js", "**/*.js", False)
+  , (Nothing, "http://example.com/api/v[0-9]", "**/api/v[0-9]", True)
+  , (Nothing, "http://example.com/api/version", "**/api/v[0-9]", False)
+  , (Nothing, "http://example.com/api?param", "**/api\\?param", True)
+  , (Nothing, "http://example.com/api-param", "**/api\\?param", False)
+  , ( Nothing
+    , "http://mydomain:8080/blah/blah/three-columns/settings.html?id=settings-e3c58efe-02e9-44b0-97ac-dd138100cf7c&blah"
+    , "**/three-columns/settings.html\\?**id=settings-**"
+    , True
+    )
   ]
     ++ concat
       [ [ (Nothing, prefix <> ":blank", prefix <> ":blank", True)
