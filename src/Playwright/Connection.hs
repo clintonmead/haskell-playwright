@@ -31,8 +31,8 @@ module Playwright.Connection
   , lookupScreencast
   , putScreencast
   , deleteScreencast
-  , deleteHarRecorder
-  , lookupHarRecorder
+  , deleteHarRecorders
+  , lookupHarRecorders
   , putHarRecorder
   , rememberBrowserType
   , lookupBrowserTypeGuid
@@ -922,17 +922,17 @@ putScreencast :: Guid -> ScreencastSession -> Playwright ()
 putScreencast pageGuid screencast =
   inConnection (\conn -> Store.putScreencast conn pageGuid screencast)
 
-lookupHarRecorder :: Guid -> Playwright (Maybe HarRecorder)
-lookupHarRecorder contextGuid =
-  inConnection (`Store.lookupHarRecorder` contextGuid)
+lookupHarRecorders :: Guid -> Playwright [HarRecorder]
+lookupHarRecorders contextGuid =
+  inConnection (`Store.lookupHarRecorders` contextGuid)
 
 putHarRecorder :: Guid -> HarRecorder -> Playwright ()
 putHarRecorder contextGuid recorder =
   inConnection (\conn -> Store.putHarRecorder conn contextGuid recorder)
 
-deleteHarRecorder :: Guid -> Playwright ()
-deleteHarRecorder contextGuid =
-  inConnection (`Store.deleteHarRecorder` contextGuid)
+deleteHarRecorders :: Guid -> Playwright ()
+deleteHarRecorders contextGuid =
+  inConnection (`Store.deleteHarRecorders` contextGuid)
 
 deleteScreencast :: Guid -> Playwright ()
 deleteScreencast pageGuid =

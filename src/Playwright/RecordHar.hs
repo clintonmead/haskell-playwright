@@ -4,6 +4,7 @@ module Playwright.RecordHar
   , RecordHarMode (..)
   , exportRecordHar
   , startRecordHar
+  , startHarUpdate
   ) where
 
 import Autodocodec
@@ -24,7 +25,7 @@ import Data.Aeson
   ( FromJSON
   )
 import Data.Aeson qualified as Aeson
-import Data.Aeson.Types qualified as Aeson (parseMaybe)
+import Data.Aeson.Types qualified as Aeson (Pair, parseMaybe)
 import Data.Aeson.Key qualified as Key
 import Data.List
   ( isSuffixOf
@@ -36,8 +37,8 @@ import Data.Text
   ( Text
   )
 import Playwright.Connection
-  ( deleteHarRecorder
-  , lookupHarRecorder
+  ( deleteHarRecorders
+  , lookupHarRecorders
   , lookupObject
   , lookupPlaywrightGuid
   , putHarRecorder
@@ -64,6 +65,7 @@ import Playwright.Json.Decode
 import Playwright.MethodName
   ( MethodName (MethodName)
   )
+import Playwright.UrlMatch (UrlMatch (UrlMatchGlob, UrlMatchPredicate, UrlMatchRegex))
 import Playwright.Monad
   ( Playwright
   )
@@ -126,24 +128,61 @@ startRecordHar :: Guid -> Guid -> RecordHar -> Playwright ()
 startRecordHar contextGuid tracingGuid opts = do
   path <- liftIO (makeAbsolute (recordHarPath opts))
   let
-    zipped = isZipPath path
     content =
       fromMaybe
-        (if zipped then RecordHarContentAttach else RecordHarContentEmbed)
+        (if isZipPath path then RecordHarContentAttach else RecordHarContentEmbed)
         (recordHarContent opts)
+  startHarRecording
+    contextGuid
+    tracingGuid
+    Nothing
+    path
+    content
+    (fromMaybe RecordHarModeFull (recordHarMode opts))
+    (UrlMatchGlob <$> recordHarUrlGlob opts)
+
+-- | Starts recording traffic into a HAR file, optionally limited to one page,
+-- for @routeFromHAR@ with update. The HAR is written when the context closes.
+startHarUpdate :: Guid -> Guid -> Maybe Guid -> FilePath -> RecordHarContent -> RecordHarMode -> Maybe UrlMatch -> Playwright ()
+startHarUpdate contextGuid tracingGuid pageGuid file content mode urlMatch = do
+  path <- liftIO (makeAbsolute file)
+  startHarRecording contextGuid tracingGuid pageGuid path content mode urlMatch
+
+startHarRecording ::
+  Guid ->
+  Guid ->
+  Maybe Guid ->
+  FilePath ->
+  RecordHarContent ->
+  RecordHarMode ->
+  Maybe UrlMatch ->
+  Playwright ()
+startHarRecording contextGuid tracingGuid pageGuid path content mode urlMatch = do
+  let
+    zipped = isZipPath path
+    urlOptions :: [Aeson.Pair]
+    urlOptions = case urlMatch of
+      Just (UrlMatchGlob glob) -> ["urlGlob" Aeson..= glob]
+      Just (UrlMatchRegex source flags) -> ["urlRegexSource" Aeson..= source, "urlRegexFlags" Aeson..= flags]
+      Just (UrlMatchPredicate _) -> []
+      Nothing -> []
     options =
       Aeson.object $
         [ "content" Aeson..= contentText content
-        , "mode" Aeson..= modeText (fromMaybe RecordHarModeFull (recordHarMode opts))
+        , "mode" Aeson..= modeText mode
         ]
-          <> [ "urlGlob" Aeson..= glob | Just glob <- [recordHarUrlGlob opts] ]
+          <> urlOptions
           -- A zipped HAR is written by this client at export time, so the driver gets no path.
           <> [ "harPath" Aeson..= path | not zipped ]
+    params =
+      Aeson.object $
+        ["options" Aeson..= options]
+          <> [ "page" Aeson..= Aeson.object ["guid" Aeson..= page] | Just page <- [pageGuid] ]
   result <-
     sendCommand
       tracingGuid
       (MethodName "harStart")
-      (Aeson.object ["options" Aeson..= options])
+      params
   harId <- resultText "harId" result
   putHarRecorder
     contextGuid
@@ -153,40 +192,42 @@ startRecordHar contextGuid tracingGuid opts = do
       , harRecorderTracing = tracingGuid
       }
 
--- | Stops the context's HAR recording, if one is running, and writes the HAR
--- to its path. Called before the context closes.
+-- | Stops the context's HAR recordings, if any are running, and writes each
+-- HAR to its path. Called before the context closes.
 exportRecordHar :: Guid -> Playwright ()
 exportRecordHar contextGuid = do
-  recorder <- lookupHarRecorder contextGuid
-  forM_ recorder $ \active -> do
-    deleteHarRecorder contextGuid
-    let path = harRecorderPath active
-    result :: Aeson.Value <-
-      sendCommand
-        (harRecorderTracing active)
-        (MethodName "harExport")
-        ( Aeson.object
-            [ "harId" Aeson..= harRecorderId active
-            , "mode" Aeson..= ("entries" :: Text)
-            ]
-        )
-    -- A plain HAR is written by the driver to its path; a zipped one is zipped here from the entries.
-    when (isZipPath path) $ do
-      entries <- resultValue "entries" result
-      utilsGuid <- lookupUtilsGuid
-      _ :: Aeson.Value <-
+  recorders <- lookupHarRecorders contextGuid
+  deleteHarRecorders contextGuid
+  forM_ recorders exportOne
+  where
+    exportOne active = do
+      let path = harRecorderPath active
+      result :: Aeson.Value <-
         sendCommand
-          utilsGuid
-          (MethodName "zip")
+          (harRecorderTracing active)
+          (MethodName "harExport")
           ( Aeson.object
-              [ "zipFile" Aeson..= path
-              , "entries" Aeson..= entries
-              , "mode" Aeson..= ("write" :: Text)
-              , "includeSources" Aeson..= False
-              , "additionalSources" Aeson..= ([] :: [Text])
+              [ "harId" Aeson..= harRecorderId active
+              , "mode" Aeson..= ("entries" :: Text)
               ]
           )
-      pure ()
+      -- A plain HAR is written by the driver to its path; a zipped one is zipped here from the entries.
+      when (isZipPath path) $ do
+        entries <- resultValue "entries" result
+        utilsGuid <- lookupUtilsGuid
+        _ :: Aeson.Value <-
+          sendCommand
+            utilsGuid
+            (MethodName "zip")
+            ( Aeson.object
+                [ "zipFile" Aeson..= path
+                , "entries" Aeson..= entries
+                , "mode" Aeson..= ("write" :: Text)
+                , "includeSources" Aeson..= False
+                , "additionalSources" Aeson..= ([] :: [Text])
+                ]
+            )
+        pure ()
 
 resultValue :: Text -> Aeson.Value -> Playwright Aeson.Value
 resultValue key result =

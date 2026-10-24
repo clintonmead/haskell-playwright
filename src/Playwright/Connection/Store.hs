@@ -5,8 +5,8 @@ module Playwright.Connection.Store
   , closedGuids
   , contextHasOwnerPage
   , deleteScreencast
-  , deleteHarRecorder
-  , lookupHarRecorder
+  , deleteHarRecorders
+  , lookupHarRecorders
   , putHarRecorder
   , lookupScreencast
   , putScreencast
@@ -469,19 +469,20 @@ putScreencast conn pageGuid screencast =
     modifySession conn $ \session ->
       session {sessionScreencasts = Map.insert pageGuid screencast (sessionScreencasts session)}
 
-lookupHarRecorder :: Connection -> Guid -> IO (Maybe HarRecorder)
-lookupHarRecorder conn contextGuid =
+lookupHarRecorders :: Connection -> Guid -> IO [HarRecorder]
+lookupHarRecorders conn contextGuid =
   atomically $
-    Map.lookup contextGuid . sessionHarRecorders <$> readSession conn
+    Map.findWithDefault [] contextGuid . sessionHarRecorders <$> readSession conn
 
+-- | Adds a recorder to the context's running recordings; a context can have several.
 putHarRecorder :: Connection -> Guid -> HarRecorder -> IO ()
 putHarRecorder conn contextGuid recorder =
   atomically $
     modifySession conn $ \session ->
-      session {sessionHarRecorders = Map.insert contextGuid recorder (sessionHarRecorders session)}
+      session {sessionHarRecorders = Map.insertWith (<>) contextGuid [recorder] (sessionHarRecorders session)}
 
-deleteHarRecorder :: Connection -> Guid -> IO ()
-deleteHarRecorder conn contextGuid =
+deleteHarRecorders :: Connection -> Guid -> IO ()
+deleteHarRecorders conn contextGuid =
   atomically $
     modifySession conn $ \session ->
       session {sessionHarRecorders = Map.delete contextGuid (sessionHarRecorders session)}

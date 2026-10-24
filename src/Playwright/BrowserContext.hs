@@ -23,6 +23,7 @@ module Playwright.BrowserContext
   , grantPermissionsFor
   , newPage
   , pageContext
+  , contextHarGuids
   , setContextExtraHTTPHeaders
   , setContextDefaultTimeout
   , setContextDefaultNavigationTimeout
@@ -58,6 +59,9 @@ import Playwright.Channel
   ( BrowserContextTag
   , Channel (Channel, channelGuid)
   , send
+  )
+import Playwright.Guid
+  ( Guid
   )
 import Playwright.Connection
   ( closedGuids
@@ -248,10 +252,16 @@ closeContextWith ctx reason =
 -- when the context closes.
 startContextRecordHar :: BrowserContext -> RecordHar -> Playwright ()
 startContextRecordHar ctx options = do
+  (guid, tracing) <- contextHarGuids ctx
+  startRecordHar guid tracing options
+
+-- | The context's guid and its tracing object's guid, which HAR recording uses.
+contextHarGuids :: BrowserContext -> Playwright (Guid, Guid)
+contextHarGuids ctx = do
   let guid = channelGuid (browserContextChannel ctx)
   obj <- lookupObject guid
   initializer <- throwDecode (remoteInitializer obj)
-  startRecordHar guid (channelRefGuid (browserContextInitializerTracing initializer)) options
+  pure (guid, channelRefGuid (browserContextInitializerTracing initializer))
 
 pageContext :: Page -> BrowserContext
 pageContext page =

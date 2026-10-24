@@ -34,6 +34,16 @@ import Data.Text qualified as Text
 import Data.Text.Encoding qualified as Text
 import Playwright.BrowserContext
   ( BrowserContext
+  , contextHarGuids
+  , pageContext
+  )
+import Playwright.Channel
+  ( channelGuid
+  )
+import Playwright.RecordHar
+  ( RecordHarContent (RecordHarContentAttach)
+  , RecordHarMode (RecordHarModeMinimal)
+  , startHarUpdate
   )
 import Playwright.Connection
   ( lookupObject
@@ -82,7 +92,7 @@ import Playwright.Monad
   ( Playwright
   )
 import Playwright.Page
-  ( Page
+  ( Page (pageChannel)
   )
 import Playwright.Protocol
   ( NameValue (nameValueName, nameValueValue)
@@ -129,6 +139,11 @@ data HarNotFound
 data HarRouteOptions = HarRouteOptions
   { harRouteUrl :: UrlMatch
   , harRouteNotFound :: HarNotFound
+  , harRouteUpdate :: Bool
+  -- ^ Records the matching traffic into the HAR file instead of serving from it.
+  -- The file is written when the context closes.
+  , harRouteUpdateContent :: RecordHarContent
+  , harRouteUpdateMode :: RecordHarMode
   }
   deriving stock (Eq, Show)
 
@@ -137,6 +152,9 @@ defaultHarRouteOptions =
   HarRouteOptions
     { harRouteUrl = UrlMatchGlob "**/*"
     , harRouteNotFound = HarNotFoundAbort
+    , harRouteUpdate = False
+    , harRouteUpdateContent = RecordHarContentAttach
+    , harRouteUpdateMode = RecordHarModeMinimal
     }
 
 -- | Serves matching requests from a HAR file, aborting unmatched ones.
@@ -145,18 +163,41 @@ routeFromHar page file =
   routeFromHarWith page file defaultHarRouteOptions
 
 routeFromHarWith :: Page -> FilePath -> HarRouteOptions -> Playwright ()
-routeFromHarWith page file opts = do
-  harId <- openHar file
-  route page (harRouteUrl opts) (handleHarRoute harId opts)
+routeFromHarWith page file opts
+  | harRouteUpdate opts = do
+      let ctx = pageContext page
+      (ctxGuid, tracing) <- contextHarGuids ctx
+      startHarUpdate
+        ctxGuid
+        tracing
+        (Just (channelGuid (pageChannel page)))
+        file
+        (harRouteUpdateContent opts)
+        (harRouteUpdateMode opts)
+        (Just (harRouteUrl opts))
+  | otherwise = do
+      harId <- openHar file
+      route page (harRouteUrl opts) (handleHarRoute harId opts)
 
 contextRouteFromHar :: BrowserContext -> FilePath -> Playwright ()
 contextRouteFromHar ctx file =
   contextRouteFromHarWith ctx file defaultHarRouteOptions
 
 contextRouteFromHarWith :: BrowserContext -> FilePath -> HarRouteOptions -> Playwright ()
-contextRouteFromHarWith ctx file opts = do
-  harId <- openHar file
-  contextRoute ctx (harRouteUrl opts) (handleHarRoute harId opts)
+contextRouteFromHarWith ctx file opts
+  | harRouteUpdate opts = do
+      (ctxGuid, tracing) <- contextHarGuids ctx
+      startHarUpdate
+        ctxGuid
+        tracing
+        Nothing
+        file
+        (harRouteUpdateContent opts)
+        (harRouteUpdateMode opts)
+        (Just (harRouteUrl opts))
+  | otherwise = do
+      harId <- openHar file
+      contextRoute ctx (harRouteUrl opts) (handleHarRoute harId opts)
 
 -- | The playwright object's initializer, which names the @utils@ channel.
 newtype PlaywrightInitializer = PlaywrightInitializer

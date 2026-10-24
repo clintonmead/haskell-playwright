@@ -123,7 +123,7 @@ data Session = Session
   , sessionPagesOwningContext :: Set Guid
   , sessionContextsWithOwnerPage :: Set Guid
   , sessionScreencasts :: Map Guid ScreencastSession
-  , sessionHarRecorders :: Map Guid HarRecorder
+  , sessionHarRecorders :: Map Guid [HarRecorder]
   , sessionBrowserTypes :: Map Guid Guid
   , sessionSelectorEngines :: [SelectorEngine]
   , sessionTimeoutDefaults :: Map Guid TimeoutDefaults
