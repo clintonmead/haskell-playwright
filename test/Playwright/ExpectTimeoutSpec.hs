@@ -36,7 +36,7 @@ import Playwright.Error
   )
 import Playwright.Harness
   ( assertBool
-  , assertWaitTimeout
+  , assertProtocolContains
   , locate
   , requireTimeout
   , withChromiumPage
@@ -84,7 +84,7 @@ tests =
     , testCase "should have timeout error name" $
         withChromiumPage $ \page -> do
           timeout <- requireTimeout 1
-          assertWaitTimeout $
+          assertProtocolContains "Timeout 1ms exceeded" $
             void (waitForSelectorHandleWith page (selectorFromText "#not-found") WaitForAttached timeout)
     , testCase "should not throw when navigating during one-shot check" $
         withChromiumPage $ \page -> do
