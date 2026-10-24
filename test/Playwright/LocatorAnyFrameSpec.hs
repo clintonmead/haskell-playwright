@@ -12,9 +12,14 @@ import Data.Text
   , pack
   , unpack
   )
+import Data.Text qualified as Text
 import Playwright
-  ( ContentType (ContentType)
+  ( AriaRole (AriaRole)
+  , AriaSnapshotMode (AriaSnapshotModeAi)
+  , AriaSnapshotOptions (ariaSnapshotOptionsMode)
+  , ContentType (ContentType)
   , ExpectOptions (expectTimeout)
+  , Exactness (Inexact)
   , FulfillBody (FulfillText)
   , FulfillOptions (fulfillBody, fulfillContentType)
   , GotoOptions (gotoOptionsWaitUntil)
@@ -26,8 +31,10 @@ import Playwright
   , WaitForState (WaitForAttached)
   , click
   , contentFrame
+  , defaultAriaSnapshotOptions
   , defaultExpectOptions
   , defaultFulfillOptions
+  , defaultGetByRoleOptions
   , defaultGotoOptions
   , evaluateOnFrame
   , evaluateOnFrameBool
@@ -37,20 +44,28 @@ import Playwright
   , expectLocator
   , expectLocatorCount
   , expectLocatorWith
+  , filterHas
   , filterHasText
   , first
+  , frameByUrl
+  , frameLocator
   , frameLocatorOwner
   , frames
   , fulfillRoute
   , getAttribute
+  , getByRole
   , goto
   , innerText
   , lastLocator
   , locator
   , locatorCount
+  , locatorOnFrame
+  , locatorToString
   , mainFrame
   , milliseconds
   , nth
+  , orLocator
+  , pageAriaSnapshotWith
   , route
   , selectorFromText
   , setDefaultTimeout
@@ -65,6 +80,7 @@ import Playwright.Harness
   , withAssets
   )
 import Playwright qualified as PW (childFrameLocator, childLocator)
+import Playwright.Locator qualified as PWL (getByRole, getByText)
 import Test.Tasty
   ( TestTree
   , testGroup
@@ -559,6 +575,178 @@ tests =
           gotoDomContentLoaded prefix page
           waitForFrameCount page 3
           expectLocatorCount defaultExpectOptions (childLocator (anyFrame page) "button") 1
+    , testCase "should support composite locators" $
+        withAssets $ \prefix page -> do
+          serve
+            page
+            [ ("empty.html", "<iframe src=\"a.html\"></iframe>")
+            , ("a.html", "<div><span>foo</span></div><div><i>bar</i></div>")
+            ]
+          gotoEmpty prefix page
+          assertEqual "text" "foo"
+            =<< innerText
+              ( filterHas
+                  (childLocator (anyFrame page) "div")
+                  (locator page (selectorFromText "span"))
+              )
+    , testCase "should only search frames inside the starting frame" $
+        withAssets $ \prefix page -> do
+          serve
+            page
+            [ ("empty.html", "<iframe src=\"a.html\"></iframe><button>main</button>")
+            , ("a.html", "<iframe src=\"b.html\"></iframe>")
+            , ("b.html", "<button>deep</button>")
+            ]
+          gotoEmpty prefix page
+          waitForFrameCount page 3
+          settle
+          middle <- frameByUrl page (UrlMatchGlob "**/a.html")
+          case middle of
+            Nothing -> assertFailure "expected the a.html frame"
+            Just frame ->
+              assertEqual "text" "deep"
+                =<< innerText
+                  (childLocator (locatorOnFrame page frame (selectorFromText "internal:control=any-frame")) "button")
+    , testCase "should render frameLocator() in the locator description" $
+        withAssets $ \_ page -> do
+          assertEqual
+            "description"
+            "frameLocator().locator('#x').contentFrame().locator('button')"
+            (locatorToString (childLocator (childFrameLocator (anyFrame page) "#x") "button"))
+          assertEqual
+            "description"
+            "frameLocator().locator('section').locator('iframe').contentFrame().getByText('foo')"
+            ( locatorToString
+                ( PWL.getByText
+                    (childFrameLocator (childLocator (anyFrame page) "section") "iframe")
+                    "foo"
+                    Inexact
+                )
+            )
+    , testCase "should not allow frameLocator() inside a composite locator" $
+        withAssets $ \prefix page -> do
+          serve
+            page
+            [ ("empty.html", "<button>main</button><iframe src=\"a.html\"></iframe>")
+            , ("a.html", "<a href=\"#\">link</a>")
+            ]
+          gotoEmpty prefix page
+          waitForChildFrames page 2 "a"
+          assertErrorContains
+            "or"
+            [ "frameLocator() is not allowed inside composite locators, while querying"
+            , "locator('button').or(frameLocator().locator('a'))"
+            ]
+            (locatorCount (orLocator (locator page (selectorFromText "button")) (childLocator (anyFrame page) "a")))
+          assertErrorContains
+            "filter has"
+            ["frameLocator() is not allowed inside composite locators"]
+            ( locatorCount
+                ( filterHas
+                    (locator page (selectorFromText "button"))
+                    (childLocator (anyFrame page) "a")
+                )
+            )
+          assertErrorContains
+            "repeated frameLocator"
+            [ "frameLocator() is not allowed inside composite locators, while querying"
+            , "frameLocator().locator('button').or(frameLocator().locator('a'))"
+            ]
+            ( locatorCount
+                ( orLocator
+                    (childLocator (anyFrame page) "button")
+                    (childLocator (anyFrame page) "a")
+                )
+            )
+          assertErrorContains
+            "repeated frameLocator in chain"
+            ["frameLocator() is not allowed inside composite locators"]
+            ( locatorCount
+                ( orLocator
+                    (childLocator (childFrameLocator (anyFrame page) "#f") "a")
+                    (childLocator (childFrameLocator (anyFrame page) "#f") "button")
+                )
+            )
+          assertErrorContains
+            "leading frameLocator"
+            ["frameLocator() matched elements in multiple frames"]
+            ( locatorCount
+                ( orLocator
+                    (childLocator (anyFrame page) "a")
+                    (locator page (selectorFromText "button"))
+                )
+            )
+    , testCase "should support a composite locator under frameLocator()" $
+        withAssets $ \prefix page -> do
+          serve
+            page
+            [ ("empty.html", "<iframe src=\"a.html\"></iframe>")
+            , ("a.html", "<div class=\"classname\">first</div><button>second</button>")
+            ]
+          gotoEmpty prefix page
+          waitForChildFrames page 2 "button"
+          pollTexts
+            ( orLocator
+                (childLocator (anyFrame page) ".classname")
+                (getByRole page (AriaRole "button") defaultGetByRoleOptions)
+            )
+            ["first", "second"]
+    , testCase "should support a composite locator under frameLocator() and a frame locator" $
+        withAssets $ \prefix page -> do
+          serve
+            page
+            [ ("empty.html", "<iframe src=\"a.html\"></iframe>")
+            , ("a.html", "<iframe id=\"f\" src=\"b.html\"></iframe>")
+            , ("b.html", "<div class=\"classname\">first</div><button>second</button>")
+            ]
+          gotoEmpty prefix page
+          waitForFrameCount page 3
+          pollTexts
+            ( orLocator
+                (childLocator (childFrameLocator (anyFrame page) "#f") ".classname")
+                (PWL.getByRole (frameLocator page (selectorFromText "#f")) (AriaRole "button") defaultGetByRoleOptions)
+            )
+            ["first", "second"]
+    , testCase "should not allow owner on frameLocator()" $
+        withAssets $ \_ page ->
+          assertErrorContains
+            "owner"
+            ["Selector cannot be empty after frameLocator()"]
+            (locatorCount (frameLocatorOwner (anyFrame page)))
+    , testCase "should resolve aria-ref selectors" $
+        withAssets $ \prefix page -> do
+          serve
+            page
+            [ ("empty.html", "<button>main</button><iframe src=\"a.html\"></iframe>")
+            , ("a.html", "<button>inside</button>")
+            ]
+          gotoEmpty prefix page
+          waitForChildFrames page 2 "button"
+          snapshot <-
+            pageAriaSnapshotWith
+              page
+              defaultAriaSnapshotOptions {ariaSnapshotOptionsMode = Just AriaSnapshotModeAi}
+          case ariaRefAfter "button \"inside\" [ref=" snapshot of
+            Nothing -> assertFailure ("no ref for the inside button in " <> unpack snapshot)
+            Just ref -> do
+              assertBool "ref shape" ("f" `Text.isPrefixOf` ref)
+              assertEqual "text" "inside"
+                =<< innerText (childLocator (anyFrame page) ("aria-ref=" <> ref))
+    , testCase "should click while another iframe is stalled" $
+        withAssets $ \prefix page -> do
+          serve
+            page
+            [ ("empty.html", "<iframe src=\"a.html\"></iframe><iframe src=\"stall.html\"></iframe>")
+            , ("a.html", "<button onclick=\"window.__clicked = true\">Click me</button>")
+            ]
+          stallRoute page
+          gotoDomContentLoaded prefix page
+          waitForFrameCount page 3
+          click (childLocator (anyFrame page) "button")
+          middle <- frameByUrl page (UrlMatchGlob "**/a.html")
+          case middle of
+            Nothing -> assertFailure "expected the a.html frame"
+            Just frame -> assertBool "button in a.html was clicked" =<< evaluateOnFrameBool frame clickedExpr
     ]
 
 clickedExpr :: Text
@@ -673,6 +861,14 @@ assertErrorContains label needles action = do
 setTimeoutMs :: Page -> Double -> Playwright ()
 setTimeoutMs page ms =
   setDefaultTimeout page =<< requireTimeout ms
+
+-- | The aria ref that follows the given prefix in an aria snapshot.
+ariaRefAfter :: Text -> Text -> Maybe Text
+ariaRefAfter prefix snapshot =
+  case Text.breakOn prefix snapshot of
+    (_, rest)
+      | Text.null rest -> Nothing
+      | otherwise -> Just (Text.takeWhile (/= ']') (Text.drop (Text.length prefix) rest))
 
 -- | Extends a locator with a CSS or internal selector given as text.
 childLocator :: Locator -> Text -> Locator
