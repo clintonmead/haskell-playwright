@@ -412,7 +412,7 @@ tests =
               values <- readIORef seen
               assertBool "requests seen" (not (null values))
               assertEqual "referers" [] (filter (/= Just expected) values)
-    , testCase "should navigate to URL with hash and fire requests without hash" $
+    , testCase "should navigate to URL with hash and and fire requests without hash" $
         withChromiumPage $ \page ->
           withLocalApp (\_ respond -> respond (responseLBS status200 [(hContentType, "text/html")] "")) $ \prefix -> do
             seen <- newIORef (0 :: Int)
