@@ -111,6 +111,7 @@ import Playwright.ExpectBooleanSpec qualified as ExpectBooleanSpec
 import Playwright.ExpectToHaveAccessibleSpec qualified as ExpectToHaveAccessibleSpec
 import Playwright.ExpectToHaveTextSpec qualified as ExpectToHaveTextSpec
 import Playwright.ExpectToHaveValueSpec qualified as ExpectToHaveValueSpec
+import Playwright.ExpectTimeoutSpec qualified as ExpectTimeoutSpec
 import Playwright.LocatorListSpec qualified as LocatorListSpec
 import Playwright.LocatorMiscSpec qualified as LocatorMiscSpec
 import Playwright.LocatorMisc2Spec qualified as LocatorMisc2Spec
@@ -351,6 +352,7 @@ main =
         , ExpectToHaveAccessibleSpec.tests
         , ExpectToHaveTextSpec.tests
         , ExpectToHaveValueSpec.tests
+        , ExpectTimeoutSpec.tests
         , LocatorListSpec.tests
         , LocatorMiscSpec.tests
         , LocatorMisc2Spec.tests

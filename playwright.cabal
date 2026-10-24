@@ -349,6 +349,7 @@ test-suite playwright-test
       Playwright.EvalOnSelectorAllSpec
       Playwright.EvalOnSelectorSpec
       Playwright.ExpectBooleanSpec
+      Playwright.ExpectTimeoutSpec
       Playwright.ExpectToHaveAccessibleSpec
       Playwright.ExpectToHaveTextSpec
       Playwright.ExpectToHaveValueSpec
