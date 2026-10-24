@@ -540,6 +540,15 @@ tests =
           lastEvent <- captureLastKeydown page
           keyboardPress page (Key "a")
           assertEqual "key" "a" =<< evaluateOnHandleText lastEvent "e => e.key"
+    -- Upstream cases not ported here (platform- or browser-specific):
+    --   should support MacOS shortcuts: upstream is it.skip(platform !== 'darwin'). The
+    --     Shift+Control+Alt+KeyB word-select shortcut is only meaningful on macOS, and this
+    --     suite runs headless Chromium on Linux, so the case is skipped as platform-specific.
+    --   should expose keyIdentifier in webkit: upstream is it.skip(browserName !== 'webkit').
+    --     event.keyIdentifier exists only in WebKit, and this suite runs Chromium only.
+    --   should move to the start of the document: upstream is it.skip(!isMac). Shift+Meta+ArrowUp
+    --     moves the selection to the document start only on macOS, so the case is skipped as
+    --     platform-specific.
     ]
 
 -- | Checks the Keydown / Keypress / Keyup report for a modifier held while
