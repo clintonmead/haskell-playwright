@@ -50,6 +50,7 @@ library:
     - exceptions
     - filepath
     - mtl
+    - network
     - process
     - regex-base
     - regex-tdfa
@@ -58,6 +59,7 @@ library:
     - text
     - typed-process
     - unliftio
+    - websockets
 
 tests:
   playwright-test:

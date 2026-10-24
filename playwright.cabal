@@ -63,6 +63,7 @@ library
       Playwright.CookieSameSite
       Playwright.CssPixel
       Playwright.DblclickOptions
+      Playwright.DebugController
       Playwright.Debugger
       Playwright.DeviceScaleFactor
       Playwright.Dialog
@@ -256,6 +257,7 @@ library
     , exceptions
     , filepath
     , mtl
+    , network
     , process
     , regex-base
     , regex-tdfa
@@ -264,6 +266,7 @@ library
     , text
     , typed-process
     , unliftio
+    , websockets
   default-language: GHC2021
 
 test-suite playwright-test
@@ -321,6 +324,7 @@ test-suite playwright-test
       Playwright.ClientCertificatesSpec
       Playwright.ComponentParserSpec
       Playwright.ConnectionSpec
+      Playwright.DebugControllerSpec
       Playwright.DebuggerSpec
       Playwright.DefaultBrowserContext1Spec
       Playwright.DefaultBrowserContext2Spec

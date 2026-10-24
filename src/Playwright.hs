@@ -1019,6 +1019,12 @@ module Playwright
   , AttributeSelectorOperator (..)
   , AttributeValue (..)
   , parseAttributeSelector
+  , DebugController
+  , HighlightTarget (..)
+  , withDebugController
+  , debugInitialize
+  , debugHighlight
+  , debugHideHighlight
   ) where
 
 import Playwright.AcceptDownloads
@@ -1136,6 +1142,14 @@ import Playwright.BrowserServer
 import Playwright.Logger
   ( LogSeverity (LogVerbose, LogInfo, LogWarning, LogError)
   , Logger (Logger, loggerLog, loggerIsEnabled)
+  )
+import Playwright.DebugController
+  ( DebugController
+  , HighlightTarget (HighlightAriaTemplate, HighlightSelector)
+  , debugHideHighlight
+  , debugHighlight
+  , debugInitialize
+  , withDebugController
   )
 import Playwright.Browser
   ( Browser (Browser, browserChannel)
