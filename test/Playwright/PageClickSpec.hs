@@ -822,6 +822,26 @@ tests =
           -- If popup blocks the click, then some of the clicks below will hang.
           forM_ [0 :: Int .. 29] $ \i ->
             clickWith (locate page ("text=\"" <> pack (show i) <> "\"")) defaultClickOptions {clickOptionsTimeout = milliseconds 5000}
+    -- Upstream cases not ported here:
+    --   should not throw protocol error when navigating during the click,
+    --   should retry when navigating during the click,
+    --   should not hang when frame is detached: each passes the test-only
+    --     `__testHookBeforeStable` click option, which runs inside the Node client between
+    --     the stability checks. ClickOptions has no such hook, so the navigation or detach
+    --     cannot be triggered at the same point.
+    --   should not wait with noAutoWaiting, should not wait with noAutoWaiting 2,
+    --   should not wait with noAutoWaiting 3: pass the test-only `__testHookNoAutoWaiting`
+    --     click option. ClickOptions has no such hook.
+    --   should abort via signal, should throw an Error when aborted in-flight with a string reason,
+    --   should abort via already-aborted signal,
+    --   should throw an Error when aborted via an already-aborted signal with a string reason:
+    --     these use the JavaScript AbortController/AbortSignal `signal` option, and assert the
+    --     JS AbortError name and `cause`. The Haskell client has no AbortSignal, and
+    --     ClickOptions has no signal field.
+    --   should click the button with fixed position inside an iframe: upstream marks it
+    --     it.fixme(browserName === 'chromium') (Chromium bug 986390). Run against this
+    --     Chromium, the click times out at 30s with "element is outside of the viewport",
+    --     so the case is skipped as browser-specific.
     ]
 
 waitUntilEnabled :: Text -> Text -> Text -> IO ()
