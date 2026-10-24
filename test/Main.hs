@@ -85,6 +85,7 @@ import Playwright.GlobalFetchCookieSpec qualified as GlobalFetchCookieSpec
 import Playwright.GlobalFetch1Spec qualified as GlobalFetch1Spec
 import Playwright.GlobalFetch2Spec qualified as GlobalFetch2Spec
 import Playwright.BrowserContextHarSpec qualified as BrowserContextHarSpec
+import Playwright.DebugControllerSpec qualified as DebugControllerSpec
 import Playwright.HarRecordSpec qualified as HarRecordSpec
 import Playwright.HarSpec qualified as HarSpec
 import Playwright.HeapSpec qualified as HeapSpec
@@ -325,6 +326,7 @@ main =
         , HarSpec.tests
         , HarRecordSpec.tests
         , HeapSpec.tests
+        , DebugControllerSpec.tests
         , BrowserContextHarSpec.tests
         , HitTargetSpec.tests
         , IntegrationSpec.tests
