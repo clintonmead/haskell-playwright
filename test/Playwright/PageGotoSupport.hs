@@ -3,6 +3,7 @@ module Playwright.PageGotoSupport
   , assetFileUrl
   , crossProcess
   , withHangServer
+  , withHttpsFixture
   , withGotoServer
   , hangApp
   , empty204App
@@ -57,6 +58,7 @@ import UnliftIO.MVar
   )
 import UnliftIO.Exception
   ( SomeException
+  , bracket
   , try
   )
 import Control.Monad
@@ -111,6 +113,16 @@ import Network.Wai.Application.Static
   )
 import Network.Wai.Handler.Warp
   ( withApplication
+  )
+import System.IO
+  ( hGetLine
+  )
+import System.Process
+  ( CreateProcess (std_out)
+  , StdStream (CreatePipe)
+  , cleanupProcess
+  , createProcess
+  , proc
   )
 import Playwright
   ( Frame
@@ -191,6 +203,42 @@ withGotoServer app action =
   withChromiumPage $ \page ->
     withLocalApp app $ \prefix ->
       action prefix page
+
+-- | Starts a Node HTTPS server with the untrusted test server certificate, so
+-- Chromium rejects it unless the context ignores HTTPS errors. It serves
+-- /redirect/1.html -> /redirect/2.html -> /empty.html like the upstream
+-- httpsServer fixture.
+withHttpsFixture :: (Text -> Playwright a) -> Playwright a
+withHttpsFixture action = do
+  root <- testAssetsDir
+  withRunInIO $ \run ->
+    bracket
+      (createProcess (proc "node" ["-e", httpsNodeScript, root <> "/client-certificates/server"]) {std_out = CreatePipe})
+      cleanupProcess
+      ( \(_, stdoutHandle, _, _) -> do
+          line <- maybe (fail "https fixture has no stdout") hGetLine stdoutHandle
+          case words line of
+            ["PORT", port] ->
+              run (action (pack ("https://127.0.0.1:" <> port)))
+            _ ->
+              fail ("unexpected https fixture output: " <> line)
+      )
+
+httpsNodeScript :: String
+httpsNodeScript =
+  unlines
+    [ "const fs = require('fs');"
+    , "const https = require('https');"
+    , "const dir = process.argv[1];"
+    , "const redirects = { '/redirect/1.html': '/redirect/2.html', '/redirect/2.html': '/empty.html' };"
+    , "const options = { key: fs.readFileSync(dir + '/server_key.pem'), cert: fs.readFileSync(dir + '/server_cert.pem') };"
+    , "const server = https.createServer(options, (req, res) => {"
+    , "  if (redirects[req.url]) { res.writeHead(302, { Location: redirects[req.url] }); res.end(); return; }"
+    , "  res.writeHead(200, { 'Content-Type': 'text/html' });"
+    , "  res.end('<div>ok</div>');"
+    , "});"
+    , "server.listen(0, '127.0.0.1', () => console.log(`PORT ${server.address().port}`));"
+    ]
 
 hangApp :: Application
 hangApp _request _respond =

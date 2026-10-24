@@ -52,6 +52,7 @@ import Playwright.Harness
   )
 import Playwright.PageGotoSupport
   ( requireMs
+  , crossProcess
   , withHangServer
   , withGotoServer
   , redirectApp
@@ -66,6 +67,14 @@ import Playwright.PageGotoSupport
   , replacedByAnotherNavigation
   , jsRedirectUrlBar
   , urlBarDuringPending
+  , withHttpsFixture
+  )
+import Playwright.Error
+  ( PlaywrightError (ProtocolRpc)
+  , ProtocolFailure (protocolFailureMessage)
+  )
+import Control.Monad
+  ( void
   )
 import Test.Tasty
   ( localOption
@@ -265,6 +274,28 @@ tests =
               (urlFromText (prefix <> "/empty.html"))
               defaultGotoOptions {gotoOptionsWaitUntil = Just LoadStateNetworkIdle}
           pure ()
+    , testCase "should fail when navigating to bad SSL" $
+        withChromiumPage $ \page ->
+          withHttpsFixture $ \prefix ->
+            expectBadSsl
+              (goto page (urlFromText (prefix <> "/empty.html")) defaultGotoOptions)
+    , testCase "should fail when navigating to bad SSL after redirects" $
+        withChromiumPage $ \page ->
+          withHttpsFixture $ \prefix ->
+            expectBadSsl
+              (goto page (urlFromText (prefix <> "/redirect/1.html")) defaultGotoOptions)
+    , testCase "should not crash when navigating to bad SSL after a cross origin navigation" $
+        withAssets $ \prefix page ->
+          withHttpsFixture $ \httpsPrefix -> do
+            _ <- goto page (urlFromText (crossProcess prefix <> "/empty.html")) defaultGotoOptions
+            outcome <-
+              try (void (goto page (urlFromText (httpsPrefix <> "/empty.html")) defaultGotoOptions))
+                :: Playwright (Either SomeException ())
+            case outcome of
+              Left _ ->
+                pure ()
+              Right () ->
+                assertFailure "expected navigation to bad SSL to fail"
     , testCase "should report raw buffer for main resource" $
         withGotoServer rawBufferApp $ \prefix page -> do
           -- Upstream marks this it.fail on chromium (Chromium sends the main resource as text),
@@ -304,6 +335,21 @@ tests =
         testCase "should succeed on url bar navigation when there is pending navigation" $
           urlBarDuringPending
     ]
+
+-- | Chromium reports an untrusted certificate as one of these net errors.
+expectBadSsl :: Playwright a -> Playwright ()
+expectBadSsl action = do
+  result <- try action
+  case result of
+    Left (ProtocolRpc failure) ->
+      let message = protocolFailureMessage failure
+       in if any (`Text.isInfixOf` message) ["net::ERR_CERT_AUTHORITY_INVALID", "net::ERR_CERT_INVALID"]
+            then pure ()
+            else assertFailure ("expected SSL certificate error, got: " <> Text.unpack message)
+    Left err ->
+      assertFailure ("expected ProtocolRpc, got: " <> show err)
+    Right _ ->
+      assertFailure "expected SSL certificate error"
 
 rawBufferBytes :: BS.ByteString
 rawBufferBytes =
