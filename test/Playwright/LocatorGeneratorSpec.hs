@@ -4,10 +4,38 @@ module Playwright.LocatorGeneratorSpec
   ( tests
   ) where
 
+import Control.Monad.IO.Class (MonadIO)
 import Data.Text qualified as T
+import Playwright
+  ( Exactness (Exact, Inexact)
+  , Locator
+  , childFrameLocator
+  , childLocator
+  , contentFrame
+  , filterHas
+  , filterHasNot
+  , filterHasNotText
+  , filterHasText
+  , filterHasTextRegex
+  , filterVisible
+  , first
+  , frameLocator
+  , getByLabel
+  , getByText
+  , getByTextRegex
+  , getByPlaceholderRegex
+  , lastLocator
+  , locator
+  , nth
+  , selectorFromText
+  , selectorToText
+  , locatorSelector
+  )
 import Playwright.Harness
   ( assertEqual
+  , withChromiumPage
   )
+import Playwright.Locator qualified as L
 import Playwright.LocatorGenerator
   ( Language (JavaScript, Python, Java, CSharp)
   , asLocator
@@ -27,14 +55,12 @@ import Test.Tasty.HUnit
 parseLocator :: Language -> T.Text -> T.Text -> T.Text
 parseLocator = locatorOrSelectorAsSelector
 
--- Official cases that stay skipped (browser-only, or derived from live Locator
--- objects that the Haskell client does not expose):
--- * reverse engineer locators (upstream line 50): generate(page.*) reads `_selector`
---   from live Locator objects; the Haskell client has no equivalent handle.
--- * reverse engineer getByRole (193), ignore-case (267), ordered (288), regex (297),
---   hasText (327), hasNotText (350), visible (359), has (379), hasNot (400),
---   has + hasText (421), frameLocator (431), frameLocator without a selector (450),
---   generate multiple locators (464): each runs generate(page.*) over a live page.
+-- The reverse engineer cases build Locators with the public API and read the
+-- selector through `locatorSelector`, then check asLocator for each language.
+--
+-- Official cases that stay skipped in this slice (outside the 11-case scope):
+-- * reverse engineer locators (upstream line 50), reverse engineer getByRole (193)
+--   and generate multiple locators (464): they are not part of this slice.
 -- * reverse engineer internal:has-text locators (552): needs window.playwright.selector
 --   inside the page (generateForNode).
 -- * should not oom in locator parser (689): needs a live page to call count() and read
@@ -301,7 +327,207 @@ tests =
           "describe then chain"
           "locator('body').locator('div')"
           (asLocatorDescription JavaScript "body >> internal:describe=\"desc\" >> div")
+    , testCase "reverse engineer ignore-case locators" $
+        withChromiumPage $ \page -> do
+          expectGenerated "getByText hello my" (selectorOf (getByText page "hello my\nwo\"rld" Inexact))
+            ( "getByText('hello my\\nwo\"rld')"
+            , "get_by_text(\"hello my\\nwo\\\"rld\")"
+            , "getByText(\"hello my\\nwo\\\"rld\")"
+            , "GetByText(\"hello my\\nwo\\\"rld\")"
+            )
+          expectGenerated "getByText spaces" (selectorOf (getByText page "hello       my     wo\"rld" Inexact))
+            ( "getByText('hello       my     wo\"rld')"
+            , "get_by_text(\"hello       my     wo\\\"rld\")"
+            , "getByText(\"hello       my     wo\\\"rld\")"
+            , "GetByText(\"hello       my     wo\\\"rld\")"
+            )
+          expectGenerated "getByLabel hello my" (selectorOf (getByLabel page "hello my\nwo\"rld" Inexact))
+            ( "getByLabel('hello my\\nwo\"rld')"
+            , "get_by_label(\"hello my\\nwo\\\"rld\")"
+            , "getByLabel(\"hello my\\nwo\\\"rld\")"
+            , "GetByLabel(\"hello my\\nwo\\\"rld\")"
+            )
+    , testCase "reverse engineer ordered locators" $
+        withChromiumPage $ \page ->
+          expectGenerated "nth first last" (selectorOf (lastLocator (first (nth (locator page (selectorFromText "div")) 3))))
+            ( "locator('div').nth(3).first().last()"
+            , "locator(\"div\").nth(3).first.last"
+            , "locator(\"div\").nth(3).first().last()"
+            , "Locator(\"div\").Nth(3).First.Last"
+            )
+    , testCase "reverse engineer locators with regex" $
+        withChromiumPage $ \page -> do
+          expectGenerated "getByText he/sl" (selectorOf (getByTextRegex page "/he\\/\\sl\\nlo/"))
+            ( "getByText(/he\\/\\sl\\nlo/)"
+            , "get_by_text(re.compile(r\"he/\\sl\\nlo\"))"
+            , "getByText(Pattern.compile(\"he\\\\/\\\\sl\\\\nlo\"))"
+            , "GetByText(new Regex(\"he\\\\/\\\\sl\\\\nlo\"))"
+            )
+          expectGenerated "getByPlaceholder he/sl" (selectorOf (getByPlaceholderRegex page "/he\\/\\sl\\nlo/"))
+            ( "getByPlaceholder(/he\\/\\sl\\nlo/)"
+            , "get_by_placeholder(re.compile(r\"he/\\sl\\nlo\"))"
+            , "getByPlaceholder(Pattern.compile(\"he\\\\/\\\\sl\\\\nlo\"))"
+            , "GetByPlaceholder(new Regex(\"he\\\\/\\\\sl\\\\nlo\"))"
+            )
+          expectGenerated "getByText hel-quote" (selectorOf (getByTextRegex page "/hel\"lo/"))
+            ( "getByText(/hel\"lo/)"
+            , "get_by_text(re.compile(r\"hel\\\"lo\"))"
+            , "getByText(Pattern.compile(\"hel\\\"lo\"))"
+            , "GetByText(new Regex(\"hel\\\"lo\"))"
+            )
+          expectGenerated "getByPlaceholder hel-quote" (selectorOf (getByPlaceholderRegex page "/hel\"lo/"))
+            ( "getByPlaceholder(/hel\"lo/)"
+            , "get_by_placeholder(re.compile(r\"hel\\\"lo\"))"
+            , "getByPlaceholder(Pattern.compile(\"hel\\\"lo\"))"
+            , "GetByPlaceholder(new Regex(\"hel\\\"lo\"))"
+            )
+    , testCase "reverse engineer hasText" $
+        withChromiumPage $ \page -> do
+          let base = getByText page "Hello" Inexact
+          expectGenerated "hasText string" (selectorOf (filterHasText base "wo\"rld\n"))
+            ( "getByText('Hello').filter({ hasText: 'wo\"rld\\n' })"
+            , "get_by_text(\"Hello\").filter(has_text=\"wo\\\"rld\\n\")"
+            , "getByText(\"Hello\").filter(new Locator.FilterOptions().setHasText(\"wo\\\"rld\\n\"))"
+            , "GetByText(\"Hello\").Filter(new() { HasText = \"wo\\\"rld\\n\" })"
+            )
+          expectGenerated "hasText regex slash" (selectorOf (filterHasTextRegex base "/wo\\/\\srld\\n/"))
+            ( "getByText('Hello').filter({ hasText: /wo\\/\\srld\\n/ })"
+            , "get_by_text(\"Hello\").filter(has_text=re.compile(r\"wo/\\srld\\n\"))"
+            , "getByText(\"Hello\").filter(new Locator.FilterOptions().setHasText(Pattern.compile(\"wo\\\\/\\\\srld\\\\n\")))"
+            , "GetByText(\"Hello\").Filter(new() { HasTextRegex = new Regex(\"wo\\\\/\\\\srld\\\\n\") })"
+            )
+          expectGenerated "hasText regex quote" (selectorOf (filterHasTextRegex base "/wor\"ld/"))
+            ( "getByText('Hello').filter({ hasText: /wor\"ld/ })"
+            , "get_by_text(\"Hello\").filter(has_text=re.compile(r\"wor\\\"ld\"))"
+            , "getByText(\"Hello\").filter(new Locator.FilterOptions().setHasText(Pattern.compile(\"wor\\\"ld\")))"
+            , "GetByText(\"Hello\").Filter(new() { HasTextRegex = new Regex(\"wor\\\"ld\") })"
+            )
+    , testCase "reverse engineer hasNotText" $
+        withChromiumPage $ \page ->
+          expectGenerated "hasNotText string" (selectorOf (filterHasNotText (getByText page "Hello" Inexact) "wo\"rld\n"))
+            ( "getByText('Hello').filter({ hasNotText: 'wo\"rld\\n' })"
+            , "get_by_text(\"Hello\").filter(has_not_text=\"wo\\\"rld\\n\")"
+            , "getByText(\"Hello\").filter(new Locator.FilterOptions().setHasNotText(\"wo\\\"rld\\n\"))"
+            , "GetByText(\"Hello\").Filter(new() { HasNotText = \"wo\\\"rld\\n\" })"
+            )
+    , testCase "reverse engineer visible" $
+        withChromiumPage $ \page -> do
+          let base = getByText page "Hello" Inexact
+              divSel = selectorFromText "div"
+          expectGenerated "visible()" (selectorOf (childLocator (filterVisible base True) divSel))
+            ( "getByText('Hello').visible().locator('div')"
+            , "get_by_text(\"Hello\").visible.locator(\"div\")"
+            , "getByText(\"Hello\").visible().locator(\"div\")"
+            , "GetByText(\"Hello\").Visible.Locator(\"div\")"
+            )
+          expectGenerated "filter visible false" (selectorOf (childLocator (filterVisible base False) divSel))
+            ( "getByText('Hello').filter({ visible: false }).locator('div')"
+            , "get_by_text(\"Hello\").filter(visible=False).locator(\"div\")"
+            , "getByText(\"Hello\").filter(new Locator.FilterOptions().setVisible(false)).locator(\"div\")"
+            , "GetByText(\"Hello\").Filter(new() { Visible = false }).Locator(\"div\")"
+            )
+          let selector = selectorOf (filterVisible base True)
+          assertEqual "parse js" selector (parseLocator JavaScript "getByText('Hello').filter({ visible: true })" "")
+          assertEqual "parse java" selector (parseLocator Java "getByText(\"Hello\").filter(new Locator.FilterOptions().setVisible(true))" "")
+          assertEqual "parse py" selector (parseLocator Python "get_by_text(\"Hello\").filter(visible=True)" "")
+          assertEqual "parse csharp" selector (parseLocator CSharp "GetByText(\"Hello\").Filter(new() { Visible = true })" "")
+    , testCase "reverse engineer has" $
+        withChromiumPage $ \page -> do
+          let base = getByText page "Hello" Inexact
+              divLoc = locator page (selectorFromText "div")
+          expectGenerated "has getByText" (selectorOf (filterHas base (L.getByText divLoc "bye" Inexact)))
+            ( "getByText('Hello').filter({ has: locator('div').getByText('bye') })"
+            , "get_by_text(\"Hello\").filter(has=locator(\"div\").get_by_text(\"bye\"))"
+            , "getByText(\"Hello\").filter(new Locator.FilterOptions().setHas(locator(\"div\").getByText(\"bye\")))"
+            , "GetByText(\"Hello\").Filter(new() { Has = Locator(\"div\").GetByText(\"bye\") })"
+            )
+          let inner = filterHas (locator page (selectorFromText "div")) (locator page (selectorFromText "span"))
+              outer = filterHas (locator page (selectorFromText "section")) inner
+              chained = filterHas (filterHasText outer "foo") (locator page (selectorFromText "a"))
+          expectGenerated "has nested" (selectorOf chained)
+            ( "locator('section').filter({ has: locator('div').filter({ has: locator('span') }) }).filter({ hasText: 'foo' }).filter({ has: locator('a') })"
+            , "locator(\"section\").filter(has=locator(\"div\").filter(has=locator(\"span\"))).filter(has_text=\"foo\").filter(has=locator(\"a\"))"
+            , "locator(\"section\").filter(new Locator.FilterOptions().setHas(locator(\"div\").filter(new Locator.FilterOptions().setHas(locator(\"span\"))))).filter(new Locator.FilterOptions().setHasText(\"foo\")).filter(new Locator.FilterOptions().setHas(locator(\"a\")))"
+            , "Locator(\"section\").Filter(new() { Has = Locator(\"div\").Filter(new() { Has = Locator(\"span\") }) }).Filter(new() { HasText = \"foo\" }).Filter(new() { Has = Locator(\"a\") })"
+            )
+    , testCase "reverse engineer hasNot" $
+        withChromiumPage $ \page -> do
+          let base = getByText page "Hello" Inexact
+              divLoc = locator page (selectorFromText "div")
+          expectGenerated "hasNot getByText" (selectorOf (filterHasNot base (L.getByText divLoc "bye" Inexact)))
+            ( "getByText('Hello').filter({ hasNot: locator('div').getByText('bye') })"
+            , "get_by_text(\"Hello\").filter(has_not=locator(\"div\").get_by_text(\"bye\"))"
+            , "getByText(\"Hello\").filter(new Locator.FilterOptions().setHasNot(locator(\"div\").getByText(\"bye\")))"
+            , "GetByText(\"Hello\").Filter(new() { HasNot = Locator(\"div\").GetByText(\"bye\") })"
+            )
+          let inner = filterHasNot (locator page (selectorFromText "div")) (locator page (selectorFromText "span"))
+              outer = filterHas (locator page (selectorFromText "section")) inner
+              chained = filterHasNot (filterHasText outer "foo") (locator page (selectorFromText "a"))
+          expectGenerated "hasNot nested" (selectorOf chained)
+            ( "locator('section').filter({ has: locator('div').filter({ hasNot: locator('span') }) }).filter({ hasText: 'foo' }).filter({ hasNot: locator('a') })"
+            , "locator(\"section\").filter(has=locator(\"div\").filter(has_not=locator(\"span\"))).filter(has_text=\"foo\").filter(has_not=locator(\"a\"))"
+            , "locator(\"section\").filter(new Locator.FilterOptions().setHas(locator(\"div\").filter(new Locator.FilterOptions().setHasNot(locator(\"span\"))))).filter(new Locator.FilterOptions().setHasText(\"foo\")).filter(new Locator.FilterOptions().setHasNot(locator(\"a\")))"
+            , "Locator(\"section\").Filter(new() { Has = Locator(\"div\").Filter(new() { HasNot = Locator(\"span\") }) }).Filter(new() { HasText = \"foo\" }).Filter(new() { HasNot = Locator(\"a\") })"
+            )
+    , testCase "reverse engineer has + hasText" $
+        withChromiumPage $ \page -> do
+          let sectionText = filterHasText (locator page (selectorFromText "section")) "foo"
+              combined = childLocator (filterHas sectionText (locator page (selectorFromText "div"))) (selectorFromText "a")
+          expectGenerated "has + hasText" (selectorOf combined)
+            ( "locator('section').filter({ hasText: 'foo' }).filter({ has: locator('div') }).locator('a')"
+            , "locator(\"section\").filter(has_text=\"foo\").filter(has=locator(\"div\")).locator(\"a\")"
+            , "locator(\"section\").filter(new Locator.FilterOptions().setHasText(\"foo\")).filter(new Locator.FilterOptions().setHas(locator(\"div\"))).locator(\"a\")"
+            , "Locator(\"section\").Filter(new() { HasText = \"foo\" }).Filter(new() { Has = Locator(\"div\") }).Locator(\"a\")"
+            )
+    , testCase "reverse engineer frameLocator" $
+        withChromiumPage $ \page -> do
+          let iframeLoc = frameLocator page (selectorFromText "iframe")
+              foo = L.getByText iframeLoc "foo" Exact
+              ownerFrame = childLocator foo (selectorFromText "frame")
+              afterFirst = contentFrame (first ownerFrame)
+              final = childLocator (childFrameLocator afterFirst (selectorFromText "iframe")) (selectorFromText "span")
+          expectGenerated "frameLocator chain" (selectorOf final)
+            ( "locator('iframe').contentFrame().getByText('foo', { exact: true }).locator('frame').first().contentFrame().locator('iframe').contentFrame().locator('span')"
+            , "locator(\"iframe\").content_frame.get_by_text(\"foo\", exact=True).locator(\"frame\").first.content_frame.locator(\"iframe\").content_frame.locator(\"span\")"
+            , "locator(\"iframe\").contentFrame().getByText(\"foo\", new FrameLocator.GetByTextOptions().setExact(true)).locator(\"frame\").first().contentFrame().locator(\"iframe\").contentFrame().locator(\"span\")"
+            , "Locator(\"iframe\").ContentFrame.GetByText(\"foo\", new() { Exact = true }).Locator(\"frame\").First.ContentFrame.Locator(\"iframe\").ContentFrame.Locator(\"span\")"
+            )
+          -- Frame locators with ">>" in the owner selector are not restored back due to ambiguity.
+          let divIframe = childLocator (frameLocator page (selectorFromText "div >> iframe")) (selectorFromText "span")
+          assertEqual
+            "frameLocator with >> owner"
+            "locator('div').locator('iframe').contentFrame().locator('span')"
+            (asLocator JavaScript (selectorOf divIframe))
+    , testCase "reverse engineer frameLocator without a selector" $
+        withChromiumPage $ \page -> do
+          -- The Haskell client has no argument-less frameLocator, so the any-frame
+          -- selector is built directly with `locator`, which is the same selector text.
+          let anyFrame = locator page (selectorFromText "internal:control=any-frame")
+              final = childLocator (L.getByText anyFrame "foo" Inexact) (selectorFromText "span")
+          expectGenerated "frameLocator() chain" (selectorOf final)
+            ( "frameLocator().getByText('foo').locator('span')"
+            , "frame_locator().get_by_text(\"foo\").locator(\"span\")"
+            , "frameLocator().getByText(\"foo\").locator(\"span\")"
+            , "FrameLocator().GetByText(\"foo\").Locator(\"span\")"
+            )
+          assertEqual "any-frame js" "frameLocator()" (asLocator JavaScript "internal:control=any-frame")
+          assertEqual "any-frame py" "frame_locator()" (asLocator Python "internal:control=any-frame")
+          assertEqual "any-frame java" "frameLocator()" (asLocator Java "internal:control=any-frame")
+          assertEqual "any-frame csharp" "FrameLocator()" (asLocator CSharp "internal:control=any-frame")
     ]
+
+-- | The Haskell Locator's selector text, the input to asLocator (upstream `_selector`).
+selectorOf :: Locator -> T.Text
+selectorOf = selectorToText . locatorSelector
+
+-- | Checks the generated code for each language:
+-- (javascript, python, java, csharp), in that order.
+expectGenerated :: MonadIO m => String -> T.Text -> (T.Text, T.Text, T.Text, T.Text) -> m ()
+expectGenerated label sel (js, py, java, cs) = do
+  assertEqual (label <> " javascript") js (asLocator JavaScript sel)
+  assertEqual (label <> " python") py (asLocator Python sel)
+  assertEqual (label <> " java") java (asLocator Java sel)
+  assertEqual (label <> " csharp") cs (asLocator CSharp sel)
 
 assertNotEqual :: String -> T.Text -> T.Text -> IO ()
 assertNotEqual label unexpected actual =
