@@ -839,7 +839,7 @@ module Playwright
   , contextRouteFromHar
   , contextRouteFromHarWith
   , HarNotFound (HarNotFoundAbort, HarNotFoundFallback)
-  , HarRouteOptions (harRouteNotFound, harRouteUrl)
+  , HarRouteOptions (harRouteNotFound, harRouteUrl, harRouteUpdate, harRouteUpdateContent, harRouteUpdateMode)
   , defaultHarRouteOptions
   , routeFetch
   , routeFetchWith
@@ -2192,7 +2192,7 @@ import Playwright.Route
   )
 import Playwright.Har
   ( HarNotFound (HarNotFoundAbort, HarNotFoundFallback)
-  , HarRouteOptions (harRouteNotFound, harRouteUrl)
+  , HarRouteOptions (harRouteNotFound, harRouteUrl, harRouteUpdate, harRouteUpdateContent, harRouteUpdateMode)
   , contextRouteFromHar
   , contextRouteFromHarWith
   , defaultHarRouteOptions
