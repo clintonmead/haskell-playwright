@@ -15,14 +15,19 @@ import Data.Text
   , replace
   )
 import Playwright
-  ( Locator
+  ( Frame
+  , Locator
   , Page
   , Playwright
+  , childFrames
+  , evaluateOnFrameText
   , evaluateOnLocatorText
   , evaluateText
   , hover
   , locator
+  , mainFrame
   , newContext
+  , waitForFunctionOnFrame
   , newPage
   , selectorFromText
   , setContent
@@ -37,6 +42,7 @@ import Playwright.Channel
 import Playwright.Harness
   ( assertBool
   , assertEqual
+  , assertFailure
   , assertProtocolContainsAll
   , withChromiumBrowser
   , withChromiumContext
@@ -81,6 +87,15 @@ generateFor page target expected =
 generateNoText :: Page -> Text -> Playwright Text
 generateNoText page target =
   evaluateOnLocatorText (firstOf page target) noTextFn
+
+generateInFrame :: Frame -> Text -> Playwright Text
+generateInFrame frame target =
+  evaluateOnFrameText frame $
+    "() => { const e = document.querySelector("
+      <> jsString target
+      <> "); return ("
+      <> generatorFn Nothing
+      <> ")(e); }"
 
 -- | Runs a mutation on the first match of a target, like upstream `page.$eval`.
 mutate :: Page -> Text -> Text -> Playwright ()
@@ -350,9 +365,19 @@ tests =
           setContent page "<div></div><div></div><div><input></div>"
           mutate page "div" "(div1) => { const shadowRoot1 = div1.attachShadow({ mode: 'open' }); const input1 = document.createElement('input'); shadowRoot1.appendChild(input1); const divExtra3 = document.createElement('div'); shadowRoot1.append(divExtra3); const div2 = document.createElement('div'); shadowRoot1.append(div2); const shadowRoot2 = div2.attachShadow({ mode: 'open' }); const input2 = document.createElement('input'); input2.setAttribute('value', 'foo'); shadowRoot2.appendChild(input2); return ''; }"
           expectSelector page "input[value=foo]" "internal:role=textbox >> nth=2"
-    -- Skipped: "should work in dynamic iframes without navigation". The generator needs the
-    -- recorder's `window.playwright` helpers in a dynamically attached frame, and the
-    -- emulated `showRecorder` does not expose them there (re-calling it after attach did not help).
+    , testCase "should work in dynamic iframes without navigation" $
+        withChromiumContext $ \ctx page -> do
+          showRecorder ctx
+          setContent page "<div></div>"
+          _ <- evaluateText page "async () => { await new Promise(f => { const iframe = document.createElement('iframe'); iframe.onload = () => { iframe.contentDocument.body.innerHTML = '<div>Target</div>'; f(); }; document.body.appendChild(iframe); }); return 'ok'; }"
+          children <- childFrames (mainFrame page)
+          case children of
+            frame : _ -> do
+              -- The recorder helpers are installed asynchronously in a newly attached frame.
+              _ <- waitForFunctionOnFrame frame "() => !!window.playwright"
+              assertEqual "selector" "internal:text=\"Target\"i" =<< generateInFrame frame "div"
+            [] ->
+              assertFailure "expected a dynamic iframe"
     , testCase "should use the name attributes for elements that can have it" $
         withRecorderPage $ \page -> do
           mapM_
